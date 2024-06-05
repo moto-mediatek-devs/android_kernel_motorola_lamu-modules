@@ -1,0 +1,18 @@
+config OEM_PROJECT
+	 bool "Enable oem project config"
+	default n
+	help
+	  enable oem project config.
+
+config PROJECT_P329A
+	bool "oem project p329a"
+	default n
+	help
+	  config oem project name.
+
+config OEM_DEVINFO
+	tristate "oem_devinfo"
+	depends on PROJECT_P329A
+	default m
+	help
+	  support oem_devinfo

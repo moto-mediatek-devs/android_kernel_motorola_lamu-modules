@@ -112,4 +112,8 @@ obj-y += drivers/media/virtio/
 
 obj-y += drivers/video/backlight/
 
+#TN Begin modified by yang.chen1/860621 20240605 CR/EKLAMU-4
+obj-y += oem/
+#TN End modified by yang.chen1/860621 20240605 CR/EKLAMU-4
+
 endif
