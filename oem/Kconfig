@@ -10,9 +10,16 @@ config PROJECT_P329A
 	help
 	  config oem project name.
 
+config PROJECT_P325A
+       bool "oem project p325a"
+       default n
+       help
+          config oem project name.
+
 config OEM_DEVINFO
-	tristate "oem_devinfo"
-	depends on PROJECT_P329A
-	default m
-	help
-	  support oem_devinfo
+       tristate "oem_devinfo"
+       depends on OEM_PROJECT
+       default m
+       help
+          support oem_devinfo
+

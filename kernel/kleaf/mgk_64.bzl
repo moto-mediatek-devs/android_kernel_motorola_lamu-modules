@@ -1837,6 +1837,9 @@ def get_overlay_modules_list():
     if "p329a_overlay.config" in DEFCONFIG_OVERLAYS:
         mgk_64_device_modules.append("oem/devinfo/oem_devinfo.ko")
 
+    if "p325a_overlay.config" in DEFCONFIG_OVERLAYS:
+        mgk_64_device_modules.append("oem/devinfo/oem_devinfo.ko")
+
     if "mt6761_overlay.config" in DEFCONFIG_OVERLAYS:
         mgk_64_platform_device_modules.update({"drivers/regulator/mt6357-regulator.ko":"mt6761"})
         mgk_64_platform_device_modules.update({"drivers/pinctrl/mediatek/pinctrl-mt6761.ko":"mt6761"})
