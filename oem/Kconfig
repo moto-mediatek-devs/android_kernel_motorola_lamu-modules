@@ -23,3 +23,17 @@ config OEM_DEVINFO
        help
           support oem_devinfo
 
+config OEM_TOUCHSCREEN
+	tristate "oem touch"
+	depends on PROJECT_P325A
+	default m
+	help
+	  support oem_touch
+
+config OEM_PANEL
+	tristate "oem panel"
+	depends on PROJECT_P325A
+	default m
+	help
+	  support oem_panel
+
