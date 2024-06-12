@@ -118,4 +118,5 @@ obj-y += ../$(DEVICE_MODULES_REL_DIR)/drivers/media/virtio/
 obj-y += ../$(DEVICE_MODULES_REL_DIR)/oem/
 #TN End modified by yang.chen1/860621 20240605 CR/EKLAMU-4
 
+obj-y += ../$(DEVICE_MODULES_REL_DIR)/drivers/tinno_charger/
 endif

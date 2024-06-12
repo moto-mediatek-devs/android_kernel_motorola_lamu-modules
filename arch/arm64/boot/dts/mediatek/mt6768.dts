@@ -5089,6 +5089,18 @@ transparent_hugepage=never";
 		enable_fast_charging_indicator;
 	};
 
+	switch_chg_eint: switch_chg_eint {
+	};
+
+	pd_eint: pd_eint {
+	};
+
+	cp_chg_eint: cp_chg_eint {
+	};
+
+	qc_eint: qc_eint {
+	};
+
 	mtk_ctd: mtk_ctd {
 		compatible = "mediatek,mtk_ctd";
 		nr-port = <1>;
@@ -5106,7 +5118,7 @@ transparent_hugepage=never";
 	extcon_usb: extcon_usb {
 		compatible = "mediatek,extcon-usb";
 		charger = <&mt6370_chg>;
-		vbus-supply = <&otg_vbus>;
+		//vbus-supply = <&otg_vbus>;
 		vbus-voltage = <5000000>;
 		vbus-current = <1800000>;
 		tcpc = "type_c_port0";

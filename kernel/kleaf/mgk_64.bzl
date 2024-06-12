@@ -1890,6 +1890,11 @@ def get_overlay_modules_list():
         mgk_64_device_modules.append("oem/devinfo/oem_devinfo.ko")
         mgk_64_device_modules.append("drivers/gpu/drm/panel/panel-djin-ft8057s-vdo.ko")
         mgk_64_device_modules.append("oem/touchscreen/ILITEK9883C/tp_ilitek.ko")
+        mgk_64_device_modules.append("drivers/tinno_charger/oem_tinno_charger.ko")
+        mgk_64_device_modules.append("drivers/tinno_charger/switch_charger/sc89890h/sc89890h.ko")
+        mgk_64_device_modules.append("drivers/tinno_charger/switch_charger/sgm41542/sgm41542.ko")
+        mgk_64_device_modules.append("drivers/tinno_charger/typec/aw35616/aw35616.ko")
+        mgk_64_device_modules.append("drivers/tinno_charger/typec/husb320/husb320.ko")
 
     if "mt6761_overlay.config" in DEFCONFIG_OVERLAYS:
         mgk_64_platform_device_modules.update({"drivers/regulator/mt6357-regulator.ko":"mt6761"})

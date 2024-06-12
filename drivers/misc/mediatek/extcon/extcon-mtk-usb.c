@@ -22,6 +22,8 @@
 #include <linux/proc_fs.h>
 
 #include "extcon-mtk-usb.h"
+#include "charger_class.h"
+static struct charger_device *primary_charger = NULL;
 
 #if IS_ENABLED(CONFIG_TCPC_CLASS)
 #include "tcpm.h"
@@ -107,6 +109,8 @@ static bool usb_is_online(struct mtk_extcon_info *extcon)
 	union power_supply_propval pval;
 	union power_supply_propval tval;
 	int ret;
+
+	return true;
 
 	ret = power_supply_get_property(extcon->usb_psy,
 				POWER_SUPPLY_PROP_ONLINE, &pval);
@@ -200,9 +204,33 @@ fail:
 	return ret;
 }
 
+static int mtk_usb_extcon_set_vbus_v1(struct mtk_extcon_info *extcon, bool is_on)
+{
+	struct device *dev = extcon->dev;
+
+	if (!primary_charger) {
+		primary_charger = get_charger_by_name("primary_chg");
+		if (!primary_charger) {
+			dev_info(dev, "%s : get primary charger device failed\n", __func__);
+			return -ENODEV;
+		}
+	}
+
+	if (is_on) {
+		charger_dev_enable_otg(primary_charger, true);
+	} else {
+		charger_dev_enable_otg(primary_charger, false);
+	}
+	return 0;
+}
+
 static int mtk_usb_extcon_set_vbus(struct mtk_extcon_info *extcon,
 							bool is_on)
 {
+	int ret;
+#if 1
+	ret = mtk_usb_extcon_set_vbus_v1(extcon, is_on);
+#else
 	struct regulator *vbus = extcon->vbus;
 	struct device *dev = extcon->dev;
 	int ret;
@@ -244,10 +272,11 @@ static int mtk_usb_extcon_set_vbus(struct mtk_extcon_info *extcon,
 	}
 
 	extcon->vbus_on = is_on;
-
-	return 0;
+#endif
+	return ret;
 }
 
+#if 0
 static ssize_t vbus_limit_cur_show(struct device *dev,
 				   struct device_attribute *attr, char *buf)
 {
@@ -335,9 +364,12 @@ static ssize_t vbus_switch_store(struct device *dev,
 }
 
 static DEVICE_ATTR_RW(vbus_switch);
+#endif
 
 static int mtk_usb_extcon_vbus_init(struct mtk_extcon_info *extcon)
 {
+	return 0;
+#if 0
 	int ret = 0;
 	struct device *dev = extcon->dev;
 
@@ -381,9 +413,9 @@ static int mtk_usb_extcon_vbus_init(struct mtk_extcon_info *extcon)
 	ret = device_create_file(dev, &dev_attr_vbus_switch);
 	if (ret)
 		dev_info(dev, "failed to create vbus switch node\n");
-
 fail:
 	return ret;
+#endif
 }
 
 #if IS_ENABLED(CONFIG_TCPC_CLASS)

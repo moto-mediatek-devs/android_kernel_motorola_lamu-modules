@@ -64,6 +64,17 @@ struct charger_device {
 
 enum charger_property {
 	CHARGER_PROP_BLEED_DISCHARGE,
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	CHARGER_PROP_CHARGER_ENABLED,
+	CHARGER_PROP_CHARGER_EXIST,
+	CHARGER_PROP_CHARGER_VOLTAGE,
+	CHARGER_PROP_CHARGER_PROP_STATUS,
+	CHARGER_PROP_CHARGER_TYPE,
+	CHARGER_PROP_VBAT,
+	CHARGER_PROP_IBAT,
+	CHARGER_PROP_VBUS,
+	CHARGER_PROP_IBUS,
+ #endif
 };
 
 union charger_propval {
@@ -92,6 +103,10 @@ struct charger_ops {
 	int (*set_charging_current)(struct charger_device *dev, u32 uA);
 	int (*get_min_charging_current)(struct charger_device *dev, u32 *uA);
 
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	int (*set_dp)(struct charger_device *dev, u32 uV);
+	int (*set_dm)(struct charger_device *dev, u32 uV);
+#endif
 	/* set cv */
 	int (*set_constant_voltage)(struct charger_device *dev, u32 uV);
 	int (*get_constant_voltage)(struct charger_device *dev, u32 *uV);

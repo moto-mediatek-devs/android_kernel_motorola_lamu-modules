@@ -116,4 +116,5 @@ obj-y += drivers/video/backlight/
 obj-y += oem/
 #TN End modified by yang.chen1/860621 20240605 CR/EKLAMU-4
 
+obj-y += drivers/tinno_charger/
 endif

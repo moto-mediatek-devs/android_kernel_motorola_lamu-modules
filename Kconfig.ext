@@ -127,3 +127,4 @@ source "$(KCONFIG_EXT_PREFIX)/drivers/video/backlight/Kconfig"
 #TN Begin modified by yang.chen1/860621 20240605 CR/EKLAMU-4
 source "$(KCONFIG_EXT_PREFIX)/oem/Kconfig"
 #TN End modified by yang.chen1/860621 20240605 CR/EKLAMU-4
+source "$(KCONFIG_EXT_PREFIX)/drivers/tinno_charger/Kconfig"

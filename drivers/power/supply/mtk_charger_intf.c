@@ -278,7 +278,7 @@ static int get_pmic_vbus(struct mtk_charger *info, int *vchr)
 	static struct power_supply *chg_psy;
 	int ret;
 
-	chg_psy = power_supply_get_by_name("mtk_charger_type");
+	chg_psy = power_supply_get_by_name("primary_chg");
 	if (chg_psy == NULL || IS_ERR(chg_psy)) {
 		chr_err("%s Couldn't get chg_psy\n", __func__);
 		ret = -1;
