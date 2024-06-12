@@ -85,9 +85,9 @@
 	};
 	led6:led@6 {
 		compatible = "mediatek,lcd-backlight";
-		led_mode = <5>;
+		led_mode = <4>;
 		data = <1>;
-		pwm_config = <0 3 0 0 0>;
+		pwm_config = <0 0 0 0 0>;
 	};
 	vibrator0:vibrator@0 {
 		compatible = "mediatek,vibrator";
@@ -270,11 +270,14 @@
 	#address-cells = <1>;
 	#size-cells = <0>;
 	panel1@0 {
-		compatible = "hx83112b,auo,cmd";
+		compatible = "djin,ft8057s,vdo";
 		reg = <0>;
-		pm-enable-gpios = <&pio 12 0>;
+
+		vddio-gpios = <&pio 12 0>;
 		reset-gpios = <&pio 45 0>;
-		gate-ic = <4831>;
+		bias-gpios = <&pio 20 0>,
+		<&pio 151 0>;
+		//gate-ic = <4831>;
 		pinctrl-names = "default";
 		port {
 			panel_in1: endpoint {

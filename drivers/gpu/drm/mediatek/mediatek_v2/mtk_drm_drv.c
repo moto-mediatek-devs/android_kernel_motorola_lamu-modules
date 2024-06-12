@@ -8994,7 +8994,7 @@ static int mtk_drm_se_enable(struct drm_device *dev, struct mtk_drm_crtc *mtk_cr
 
 static int mtk_drm_se_plane_config(struct mtk_drm_crtc *mtk_crtc)
 {
-	int index = drm_crtc_index(&mtk_crtc->base);
+	//int index = drm_crtc_index(&mtk_crtc->base);
 	struct cmdq_pkt *cmdq_handle;
 	struct mtk_ddp_comp *comp;
 	int i = 0, ret;
@@ -9035,6 +9035,7 @@ static int mtk_drm_se_plane_config(struct mtk_drm_crtc *mtk_crtc)
 		    mtk_crtc->se_plane[i].state.comp_state.comp_id != 0) {
 			comp = mtk_crtc_get_plane_comp(&mtk_crtc->base,
 				&mtk_crtc->se_plane[i].state);
+#if 0
 			DDPINFO("se crtc%d i%d comp%d,layer%d,size(%d %d %d %d)addr0x%lx\n",
 				index, i, mtk_crtc->se_plane[i].state.comp_state.comp_id,
 				mtk_crtc->se_plane[i].state.comp_state.lye_id,
@@ -9042,7 +9043,8 @@ static int mtk_drm_se_plane_config(struct mtk_drm_crtc *mtk_crtc)
 				mtk_crtc->se_plane[i].state.pending.dst_y,
 				mtk_crtc->se_plane[i].state.pending.width,
 				mtk_crtc->se_plane[i].state.pending.height,
-				mtk_crtc->se_plane[i].state.pending.addr);
+				(mtk_crtc->se_plane[i].state.pending.addr));
+#endif
 			//pts
 			if (mtk_crtc->se_plane[i].state.pending.pts != 0) {
 				DDPINFO("LATENCY_TEST %s t=%lld", __func__,
@@ -9215,11 +9217,11 @@ static int mtk_drm_set_ovl_layer(struct drm_device *dev, void *data,
 
 	switch (layer_info->panel_id) {
 	case MTK_PANEL_DSI0_0:
-		#if (CONFIG_MTK_MULTI_DSI_PATH == 2)
-		state->comp_state.comp_id = DDP_COMPONENT_OVL0;
-		#else
+		//#if (CONFIG_MTK_MULTI_DSI_PATH == 2)
+		//state->comp_state.comp_id = DDP_COMPONENT_OVL0;
+		//#else
 		state->comp_state.comp_id = DDP_COMPONENT_OVL_EXDMA3;
-		#endif
+		//#endif
 		break;
 	case MTK_PANEL_DSI0_1:
 		state->comp_state.comp_id = DDP_COMPONENT_OVL0_2L;
@@ -9340,7 +9342,7 @@ static int mtk_drm_map_dma_buf(struct drm_device *dev, void *data,
 
 	dma_map->mva = mva;
 
-	DDPINFO("dma fd is %d mva 0x%lx\n", dma_map->fd, dma_map->mva);
+	//DDPINFO("dma fd is %d mva 0x%lx\n", dma_map->fd, dma_map->mva);
 
 	list_add_tail(&map_list->list, &dma_map_list.list);
 

@@ -1839,6 +1839,7 @@ def get_overlay_modules_list():
 
     if "p325a_overlay.config" in DEFCONFIG_OVERLAYS:
         mgk_64_device_modules.append("oem/devinfo/oem_devinfo.ko")
+        mgk_64_device_modules.append("drivers/gpu/drm/panel/panel-djin-ft8057s-vdo.ko")
 
     if "mt6761_overlay.config" in DEFCONFIG_OVERLAYS:
         mgk_64_platform_device_modules.update({"drivers/regulator/mt6357-regulator.ko":"mt6761"})
