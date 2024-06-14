@@ -19,6 +19,14 @@ ifneq (, $(filter $(strip $(CONFIG_MTK_CAMERA_FD_ISP6S)),m y))
   $(info fdvt tina)
 endif
 
+ifneq (, $(filter $(strip $(CONFIG_MTK_CAMERA_FD_ISP6S_V1)),m y))
+  $(info FDVT: Drv use 5.1 V1 folder)
+  MTKCAM_FDVT_VERSION := 5.1
+  MTKCAM_FDVT_PATH := $(MTK_CUSTOM_PATH)/cameraisp/fdvt/6781
+  subdir-ccflags-y += -I$(MTK_CUSTOM_PATH)/cameraisp/fdvt/6781/inc
+  $(info 6781 fdvt tina)
+endif
+
 ifneq (, $(filter $(strip $(CONFIG_MTK_CAMERA_FD_VERSION35)),m y))
   $(info FDVT: Drv use 3.5 folder)
   MTKCAM_FDVT_VERSION := 3.5
@@ -41,7 +49,7 @@ ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/staging/android/ion \
 	     -I$(DEVICE_MODULES_PATH)/drivers/staging/android/ion/mtk
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/include/
 
-ifeq ($(strip $(CONFIG_MTK_CAM_SECURE_FD_SUPPORT)),y)
+ifneq (, $(filter $(strip $(CONFIG_MTK_CAM_SECURE_FD_SUPPORT)),m y))
 ccflags-y += -DCMDQ_MTEE
 endif
 
@@ -50,6 +58,11 @@ endif
 ifneq (, $(filter $(strip $(CONFIG_MTK_CAMERA_FD_ISP6S)),m y))
 obj-$(CONFIG_MTK_CAMERA_FD_ISP6S) += camera_fdvt_isp51.o
 camera_fdvt_isp51-objs += 5.1/camera_fdvt.o
+endif
+
+ifneq (, $(filter $(strip $(CONFIG_MTK_CAMERA_FD_ISP6S_V1)),m y))
+obj-$(CONFIG_MTK_CAMERA_FD_ISP6S_V1) += camera_fdvt_isp51_v1.o
+camera_fdvt_isp51_v1-objs += 6781/camera_fdvt.o
 endif
 
 ifneq (, $(filter $(strip $(CONFIG_MTK_CAMERA_FD_VERSION40)),m y))

@@ -270,8 +270,8 @@ static void mt6681_get_hw_ver(struct mt6681_priv *priv)
 	priv->hw_ver = id;
 	priv->hw_ecid = ecid << 31 | ecid2;
 
-	pr_info("MT6681_ID : %s() mt6681 hw_id =%d, hw_ver= %d, ecid = %lx%lx  (%llx)\n",
-		__func__, priv->hw_ver, ver, ecid, ecid2, priv->hw_ecid);
+	pr_info("MT6681_ID : %s() mt6681 hw_id =%d, hw_ver= %d, ecid = %lx%lx  (%llx), ret %d\n",
+		__func__, priv->hw_ver, ver, ecid, ecid2, priv->hw_ecid, ret);
 }
 
 #ifdef NLE_IMP
@@ -1663,13 +1663,6 @@ void mt6681_set_mtkaif_calibration_phase(struct snd_soc_component *cmpnt,
 }
 EXPORT_SYMBOL_GPL(mt6681_set_mtkaif_calibration_phase);
 
-static const char *const dl_pga_gain[] = {
-	"8Db",  "7Db",  "6Db",  "5Db",  "4Db",   "3Db",  "2Db",
-	"1Db",  "0Db",  "-1Db", "-2Db", "-3Db",  "-4Db", "-5Db",
-	"-6Db", "-7Db", "-8Db", "-9Db", "-10Db", "-40Db"};
-
-static const char *const hp_dl_pga_gain[] = {"9Db", "6Db", "3Db", "0Db"};
-
 static void hp_aux_feedback_loop_gain_ramp(struct mt6681_priv *priv, bool up)
 {
 	unsigned int i = 0, stage = 0;
@@ -2669,49 +2662,49 @@ static const struct snd_kcontrol_new vow_dmic3_mux_control =
 	SOC_DAPM_ENUM("VOW_DMIC_MUX Select", vow_dmic3_mux_map_enum);
 
 /* VOW ADC MUX */
-static const char *const vow_adc_mux_map[] = {"VOW_ONLY", "VOW_SHARE"};
+static const char *const vow_adc_mux_map[] = {"VOW_INIT", "VOW_ONLY", "VOW_SHARE"};
 
 static int vow_adc_mux_map_value[] = {
-	0x0, 0x1
+	0x0, 0x1, 0x2
 };
 
 static SOC_VALUE_ENUM_SINGLE_DECL(vow_adc_l_mux_map_enum,
-				  SND_SOC_NOPM, 0, 0,
+				  SND_SOC_NOPM, 0, 0x3,
 				  vow_adc_mux_map, vow_adc_mux_map_value);
 
 static const struct snd_kcontrol_new vow_adc_l_mux_control =
 	SOC_DAPM_ENUM("VOW_ADC_MUX Select", vow_adc_l_mux_map_enum);
 
 static SOC_VALUE_ENUM_SINGLE_DECL(vow_adc_r_mux_map_enum,
-				  SND_SOC_NOPM, 0, 0,
+				  SND_SOC_NOPM, 0, 0x3,
 				  vow_adc_mux_map, vow_adc_mux_map_value);
 
 static const struct snd_kcontrol_new vow_adc_r_mux_control =
 	SOC_DAPM_ENUM("VOW_ADC_MUX Select", vow_adc_r_mux_map_enum);
 
 static SOC_VALUE_ENUM_SINGLE_DECL(vow_adc_3_mux_map_enum,
-				  SND_SOC_NOPM, 0, 0,
+				  SND_SOC_NOPM, 0, 0x3,
 				  vow_adc_mux_map, vow_adc_mux_map_value);
 
 static const struct snd_kcontrol_new vow_adc_3_mux_control =
 	SOC_DAPM_ENUM("VOW_ADC_MUX Select", vow_adc_3_mux_map_enum);
 
 static SOC_VALUE_ENUM_SINGLE_DECL(vow_adc_4_mux_map_enum,
-				  SND_SOC_NOPM, 0, 0,
+				  SND_SOC_NOPM, 0, 0x3,
 				  vow_adc_mux_map, vow_adc_mux_map_value);
 
 static const struct snd_kcontrol_new vow_adc_4_mux_control =
 	SOC_DAPM_ENUM("VOW_ADC_MUX Select", vow_adc_4_mux_map_enum);
 
 static SOC_VALUE_ENUM_SINGLE_DECL(vow_adc_5_mux_map_enum,
-				  SND_SOC_NOPM, 0, 0,
+				  SND_SOC_NOPM, 0, 0x3,
 				  vow_adc_mux_map, vow_adc_mux_map_value);
 
 static const struct snd_kcontrol_new vow_adc_5_mux_control =
 	SOC_DAPM_ENUM("VOW_ADC_MUX Select", vow_adc_5_mux_map_enum);
 
 static SOC_VALUE_ENUM_SINGLE_DECL(vow_adc_6_mux_map_enum,
-				  SND_SOC_NOPM, 0, 0,
+				  SND_SOC_NOPM, 0, 0x3,
 				  vow_adc_mux_map, vow_adc_mux_map_value);
 
 static const struct snd_kcontrol_new vow_adc_6_mux_control =
@@ -2727,7 +2720,7 @@ static int vow_cic_mux_map_value[] = {
 };
 
 static SOC_VALUE_ENUM_SINGLE_DECL(vow_cic_mux_map_enum,
-				  SND_SOC_NOPM, 0, 0,
+				  SND_SOC_NOPM, 0, 0x1,
 				  vow_cic_mux_map, vow_cic_mux_map_value);
 
 static const struct snd_kcontrol_new vow_cic_mux_control =
@@ -8156,14 +8149,13 @@ static int mt_adc_l_event(struct snd_soc_dapm_widget *w,
 					"%s(), adc_l calibration fail, resetting...\n",
 					__func__);
 				/* Disable audio L ADC */
-				regmap_write(priv->regmap, MT6681_AUDENC_PMU_CON0, 0x0);
-				regmap_write(priv->regmap, MT6681_AUDENC_PMU_CON1, 0x0);
+				regmap_update_bits(priv->regmap, MT6681_AUDENC_PMU_CON1,
+						   RG_AUDADCLPWRUP_MASK_SFT,
+						   0x0 << RG_AUDADCLPWRUP_SFT);
 				/* Enable audio L ADC */
-				regmap_write(priv->regmap, MT6681_AUDENC_PMU_CON0, 0x4);
-				regmap_write(priv->regmap, MT6681_AUDENC_PMU_CON0, 0x6);
-				regmap_write(priv->regmap, MT6681_AUDENC_PMU_CON0, 0x7);
-				regmap_write(priv->regmap, MT6681_AUDENC_PMU_CON1, 0x40);
-				regmap_write(priv->regmap, MT6681_AUDENC_PMU_CON1, 0x50);
+				regmap_update_bits(priv->regmap, MT6681_AUDENC_PMU_CON1,
+						   RG_AUDADCLPWRUP_MASK_SFT,
+						   0x1 << RG_AUDADCLPWRUP_SFT);
 				usleep_range(500, 520);
 				regmap_read(priv->regmap, MT6681_AUDENC_PMU_CON32,
 					    &rc_tune);
@@ -8607,14 +8599,13 @@ static int mt_adc_r_event(struct snd_soc_dapm_widget *w,
 					 "%s(), adc_r calibration fail, resetting...\n",
 					 __func__);
 				/* Disable audio R ADC */
-				regmap_write(priv->regmap, MT6681_AUDENC_PMU_CON2, 0x0);
-				regmap_write(priv->regmap, MT6681_AUDENC_PMU_CON3, 0x0);
+				regmap_update_bits(priv->regmap, MT6681_AUDENC_PMU_CON3,
+						   RG_AUDADCRPWRUP_MASK_SFT,
+						   0x0 << RG_AUDADCRPWRUP_SFT);
 				/* Enable audio R ADC */
-				regmap_write(priv->regmap, MT6681_AUDENC_PMU_CON2, 0x84);
-				regmap_write(priv->regmap, MT6681_AUDENC_PMU_CON2, 0x86);
-				regmap_write(priv->regmap, MT6681_AUDENC_PMU_CON2, 0x87);
-				regmap_write(priv->regmap, MT6681_AUDENC_PMU_CON3, 0x40);
-				regmap_write(priv->regmap, MT6681_AUDENC_PMU_CON3, 0x50);
+				regmap_update_bits(priv->regmap, MT6681_AUDENC_PMU_CON3,
+						   RG_AUDADCRPWRUP_MASK_SFT,
+						   0x1 << RG_AUDADCRPWRUP_SFT);
 				usleep_range(500, 520);
 				regmap_read(priv->regmap, MT6681_AUDENC_PMU_CON33,
 					    &rc_tune);
@@ -12331,14 +12322,10 @@ static int mt_sdm_event(struct snd_soc_dapm_widget *w,
 {
 	struct snd_soc_component *cmpnt = snd_soc_dapm_to_component(w->dapm);
 	struct mt6681_priv *priv = snd_soc_component_get_drvdata(cmpnt);
-	unsigned int rate = 0;
 
 	dev_info(priv->dev, "%s() dl sample_rate = %d", __func__,
 		priv->dl_rate[0]);
-	if (priv->dl_rate[0] != 0)
-		rate = mt6681_dlsrc_rate_transform(priv->dl_rate[0]);
-	else
-		rate = MT6681_DLSRC_48000HZ;
+
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
 		/* select 12bit 2nd SDM  */
@@ -13757,6 +13744,7 @@ static const struct snd_soc_dapm_widget mt6681_dapm_widgets[] = {
 	SND_SOC_DAPM_INPUT("AIN3_DMIC"), SND_SOC_DAPM_INPUT("AIN4_DMIC"),
 
 #if IS_ENABLED(CONFIG_MTK_VOW_SUPPORT)
+	SND_SOC_DAPM_INPUT("AIN_EMPTY"),
 	SND_SOC_DAPM_INPUT("AIN_VIRTUAL"),
 	SND_SOC_DAPM_INPUT("VOW_PBUF_SRC"),
 	SND_SOC_DAPM_INPUT("VOW_LEGACY_CIC"),
@@ -14234,16 +14222,22 @@ static const struct snd_soc_dapm_route mt6681_dapm_routes[] = {
 	{"VOW_AMIC3_MUX", "ADC_DATA_3", "VOW_ADC_4_MUX"},
 	{"VOW_AMIC3_MUX", "ADC_DATA_4", "VOW_ADC_5_MUX"},
 	{"VOW_AMIC3_MUX", "ADC_DATA_5", "VOW_ADC_6_MUX"},
+	{"VOW_ADC_L_MUX", "VOW_INIT", "AIN_EMPTY"},
 	{"VOW_ADC_L_MUX", "VOW_SHARE", "AIN_VIRTUAL"},
 	{"VOW_ADC_L_MUX", "VOW_ONLY", "ADC_L"},
+	{"VOW_ADC_R_MUX", "VOW_INIT", "AIN_EMPTY"},
 	{"VOW_ADC_R_MUX", "VOW_SHARE", "AIN_VIRTUAL"},
 	{"VOW_ADC_R_MUX", "VOW_ONLY", "ADC_R"},
+	{"VOW_ADC_3_MUX", "VOW_INIT", "AIN_EMPTY"},
 	{"VOW_ADC_3_MUX", "VOW_SHARE", "AIN_VIRTUAL"},
 	{"VOW_ADC_3_MUX", "VOW_ONLY", "ADC_3"},
+	{"VOW_ADC_4_MUX", "VOW_INIT", "AIN_EMPTY"},
 	{"VOW_ADC_4_MUX", "VOW_SHARE", "AIN_VIRTUAL"},
 	{"VOW_ADC_4_MUX", "VOW_ONLY", "ADC_4"},
+	{"VOW_ADC_5_MUX", "VOW_INIT", "AIN_EMPTY"},
 	{"VOW_ADC_5_MUX", "VOW_SHARE", "AIN_VIRTUAL"},
 	{"VOW_ADC_5_MUX", "VOW_ONLY", "ADC_5"},
+	{"VOW_ADC_6_MUX", "VOW_INIT", "AIN_EMPTY"},
 	{"VOW_ADC_6_MUX", "VOW_SHARE", "AIN_VIRTUAL"},
 	{"VOW_ADC_6_MUX", "VOW_ONLY", "ADC_6"},
 	{"AIN_VIRTUAL", NULL, "VOW_HDR_CONCURRENT"},
@@ -17679,19 +17673,15 @@ static int mt6681_hwgain_set(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *cmpnt = snd_soc_kcontrol_component(kcontrol);
 	struct mt6681_priv *priv = snd_soc_component_get_drvdata(cmpnt);
-	int gain = 0;
+	int gain = ucontrol->value.integer.value[0];
 
-	dev_info(priv->dev, "%s(), DB = %ld\n",
-	 __func__, ucontrol->value.integer.value[0]);
-
-	gain = ucontrol->value.integer.value[0] + 64;
+	dev_info(priv->dev, "%s(), gain_index = %d\n", __func__, gain);
 
 	if (gain >= ARRAY_SIZE(kHWGainMap)) {
 		dev_info(priv->dev, "%s(), return -EINVAL\n", __func__);
 		return -EINVAL;
 	}
 	priv->dl_hwgain = kHWGainMap[gain];
-
 
 	return 0;
 }
@@ -19134,8 +19124,8 @@ static void codec_write_reg(struct mt6681_priv *priv, void *arg)
 			 __func__, reg_addr, reg_value);
 		regmap_write(priv->regmap, reg_addr, reg_value);
 		regmap_read(priv->regmap, reg_addr, &reg_value);
-		dev_info(priv->dev, "%s(), reg_addr = 0x%x, reg_value = 0x%x\n",
-			 __func__, reg_addr, reg_value);
+		dev_info(priv->dev, "%s(), reg_addr = 0x%x, reg_value = 0x%x, ret %d\n",
+			 __func__, reg_addr, reg_value, ret);
 	} else {
 		dev_info(priv->dev, "token1 or token2 is NULL!\n");
 	}

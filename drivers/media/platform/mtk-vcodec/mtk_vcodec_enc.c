@@ -1742,18 +1742,21 @@ static int vidioc_venc_s_fmt_cap(struct file *file, void *priv,
 		q_data->sizeimage[i] = plane_fmt->sizeimage;
 	}
 
+	mutex_lock(&ctx->init_lock);
 	if (mtk_vcodec_is_state(ctx, MTK_STATE_FREE)) {
 		ret = venc_if_init(ctx, q_data->fmt->fourcc);
 		if (ret) {
 			mtk_v4l2_err("venc_if_init failed=%d, codec type=%s(0x%x)",
 				ret, FOURCC_STR(q_data->fmt->fourcc), q_data->fmt->fourcc);
 			mtk_venc_error_handle(ctx);
+			mutex_unlock(&ctx->init_lock);
 			return -EBUSY;
 		}
 		mtk_vcodec_set_state_from(ctx, MTK_STATE_INIT, MTK_STATE_FREE);
 	}
 	// format change, trigger encode header
 	mtk_vcodec_set_state_from(ctx, MTK_STATE_INIT, MTK_STATE_STOP);
+	mutex_unlock(&ctx->init_lock);
 
 	return 0;
 }
@@ -2925,6 +2928,15 @@ err_set_param:
 		}
 	}
 
+	mutex_lock(&ctx->buf_lock);
+	if (q->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE)
+		while (v4l2_m2m_dst_buf_remove(ctx->m2m_ctx))
+			;
+	else
+		while (v4l2_m2m_src_buf_remove(ctx->m2m_ctx))
+			;
+	mutex_unlock(&ctx->buf_lock);
+
 	return ret;
 }
 
@@ -3056,7 +3068,7 @@ static int mtk_venc_encode_header(void *priv)
 {
 	struct mtk_vcodec_ctx *ctx = priv;
 	int ret;
-	struct vb2_buffer *src_buf, *dst_buf;
+	struct vb2_buffer *dst_buf;
 	struct vb2_v4l2_buffer *dst_vb2_v4l2, *src_vb2_v4l2;
 	struct mtk_video_enc_buf *dst_buf_info;
 	struct mtk_vcodec_mem *bs_buf;
@@ -3111,9 +3123,7 @@ static int mtk_venc_encode_header(void *priv)
 	}
 	src_vb2_v4l2 = v4l2_m2m_next_src_buf(ctx->m2m_ctx);
 	if (src_vb2_v4l2) {
-		src_buf = &src_vb2_v4l2->vb2_buf;
-		dst_vb2_v4l2->vb2_buf.timestamp =
-			src_vb2_v4l2->vb2_buf.timestamp;
+		dst_vb2_v4l2->vb2_buf.timestamp = src_vb2_v4l2->vb2_buf.timestamp;
 		dst_vb2_v4l2->timecode = src_vb2_v4l2->timecode;
 	} else
 		mtk_v4l2_err("No timestamp for the header buffer.");
@@ -3436,12 +3446,11 @@ static void mtk_venc_worker(struct work_struct *work)
 {
 	struct mtk_vcodec_ctx *ctx = container_of(work, struct mtk_vcodec_ctx,
 					encode_work);
-	struct mtk_q_data *q_data_src = &ctx->q_data[MTK_Q_DATA_SRC];
 	struct vb2_buffer *src_buf, *dst_buf;
 	struct venc_frm_buf *pfrm_buf;
 	struct mtk_vcodec_mem *pbs_buf;
 	struct venc_done_result enc_result;
-	int ret, i, length;
+	int ret, i;
 	struct vb2_v4l2_buffer *dst_vb2_v4l2, *src_vb2_v4l2, *pend_src_vb2_v4l2;
 	struct mtk_video_enc_buf *dst_buf_info, *src_buf_info;
 
@@ -3607,7 +3616,6 @@ static void mtk_venc_worker(struct work_struct *work)
 	pfrm_buf->timestamp = src_vb2_v4l2->vb2_buf.timestamp;
 	pfrm_buf->index = src_buf->index;
 	ctx->fb_list[pfrm_buf->index + 1] = (uintptr_t)pfrm_buf;
-	length = q_data_src->coded_width * q_data_src->coded_height;
 
 	mtk_v4l2_debug(2,
 			"Framebuf %d VA=%p PA=%llx Size=0x%zx Offset=%d;VA=%p PA=0x%llx Size=0x%zx Offset=%d;VA=%p PA=0x%llx Size=%zu Offset=%d",

@@ -1105,8 +1105,10 @@ static void mtk_atomic_doze_update_pq(struct drm_crtc *crtc, unsigned int stage,
 		DDPPR_ERR("failed to flush user_cmd\n");
 
 #ifndef DRM_CMDQ_DISABLE
-	if (bypass)
+	if (bypass) {
+		cmdq_mbox_stop(client); /* Before power off need stop first */
 		cmdq_mbox_disable(client->chan); /* GCE clk refcnt - 1 */
+	}
 #endif
 }
 
@@ -2580,10 +2582,6 @@ static const enum mtk_ddp_comp_id mt6877_mtk_ddp_main_minor_sub[] = {
 	DDP_COMPONENT_DSI0,     DDP_COMPONENT_PWM0,
 };
 
-static const struct mtk_addon_module_data addon_wdma0_ovl_data[] = {
-	{DISP_WDMA0, ADDON_AFTER, DDP_COMPONENT_OVL0},
-};
-
 static const struct mtk_addon_scenario_data mt6877_addon_main[ADDON_SCN_NR] = {
 		[NONE] = {
 				.module_num = 0,
@@ -2597,16 +2595,6 @@ static const struct mtk_addon_scenario_data mt6877_addon_main[ADDON_SCN_NR] = {
 		[TWO_SCALING] = {
 				.module_num = ARRAY_SIZE(addon_rsz_data),
 				.module_data = addon_rsz_data,
-				.hrt_type = HRT_TB_TYPE_GENERAL1,
-			},
-		[WDMA_WRITE_BACK] = {
-				.module_num = ARRAY_SIZE(addon_wdma0_data),
-				.module_data = addon_wdma0_data,
-				.hrt_type = HRT_TB_TYPE_GENERAL1,
-			},
-		[WDMA_WRITE_BACK_OVL] = {
-				.module_num = ARRAY_SIZE(addon_wdma0_ovl_data),
-				.module_data = addon_wdma0_ovl_data,
 				.hrt_type = HRT_TB_TYPE_GENERAL1,
 			},
 };
@@ -3771,6 +3759,10 @@ static const struct mtk_addon_module_data mt6991_addon_wdma0_data[] = {
 	{DISP_WDMA0_v6, ADDON_AFTER, DDP_COMPONENT_SPLITTER0_OUT_CB9},
 };
 
+static const struct mtk_addon_module_data mt6991_addon_mid_wdma_data[] = {
+	{DISP_WDMA_MID, ADDON_AFTER, DDP_COMPONENT_PQ0_OUT_CB0},
+};
+
 static const struct mtk_addon_module_data mt6989_addon_ovl_ufbc_wdma0_data[] = {
 	/* Leroy IWB */
 	{DISP_OVLSYS_UFBC_WDMA0, ADDON_AFTER, DDP_COMPONENT_OVL2_2L},
@@ -3786,6 +3778,10 @@ static const struct mtk_addon_module_data mt6985_addon_ovlsys_wdma0_data[] = {
 
 static const struct mtk_addon_module_data mt6989_addon_ovlsys_wdma0_data[] = {
 	{DISP_OVLSYS_WDMA0_v2, ADDON_AFTER, DDP_COMPONENT_OVL2_2L},
+};
+
+static const struct mtk_addon_module_data mt6991_addon_ovlsys_wdma0_data[] = {
+	{DISP_OVLSYS_WDMA0_v3, ADDON_AFTER, DDP_COMPONENT_OVL0_OUTPROC0},
 };
 
 static const struct mtk_addon_module_data mt6985_addon_ovlsys_wdma2_data[] = {
@@ -4281,6 +4277,15 @@ static const struct mtk_addon_scenario_data mt6991_addon_main[ADDON_SCN_NR] = {
 	[WDMA_WRITE_BACK] = {
 		.module_num = ARRAY_SIZE(mt6991_addon_wdma0_data),
 		.module_data = mt6991_addon_wdma0_data,
+		.hrt_type = HRT_TB_TYPE_GENERAL1,
+	},
+	[WDMA_WRITE_BACK_MID] = {
+		.module_num = ARRAY_SIZE(mt6991_addon_mid_wdma_data),
+		.module_data = mt6991_addon_mid_wdma_data,
+	},
+	[WDMA_WRITE_BACK_OVL] = {
+		.module_num = ARRAY_SIZE(mt6991_addon_ovlsys_wdma0_data),
+		.module_data = mt6991_addon_ovlsys_wdma0_data,
 		.hrt_type = HRT_TB_TYPE_GENERAL1,
 	},
 };
@@ -6786,6 +6791,9 @@ int mtk_drm_pm_ctrl(struct mtk_drm_private *priv, enum disp_pm_action action)
 		if (priv->dsi_phy0_dev && (!pm_runtime_enabled(priv->dsi_phy0_dev)))
 			pm_runtime_enable(priv->dsi_phy0_dev);
 
+		if (priv->dsi_phy1_dev && (!pm_runtime_enabled(priv->dsi_phy1_dev)))
+			pm_runtime_enable(priv->dsi_phy1_dev);
+
 		if (priv->dpc_dev && (!pm_runtime_enabled(priv->dpc_dev)))
 			pm_runtime_enable(priv->dpc_dev);
 
@@ -6813,12 +6821,23 @@ int mtk_drm_pm_ctrl(struct mtk_drm_private *priv, enum disp_pm_action action)
 
 		if (priv->dsi_phy0_dev)
 			pm_runtime_disable(priv->dsi_phy0_dev);
+
+		if (priv->dsi_phy1_dev)
+			pm_runtime_disable(priv->dsi_phy1_dev);
 		break;
 	case DISP_PM_GET:
 		if (priv->dsi_phy0_dev) {
 			ret = pm_runtime_resume_and_get(priv->dsi_phy0_dev);
 			if (unlikely(ret)) {
-				DDPMSG("request dsi phy power failed\n");
+				DDPMSG("request dsi phy0 power failed\n");
+				return ret;
+			}
+		}
+
+		if (priv->dsi_phy1_dev) {
+			ret = pm_runtime_resume_and_get(priv->dsi_phy1_dev);
+			if (unlikely(ret)) {
+				DDPMSG("request dsi phy1 power failed\n");
 				return ret;
 			}
 		}
@@ -6856,6 +6875,9 @@ int mtk_drm_pm_ctrl(struct mtk_drm_private *priv, enum disp_pm_action action)
 
 		if (priv->dsi_phy0_dev)
 			pm_runtime_put_sync(priv->dsi_phy0_dev);
+
+		if (priv->dsi_phy1_dev)
+			pm_runtime_put_sync(priv->dsi_phy1_dev);
 		break;
 	case DISP_PM_PUT_SYNC:
 		if (priv->side_ovlsys_dev)
@@ -6875,9 +6897,14 @@ int mtk_drm_pm_ctrl(struct mtk_drm_private *priv, enum disp_pm_action action)
 
 		if (priv->dsi_phy0_dev)
 			pm_runtime_put_sync(priv->dsi_phy0_dev);
+
+		if (priv->dsi_phy1_dev)
+			pm_runtime_put_sync(priv->dsi_phy1_dev);
 		break;
 	case DISP_PM_CHECK:
 		if (priv->dsi_phy0_dev && pm_runtime_get_if_in_use(priv->dsi_phy0_dev) <= 0)
+			return -1;
+		if (priv->dsi_phy1_dev && pm_runtime_get_if_in_use(priv->dsi_phy1_dev) <= 0)
 			return -1;
 		if (priv->dpc_dev && pm_runtime_get_if_in_use(priv->dpc_dev) <= 0)
 			goto err_dpc_dev;
@@ -6908,6 +6935,8 @@ err_mmsys:
 err_dpc_dev:
 	if (priv->dsi_phy0_dev)
 		pm_runtime_put_sync(priv->dsi_phy0_dev);
+	if (priv->dsi_phy1_dev)
+		pm_runtime_put_sync(priv->dsi_phy1_dev);
 	return -1;
 }
 
@@ -7114,7 +7143,7 @@ bool mtk_drm_top_clk_isr_get(struct mtk_ddp_comp *comp)
 		atomic_inc(&top_isr_ref);
 		if (g_dpc_dev) {
 			comp->pm_ret = mtk_vidle_user_power_keep(DISP_VIDLE_USER_TOP_CLK_ISR);
-			if (comp->pm_ret == 2) {
+			if (comp->pm_ret == VOTER_PM_LATER) {
 				DRM_MMP_EVENT_START(top_clk, comp->id, 0);
 				ret = pm_runtime_resume_and_get(g_dpc_dev);
 				if (unlikely(ret)) {
@@ -7147,7 +7176,7 @@ void mtk_drm_top_clk_isr_put(struct mtk_ddp_comp *comp)
 		}
 		atomic_dec(&top_isr_ref);
 		if (g_dpc_dev) {
-			if (comp->pm_ret == 2) {
+			if (comp->pm_ret == VOTER_PM_LATER) {
 				pm_runtime_put(g_dpc_dev);
 				comp->pm_ret = 0;
 			}
@@ -7776,6 +7805,7 @@ int mtk_drm_disp_test_show(struct drm_crtc *crtc, bool enable)
 #else
 	DDPMSG("%s: trigger cmdq\n", __func__);
 	mtk_crtc_hw_block_ready(crtc);
+	CRTC_MMP_MARK(0, set_dirty, TEST_SHOW, __LINE__);
 	mtk_crtc_set_dirty(mtk_crtc);
 #endif
 
@@ -8850,6 +8880,9 @@ static int mtk_drm_kms_init(struct drm_device *drm)
 		goto err_unset_dma_parms;
 	}
 
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+	drm_kms_helper_poll_init(drm);
+#endif
 	drm_mode_config_reset(drm);
 
 	INIT_WORK(&private->unreference.work, mtk_unreference_work);
@@ -10622,6 +10655,8 @@ static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
 	 .data = (void *)MTK_MML_MUTEX},
 	{.compatible = "mediatek,mt6991-mml_mutex",
 	 .data = (void *)MTK_MML_MUTEX},
+	{.compatible = "mediatek,mt6991-mmlt_mutex",
+	 .data = (void *)MTK_MML_MUTEX},
 	{.compatible = "mediatek,mt6897-mml_mutex",
 	 .data = (void *)MTK_MML_MUTEX},
 	{.compatible = "mediatek,mt6886-mml_mutex",
@@ -11120,6 +11155,7 @@ SKIP_OVLSYS_CONFIG:
 		DDPMSG("register_pm_notifier failed %d", ret);
 
 	private->dsi_phy0_dev = mtk_drm_get_pd_device(dev, "dsi_phy0");
+	private->dsi_phy1_dev = mtk_drm_get_pd_device(dev, "dsi_phy1");
 
 	private->dpc_dev = mtk_drm_get_pd_device(dev, "mminfra_in_dpc");
 	if (private->dpc_dev) {

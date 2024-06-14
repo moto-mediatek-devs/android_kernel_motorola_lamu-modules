@@ -139,6 +139,9 @@ static u32 slbc_pmu_4;
 static u32 slbc_pmu_5;
 static u32 slbc_pmu_6;
 static u32 slbc_total_ceil_n;
+static u32 slbc_sspm_major_ver;
+static u32 slbc_sspm_minor_ver;
+static u32 slbc_sspm_patch_ver;
 static int debug_level;
 static int uid_ref[UID_MAX];
 static int slbc_mic_num = 3;
@@ -1631,6 +1634,7 @@ static int dbg_slbc_proc_show(struct seq_file *m, void *v)
 	}
 #endif /* CONFIG_MTK_SLBC_IPI */
 
+	seq_printf(m, "slbc_version: v%u.%u.%u\n", slbc_sspm_major_ver, slbc_sspm_minor_ver, slbc_sspm_patch_ver);
 	seq_printf(m, "slbc_enable %x\n", slbc_enable);
 	seq_printf(m, "slb_disable %x\n", slb_disable);
 	seq_printf(m, "slc_disable %x\n", slc_disable);
@@ -1875,17 +1879,17 @@ static ssize_t dbg_slbc_proc_write(struct file *file,
 		temp = val_2;
 		test_gid_d.dma_size = val_3;
 		test_gid_d.sign = SLC_DATA_MAGIC;
-		slbc_gid_request(val_1, &temp, &test_gid_d);
+		slbc_gid_request((enum slc_ach_uid)val_1, &temp, &test_gid_d);
 	} else if (!strcmp(cmd, "slbc_gid_release")) {
-		slbc_gid_release(val_1, val_2);
+		slbc_gid_release((enum slc_ach_uid)val_1, val_2);
 	} else if (!strcmp(cmd, "slbc_validate")) {
-		slbc_validate(val_1, (int)val_2);
+		slbc_validate((enum slc_ach_uid)val_1, (int)val_2);
 	} else if (!strcmp(cmd, "slbc_invalidate")) {
-		slbc_invalidate(val_1, (int)val_2);
+		slbc_invalidate((enum slc_ach_uid)val_1, (int)val_2);
 	} else if (!strcmp(cmd, "slbc_read_invalidate")) {
-		slbc_read_invalidate(val_1, val_2, val_3);
+		slbc_read_invalidate((enum slc_ach_uid)val_1, val_2, val_3);
 	} else if (!strcmp(cmd, "slbc_ceil")) {
-		slbc_ceil(val_1, val_2);
+		slbc_ceil((enum slc_ach_uid)val_1, val_2);
 	} else if (!strcmp(cmd, "slbc_total_ceil")) {
 		slbc_total_ceil(val_1);
 	} else if (!strcmp(cmd, "slbc_window")) {
@@ -2291,8 +2295,10 @@ static int slbc_probe(struct platform_device *pdev)
 		SLBC_TRACE_REC(LVL_NORM, TYPE_C, 0, ret, "mtk_dmaheap_register_slc_callback done");
 	}
 
-	if (slbc_enable)
+	if (slbc_enable) {
 		slbc_sspm_enable(slbc_enable);
+		slbc_get_sspm_ver(&slbc_sspm_major_ver, &slbc_sspm_minor_ver, &slbc_sspm_patch_ver);
+	}
 
 #ifdef SLBC_CB_TEST
 	user_cb_register();

@@ -90,6 +90,7 @@ struct mml_data {
 	void (*aid_sel)(struct mml_comp *comp, struct mml_task *task,
 		struct mml_comp_config *ccfg);
 	const struct mml_comp_hw_ops *hw_ops;
+	const struct mml_comp_debug_ops *debug_ops;
 	u8 gpr[MML_PIPE_CNT];
 	enum mml_aidsel_mode aidsel_mode;
 	u8 px_per_tick;
@@ -238,6 +239,8 @@ struct sys_frame_data {
 	u32 frame_pipe_conti_jump;
 
 	u32 tile_idx;
+
+	u16 label_vlp_sleep;
 };
 
 struct dl_frame_data {
@@ -292,6 +295,12 @@ static s32 sys_config_prepare(struct mml_comp *comp, struct mml_task *task,
 	return 0;
 }
 
+static u32 sys_get_label_count(struct mml_comp *comp, struct mml_task *task,
+	struct mml_comp_config *ccfg)
+{
+	return 1;
+}
+
 static s32 sys_setup_framedone_events(struct mml_comp *comp, struct mml_task *task,
 	struct mml_comp_config *ccfg)
 {
@@ -331,12 +340,20 @@ static s32 sys_init(struct mml_comp *comp, struct mml_task *task,
 	struct mml_comp_config *ccfg)
 {
 #ifndef MML_FPGA
+	struct mml_sys *sys = comp_to_sys(comp);
 	struct mml_frame_config *cfg = task->config;
 	struct cmdq_pkt *pkt = task->pkts[ccfg->pipe];
 
 	if (cfg->dpc) {
-		if (mml_dl_dpc & MML_DPC_PKT_VOTE)
-			mml_dpc_power_keep_gce(comp->sysid, pkt);
+		if (mml_dl_dpc & MML_DPC_PKT_VOTE) {
+			struct sys_frame_data *sys_frm = sys_frm_data(ccfg);
+			struct mml_task_reuse *reuse = &task->reuse[ccfg->pipe];
+
+			mml_add_reuse_label(comp->id, &task->reuse[ccfg->pipe],
+				&sys_frm->label_vlp_sleep, 0);
+			mml_dpc_power_keep_gce(comp->sysid, pkt, sys->data->gpr[ccfg->pipe],
+				&reuse->labels[sys_frm->label_vlp_sleep]);
+		}
 	}
 
 	if (mml_isdc(cfg->info.mode) && !mml_dev_get_couple_cnt(cfg->mml)) {
@@ -989,14 +1006,13 @@ static s32 sys_post(struct mml_comp *comp, struct mml_task *task,
 static s32 sys_done(struct mml_comp *comp, struct mml_task *task,
 		    struct mml_comp_config *ccfg)
 {
-	struct cmdq_pkt *pkt = task->pkts[ccfg->pipe];
 	if (task->config->dpc && (mml_dl_dpc & MML_DPC_PKT_VOTE)) {
 #ifndef MML_FPGA
+		struct cmdq_pkt *pkt = task->pkts[ccfg->pipe];
+
 		mml_dpc_power_release_gce(comp->sysid, pkt);
 #endif
 	}
-
-	cmdq_pkt_write(pkt, NULL, comp->base_pa + SYS_MISC_REG, 0, GENMASK(21, 12));
 
 	return 0;
 }
@@ -1021,6 +1037,7 @@ static s32 sys_repost(struct mml_comp *comp, struct mml_task *task,
 
 static const struct mml_comp_config_ops sys_config_ops = {
 	.prepare = sys_config_prepare,
+	.get_label_count = sys_get_label_count,
 	.init = sys_init,
 	.frame = sys_config_frame,
 	.tile = sys_config_tile,
@@ -1281,8 +1298,10 @@ static const struct mml_comp_hw_ops sys_hw_ops_mminfra = {
 	.clk_disable = &mml_sys_comp_clk_disable,
 };
 
+#ifdef MML_FPGA
 static const struct mml_comp_hw_ops sys_hw_ops_fpga = {
 };
+#endif
 
 static int sys_comp_init(struct device *dev, struct mml_sys *sys,
 			 struct mml_comp *comp)
@@ -1441,7 +1460,7 @@ static int sys_comp_init(struct device *dev, struct mml_sys *sys,
 	of_property_read_u16(dev->of_node, "ready-sel", &sys->inline_ready_sel);
 
 	comp->config_ops = &sys_config_ops;
-	comp->debug_ops = &sys_debug_ops;
+	comp->debug_ops = sys->data->debug_ops;
 
 
 #ifndef MML_FPGA
@@ -2233,10 +2252,14 @@ static int subcomp_init(struct platform_device *pdev, struct mml_sys *sys,
 			int subcomponent)
 {
 	struct device *dev = &pdev->dev;
-	struct mml_comp *comp = &sys->comps[subcomponent];
+	struct mml_comp *comp;
 	const struct mml_data *data = sys->data;
 	u32 comp_type = 0;
 	int ret;
+
+	if (subcomponent >= MML_MAX_SYS_COMPONENTS)
+		return -EINVAL;
+	comp = &sys->comps[subcomponent];
 
 	ret = mml_subcomp_init(pdev, subcomponent, comp);
 	if (ret)
@@ -2247,27 +2270,29 @@ static int subcomp_init(struct platform_device *pdev, struct mml_sys *sys,
 		dev_info(dev, "no comp-type of mmlsys comp-%d\n", subcomponent);
 		return 0;
 	}
-	if (comp_type < MML_COMP_TYPE_TOTAL) {
-		if (data->comp_inits[comp_type]) {
-			ret = data->comp_inits[comp_type](dev, sys, comp);
-			if (ret)
-				return ret;
-		}
+	if (comp_type >= MML_COMP_TYPE_TOTAL) {
+		mml_err("%s comp_type %d >= TOTAL %d", __func__,
+			comp_type, MML_COMP_TYPE_TOTAL);
+		return -EINVAL;
+	}
 
-		/* currently only mml-sys comp add to ddp comps */
-		if (data->ddp_comp_funcs[comp_type] && comp_type == MML_CT_SYS) {
-			ret = mml_ddp_comp_init(dev, &sys->ddp_comps[subcomponent],
-						comp, data->ddp_comp_funcs[comp_type]);
-			if (unlikely(ret)) {
-				mml_log("failed to init ddp comp-%d: %d",
-					subcomponent, ret);
-				return ret;
-			}
-			sys->ddp_comp_en |= 1 << subcomponent;
-		}
-	} else
-		mml_err("%s comp_type %d >= MML_COMP_TYPE_TOTAL", __func__, comp_type);
+	if (data->comp_inits[comp_type]) {
+		ret = data->comp_inits[comp_type](dev, sys, comp);
+		if (ret)
+			return ret;
+	}
 
+	/* currently only mml-sys comp add to ddp comps */
+	if (data->ddp_comp_funcs[comp_type] && comp_type == MML_CT_SYS) {
+		ret = mml_ddp_comp_init(dev, &sys->ddp_comps[subcomponent],
+					comp, data->ddp_comp_funcs[comp_type]);
+		if (unlikely(ret)) {
+			mml_log("failed to init ddp comp-%d: %d",
+				subcomponent, ret);
+			return ret;
+		}
+		sys->ddp_comp_en |= 1 << subcomponent;
+	}
 	return ret;
 }
 
@@ -2572,6 +2597,7 @@ static const struct mml_data mt6893_mml_data = {
 	},
 	.aid_sel = sys_config_aid_sel,
 	.hw_ops = &sys_hw_ops,
+	.debug_ops = &sys_debug_ops,
 	.gpr = {CMDQ_GPR_R08, CMDQ_GPR_R10},
 	.sysid = mml_sys_frame,
 };
@@ -2589,6 +2615,7 @@ static const struct mml_data mt6983_mml_data = {
 	},
 	.aid_sel = sys_config_aid_sel,
 	.hw_ops = &sys_hw_ops,
+	.debug_ops = &sys_debug_ops,
 	.gpr = {CMDQ_GPR_R08, CMDQ_GPR_R10},
 	.sysid = mml_sys_frame,
 };
@@ -2601,6 +2628,7 @@ static const struct mml_data mt6879_mml_data = {
 	},
 	.aid_sel = sys_config_aid_sel,
 	.hw_ops = &sys_hw_ops,
+	.debug_ops = &sys_debug_ops,
 	.gpr = {CMDQ_GPR_R08, CMDQ_GPR_R10},
 	.sysid = mml_sys_frame,
 };
@@ -2618,6 +2646,7 @@ static const struct mml_data mt6985_mml_data = {
 	},
 	.aid_sel = sys_config_aid_sel_engine,
 	.hw_ops = &sys_hw_ops,
+	.debug_ops = &sys_debug_ops,
 	.gpr = {CMDQ_GPR_R08, CMDQ_GPR_R10},
 	.aidsel_mode = MML_AIDSEL_ENGINE,
 	.set_mml_uid = true,
@@ -2637,6 +2666,7 @@ static const struct mml_data mt6897_mml_data = {
 	},
 	.aid_sel = sys_config_aid_sel_engine,
 	.hw_ops = &sys_hw_ops,
+	.debug_ops = &sys_debug_ops,
 	.gpr = {CMDQ_GPR_R08, CMDQ_GPR_R10},
 	.aidsel_mode = MML_AIDSEL_ENGINE,
 	.sysid = mml_sys_frame,
@@ -2656,6 +2686,7 @@ static const struct mml_data mt6989_mml_data = {
 	},
 	.aid_sel = sys_config_aid_sel_bits,
 	.hw_ops = &sys_hw_ops_mminfra,
+	.debug_ops = &sys_debug_ops,
 	.gpr = {CMDQ_GPR_R08, CMDQ_GPR_R10},
 	.px_per_tick = 2,
 	.aidsel_mode = MML_AIDSEL_ENGINEBITS,
@@ -2672,6 +2703,7 @@ static const struct mml_data mt6991_mmlt_data = {
 	},
 	.aid_sel = sys_config_aid_sel_bits_sys,
 	.hw_ops = &sys_hw_ops_mminfra,
+	.debug_ops = &sys_debug_ops_mt6991,
 	.gpr = {CMDQ_GPR_R12, CMDQ_GPR_R14},
 	.px_per_tick = 2,
 	.aidsel_mode = MML_AIDSEL_ENGINEBITS,
@@ -2694,6 +2726,7 @@ static const struct mml_data mt6991_mmlf_data = {
 	},
 	.aid_sel = sys_config_aid_sel_bits_sys,
 	.hw_ops = &sys_hw_ops_mminfra,
+	.debug_ops = &sys_debug_ops_mt6991,
 	.gpr = {CMDQ_GPR_R08, CMDQ_GPR_R10},
 	.px_per_tick = 2,
 	.aidsel_mode = MML_AIDSEL_ENGINEBITS,

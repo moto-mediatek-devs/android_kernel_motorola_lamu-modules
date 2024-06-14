@@ -156,10 +156,12 @@ static ssize_t custom_boost_gpu_freq_show(struct kobject *kobj,
 		char *buf)
 {
 	unsigned int ui32BoostGpuFreqLevel = 0;
+	char debug_buf[GED_SYSFS_MAX_BUFF_SIZE];
 
 	ui32BoostGpuFreqLevel = ged_dvfs_get_custom_boost_gpu_freq();
+	ged_dvfs_get_custom_boost_gpu_freq_info_str(debug_buf, sizeof(debug_buf), 0);
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", ui32BoostGpuFreqLevel);
+	return scnprintf(buf, PAGE_SIZE, "%u\n%s\n", ui32BoostGpuFreqLevel, debug_buf);
 }
 
 static ssize_t custom_boost_gpu_freq_store(struct kobject *kobj,
@@ -187,10 +189,12 @@ static ssize_t custom_upbound_gpu_freq_show(struct kobject *kobj,
 		char *buf)
 {
 	unsigned int ui32UpboundGpuFreqLevel = 0;
+	char debug_buf[GED_SYSFS_MAX_BUFF_SIZE];
 
 	ui32UpboundGpuFreqLevel = ged_dvfs_get_custom_ceiling_gpu_freq();
+	ged_dvfs_get_custom_ceiling_gpu_freq_info_str(debug_buf, sizeof(debug_buf), 0);
 
-	return scnprintf(buf, PAGE_SIZE, "%u\n", ui32UpboundGpuFreqLevel);
+	return scnprintf(buf, PAGE_SIZE, "%u\n%s\n", ui32UpboundGpuFreqLevel, debug_buf);
 }
 
 static ssize_t custom_upbound_gpu_freq_store(struct kobject *kobj,
@@ -578,9 +582,10 @@ static ssize_t target_fps_vsync_show(struct kobject *kobj,
 
 	ged_kpi_hint_frame_info(&infoOut);
 	length = scnprintf(buf + pos, PAGE_SIZE - pos,
-			"main_head BQ_ID:%llu FPS_V:%d FPS_gpu:%d\n",
+			"main_head BQ_ID:%llu FPS_V:%d FPS_gpu:%d  (%d, %d)\n",
 			(unsigned long long)infoOut.mainHead_BQ_ID,
-			infoOut.mainHead_fps_v, infoOut.mainHead_fps_gpu);
+			infoOut.mainHead_fps_v, infoOut.mainHead_fps_gpu,
+			prom_enable, g_target_fps_vsync);
 	pos += length;
 
 	return pos;
@@ -1325,8 +1330,8 @@ static ssize_t whitebox_power_force_state_show(struct kobject *kobj,
 	state20_3 = stat_mcu_store[20][3];
 
 	pos += scnprintf(buf + pos, PAGE_SIZE - pos,
-				"stat_mcu_store[6][3]=%d, stat_mcu_store[7][3]=%d, stat_mcu_store[20][3]=%d\n",
-					state6_3, state7_3, state20_3);
+				"stat_mcu_store[6][3]=%d, stat_mcu_store[7][3]=%d, stat_mcu_store[20][3]=%d, force_state=%d\n",
+					state6_3, state7_3, state20_3, force_state);
 
 	return pos;
 }

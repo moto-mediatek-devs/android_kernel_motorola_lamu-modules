@@ -3708,8 +3708,13 @@ transparent_hugepage=never";
 			"PWR";
 		operating-points-v2 = <&gpu_mali_opp>;
 		ged-supply = <&ged>;
+		gpu-frame-base-optimize = <1>;
 	};
 
+	gpu_dvfs_prefence: gpu-prefence {
+		compatible = "mediatek,gpu_prefence";
+		dvfs-prefence-enable = <1>;
+	};
 	gpufreq: gpufreq {
 		compatible = "mediatek,gpufreq";
 		clocks =
@@ -4238,6 +4243,11 @@ transparent_hugepage=never";
 		compatible = "mediatek,mtk-smi-dbg";
 		mediatek-larb-supply = <&smi_larb0 &smi_larb1 &smi_larb2 &smi_larb3 &smi_larb4>;
 		mediatek-common-supply = <&smi_common>;
+	};
+
+	smi-test {
+		compatible = "mediatek,smi-testcase";
+		mediatek,larbs = <&smi_larb2>;
 	};
 
 	smi_larb2: smi_larb2@15021000 {

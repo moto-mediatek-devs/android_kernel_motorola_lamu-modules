@@ -25,8 +25,6 @@
 #else
 #define MML_TRACE_MSG_LEN 896
 #endif
-#define CREATE_TRACE_POINTS
-#include "mtk-mml-trace.h"
 
 #ifndef MML_FPGA
 int mtk_mml_msg;
@@ -118,6 +116,7 @@ int mml_stash = 0x3;
 int mml_stash;
 #endif
 module_param(mml_stash, int, 0644);
+EXPORT_SYMBOL(mml_stash);
 
 int mml_urate = 110;
 module_param(mml_urate, int, 0644);
@@ -497,6 +496,18 @@ static s32 command_make(struct mml_task *task, u32 pipe)
 			ret = -ENOMEM;
 			goto err;
 		}
+
+		reuse->label_mods = kcalloc(cache->label_cnt, sizeof(*reuse->label_mods), GFP_KERNEL);
+		if (!reuse->label_mods) {
+			ret = -ENOMEM;
+			goto err;
+		}
+
+		reuse->label_check = kcalloc(cache->label_cnt, sizeof(*reuse->label_check), GFP_KERNEL);
+		if (!reuse->label_check) {
+			ret = -ENOMEM;
+			goto err;
+		}
 	}
 
 	/* call all component init and frame op, include mmlsys and mutex */
@@ -598,7 +609,11 @@ static s32 command_reuse(struct mml_task *task, u32 pipe)
 	struct mml_pipe_cache *cache = &task->config->cache[pipe];
 	struct mml_comp_config *ccfg = cache->cfg;
 	struct mml_comp *comp;
-	u32 i;
+	u32 label_cnt, i;
+
+	label_cnt = task->reuse[pipe].label_idx;
+	if (label_cnt)
+		memset(task->reuse[pipe].label_check, 0, sizeof(bool) * label_cnt);
 
 	for (i = 0; i < path->node_cnt; i++) {
 		comp = path->nodes[i].comp;
@@ -616,6 +631,14 @@ static s32 command_reuse(struct mml_task *task, u32 pipe)
 		task->reuse[pipe].label_idx);
 	/* make sure this pkt not jump to others */
 	cmdq_pkt_refinalize(task->pkts[pipe]);
+
+	for (i = 0; i < label_cnt; i++) {
+		if (!task->reuse[pipe].label_check[i])
+			mml_msg("[warn]job %u not update reuse idx %u mod %u offset %#x",
+				task->job.jobid, i,
+				task->reuse[pipe].label_mods[i],
+				task->reuse[pipe].labels[i].offset);
+	}
 
 	return 0;
 }
@@ -966,6 +989,8 @@ static void mml_core_qos_set(struct mml_task *task, u32 pipe, u32 throughput, u3
 
 	memset(&task->dpc_srt_bw[0], 0, sizeof(task->dpc_srt_bw));
 	memset(&task->dpc_hrt_bw[0], 0, sizeof(task->dpc_hrt_bw));
+	memset(&task->dpc_srt_write_bw[0], 0, sizeof(task->dpc_srt_write_bw));
+	memset(&task->dpc_hrt_write_bw[0], 0, sizeof(task->dpc_hrt_write_bw));
 
 	for (i = 0; i < path->node_cnt; i++) {
 		comp = path->nodes[i].comp;
@@ -979,12 +1004,17 @@ static void mml_core_qos_update_dpc(struct mml_frame_config *cfg, bool trigger)
 	struct mml_task_pipe *task_pipe;
 	struct mml_task *task;
 	u32 srt_bw[mml_max_sys] = {0}, hrt_bw[mml_max_sys] = {0}, srt_bw_max = 0, hrt_bw_max = 0;
+	u32 stash_srt_bw[mml_max_sys] = {0}, stash_hrt_bw[mml_max_sys] = {0};
 	u32 dpc_dvfs_lv = 0;
 	enum mml_sys_id sysid;
 	u32 i;
 
+	if (unlikely(!tp))
+		return;
+
 	for (i = 0; i < ARRAY_SIZE(tp->path_clts); i++) {
 		u32 task_srt_max[mml_max_sys] = {0}, task_hrt_max[mml_max_sys] = {0};
+		u32 task_stash_srt_max[mml_max_sys] = {0}, task_stash_hrt_max[mml_max_sys] = {0};
 
 		/* scan all tasks in this cmdq client and find max srt hrt */
 		list_for_each_entry(task_pipe, &tp->path_clts[i].tasks, entry_clt) {
@@ -995,12 +1025,19 @@ static void mml_core_qos_update_dpc(struct mml_frame_config *cfg, bool trigger)
 					max_t(u32, task_srt_max[sysid], task->dpc_srt_bw[sysid]);
 				task_hrt_max[sysid] =
 					max_t(u32, task_hrt_max[sysid], task->dpc_hrt_bw[sysid]);
+
+				task_stash_srt_max[sysid] = max_t(u32, task_stash_srt_max[sysid],
+					task->dpc_srt_write_bw[sysid]);
+				task_stash_hrt_max[sysid] = max_t(u32, task_stash_hrt_max[sysid],
+					task->dpc_hrt_write_bw[sysid]);
 			}
 		}
 
 		for (sysid = 0; sysid < mml_max_sys; sysid++) {
 			srt_bw[sysid] += task_srt_max[sysid];
 			hrt_bw[sysid] += task_hrt_max[sysid];
+			stash_srt_bw[sysid] += task_stash_srt_max[sysid];
+			stash_hrt_bw[sysid] += task_stash_hrt_max[sysid];
 		}
 	}
 
@@ -1029,6 +1066,9 @@ static void mml_core_qos_update_dpc(struct mml_frame_config *cfg, bool trigger)
 
 		mml_mmp(dpc_bw_srt, MMPROFILE_FLAG_PULSE, sysid, srt_bw[sysid]);
 		mml_mmp(dpc_bw_hrt, MMPROFILE_FLAG_PULSE, sysid, hrt_bw_max);
+
+		mml_dpc_channel_bw_set_by_idx(sysid, stash_srt_bw[sysid], false);
+		mml_dpc_channel_bw_set_by_idx(sysid, stash_hrt_bw[sysid], true);
 	}
 
 	/* set dpc dvfs (mminfra, bus) */
@@ -1663,7 +1703,7 @@ static void core_taskdone(struct work_struct *work)
 	core_buffer_unmap(task);
 
 	if (cfg->dpc && cfg->info.mode != MML_MODE_DDP_ADDON)
-		mml_dpc_task_cnt_dec(task, false);
+		mml_dpc_task_cnt_dec(task);
 
 	if (unlikely(cfg->task_ops->frame_err && !task->pkts[0] &&
 		(!cfg->dual || !task->pkts[1])))
@@ -2044,7 +2084,7 @@ static void core_config_pipe(struct mml_task *task, u32 pipe)
 	task->config_pipe_time[pipe] = sched_clock();
 
 	if (cfg->dpc && cfg->info.mode != MML_MODE_DDP_ADDON)
-		mml_dpc_task_cnt_inc(task, false);
+		mml_dpc_task_cnt_inc(task);
 
 	if (cfg->dpc) {
 		cmdq_check_thread_complete(tp_clt->chan);
@@ -2102,7 +2142,7 @@ static void core_config_pipe(struct mml_task *task, u32 pipe)
 		__func__, task, task->job.jobid, pipe, task->pkts[pipe]);
 exit:
 	if (cfg->dpc && cfg->info.mode != MML_MODE_DDP_ADDON && err < 0)
-		mml_dpc_task_cnt_dec(task, false);
+		mml_dpc_task_cnt_dec(task);
 
 	mml_trace_ex_end();
 }
@@ -2279,8 +2319,11 @@ void mml_core_destroy_task(struct mml_task *task)
 {
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(task->reuse); i++)
+	for (i = 0; i < ARRAY_SIZE(task->reuse); i++) {
 		kfree(task->reuse[i].labels);
+		kfree(task->reuse[i].label_mods);
+		kfree(task->reuse[i].label_check);
+	}
 	for (i = 0; i < ARRAY_SIZE(task->pkts); i++) {
 		if (task->pkts[i])
 			cmdq_pkt_destroy(task->pkts[i]);
@@ -2406,14 +2449,15 @@ static s32 check_label_idx(struct mml_task_reuse *reuse,
 	return 0;
 }
 
-void add_reuse_label(struct mml_task_reuse *reuse, u16 *label_idx, u32 value)
+void mml_add_reuse_label(u32 comp_id, struct mml_task_reuse *reuse, u16 *label_idx, u32 value)
 {
 	*label_idx = reuse->label_idx;
 	reuse->labels[reuse->label_idx].val = value;
+	reuse->label_mods[reuse->label_idx] = comp_id;
 	reuse->label_idx++;
 }
 
-s32 mml_assign(struct cmdq_pkt *pkt, u16 reg_idx, u32 value,
+s32 mml_assign(u32 comp_id, struct cmdq_pkt *pkt, u16 reg_idx, u32 value,
 	       struct mml_task_reuse *reuse,
 	       struct mml_pipe_cache *cache,
 	       u16 *label_idx)
@@ -2427,11 +2471,11 @@ s32 mml_assign(struct cmdq_pkt *pkt, u16 reg_idx, u32 value,
 	cmdq_pkt_assign_command_reuse(pkt, reg_idx, value,
 		&reuse->labels[reuse->label_idx]);
 
-	add_reuse_label(reuse, label_idx, value);
+	mml_add_reuse_label(comp_id, reuse, label_idx, value);
 	return 0;
 }
 
-s32 mml_write(struct cmdq_pkt *pkt, dma_addr_t addr, u32 value, u32 mask,
+s32 mml_write(u32 comp_id, struct cmdq_pkt *pkt, dma_addr_t addr, u32 value, u32 mask,
 	      struct mml_task_reuse *reuse,
 	      struct mml_pipe_cache *cache,
 	      u16 *label_idx)
@@ -2445,13 +2489,37 @@ s32 mml_write(struct cmdq_pkt *pkt, dma_addr_t addr, u32 value, u32 mask,
 	cmdq_pkt_write_value_addr_reuse(pkt, addr, value, mask,
 		&reuse->labels[reuse->label_idx]);
 
-	add_reuse_label(reuse, label_idx, value);
+	mml_add_reuse_label(comp_id, reuse, label_idx, value);
 	return 0;
 }
 
-void mml_update(struct mml_task_reuse *reuse, u16 label_idx, u32 value)
+void mml_update(u32 comp_id, struct mml_task_reuse *reuse, u16 label_idx, u32 value)
 {
+	if (label_idx >= reuse->label_idx)
+		mml_err("%s label idx %u/%u mod %u overflow value %#x",
+			__func__, label_idx, reuse->label_idx, comp_id, value);
+
+	if (comp_id != reuse->label_mods[label_idx])
+		mml_err("%s label idx %u/%u mod %u %u module overwrite value %#x",
+			__func__, label_idx, reuse->label_mods[label_idx], comp_id,
+			reuse->label_mods[label_idx], value);
+
 	reuse->labels[label_idx].val = value;
+	reuse->label_check[label_idx] = true;
+}
+
+void mml_reuse_touch(u32 comp_id, struct mml_task_reuse *reuse, u16 label_idx)
+{
+	if (label_idx >= reuse->label_idx)
+		mml_err("%s label idx %u/%u mod %u overflow",
+			__func__, label_idx, reuse->label_idx, comp_id);
+
+	if (comp_id != reuse->label_mods[label_idx])
+		mml_err("%s label idx %u/%u mod %u %u module overwrite",
+			__func__, label_idx, reuse->label_mods[label_idx], comp_id,
+			reuse->label_mods[label_idx]);
+
+	reuse->label_check[label_idx] = true;
 }
 
 static s32 mml_reuse_add_offset(struct mml_task_reuse *reuse,
@@ -2516,7 +2584,7 @@ inc:
 	return 0;
 }
 
-s32 mml_write_array(struct cmdq_pkt *pkt, dma_addr_t addr, u32 value, u32 mask,
+s32 mml_write_array(u32 comp_id, struct cmdq_pkt *pkt, dma_addr_t addr, u32 value, u32 mask,
 	struct mml_task_reuse *reuse, struct mml_pipe_cache *cache,
 	struct mml_reuse_array *reuses)
 {
@@ -2525,7 +2593,7 @@ s32 mml_write_array(struct cmdq_pkt *pkt, dma_addr_t addr, u32 value, u32 mask,
 	if (!cache->label_cnt)
 		return cmdq_pkt_write_value_addr(pkt, addr, value, mask);
 
-	ret = mml_write(pkt, addr, value, mask, reuse, cache,
+	ret = mml_write(comp_id, pkt, addr, value, mask, reuse, cache,
 		&reuses->offs[reuses->idx].label_idx);
 
 	if (ret < 0)
@@ -2533,16 +2601,33 @@ s32 mml_write_array(struct cmdq_pkt *pkt, dma_addr_t addr, u32 value, u32 mask,
 	return mml_reuse_add_offset(reuse, reuses);
 }
 
-void mml_update_array(struct mml_task_reuse *reuse,
+void mml_update_array(u32 comp_id, struct mml_task_reuse *reuse,
 	struct mml_reuse_array *reuses, u32 reuse_idx, u32 off_idx, u32 value)
 {
-	struct cmdq_reuse *label = &reuse->labels[reuses->offs[reuse_idx].label_idx];
+	u32 label_idx = reuses->offs[reuse_idx].label_idx;
+	struct cmdq_reuse *label = &reuse->labels[label_idx];
 	u64 *va = label->va + reuses->offs[reuse_idx].offset * off_idx;
 
+	if (comp_id != reuse->label_mods[label_idx])
+		mml_err("%s label idx %u/%u mod %u %u module overwrite value %#x",
+			__func__, label_idx, comp_id, reuse->label_mods[label_idx],
+			reuse->label_idx, value);
+
 	*va = (*va & GENMASK_ULL(63, 32)) | value;
+	reuse->label_check[label_idx] = true;
 }
 
-noinline int mml_tracing_mark_write(char *fmt, ...)
+#ifdef CONFIG_TRACING
+#if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
+static noinline int tracing_mark_write(char *buf)
+{
+	trace_puts(buf);
+	return 0;
+}
+#endif
+#endif
+
+int mml_tracing_mark_write(char *fmt, ...)
 {
 #ifdef CONFIG_TRACING
 #if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
@@ -2559,7 +2644,7 @@ noinline int mml_tracing_mark_write(char *fmt, ...)
 		return -1;
 	}
 
-	trace_puts(buf);
+	tracing_mark_write(buf);
 #endif
 #endif
 	return 0;

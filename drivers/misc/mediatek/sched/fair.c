@@ -92,11 +92,10 @@ static inline unsigned long task_util(struct task_struct *p)
 	return READ_ONCE(p->se.avg.util_avg);
 }
 
+/* cloned from kmainline _task_util_est() */
 static inline unsigned long _task_util_est(struct task_struct *p)
 {
-	struct util_est ue = READ_ONCE(p->se.avg.util_est);
-
-	return max(ue.ewma, (ue.enqueued & ~UTIL_AVG_UNCHANGED));
+	return READ_ONCE(p->se.avg.util_est) & ~UTIL_AVG_UNCHANGED;
 }
 
 static inline unsigned long task_util_est(struct task_struct *p)
@@ -303,7 +302,15 @@ void init_dsu_pwr_enable(void)
 
 inline bool is_dsu_pwr_concerned(int wl)
 {
-	return (wl != 4);
+	if (wl == 4)
+		return false;
+
+	if (is_dpt_support_driver_hook) {
+		if (is_dpt_support_driver_hook())
+			return false;
+	}
+
+	return true;
 }
 
 inline bool is_dsu_pwr_triggered(int wl)
@@ -318,7 +325,6 @@ static inline void eenv_init(struct energy_env *eenv, struct task_struct *p,
 	struct cpumask *cpus = this_cpu_cpumask_var_ptr(mtk_select_rq_mask);
 	unsigned int cpu, pd_idx;
 	struct perf_domain *pd_ptr = pd;
-	unsigned long pd_base_freq[MAX_NR_CPUS] = {0};
 
 	eenv_task_busy_time(eenv, p, prev_cpu);
 
@@ -330,16 +336,21 @@ static inline void eenv_init(struct energy_env *eenv, struct task_struct *p,
 		eenv->gear_max_util[cpu][1] =  -1;
 		eenv->pds_cpu_cap[cpu] = -1;
 		eenv->pds_cap[cpu] = -1;
+		eenv->pd_base_max_util[cpu] = 0;
+		eenv->pd_base_freq[cpu] = 0;
 	}
 
 	eenv->wl_support = get_eas_dsu_ctrl();
 	eenv->total_util = 0;
 
 	/* get wl snapshot*/
-	if (eenv->wl_support)
-		eenv->wl = get_em_wl();
-	else
-		eenv->wl = 0;
+	if (eenv->wl_support) {
+		eenv->wl_cpu = get_em_wl();
+		eenv->wl_dsu = get_wl_dsu();
+	} else {
+		eenv->wl_cpu = 0;
+		eenv->wl_dsu = 0;
+	}
 
 	for (; pd_ptr; pd_ptr = pd_ptr->next) {
 		unsigned long cpu_thermal_cap;
@@ -375,7 +386,8 @@ static inline void eenv_init(struct energy_env *eenv, struct task_struct *p,
 			max_util = eenv_pd_max_util(eenv, cpus, p, -1);
 			pd_freq = pd_get_util_cpufreq(eenv, cpus, max_util,
 					eenv->pds_cpu_cap[pd_idx], arch_scale_cpu_capacity(pd_idx));
-			pd_base_freq[pd_idx] = max(pd_freq, per_cpu(min_freq, pd_idx));
+			eenv->pd_base_freq[pd_idx] = max(pd_freq, per_cpu(min_freq, pd_idx));
+			eenv->pd_base_max_util[pd_idx] = max_util;
 		}
 	}
 
@@ -398,11 +410,12 @@ static inline void eenv_init(struct energy_env *eenv, struct task_struct *p,
 	}
 
 	if (eenv->wl_support) {
-		unsigned int output[6] = {0}, val[MAX_NR_CPUS];
+		unsigned int output[8] = {[0 ... 7] = -1};
+		unsigned int val[MAX_NR_CPUS] = {[0 ... MAX_NR_CPUS-1] = -1};
 
-		if (is_dsu_pwr_triggered(eenv->wl)) {
-			eenv_dsu_init(eenv->android_vendor_data1, false, eenv->wl,
-					PERCORE_L3_BW, cpu_active_mask->bits[0], pd_base_freq,
+		if (is_dsu_pwr_triggered(eenv->wl_dsu)) {
+			eenv_dsu_init(eenv->android_vendor_data1, false, eenv->wl_dsu,
+					PERCORE_L3_BW, cpu_active_mask->bits[0], eenv->pd_base_freq,
 					val, output);
 		}
 
@@ -422,11 +435,11 @@ static inline void eenv_init(struct energy_env *eenv, struct task_struct *p,
 
 		if (trace_sched_eenv_init_enabled())
 #if IS_ENABLED(CONFIG_MTK_THERMAL_INTERFACE)
-			trace_sched_eenv_init(output[1], output[2],
+			trace_sched_eenv_init(output[1], output[2], output[6], output[7],
 					output[3], output[4], output[5],
 					share_buck.gear_idx);
 #else
-			trace_sched_eenv_init(output[1], output[2],
+			trace_sched_eenv_init(output[1], output[2], output[6], output[7],
 					0, output[4], output[5], share_buck.gear_idx);
 #endif
 	}
@@ -450,10 +463,14 @@ mtk_compute_energy_cpu(struct energy_env *eenv, struct perf_domain *pd,
 	if (dst_cpu >= 0)
 		busy_time = min(eenv->pds_cap[pd_idx], busy_time + eenv->task_busy_time);
 
-	pd_freq = pd_get_util_cpufreq(eenv, pd_cpus, pd_max_util,
-			eenv->pds_cpu_cap[pd_idx], scale_cpu);
+	if (pd_max_util == eenv->pd_base_max_util[pd_idx]) {
+		pd_freq = eenv->pd_base_freq[pd_idx];
+	} else {
+		pd_freq = pd_get_util_cpufreq(eenv, pd_cpus, pd_max_util,
+				eenv->pds_cpu_cap[pd_idx], scale_cpu);
+	}
 
-	if (eenv->wl_support && is_dsu_pwr_triggered(eenv->wl)) {
+	if (eenv->wl_support && is_dsu_pwr_triggered(eenv->wl_dsu)) {
 		dsu_volt = update_dsu_status(eenv, false, pd_freq, pd_idx, dst_cpu);
 
 		if (share_buck.gear_idx != eenv->gear_idx)
@@ -465,13 +482,13 @@ mtk_compute_energy_cpu(struct energy_env *eenv, struct perf_domain *pd,
 	/* dvfs power overhead */
 	if (!cpumask_equal(pd_cpus, get_gear_cpumask(eenv->gear_idx))) {
 		/* dvfs Vin/Vout */
-		pd_volt = pd_get_freq_volt(pd_idx, pd_freq, false, eenv->wl);
+		pd_volt = pd_get_freq_volt(pd_idx, pd_freq, false, eenv->wl_cpu);
 
 		dst_idx = (dst_cpu >= 0) ? 1 : 0;
 		gear_max_util = eenv->gear_max_util[eenv->gear_idx][dst_idx];
 		gear_freq = pd_get_util_cpufreq(eenv, pd_cpus, gear_max_util,
 				eenv->pds_cpu_cap[pd_idx], scale_cpu);
-		gear_volt = pd_get_freq_volt(pd_idx, gear_freq, false, eenv->wl);
+		gear_volt = pd_get_freq_volt(pd_idx, gear_freq, false, eenv->wl_cpu);
 
 		if (gear_volt-pd_volt < volt_diff) {
 			extern_volt = max(gear_volt, dsu_volt);
@@ -587,7 +604,7 @@ mtk_compute_energy(struct energy_env *eenv, struct perf_domain *pd,
 
 	/* calc indirect DSU share_buck */
 
-	if (is_dsu_pwr_triggered(eenv->wl)) {
+	if (is_dsu_pwr_triggered(eenv->wl_dsu)) {
 		if ((share_buck.gear_idx != -1) && !(shared_gear(eenv->gear_idx))
 				&& dsu_freq_changed(eenv->android_vendor_data1)) {
 			struct root_domain *rd = this_rq()->rd;
@@ -640,11 +657,15 @@ calc_sharebuck_done:
 		gear_idx = eenv->gear_idx;
 		eenv->gear_idx = share_buck.gear_idx;
 		pd_idx = cpumask_first(share_buck.cpus);
-		share_buck_freq = pd_get_util_cpufreq(eenv, pd_cpus,
-				eenv->gear_max_util[share_buck.gear_idx][dst_idx],
-				eenv->pds_cpu_cap[pd_idx], arch_scale_cpu_capacity(pd_idx));
+		if (eenv->gear_max_util[share_buck.gear_idx][dst_idx] == eenv->pd_base_max_util[pd_idx]) {
+			share_buck_freq = eenv->pd_base_freq[pd_idx];
+		} else {
+			share_buck_freq = pd_get_util_cpufreq(eenv, pd_cpus,
+					eenv->gear_max_util[share_buck.gear_idx][dst_idx],
+					eenv->pds_cpu_cap[pd_idx], arch_scale_cpu_capacity(pd_idx));
+		}
 		dsu_extern_volt = pd_get_freq_volt(cpumask_first(share_buck.cpus),
-				share_buck_freq, false, eenv->wl);
+				share_buck_freq, false, eenv->wl_dsu);
 		eenv->gear_idx = gear_idx;
 	}
 
@@ -653,12 +674,12 @@ calc_sharebuck_done:
 	else
 		total_util = eenv->total_util;
 
-	dsu_pwr = get_dsu_pwr(eenv->wl, dst_cpu, eenv->task_busy_time, total_util,
-			eenv->android_vendor_data1, dsu_extern_volt, is_dsu_pwr_triggered(eenv->wl));
+	dsu_pwr = get_dsu_pwr(eenv->wl_dsu, dst_cpu, eenv->task_busy_time, total_util,
+			eenv->android_vendor_data1, dsu_extern_volt, is_dsu_pwr_triggered(eenv->wl_dsu));
 
 done:
 	if (trace_sched_compute_energy_cpu_dsu_enabled())
-		trace_sched_compute_energy_cpu_dsu(dst_cpu, eenv->wl, cpu_pwr, shared_pwr_dvfs,
+		trace_sched_compute_energy_cpu_dsu(dst_cpu, eenv->wl_cpu, cpu_pwr, shared_pwr_dvfs,
 					shared_pwr, dsu_pwr, cpu_pwr + shared_pwr + dsu_pwr);
 
 	return cpu_pwr + shared_pwr_dvfs + shared_pwr + dsu_pwr;
@@ -1054,11 +1075,30 @@ void mtk_can_migrate_task(void *data, struct task_struct *p,
 {
 	bool latency_sensitive;
 	struct cpumask eff_mask;
+	int src_cpu = task_cpu(p), num_vip_src, num_vip_dst;
 
 	if (!get_eas_hook())
 		return;
 
-	if (READ_ONCE(cpu_rq(task_cpu(p))->rd->overutilized)) {
+	if (cpu_paused(dst_cpu)) {
+		*can_migrate = false;
+		return;
+	}
+
+	if (task_is_vip(p, VVIP)) {
+		num_vip_src = num_vip_in_cpu(src_cpu, VVIP);
+		num_vip_dst = num_vip_in_cpu(dst_cpu, VVIP);
+		if (num_vip_src-1 < num_vip_dst) {
+			*can_migrate = 0;
+			return;
+		} else if ((num_vip_src-1 == num_vip_dst) &&
+			(capacity_orig_of(src_cpu) > capacity_orig_of(dst_cpu))) {
+			*can_migrate = 0;
+			return;
+		}
+	}
+
+	if (READ_ONCE(cpu_rq(src_cpu)->rd->overutilized)) {
 		*can_migrate = 1;
 		return;
 	}
@@ -1390,27 +1430,16 @@ static inline bool task_can_skip_this_cpu(struct task_struct *p, unsigned long p
 }
 
 static inline bool is_target_max_spare_cpu(long spare_cap, long target_max_spare_cap,
-			int best_cpu, int new_cpu, const char *type, int fit, int best_fit, bool compare_fits)
+			int best_cpu, int new_cpu, const char *type)
 {
 	bool replace = true;
 
-	if (compare_fits) {
-		if (fit > best_fit)
-			goto out;
-		else if (fit < best_fit) {
-			replace = false;
-			goto out;
-		}
-	}
-
-	/* if compare_fits is true, only compare space cap when (fit == max_fit)*/
 	if (spare_cap <= target_max_spare_cap)
 		replace = false;
 
-out:
 	if (trace_sched_target_max_spare_cpu_enabled())
 		trace_sched_target_max_spare_cpu(type, best_cpu, new_cpu, replace,
-			spare_cap, target_max_spare_cap, fit, best_fit);
+			spare_cap, target_max_spare_cap);
 
 	return replace;
 }
@@ -1680,12 +1709,17 @@ inline int util_fits_capacity(unsigned long util, unsigned long uclamp_min,
 	bool AM_enabled = adaptive_margin_enabled[cpu];
 	unsigned int sugov_margin = AM_enabled ? get_adaptive_margin(cpu) : SCHED_CAPACITY_SCALE;
 	unsigned long capacity_orig_thermal, capacity_orig = capacity_orig_of(cpu);
-	int fit, uclamp_max_fits;
+	int fit, uclamp_max_fits, uclamp_involve;
 
-	uclamp_min = clamp((uclamp_min * sugov_margin) >> SCHED_FIXEDPOINT_SHIFT,
+
+	uclamp_min = clamp((uclamp_min * DEFAULT_MARGIN) >> SCHED_FIXEDPOINT_SHIFT,
 		0UL, (unsigned long) SCHED_CAPACITY_SCALE);
-	uclamp_max = clamp((uclamp_max * sugov_margin) >> SCHED_FIXEDPOINT_SHIFT,
+	uclamp_max = clamp((uclamp_max * DEFAULT_MARGIN) >> SCHED_FIXEDPOINT_SHIFT,
 		0UL, (unsigned long) SCHED_CAPACITY_SCALE);
+
+	uclamp_involve = mtk_uclamp_involve(uclamp_min, uclamp_max, true);
+	if (uclamp_involve)
+		sugov_margin = DEFAULT_MARGIN;
 
 	/* ceiling shouldn't affect capacity since updown_migration is not enabled,  */
 	if (!updown_migration_enable)
@@ -1710,7 +1744,7 @@ inline int util_fits_capacity(unsigned long util, unsigned long uclamp_min,
 
 	if (trace_sched_fits_cap_ceiling_enabled())
 		trace_sched_fits_cap_ceiling(fit, cpu, util, uclamp_min, uclamp_max, capacity, ceiling, sugov_margin,
-			sched_capacity_down_margin[cpu], sched_capacity_up_margin[cpu], AM_enabled);
+			sched_capacity_down_margin[cpu], sched_capacity_up_margin[cpu], AM_enabled, uclamp_involve);
 
 	return fit;
 }
@@ -1732,8 +1766,16 @@ inline int util_fits_capacity(unsigned long util, unsigned long uclamp_min,
 	bool AM_enabled = adaptive_margin_enabled[cpu];
 	unsigned int sugov_margin = AM_enabled ? get_adaptive_margin(cpu) : SCHED_CAPACITY_SCALE;
 	unsigned long capacity_orig_thermal, capacity_orig = capacity_orig_of(cpu);
-	int fit, uclamp_max_fits;
+	int fit, uclamp_max_fits, uclamp_involve;
 
+	uclamp_min = clamp((uclamp_min * DEFAULT_MARGIN) >> SCHED_FIXEDPOINT_SHIFT,
+		0UL, (unsigned long) SCHED_CAPACITY_SCALE);
+	uclamp_max = clamp((uclamp_max * DEFAULT_MARGIN) >> SCHED_FIXEDPOINT_SHIFT,
+		0UL, (unsigned long) SCHED_CAPACITY_SCALE);
+
+	uclamp_involve = mtk_uclamp_involve(uclamp_min, uclamp_max, true);
+	if (uclamp_involve)
+		sugov_margin = DEFAULT_MARGIN;
 	/* Whether PELT fit after considering up-down migration ? */
 	fit = fits_capacity(util, capacity, sugov_margin);
 
@@ -1749,7 +1791,6 @@ inline int util_fits_capacity(unsigned long util, unsigned long uclamp_min,
 		fit = -1;
 
 	return fit;
-
 }
 #endif /* CONFIG_MTK_SCHED_UPDOWN_MIGRATE */
 
@@ -1870,7 +1911,6 @@ static void mtk_find_best_candidates(struct cpumask *candidates, struct task_str
 	unsigned long min_cap = eenv->min_cap;
 	unsigned long max_cap = eenv->max_cap;
 	bool is_vvip = false;
-	unsigned int num_vip, prev_min_num_vip, min_num_vip;
 #if IS_ENABLED(CONFIG_MTK_SCHED_VIP_TASK)
 	int target_balance_cluster;
 #endif
@@ -1883,13 +1923,11 @@ static void mtk_find_best_candidates(struct cpumask *candidates, struct task_str
 	bool is_vip = fbc_params->is_vip;
 	int vip_prio = fbc_params->vip_prio;
 	struct cpumask vip_candidate = fbc_params->vip_candidate;
-	int best_fit = -1;
 
-	num_vip = prev_min_num_vip = min_num_vip = UINT_MAX;
 #if IS_ENABLED(CONFIG_MTK_SCHED_VIP_TASK)
 	is_vvip = prio_is_vip(vip_prio, VVIP);
 
-	if (is_vvip) {
+	if (is_vvip && !cpumask_empty(&vip_candidate)) {
 		target_balance_cluster = topology_cluster_id(cpumask_last(&vip_candidate));
 		order_index = target_balance_cluster;
 		end_index = 0;
@@ -1967,7 +2005,7 @@ static void mtk_find_best_candidates(struct cpumask *candidates, struct task_str
 				spare_cap += spare_cap >> 6;
 
 			if (is_target_max_spare_cpu(spare_cap_without_p, sys_max_spare_cap,
-					*sys_max_spare_cap_cpu, cpu, "sys_max_spare", 0, 0, SKIP_COMPARE_FIT)) {
+					*sys_max_spare_cap_cpu, cpu, "sys_max_spare")) {
 				sys_max_spare_cap = spare_cap_without_p;
 				*sys_max_spare_cap_cpu = cpu;
 			}
@@ -1980,7 +2018,7 @@ static void mtk_find_best_candidates(struct cpumask *candidates, struct task_str
 			 */
 			if (latency_sensitive && available_idle_cpu(cpu)) {
 				if (is_target_max_spare_cpu(spare_cap_without_p, idle_max_spare_cap,
-					*idle_max_spare_cap_cpu, cpu, "idle_max_spare", 0, 0, SKIP_COMPARE_FIT)) {
+					*idle_max_spare_cap_cpu, cpu, "idle_max_spare")) {
 					idle_max_spare_cap = spare_cap_without_p;
 					*idle_max_spare_cap_cpu = cpu;
 				}
@@ -2007,7 +2045,7 @@ static void mtk_find_best_candidates(struct cpumask *candidates, struct task_str
 			cpu_utils[uint_cpu] = cpu_util;
 
 			fit = util_fits_capacity(cpu_util_without_uclamp, rq_uclamp_min, rq_uclamp_max, cpu_cap, cpu);
-			if (!fit)
+			if (fit <= 0)
 				continue;
 
 			/*
@@ -2015,10 +2053,9 @@ static void mtk_find_best_candidates(struct cpumask *candidates, struct task_str
 			 * the performance domain
 			 */
 			if (!latency_sensitive && is_target_max_spare_cpu(spare_cap, pd_max_spare_cap,
-					pd_max_spare_cap_cpu, cpu, "pd_max_spare", fit, best_fit, COMPARE_FIT)) {
+					pd_max_spare_cap_cpu, cpu, "pd_max_spare")) {
 				pd_max_spare_cap = spare_cap;
 				pd_max_spare_cap_cpu = cpu;
-				best_fit = fit;
 			}
 
 			if (!latency_sensitive)
@@ -2038,8 +2075,7 @@ static void mtk_find_best_candidates(struct cpumask *candidates, struct task_str
 #endif
 
 				if (!is_target_max_spare_cpu(spare_cap, pd_max_spare_cap_ls_idle,
-					pd_max_spare_cap_cpu_ls_idle, cpu, "pd_max_spare_is_idle",
-					fit, best_fit, COMPARE_FIT))
+					pd_max_spare_cap_cpu_ls_idle, cpu, "pd_max_spare_is_idle"))
 					continue;
 
 				pd_min_exit_lat = idle ? idle->exit_latency : 0;
@@ -2047,7 +2083,6 @@ static void mtk_find_best_candidates(struct cpumask *candidates, struct task_str
 				pd_max_spare_cap_ls_idle = spare_cap;
 				target_cap = cpu_cap;
 				pd_max_spare_cap_cpu_ls_idle = cpu;
-				best_fit = fit;
 			}
 		}
 
@@ -2233,7 +2268,8 @@ void mtk_find_energy_efficient_cpu(void *data, struct task_struct *p, int prev_c
 
 			max_util = eenv_pd_max_util(&eenv, cpus, p, cpu);
 
-			cur_delta = shared_buck_calc_pwr_eff(&eenv, cpu, max_util, cpus, is_dsu_pwr_triggered(eenv.wl));
+			cur_delta = shared_buck_calc_pwr_eff(&eenv, cpu, max_util, cpus,
+				is_dsu_pwr_triggered(eenv.wl_dsu));
 			base_energy = 0;
 		} else {
 			eenv_pd_busy_time(&eenv, cpus, p);
@@ -2309,7 +2345,7 @@ fail:
 		struct cpumask temp_mask;
 
 		/* for VVIP, select biggest CPU */
-		if (prio_is_vip(vip_prio , VVIP)) {
+		if (prio_is_vip(vip_prio , VVIP) && !cpumask_empty(&vip_candidate)) {
 			*new_cpu = cpumask_last(&vip_candidate);
 			backup_reason = LB_BACKUP_VVIP;
 			goto backup_unlock;

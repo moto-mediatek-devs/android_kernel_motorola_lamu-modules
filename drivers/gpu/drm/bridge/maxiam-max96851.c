@@ -56,14 +56,18 @@ static u8 serdes_read_byte(struct i2c_client *client,
 	ret = i2c_master_send(client, read_data, 2);
 	if (ret <= 0) {
 		mutex_unlock(&edp_i2c_access);
+#if SERDES_DEBUG
 		pr_info("[MAX96851] Failed to send i2c command, ret = %d\n", ret);
+#endif
 		return ret;
 	}
 
 	ret = i2c_master_recv(client, &buf, 1);
 	if (ret <= 0) {
 		mutex_unlock(&edp_i2c_access);
+#if SERDES_DEBUG
 		pr_info("[MAX96851] Failed to recv i2c data, ret = %d\n", ret);
+#endif
 		return -1;
 	}
 
@@ -92,7 +96,9 @@ static int serdes_write_byte(struct i2c_client *client, u16 addr,
 	ret = i2c_master_send(client, write_data, 3);
 	if (ret <= 0) {
 		mutex_unlock(&edp_i2c_access);
+#if SERDES_DEBUG
 		pr_info("[MAX96851] I2C write fail, addr:0x%x val:0x%x ret:%d\n", addr, val, ret);
+#endif
 		return ret;
 	}
 
@@ -383,7 +389,7 @@ err:
 static int excute_feature_verify_cmd(struct max96851_bridge *max_bridge, struct feature_cmd feature_cmd)
 {
 	struct i2c_client *client = NULL;
-	int ret = 0, i = 0, j = 0;
+	int ret = 0, i = 0;
 	u8 value[32] = {0};
 
 	client = i2c_new_dummy_device(max_bridge->max96851_i2c->adapter, feature_cmd.i2c_addr);
@@ -403,8 +409,8 @@ static int excute_feature_verify_cmd(struct max96851_bridge *max_bridge, struct 
 
 	/* verify the received data */
 	for (i = 0; i < feature_cmd.cmd_length; i += 2) {
-		pr_info("[MAX96851] value:%x mask:%x verify:%x\n",value[j],feature_cmd.data[i],feature_cmd.data[i+1]);
-		if ((value[j++] & feature_cmd.data[i]) != feature_cmd.data[i+1]) {
+		pr_info("[MAX96851] value:%x mask:%x verify:%x\n",value[i/2],feature_cmd.data[i],feature_cmd.data[i+1]);
+		if ((value[i/2] & feature_cmd.data[i]) != feature_cmd.data[i+1]) {
 			pr_info("[MAX96851] Received data does not match with expected value, doesn't apply this setting\n");
 			ret = -EINVAL;
 			goto err;
@@ -480,7 +486,12 @@ static int parse_feature_info_from_dts(struct max96851_bridge *max_bridge, struc
 	/* feature-handle number process */
 	for (i = 0; i < feature_handle_num; i++) {
 		memset(feature_handle_name, 0, 64);
-		sprintf(feature_handle_name, "%s%d", PANEL_FEATURE_HANDLE, i);
+		ret = sprintf(feature_handle_name, "%s%d", PANEL_FEATURE_HANDLE, i);
+		if (ret < 0) {
+			pr_info("%s: failed to sprintf feature handle name %d\n", __func__, ret);
+			return ret;
+		}
+
 		feature_handle_np = of_get_child_by_name(feature_np, feature_handle_name);
 		if (!feature_handle_np) {
 			pr_info("%s: failed to find feature handle node %s\n", __func__, feature_handle_name);

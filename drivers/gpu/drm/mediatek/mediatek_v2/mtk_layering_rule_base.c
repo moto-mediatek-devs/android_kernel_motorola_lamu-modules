@@ -1849,7 +1849,7 @@ static int get_layer_weight(struct drm_device *dev, int disp_idx,
 						dump_disp_info(disp_info,
 							DISP_DEBUG_LEVEL_CRITICAL);
 						mtk_drm_crtc_diagnose();
-						DDPPR_ERR("%s:%d gets ratio:%u > 1000\n",
+						DDPAEE("%s:%d gets ratio:%u > 1000\n",
 							__func__, __LINE__, peak_ratio);
 						aee_trigger = false;
 					}
@@ -1895,7 +1895,7 @@ static int get_layer_weight(struct drm_device *dev, int disp_idx,
 						dump_disp_info(disp_info,
 							DISP_DEBUG_LEVEL_CRITICAL);
 						mtk_drm_crtc_diagnose();
-						DDPPR_ERR("%s:%d gets ratio:%u > 1000\n",
+						DDPAEE("%s:%d gets ratio:%u > 1000\n",
 							__func__, __LINE__, peak_ratio);
 						aee_trigger = false;
 					}
@@ -4901,7 +4901,9 @@ static int layering_rule_start(struct drm_mtk_layering_info *disp_info_user,
 		l_rule_ops->fbdc_pre_calculate(&layering_info);
 
 	/* Initial HRT conditions */
-	if (priv && (priv->data->mmsys_id == MMSYS_MT6768 || priv->data->mmsys_id == MMSYS_MT6885))
+	if (priv && priv->data && (priv->data->mmsys_id == MMSYS_MT6768 ||
+		priv->data->mmsys_id == MMSYS_MT6877 ||
+		priv->data->mmsys_id == MMSYS_MT6885))
 		l_rule_ops->scenario_decision(dev, scn_decision_flag, scale_num);
 
 	/* Layer Grouping */
@@ -5022,7 +5024,9 @@ static int layering_rule_start(struct drm_mtk_layering_info *disp_info_user,
 	check_layering_result(&layering_info);
 
 	/* adjust scenario after dispatch gles range */
-	if (priv && (priv->data->mmsys_id == MMSYS_MT6768 || priv->data->mmsys_id == MMSYS_MT6885)) {
+	if (priv && priv->data && (priv->data->mmsys_id == MMSYS_MT6768 ||
+		priv->data->mmsys_id == MMSYS_MT6877 ||
+		priv->data->mmsys_id == MMSYS_MT6885)) {
 		scale_num = get_scale_cnt(&layering_info);
 		l_rule_ops->scenario_decision(dev, scn_decision_flag, scale_num);
 	}

@@ -40,6 +40,8 @@ static const struct usb_audio_quirk_flags_table mtk_snd_quirk_flags_table[] = {
 		   QUIRK_FLAG_CTL_MSG_DELAY),
 		DEVICE_FLG(0x04e8, 0xa051,      /* SS USBC Headset (AKG) */
 		   QUIRK_FLAG_CTL_MSG_DELAY),
+		DEVICE_FLG(0x04e8, 0xa057,
+		   QUIRK_FLAG_CTL_MSG_DELAY),
 		/* Vendor matches */
 		VENDOR_FLG(0x2fc6,		/* Comtrue Devices */
 		   QUIRK_FLAG_CTL_MSG_DELAY),
@@ -217,12 +219,8 @@ static bool xhci_mtk_is_usb_audio(struct urb *urb)
 
 static void xhci_trace_ep_urb_enqueue(void *data, struct urb *urb)
 {
-	struct device *hcd_dev = (struct device *)data;
-
-	if (!urb || !urb->setup_packet || !urb->dev) {
-		dev_dbg_ratelimited(hcd_dev, "%s urb/setup pkt/device can't be NULL\n", __func__);
+	if (!urb || !urb->setup_packet || !urb->dev)
 		return;
-	}
 
 	if (xhci_mtk_is_usb_audio(urb)) {
 		/* apply clear packet size */

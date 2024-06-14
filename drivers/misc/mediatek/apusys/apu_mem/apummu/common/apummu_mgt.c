@@ -22,20 +22,6 @@
 
 extern struct apummu_dev_info *g_adv;
 
-struct apummu_tbl {
-	struct list_head g_stable_head;
-	struct kref session_tbl_cnt;
-	struct mutex table_lock;
-	struct mutex DRAM_FB_lock;
-	uint16_t subcmd_refcnt;
-	uint8_t alloc_subcmd_refcnt;
-	bool is_VLM_info_IPI_sent; // to set VLM DRAM FB or clean setting
-	bool is_SLB_set;
-	bool is_work_canceled;
-	bool is_free_job_set;
-	bool is_SLB_alloc; // Since SLB state might not sync with APU
-};
-
 struct apummu_tbl g_ammu_table_set;
 struct apummu_session_tbl *g_ammu_stable_ptr; // stable stand for session table
 
@@ -971,8 +957,6 @@ void ammu_session_table_check_SLB(uint32_t type)
 /* Init lust head, lock */
 void apummu_mgt_init(void)
 {
-	char wq_name[] = "ammu_dram_free";
-
 	g_ammu_table_set.is_VLM_info_IPI_sent = false;
 	g_ammu_table_set.is_SLB_set = false;
 	g_ammu_table_set.is_work_canceled = true;
@@ -982,7 +966,7 @@ void apummu_mgt_init(void)
 	mutex_init(&g_ammu_table_set.DRAM_FB_lock);
 
 	INIT_DELAYED_WORK(&DRAM_free_work, ammu_DRAM_free_work);
-	ammu_workq = alloc_ordered_workqueue(wq_name, WQ_MEM_RECLAIM);
+	ammu_workq = alloc_ordered_workqueue("ammu_dram_free", WQ_MEM_RECLAIM);
 }
 
 /* apummu_mgt_destroy session table set */

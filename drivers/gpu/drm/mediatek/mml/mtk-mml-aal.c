@@ -389,7 +389,7 @@ static const struct aal_data mt6991_mmlt_aal_data = {
 	.tile_width = 560,
 	.min_hist_width = 128,
 	.gpr = {CMDQ_GPR_R12, CMDQ_GPR_R14},
-	.cpr = {CMDQ_CPR_MML_PQ0_ADDR, CMDQ_CPR_MML_PQ1_ADDR},
+	.cpr = {CMDQ_CPR_MML0_PQ0_ADDR, CMDQ_CPR_MML0_PQ1_ADDR},
 	.reg_table = aal_reg_table_mt6897,
 	.alpha_pq_r2y = true,
 	.rb_mode = RB_EOF_MODE,
@@ -553,9 +553,9 @@ static s32 aal_tile_prepare(struct mml_comp *comp, struct mml_task *task,
 		func->l_tile_loss = 0;
 		func->r_tile_loss = 0;
 	}
-	func->in_min_width = max(min(aal->data->min_hist_width,
-				     (u32)func->full_size_x_in),
-				 aal->data->min_tile_width);
+	if (!aal_frm->relay_mode)
+		func->in_min_width = max(min(aal->data->min_hist_width, (u32)func->full_size_x_in),
+			aal->data->min_tile_width);
 
 	return 0;
 }
@@ -715,7 +715,6 @@ static s32 aal_hist_ctrl(struct mml_comp *comp, struct mml_task *task,
 	struct mml_task_reuse *reuse = NULL;
 	struct mml_pipe_cache *cache = NULL;
 	struct aal_frame_data *aal_frm = NULL;
-	struct mml_frame_dest *dest = NULL;
 
 	if (IS_ERR_OR_NULL(task) || IS_ERR_OR_NULL(task->pq_task)) {
 		mml_err("%s task or pq_task is NULL", __func__);
@@ -729,7 +728,6 @@ static s32 aal_hist_ctrl(struct mml_comp *comp, struct mml_task *task,
 	reuse = &task->reuse[ccfg->pipe];
 	cache = &cfg->cache[ccfg->pipe];
 	aal_frm = aal_frm_data(ccfg);
-	dest = &cfg->info.dest[ccfg->node->out_idx];
 
 	if (mode != MML_MODE_DDP_ADDON && mode != MML_MODE_DIRECT_LINK)
 		return 0;
@@ -762,11 +760,11 @@ static s32 aal_hist_ctrl(struct mml_comp *comp, struct mml_task *task,
 		task->pq_task->read_status.aal_comp);
 
 	if (is_config)
-		mml_write(pkt, base_pa + aal->data->reg_table[AAL_INTSTA],
+		mml_write(comp->id, pkt, base_pa + aal->data->reg_table[AAL_INTSTA],
 			0x0, U32_MAX, reuse, cache,
 			&aal_frm->labels[0]);
 	else
-		mml_update(reuse, aal_frm->labels[0], 0x0);
+		mml_update(comp->id, reuse, aal_frm->labels[0], 0x0);
 
 	if (task->pq_task->read_status.aal_comp == MML_PQ_HIST_IDLE) {
 
@@ -823,19 +821,19 @@ static s32 aal_hist_ctrl(struct mml_comp *comp, struct mml_task *task,
 			aal->mmlsys_comp = task->config->path[0]->mmlsys;
 
 			if (is_config)
-				mml_write(pkt, base_pa + aal->data->reg_table[AAL_INTEN],
+				mml_write(comp->id, pkt, base_pa + aal->data->reg_table[AAL_INTEN],
 					0x2, U32_MAX, reuse, cache,
 					&aal_frm->labels[1]);
 			else
-				mml_update(reuse, aal_frm->labels[1], 0x2);
+				mml_update(comp->id, reuse, aal_frm->labels[1], 0x2);
 		}
 		if (is_config)
-			mml_write(pkt, base_pa + aal->data->reg_table[AAL_SRAM_CFG],
+			mml_write(comp->id, pkt, base_pa + aal->data->reg_table[AAL_SRAM_CFG],
 				aal->hist_sram_idx << 6 | aal->hist_read_idx << 5 |
 				1 << 4,	0x7 << 4, reuse, cache,
 				&aal_frm->labels[2]);
 		else
-			mml_update(reuse, aal_frm->labels[2], aal->hist_sram_idx << 6 |
+			mml_update(comp->id, reuse, aal_frm->labels[2], aal->hist_sram_idx << 6 |
 				aal->hist_read_idx << 5 | 1 << 4);
 
 		mml_pq_msg("%s: hist_sram_idx write to [%d], hist_read_idx change to[%d]",
@@ -853,18 +851,18 @@ static s32 aal_hist_ctrl(struct mml_comp *comp, struct mml_task *task,
 
 		if (aal_get_rb_mode(aal) == RB_EOF_MODE) {
 			if (is_config)
-				mml_write(pkt, base_pa + aal->data->reg_table[AAL_INTEN],
+				mml_write(comp->id, pkt, base_pa + aal->data->reg_table[AAL_INTEN],
 					0x0, U32_MAX, reuse, cache,
 					&aal_frm->labels[1]);
 			else
-				mml_update(reuse, aal_frm->labels[1], 0x0);
+				mml_update(comp->id, reuse, aal_frm->labels[1], 0x0);
 		}
 		if (is_config)
-			mml_write(pkt, base_pa + aal->data->reg_table[AAL_SRAM_CFG],
+			mml_write(comp->id, pkt, base_pa + aal->data->reg_table[AAL_SRAM_CFG],
 				aal->hist_sram_idx << 6 | 1 << 4,
 				0x5 << 4, reuse, cache, &aal_frm->labels[2]);
 		else
-			mml_update(reuse, aal_frm->labels[2], aal->hist_sram_idx << 6 | 1 << 4);
+			mml_update(comp->id, reuse, aal_frm->labels[2], aal->hist_sram_idx << 6 | 1 << 4);
 	}
 
 	mml_pq_msg("%s: hist_sram_idx write to [%d], hist_read_idx[%d]",
@@ -948,11 +946,11 @@ static void aal_write_curve(struct mml_comp *comp, struct mml_task *task,
 	mml_lock_wake_lock(aal->mml, false);
 
 	if (is_config)
-		mml_write(pkt, base_pa + aal->data->reg_table[AAL_SRAM_CFG],
+		mml_write(comp->id, pkt, base_pa + aal->data->reg_table[AAL_SRAM_CFG],
 			!aal->curve_sram_idx << 10 | aal->curve_sram_idx << 9 | 1 << 8,
 			0x7 << 8, reuse, cache, &aal_frm->labels[3]);
 	else
-		mml_update(reuse, aal_frm->labels[3], !aal->curve_sram_idx << 10 |
+		mml_update(comp->id, reuse, aal_frm->labels[3], !aal->curve_sram_idx << 10 |
 			aal->curve_sram_idx << 9 | 1 << 8);
 }
 
@@ -1063,7 +1061,7 @@ static s32 aal_config_frame(struct mml_comp *comp, struct mml_task *task,
 			base_pa + aal->data->reg_table[AAL_SRAM_STATUS],
 			(0x1 << aal->data->curve_ready_bit), gpr);
 		for (i = 0; i < AAL_CURVE_NUM; i++, addr += 4)
-			mml_write_array(pkt, base_pa + aal->data->reg_table[AAL_SRAM_RW_IF_1],
+			mml_write_array(comp->id, pkt, base_pa + aal->data->reg_table[AAL_SRAM_RW_IF_1],
 				curve[i], U32_MAX, reuse, cache, &aal_frm->reuse_curve);
 	} else if ((mode == MML_MODE_DDP_ADDON || mode == MML_MODE_DIRECT_LINK) &&
 		!aal->data->is_linear)
@@ -1387,9 +1385,9 @@ static void aal_readback_cmdq(struct mml_comp *comp, struct mml_task *task,
 	 */
 	cmdq_pkt_assign_command(pkt, idx_addr, dre30_hist_sram_start);
 
-	mml_assign(pkt, idx_out, (u32)pa,
+	mml_assign(comp->id, pkt, idx_out, (u32)pa,
 		reuse, cache, &aal_frm->labels[AAL_POLLGPR_0]);
-	mml_assign(pkt, idx_out + 1, (u32)DO_SHIFT_RIGHT(pa, 32),
+	mml_assign(comp->id, pkt, idx_out + 1, (u32)DO_SHIFT_RIGHT(pa, 32),
 		reuse, cache, &aal_frm->labels[AAL_POLLGPR_1]);
 
 
@@ -1527,7 +1525,7 @@ static void aal_readback_vcp(struct mml_comp *comp, struct mml_task *task,
 		&reuse->labels[reuse->label_idx],
 		&aal_frm->polling_reuse);
 
-	add_reuse_label(reuse, &aal_frm->labels[AAL_POLLGPR_0],
+	mml_add_reuse_label(comp->id, reuse, &aal_frm->labels[AAL_POLLGPR_0],
 		task->pq_task->aal_hist[pipe]->va_offset);
 
 	mml_pq_rb_msg("%s end job_id[%d] engine_id[%d] va[%p] pa[%pad] pkt[%p] offset[%d]",
@@ -1615,7 +1613,7 @@ static s32 aal_reconfig_frame(struct mml_comp *comp, struct mml_task *task,
 	if (mode == MML_MODE_MML_DECOUPLE || mode == MML_MODE_MML_DECOUPLE2) {
 		for (i = 0; i < aal_frm->reuse_curve.idx; i++)
 			for (j = 0; j < aal_frm->reuse_curve.offs[i].cnt; j++, idx++)
-				mml_update_array(reuse, &aal_frm->reuse_curve, i, j, curve[idx]);
+				mml_update_array(comp->id, reuse, &aal_frm->reuse_curve, i, j, curve[idx]);
 	} else if (mode == MML_MODE_DIRECT_LINK && !aal->data->is_linear)
 		aal_write_curve(comp, task, ccfg, curve, false);
 
@@ -1673,7 +1671,7 @@ static s32 aal_config_repost(struct mml_comp *comp, struct mml_task *task,
 		mml_pq_get_vcp_buf_offset(task, MML_PQ_AAL0+pipe,
 			task->pq_task->aal_hist[pipe]);
 
-		mml_update(reuse, aal_frm->labels[AAL_POLLGPR_0],
+		mml_update(comp->id, reuse, aal_frm->labels[AAL_POLLGPR_0],
 			cmdq_pkt_vcp_reuse_val(engine,
 			task->pq_task->aal_hist[pipe]->va_offset,
 			AAL_HIST_NUM + AAL_DUAL_INFO_NUM));
@@ -1694,9 +1692,9 @@ static s32 aal_config_repost(struct mml_comp *comp, struct mml_task *task,
 			goto comp_config_put;
 		}
 
-		mml_update(reuse, aal_frm->labels[AAL_POLLGPR_0],
+		mml_update(comp->id, reuse, aal_frm->labels[AAL_POLLGPR_0],
 			(u32)task->pq_task->aal_hist[pipe]->pa);
-		mml_update(reuse, aal_frm->labels[AAL_POLLGPR_1],
+		mml_update(comp->id, reuse, aal_frm->labels[AAL_POLLGPR_1],
 			(u32)DO_SHIFT_RIGHT(task->pq_task->aal_hist[pipe]->pa, 32));
 
 		begin_pa = cmdq_pkt_get_pa_by_offset(pkt, aal_frm->begin_offset);
@@ -2305,21 +2303,16 @@ static const struct component_ops mml_comp_ops = {
 	.unbind = mml_unbind,
 };
 
-static const struct mtk_ddp_comp_funcs ddp_comp_funcs = {
-};
-
 static struct mml_comp_aal *dbg_probed_components[4];
 static int dbg_probed_count;
 
 static void aal_readback_work(struct work_struct *work_item)
 {
 	struct mml_comp_aal *aal = NULL;
-	u32 *phist0 = NULL;
 	struct mml_comp *comp = NULL;
 	void __iomem *base = NULL;
 
 	aal = container_of(work_item, struct mml_comp_aal, aal_readback_task);
-	phist0 = aal->phist;
 	comp = &aal->comp;
 	base = comp->base;
 
@@ -2427,7 +2420,6 @@ static void clarity_hist_work(struct work_struct *work_item)
 	struct mml_comp *comp = NULL;
 	struct cmdq_pkt *pkt = NULL;
 	struct cmdq_operand lop, rop;
-	struct mml_pq_task *pq_task = NULL;
 
 	const u16 idx_val = CMDQ_THR_SPR_IDX2;
 	u16 idx_out = 0;
@@ -2450,8 +2442,6 @@ static void clarity_hist_work(struct work_struct *work_item)
 	base_pa = comp->base_pa;
 	pkt = aal->hist_pkts[pipe];
 	idx_out = aal->data->cpr[aal->pipe];
-	pq_task = aal->pq_task;
-
 
 	mml_pq_ir_log("%s job_id[%d] eng_id[%d] cmd_buf_size[%zu] hist_cmd_done[%d]",
 		__func__, aal->jobid, comp->id,

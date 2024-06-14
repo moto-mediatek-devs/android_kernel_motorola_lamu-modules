@@ -226,12 +226,12 @@ paddr_t smmu_get_global_ste_pa(void)
 	return global_ste_pa;
 }
 
-void *smmu_get_cmdq_buf(int idx)
+void *smmu_get_cmdq_buf(unsigned int idx)
 {
 	return smmu_cmdqs[idx];
 }
 
-paddr_t smmu_get_cmdq_buf_pa(int idx)
+paddr_t smmu_get_cmdq_buf_pa(unsigned int idx)
 {
 	return mpool_va_to_pa(smmu_cmdqs[idx]);
 }
@@ -511,6 +511,24 @@ void add_to_exclusive_map_region(uint16_t vmid, uint64_t base, uint64_t size,
 	e->mode = mode;
 	vms->idt_exclusive_map_idx++;
 }
+/* Check memory address belongs to the VM */
+bool address_vm_range_check(struct smmu_vm *vm, uint64_t base, uint64_t end)
+{
+	int idx;
+
+	if (!vm)
+		return false;
+
+	for (idx = 0; idx < vm->identity_map_idx; idx++) {
+		if (base < vm->identity_map[idx].base)
+			continue;
+		else if (end > (vm->identity_map[idx].base + vm->identity_map[idx].size))
+			continue;
+		else
+			return true;
+	}
+	return false;
+}
 
 void add_to_map_region(struct smmu_vm *vm, uint64_t base, uint64_t size)
 {
@@ -749,13 +767,12 @@ void smmu_mem_init(uint level)
  */
 unsigned long smmu_s2_table_content_info(uint64_t ipa, uint32_t sid)
 {
-	uint64_t *step;
-	uint16_t vmid;
-	struct smmu_vm *vm;
+	uint64_t *step = NULL;
+	uint16_t vmid = 0;
+	struct smmu_vm *vm = NULL;
 	struct smmu_vm_locked locked;
-	uint64_t ipa_upper_bit, ipa_lower_bit, combine_ipa, ret_value;
-
-	ret_value = 0;
+	uint64_t ipa_upper_bit = 0ULL, ipa_lower_bit = 0ULL, combine_ipa = 0ULL,
+		 ret_value = 0ULL;
 
 	if (sid >= SID_CNT) {
 		pkvm_smmu_ops->puts("[ERROR]Invalid sid");

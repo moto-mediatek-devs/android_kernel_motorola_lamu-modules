@@ -46,6 +46,7 @@ struct mtk_dsi_driver_data {
 	const u32 reg_vm_cmd_data10_ofs;
 	const u32 reg_vm_cmd_data20_ofs;
 	const u32 reg_vm_cmd_data30_ofs;
+	const u32 reg_dsi_input_dbg_ofs;
 	s32 (*poll_for_idle)(struct mtk_dsi *dsi, struct cmdq_pkt *handle);
 	irqreturn_t (*irq_handler)(int irq, void *dev_id);
 	char *esd_eint_compat;
@@ -57,6 +58,7 @@ struct mtk_dsi_driver_data {
 	const u32 sram_unit;
 	const u32 urgent_lo_fifo_us;
 	const u32 urgent_hi_fifo_us;
+	const u32 output_valid_fifo_us;
 	bool dsi_buffer;
 	bool smi_dbg_disable;
 	bool require_phy_reset; /* reset phy before trigger DSI */
@@ -91,6 +93,8 @@ struct mtk_dsi_driver_data {
 	const u32 dsi_ltpo_vdo_sq0;
 	bool support_512byte_rx;
 	bool support_bl_at_te;
+	const u32 dsi_rx_trig_sta;
+	const u32 dsi_rx_con;
 };
 
 struct mtk_dsi {

@@ -192,6 +192,7 @@ static int mt6877_clk_enable(struct apu_clk_gp *aclk)
 	}
 
 	if (ad->user == APUCONN) {
+		mutex_lock(&mt6877_clk_lock);
 		/* ACC only support some power domain */
 		for (usr = 0; usr < APUVB; usr++) {
 			dom = apu_dev2_domain(usr);
@@ -205,12 +206,14 @@ static int mt6877_clk_enable(struct apu_clk_gp *aclk)
 					aclk_info(aclk->dev, "domain@%d, enabled FAIL, ret = %lu\n",
 								dom, res.a0);
 					ret = res.a0;
+					mutex_unlock(&mt6877_clk_lock);
 					goto out;
 				}
 				ret = res.a0;
 			}
 		}
 		mt6877_clk_en = 1;
+		mutex_unlock(&mt6877_clk_lock);
 	}
 out:
 	mutex_unlock(&aclk->clk_lock);
@@ -240,6 +243,7 @@ static void mt6877_clk_disable(struct apu_clk_gp *aclk)
 	}
 
 	if (ad->user == APUCONN) {
+		mutex_lock(&mt6877_clk_lock);
 		/* ACC only support some power domain */
 		for (usr = 0; usr < APUVB; usr++) {
 			dom = apu_dev2_domain(usr);
@@ -252,6 +256,7 @@ static void mt6877_clk_disable(struct apu_clk_gp *aclk)
 				if (res.a0) {
 					aclk_err(aclk->dev, "domain@%d, disable FAIL, ret = %lu\n",
 								dom, res.a0);
+					mutex_unlock(&mt6877_clk_lock);
 					goto out;
 				}
 
@@ -263,11 +268,13 @@ static void mt6877_clk_disable(struct apu_clk_gp *aclk)
 				if (res.a0) {
 					aclk_err(aclk->dev, "domain@%d, set_parent SOC FAIL, ret = %lu\n",
 								dom, res.a0);
+					mutex_unlock(&mt6877_clk_lock);
 					goto out;
 				}
 			}
 		}
 		mt6877_clk_en = 0;
+		mutex_unlock(&mt6877_clk_lock);
 	}
 out:
 	mutex_unlock(&aclk->clk_lock);

@@ -1088,7 +1088,7 @@ void iavg_check(struct mtk_gauge *gauge_dev, int *offset_less, int *iavg_less)
 	int fg_iavg_reg_27_16 = 0;
 	int fg_iavg_reg_15_00 = 0;
 	int sign_bit = 0, dwa = 0, fg_int_mode = 0;
-	int r_fg_value, car_tune_value, valid_bit, iavg, is_bat_charging;
+	int r_fg_value, car_tune_value, valid_bit, iavg, is_bat_charging = 0;
 
 	r_fg_value = gauge_dev->hw_status.r_fg_value;
 	car_tune_value = gauge_dev->gm->fg_cust_data.car_tune_value;
@@ -1163,10 +1163,10 @@ void iavg_check(struct mtk_gauge *gauge_dev, int *offset_less, int *iavg_less)
 
 	regmap_read(gauge_dev->regmap, RG_FGADC_ANA_TEST_CON0, &dwa);
 	regmap_read(gauge_dev->regmap, RG_FGADC_ANA_CON0, &fg_int_mode);
-	bm_err(gauge_dev->gm, "[%s] iavg:%lld cic2:%d offset:%d 0x%x 0x%x %d %d\r\n",
+	bm_err(gauge_dev->gm, "[%s] iavg:%lld cic2:%d offset:%d 0x%x 0x%x %d %d is_bat_charging:%d\r\n",
 		__func__,
 		fg_iavg_ma, cic2, offset,
-		dwa, fg_int_mode, *offset_less, *iavg_less);
+		dwa, fg_int_mode, *offset_less, *iavg_less, is_bat_charging);
 }
 
 void iavg_workaround(struct mtk_gauge *gauge, enum gauge_event evt)
@@ -1547,7 +1547,7 @@ static int average_current_get(struct mtk_gauge *gauge_dev,
 	int fg_iavg_reg_27_16 = 0;
 	int fg_iavg_reg_15_00 = 0;
 	int sign_bit = 0;
-	int is_bat_charging;
+	int is_bat_charging = 0;
 	int iavg_vld;
 	int r_fg_value, car_tune_value;
 
@@ -1647,7 +1647,7 @@ static int average_current_get(struct mtk_gauge *gauge_dev,
 	*data = gauge_dev->fg_hw_info.current_avg;
 
 	gauge_dev->fg_hw_info.current_avg_valid = iavg_vld;
-	bm_debug(gauge_dev->gm, "[fg_get_current_iavg] %d %d\n", *data, iavg_vld);
+	bm_debug(gauge_dev->gm, "[fg_get_current_iavg] %d %d is_bat_charging:%d\n", *data, iavg_vld, is_bat_charging);
 
 	return 0;
 }
@@ -1967,7 +1967,11 @@ int hw_info_set(struct mtk_gauge *gauge_dev,
 	/* fg_offset = pmic_get_register_value(PMIC_FG_OFFSET); */
 
 	/* Iavg */
-	average_current_get(gauge_dev, NULL, &avg_current);
+	ret = average_current_get(gauge_dev, NULL, &avg_current);
+	if (ret) {
+		pr_notice("%s error, ret = %d\n", __func__, ret);
+		return ret;
+	}
 	is_iavg_valid = gauge_dev->fg_hw_info.current_avg_valid;
 	if ((is_iavg_valid == 1) && (gauge_status->iavg_intr_flag == 0)) {
 		bm_debug(gauge_dev->gm, "[read_fg_hw_info]set first fg_set_iavg_intr %d %d\n",
@@ -2807,6 +2811,12 @@ static int boot_zcv_get(struct mtk_gauge *gauge_dev,
 		__func__, _hw_ocv_58_pon_rdy, _hw_ocv_58_pon,
 		_hw_ocv_58_plugin, _hw_ocv_chgin, _sw_ocv, now_temp, now_thr);
 
+	return 0;
+}
+
+static int battery_cic2_get(struct mtk_gauge *gauge, struct mtk_gauge_sysfs_field_info *attr,
+			    int *val)
+{
 	return 0;
 }
 
@@ -3709,6 +3719,8 @@ static struct mtk_gauge_sysfs_field_info mt6358_sysfs_field_tbl[] = {
 		GAUGE_PROP_MONITOR_SOFF_VALIDTIME),
 	GAUGE_SYSFS_INFO_FIELD_RW(
 		info_con0_soc, GAUGE_PROP_CON0_SOC),
+	GAUGE_SYSFS_INFO_FIELD_RW(info_con1_uisoc, GAUGE_PROP_CON1_UISOC),
+	GAUGE_SYSFS_INFO_FIELD_RW(info_con1_vaild, GAUGE_PROP_CON1_VAILD),
 	GAUGE_SYSFS_INFO_FIELD_RW(
 		info_shutdown_car, GAUGE_PROP_SHUTDOWN_CAR),
 	GAUGE_SYSFS_INFO_FIELD_RW(
@@ -3723,6 +3735,7 @@ static struct mtk_gauge_sysfs_field_info mt6358_sysfs_field_tbl[] = {
 		bat_temp_froze_en_set, GAUGE_PROP_BAT_TEMP_FROZE_EN),
 	GAUGE_SYSFS_FIELD_RO(battery_voltage_cali, GAUGE_PROP_BAT_EOC),
 	GAUGE_SYSFS_FIELD_RO(regmap_type_get, GAUGE_PROP_REGMAP_TYPE),
+	GAUGE_SYSFS_FIELD_RO(battery_cic2_get, GAUGE_PROP_CIC2),
 };
 
 static struct attribute *mt6358_sysfs_attrs[GAUGE_PROP_MAX + 1];
@@ -4040,6 +4053,11 @@ static int adc_cali_cdev_init(struct mtk_battery *gm, struct platform_device *pd
 		bat_cali_devno,
 		NULL, BAT_CALI_DEVNAME);
 
+	if (IS_ERR(class_dev)) {
+		bm_err(gm, "%s, Failed to create cdev_device\n", __func__);
+		cdev_del(bat_cali_cdev);
+		return PTR_ERR(bat_cali_cdev);
+	}
 	return 0;
 }
 

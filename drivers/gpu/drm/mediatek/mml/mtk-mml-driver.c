@@ -107,7 +107,6 @@ module_param(mml_freq_for_tppa, int, 0644);
 
 struct mml_dpc {
 	atomic_t task_cnt;
-	atomic_t addon_task_cnt;
 	atomic_t exc_pw_cnt[mml_max_sys];
 	atomic_t dc_force_cnt[mml_max_sys];
 };
@@ -129,6 +128,7 @@ struct mml_dev {
 	struct cmdq_client *cmdq_clts[MML_MAX_CMDQ_CLTS];
 	u8 cmdq_clt_cnt;
 
+	u32 sw_ver;
 	atomic_t drm_cnt;
 	struct mml_drm_ctx *drm_ctx;
 	atomic_t dle_cnt;
@@ -463,6 +463,9 @@ u32 mml_qos_update_sys(struct mml_dev *mml, bool dpc,
 {
 	u32 sysid, tput = 0;
 	struct mml_topology_cache *tp = mml_topology_get_cache(mml);
+
+	if (unlikely(!tp))
+		return 0;
 
 	/* for all mmlsys, update the count to current path client reference count,
 	 * so that mml_qos_update_tput api could update throughput to running client.
@@ -1043,26 +1046,17 @@ struct device *mml_smmu_get_shared_device(struct device *dev, const char *name)
 	return shared_dev;
 }
 
-s32 mml_dpc_task_cnt_get(struct mml_task *task, bool addon_task)
+s32 mml_dpc_task_cnt_get(struct mml_task *task)
 {
 	struct mml_dev *mml = task->config->mml;
 
-	if (addon_task)
-		return atomic_read(&mml->dpc.addon_task_cnt);
-	else
-		return atomic_read(&mml->dpc.task_cnt);
+	return atomic_read(&mml->dpc.task_cnt);
 }
 
-void mml_dpc_task_cnt_inc(struct mml_task *task, bool addon_task)
+void mml_dpc_task_cnt_inc(struct mml_task *task)
 {
 	struct mml_dev *mml = task->config->mml;
-	s32 cur_task_cnt = atomic_read(&mml->dpc.task_cnt);
-	s32 cur_addon_task_cnt = atomic_read(&mml->dpc.addon_task_cnt);
-
-	if (addon_task)
-		cur_addon_task_cnt = atomic_inc_return(&mml->dpc.addon_task_cnt);
-	else
-		cur_task_cnt = atomic_inc_return(&mml->dpc.task_cnt);
+	s32 cur_task_cnt = atomic_inc_return(&mml->dpc.task_cnt);
 
 	if (cur_task_cnt == 1) {
 		const struct mml_topology_path *path = task->config->path[0];
@@ -1081,26 +1075,15 @@ void mml_dpc_task_cnt_inc(struct mml_task *task, bool addon_task)
 	}
 }
 
-void mml_dpc_task_cnt_dec(struct mml_task *task, bool addon_task)
+void mml_dpc_task_cnt_dec(struct mml_task *task)
 {
 	struct mml_dev *mml = task->config->mml;
-	s32 cur_task_cnt = atomic_read(&mml->dpc.task_cnt);
-	s32 cur_addon_task_cnt = atomic_read(&mml->dpc.addon_task_cnt);
+	s32 cur_task_cnt = atomic_dec_return(&mml->dpc.task_cnt);
 
-	if (addon_task) {
-		cur_addon_task_cnt = atomic_dec_return(&mml->dpc.addon_task_cnt);
-		if (cur_addon_task_cnt < 0) {
-			cur_addon_task_cnt = 0;
-			atomic_set(&mml->dpc.addon_task_cnt, 0);
-			mml_err("%s addon task_cnt < 0", __func__);
-		}
-	} else {
-		cur_task_cnt = atomic_dec_return(&mml->dpc.task_cnt);
-		if (cur_task_cnt < 0) {
-			cur_task_cnt = 0;
-			atomic_set(&mml->dpc.task_cnt, 0);
-			mml_err("%s task_cnt < 0", __func__);
-		}
+	if (cur_task_cnt < 0) {
+		cur_task_cnt = 0;
+		atomic_set(&mml->dpc.task_cnt, 0);
+		mml_err("%s task_cnt < 0", __func__);
 	}
 
 	if (cur_task_cnt == 0) {
@@ -1365,6 +1348,8 @@ void mml_comp_qos_set(struct mml_comp *comp, struct mml_task *task,
 	if (cfg->dpc) {
 		task->dpc_srt_bw[comp->sysid] += comp->srt_bw;
 		task->dpc_hrt_bw[comp->sysid] += comp->hrt_bw;
+		task->dpc_srt_write_bw[comp->sysid] += stash_srt_bw;
+		task->dpc_hrt_write_bw[comp->sysid] += stash_hrt_bw;
 	}
 
 	mml_mmp(bandwidth, MMPROFILE_FLAG_PULSE, comp->id, (comp->srt_bw << 16) | comp->hrt_bw);
@@ -1379,15 +1364,21 @@ void mml_comp_qos_set(struct mml_comp *comp, struct mml_task *task,
 void mml_comp_qos_clear(struct mml_comp *comp, bool dpc)
 {
 #ifndef MML_FPGA
-	if (dpc)
+	if (dpc) {
 		mtk_icc_set_bw(comp->icc_dpc_path, 0, 0);
-	else
+		if (comp->icc_dpc_stash_path)
+			mtk_icc_set_bw(comp->icc_dpc_stash_path, 0, 0);
+	} else {
 		mtk_icc_set_bw(comp->icc_path, 0, 0);
+		if (comp->icc_stash_path)
+			mtk_icc_set_bw(comp->icc_stash_path, 0, 0);
+	}
 #endif
 	comp->srt_bw = 0;
 	comp->hrt_bw = 0;
 
-	mml_msg_qos("%s comp %u %s qos bw clear", __func__, comp->id, comp->name);
+	mml_msg_qos("%s comp %u %s qos bw clear%s",
+		__func__, comp->id, comp->name, dpc ? " dpc" : "");
 }
 
 static const struct mml_comp_hw_ops mml_hw_ops = {
@@ -2045,6 +2036,41 @@ static const struct component_ops sys_comp_ops = {
 	.unbind = sys_unbind,
 };
 
+struct tag_chipid {
+	u32 size;
+	u32 hw_code;
+	u32 hw_subcode;
+	u32 hw_ver;
+	u32 sw_ver;
+};
+
+static void mml_get_chipid(struct mml_dev *mml)
+{
+	struct device_node *node;
+	struct tag_chipid *chip_id = NULL;
+	int len;
+
+	node = of_find_node_by_path("/chosen");
+	if (!node)
+		node = of_find_node_by_path("/chosen@0");
+	if (node) {
+		chip_id = (struct tag_chipid *) of_get_property(node, "atag,chipid", &len);
+		if (!chip_id)
+			mml_log("could not found atag,chipid in chosen");
+	} else {
+		mml_log("chosen node not found in device tree");
+	}
+	if (chip_id)
+		mml->sw_ver = chip_id->sw_ver;
+	mml_log("current sw version:%#x\n", mml->sw_ver);
+}
+
+u32 mml_get_chip_swver(struct mml_dev *mml)
+{
+	return mml->sw_ver;
+}
+EXPORT_SYMBOL_GPL(mml_get_chip_swver);
+
 static bool dbg_probed;
 static int mml_probe(struct platform_device *pdev)
 {
@@ -2113,6 +2139,8 @@ static int mml_probe(struct platform_device *pdev)
 	mml->v4l2_en = of_property_read_bool(dev->of_node, "v4l2-enable");
 
 	mml->tablet_ext = of_property_read_bool(dev->of_node, "tablet-ext");
+
+	mml_get_chipid(mml);
 
 	if (of_property_read_u8(dev->of_node, "racing-height", &mml->racing_height))
 		mml->racing_height = 64;	/* default height 64px */

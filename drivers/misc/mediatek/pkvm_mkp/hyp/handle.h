@@ -9,9 +9,9 @@
 #include "lib/spinlock.h"
 #include "policy.h"
 
-#define cpu_reg(ctxt, r)	((ctxt)->regs.regs[r])
-#define DECLARE_REG(type, name, ctxt, reg)\
-			type name = (type)cpu_reg(ctxt, (reg))
+#define cpu_reg(regs, r)	(regs)->regs[r]
+#define DECLARE_REG(type, name, regs, reg)\
+			type name = (type)cpu_reg(regs, (reg))
 
 enum attr_type {
 	ATTR_RW = 0x0001,
@@ -96,7 +96,7 @@ static inline u32 sb_set_is_applied(u32 curr_attr)
 	return (curr_attr | ATTR_SB_SET);
 }
 
-void init_handle_manipulation(u64 dram_size, u64 smccc_trng_available);
+void init_handle_manipulation(u64 start_ipa, u64 dram_size, u64 smccc_trng_available);
 
 typedef struct hash_bucket {
 	struct handle_object *hList;

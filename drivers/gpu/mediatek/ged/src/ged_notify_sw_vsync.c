@@ -27,6 +27,7 @@
 #include "ged_dcs.h"
 #include "ged_kpi.h"
 #include "ged_eb.h"
+#include "ged_log.h"
 
 #if defined(CONFIG_MTK_GPUFREQ_V2)
 #include <ged_gpufreq_v2.h>
@@ -236,6 +237,8 @@ void ged_eb_dvfs_trace_dump(void)
 	GED_DVFS_COMMIT_TYPE eCommitType;
 	static int apply_lb_async;
 	int top_freq_diff = 0, sc_freq_diff = 0;
+	struct cmd_info custom_ceiling_info ={0};
+	struct cmd_info custom_boost_info ={0};
 
 	//struct GpuUtilization_Ex util_ex;
 
@@ -277,6 +280,26 @@ void ged_eb_dvfs_trace_dump(void)
 			ged_get_cur_limiter_ceil());
 		trace_tracing_mark_write(5566, "limitter_floor",
 			ged_get_cur_limiter_floor());
+		if (ged_get_cur_limiter_ceil() == LIMIT_POWERHAL) {
+			custom_ceiling_info = ged_dvfs_get_custom_ceiling_gpu_freq_info();
+			trace_tracing_mark_write(5566, "limitter_ceil_pid",
+				custom_ceiling_info.pid);
+			trace_tracing_mark_write(5566, "limitter_ceil_id",
+				custom_ceiling_info.user_id);
+			trace_tracing_mark_write(5566, "limitter_ceil_cus_val",
+				custom_ceiling_info.value);
+		}
+
+		if (ged_get_cur_limiter_floor() == LIMIT_POWERHAL) {
+			custom_boost_info = ged_dvfs_get_custom_boost_gpu_freq_info();
+			trace_tracing_mark_write(5566, "limitter_floor_pid",
+				custom_boost_info.pid);
+			trace_tracing_mark_write(5566, "limitter_floor_id",
+				custom_boost_info.user_id);
+			trace_tracing_mark_write(5566, "limitter_floor_cus_val",
+				custom_boost_info.value);
+		}
+
 
 		if (dcs_get_adjust_support() % 2 != 0)
 			trace_tracing_mark_write(5566, "preserve", g_force_disable_dcs);
@@ -285,11 +308,16 @@ void ged_eb_dvfs_trace_dump(void)
 			mtk_gpueb_sysram_read(SYSRAM_GPU_EB_26M_REPLACE));
 	}
 
-	if (ged_policy_state != POLICY_STATE_FB) {
+	if (eb_policy_state != POLICY_STATE_FB) {
 		trace_tracing_mark_write(5566, "t_gpu",
 			mtk_gpueb_sysram_read(SYSRAM_GPU_EB_USE_T_GPU));
 		trace_tracing_mark_write(5566, "t_gpu_target",
 			mtk_gpueb_sysram_read(SYSRAM_GPU_EB_USE_TARGET_GPU));
+		trace_GPU_DVFS__EB_Loading_dump(
+			mtk_gpueb_sysram_read(SYSRAM_GPU_EB_USE_GPU_LOADING),
+			mtk_gpueb_sysram_read(SYSRAM_GPU_EB_USE_MCU_LOADING),
+			mtk_gpueb_sysram_read(SYSRAM_GPU_EB_USE_ITER_LOADING),
+			mtk_gpueb_sysram_read(SYSRAM_GPU_EB_USE_ITER_U_MCU_LOADING));
 	}
 
 	// LB async ratio on EB

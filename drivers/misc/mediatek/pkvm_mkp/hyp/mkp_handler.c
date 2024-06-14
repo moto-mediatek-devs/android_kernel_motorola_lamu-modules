@@ -15,6 +15,10 @@
 #undef memcpy
 #endif
 
+/* Default fix range */
+u64 FIX_END = ((uint64_t)0xfffffffefea00000);
+u64 FIX_START = ((uint64_t)0xfffffffefe438000);
+
 /* A64 TOP-LEVEL */
 #define A64_TL_LOAD_STORE_OP0		(0b0100 << 25)
 #define A64_TL_LOAD_STORE_MASK		(0b0101 << 25)
@@ -350,19 +354,25 @@ static u32 handle_low_el_dabt(struct user_pt_regs *regs, u64 fault_va, u64 pc_ip
 		u64 el2_gpa_va, u32 size)
 {
 	u64 pc_el2_va = pc_ipa;
-	u64 pc;
+	// u64 pc;
 	void *fixmap_ptr;
 	u32 inst = 0;
 	int ret = 0;
 
-	pc = read_sysreg_el2(SYS_ELR);
+	// pc = read_sysreg_el2(SYS_ELR);
 
 	if (pc_el2_va == 0) {
-		// trace_hyp_printk("[MKP] handle_low_el_dabt:%d: invalid pc_el2_va!", __LINE__);
+		module_ops->puts("handle_low_el_dabt: invalid pc_el2_va!");
 		goto no_err;
 	}
 
 	fixmap_ptr = module_ops->fixmap_map((u64)pc_el2_va);
+
+	if (!fixmap_ptr) {
+		module_ops->puts("handle_low_el_dabt: fixmap failed");
+		return 1;
+	}
+
 	inst = *(u32 *)fixmap_ptr;
 	module_ops->fixmap_unmap();
 
@@ -371,10 +381,14 @@ static u32 handle_low_el_dabt(struct user_pt_regs *regs, u64 fault_va, u64 pc_ip
 	//	inst, fault_va, el2_gpa_va);
 
 	ret = fix_store(regs, inst, el2_gpa_va, size);
+	if (ret == 0)
+		return 0;	/* For pKVM perm fault handler, return 0 will not trigger BUG_ON */
+
+	module_ops->puts("handle_low_el_dabt: failed to fix_store");
 
 no_err:
 	// trace_hyp_printk("[MKP] handle_low_el_dabt:%d - INST(%x)", __LINE__, inst);
-	return MKP_EXCEPTION_NO_ERROR;
+	return 1;		/* For pKVM perm fault handler, return 1 will trigger BUG_ON */
 }
 
 u32 mkp_sync_handler(struct user_pt_regs *regs)
@@ -383,10 +397,9 @@ u32 mkp_sync_handler(struct user_pt_regs *regs)
 	u64 far = read_sysreg_el2(SYS_FAR);
 	u64 hpfar = read_sysreg(hpfar_el2);
 	u64 el2_gpa_va = (hpfar & HPFAR_MASK) << 8 | (far & FAR_MASK);
-	bool l3_translation_fault = false;
-	u64 pc_el2_va, pc;
+	u64 pc_el2_va;
 	int line = 0;
-	u32 ret = 1;
+	u32 ret = 0;
 
 	/*
 	if (el2_gpa_va == 0) {
@@ -427,10 +440,6 @@ u32 mkp_sync_handler(struct user_pt_regs *regs)
 			break;
 		}
 
-		/* Tag it if translation level3 fault occurs */
-		if ((esr & ESR_ELx_FSC_FAULT) && ((esr & ESR_ELx_FSC_LEVEL) == 0x3))
-			l3_translation_fault = true;
-
 		/* Currently, it supports write data abort only */
 		if (!(esr & ESR_ELx_WNR)) {
 			line = __LINE__;
@@ -438,10 +447,11 @@ u32 mkp_sync_handler(struct user_pt_regs *regs)
 		}
 
 		/* Get pc ipa */
-		pc = read_sysreg_el2(SYS_ELR);
-		pc_el2_va = gva_to_par_ipa(pc) | (pc & (PAGE_SIZE - 1));
+		pc_el2_va = gva_to_par_ipa(regs->pc) | (regs->pc & (PAGE_SIZE - 1));
 
-		/* TODO: Is faulting va in the range of FIXADDR_xxx */
+		/* Is faulting va in the range of FIXADDR_xxx */
+		if (far >= FIX_END || far < FIX_START)
+			goto finish;
 
 		/* Start handling lower EL data abort */
 		ret = handle_low_el_dabt(regs, far, pc_el2_va, el2_gpa_va,
@@ -458,14 +468,19 @@ u32 mkp_sync_handler(struct user_pt_regs *regs)
 	}
 
 	/* MKP service tries to report something it fails to handle by injecting a dabt to EL1 */
-	/*
-	trace_hyp_printk("[MKP] mkp_sync_handler: failed to handle at %d - ESR_EL2(0x%lx) EC(0x%lx)",
-		line, esr, ESR_ELx_EC(esr));
-	trace_hyp_printk("[MKP] pc(%llx) gva(%llx) el2_gpa_va(%llx)", regs->pc, far, el2_gpa_va);
-	*/
-
+	module_ops->puts("mkp_sync_handler: failed to handle at line:");
+	module_ops->putx64(line);
+	module_ops->puts("ESR_EL2:");
+	module_ops->putx64(esr);
+	module_ops->puts("EC:");
+	module_ops->putx64((u64)ESR_ELx_EC(esr));
+	module_ops->puts("pc:");
+	module_ops->putx64((u64)regs->pc);
+	module_ops->puts("gva:");
+	module_ops->putx64(far);
+	module_ops->puts("el2_gpa_va:");
+	module_ops->putx64(el2_gpa_va);
 finish:
-
 	return ret;
 }
 

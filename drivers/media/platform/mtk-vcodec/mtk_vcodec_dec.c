@@ -1576,6 +1576,7 @@ static void mtk_vdec_queue_res_chg_event(struct mtk_vcodec_ctx *ctx)
 		V4L2_EVENT_SRC_CH_RESOLUTION,
 	};
 
+	ctx->waiting_fmt = true;
 	mtk_v4l2_debug(1, "[%d]", ctx->id);
 	v4l2_event_queue_fh(&ctx->fh, &ev_src_ch);
 
@@ -2410,8 +2411,12 @@ static int mtk_vcodec_dec_init(struct mtk_vcodec_ctx *ctx, struct mtk_q_data *q_
 {
 	int ret = 0;
 
-	if (!mtk_vcodec_is_state(ctx, MTK_STATE_FREE))
+	mutex_lock(&ctx->init_lock);
+
+	if (!mtk_vcodec_is_state(ctx, MTK_STATE_FREE)) {
+		mutex_unlock(&ctx->init_lock);
 		return 0;
+	}
 
 	ret = vdec_if_init(ctx, q_data->fmt->fourcc);
 	v4l2_m2m_set_dst_buffered(ctx->m2m_ctx, ctx->input_driven != NON_INPUT_DRIVEN);
@@ -2426,6 +2431,7 @@ static int mtk_vcodec_dec_init(struct mtk_vcodec_ctx *ctx, struct mtk_q_data *q_
 	} else
 		mtk_vcodec_set_state_from(ctx, MTK_STATE_INIT, MTK_STATE_FREE);
 
+	mutex_unlock(&ctx->init_lock);
 	return ret;
 }
 
@@ -3498,6 +3504,7 @@ static int vidioc_vdec_g_fmt(struct file *file, void *priv,
 		 * So we just return picinfo yet, and update picinfo in
 		 * stop_streaming hook function
 		 */
+		ctx->waiting_fmt = false;
 		for (i = 0; i < q_data->fmt->num_planes; i++) {
 			q_data->sizeimage[i] = ctx->picinfo.fb_sz[i];
 			q_data->bytesperline[i] =
@@ -4457,6 +4464,9 @@ static int m2mops_vdec_job_ready(void *m2m_priv)
 	int ret = 1;
 
 	if (!mtk_vcodec_is_state(ctx, MTK_STATE_HEADER))
+		ret = 0;
+
+	if (ctx->waiting_fmt)
 		ret = 0;
 
 	if ((ctx->last_decoded_picinfo.pic_w != ctx->picinfo.pic_w) ||

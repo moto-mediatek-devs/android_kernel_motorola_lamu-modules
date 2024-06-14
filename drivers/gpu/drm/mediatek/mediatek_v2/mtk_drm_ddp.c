@@ -3966,7 +3966,7 @@ same with 6873
 	#define MT6833_RSZ0_MOUT_TO_DISP_WDMA0_SEL              BIT(1)
 	#define MT6833_RSZ0_MOUT_TO_DISP_RDMA2_RSZ0_RSZ1_SOUT  BIT(2)
 #define MT6833_DISP_REG_CONFIG_DISP_DITHER0_MOUT_EN 0xF20
-	#define MT6833_DITHER0_MOUT_TO_DISP_DSI0_SEL     (0)
+	#define MT6833_DITHER0_MOUT_TO_DISP_DSI0_SEL     BIT(0)
 	#define MT6833_DITHER0_MOUT_TO_DISP_DISP_WDMA0       BIT(1)
 #define MT6833_DISP_REG_CONFIG_DISP_RSZ0_SEL_IN 0xF24
 	#define MT6833_RSZ0_SEL_IN_FROM_DISP_OVL0_2L     (0)
@@ -4068,6 +4068,7 @@ same with 6873
 #define MT6877_MUTEX_MOD_DISP_RSZ0 BIT(3)
 #define MT6877_MUTEX_MOD_DISP_COLOR0 BIT(4)
 #define MT6877_MUTEX_MOD_DISP_CCORR0 BIT(5)
+#define MT6877_MUTEX_MOD_DISP_CCORR1 BIT(6)
 #define MT6877_MUTEX_MOD_DISP_AAL0 BIT(7)
 #define MT6877_MUTEX_MOD_DISP_GAMMA0 BIT(8)
 #define MT6877_MUTEX_MOD_DISP_POSTMASK0 BIT(9)
@@ -5827,6 +5828,7 @@ static const unsigned int mt6877_mutex_mod[DDP_COMPONENT_ID_MAX] = {
 		[DDP_COMPONENT_RSZ0] = MT6877_MUTEX_MOD_DISP_RSZ0,
 		[DDP_COMPONENT_COLOR0] = MT6877_MUTEX_MOD_DISP_COLOR0,
 		[DDP_COMPONENT_CCORR0] = MT6877_MUTEX_MOD_DISP_CCORR0,
+		[DDP_COMPONENT_CCORR1] = MT6877_MUTEX_MOD_DISP_CCORR1,
 		[DDP_COMPONENT_AAL0] = MT6877_MUTEX_MOD_DISP_AAL0,
 		[DDP_COMPONENT_GAMMA0] = MT6877_MUTEX_MOD_DISP_GAMMA0,
 		[DDP_COMPONENT_POSTMASK0] = MT6877_MUTEX_MOD_DISP_POSTMASK0,
@@ -25673,17 +25675,27 @@ void mtk_gce_event_config_MT6991(struct drm_device *drm)
 	writel(MT6991_DISP1_GCE_FRAME_DONE_SEL5_WDMA3_FRAME_DONE,
 		priv->side_config_regs + MT6991_DISP1_GCE_FRAME_DONE_SEL5);
 
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+	writel(MT6991_DISP1_GCE_FRAME_DONE_SEL6_DSI2_FRAME_DONE,
+		priv->side_config_regs + MT6991_DISP1_GCE_FRAME_DONE_SEL6);
+
+	for (off = MT6991_DISP1_GCE_FRAME_DONE_SEL7;
+			off <= MT6991_DISP1_GCE_FRAME_DONE_SEL15; off += 0x4)
+		writel(~0, priv->side_config_regs + off);
+#else
 	for (off = MT6991_DISP1_GCE_FRAME_DONE_SEL6;
 			off <= MT6991_DISP1_GCE_FRAME_DONE_SEL15; off += 0x4)
 		writel(~0, priv->side_config_regs + off);
 
+#endif
 	SET_VAL_MASK(value, mask,
 		MT6991_OVLSYS0_GCE_FRAME_DONE_SEL0_WDMA1, GCE_FRAME_DONE_SEL0);
-	SET_VAL_MASK(value, mask, 0x3F, GCE_FRAME_DONE_SEL1);
+	SET_VAL_MASK(value, mask,
+		MT6991_OVLSYS0_GCE_FRAME_DONE_SEL0_WDMA0, GCE_FRAME_DONE_SEL1);
 	SET_VAL_MASK(value, mask, 0x3F, GCE_FRAME_DONE_SEL2);
 	SET_VAL_MASK(value, mask, 0x3F, GCE_FRAME_DONE_SEL3);
 	writel(value, priv->ovlsys0_regs + MT6991_OVLSYS_GCE_FRAME_DONE_SEL0);
-	writel(~0, priv->ovlsys0_regs + MT6991_OVLSYS_GCE_FRAME_DONE_SEL1);
+	writel(value, priv->ovlsys0_regs + MT6991_OVLSYS_GCE_FRAME_DONE_SEL1);
 	writel(~0, priv->ovlsys0_regs + MT6991_OVLSYS_GCE_FRAME_DONE_SEL2);
 	writel(~0, priv->ovlsys0_regs + MT6991_OVLSYS_GCE_FRAME_DONE_SEL3);
 
@@ -25970,8 +25982,10 @@ void mtk_ddp_add_comp_to_path(struct mtk_drm_crtc *mtk_crtc,
 		reg1 = 0;
 		/* decide which dispsys need to config */
 		if (mtk_crtc->dispsys_num > 1 && reg_data->dispsys_map &&
-				reg_data->dispsys_map[cur] == DISPSYS1)
+				reg_data->dispsys_map[cur] == DISPSYS1) {
 			config_regs = mtk_crtc->side_config_regs;
+			addr = MT6991_DISPSYS1_BYPASS_MUX_SHADOW;
+		}
 
 		if (reg_data->dispsys_map && (reg_data->dispsys_map[cur] == OVLSYS0 ||
 			reg_data->dispsys_map[next] == OVLSYS0)) {
@@ -26298,7 +26312,7 @@ void mtk_ddp_add_comp_to_path_with_cmdq(struct mtk_drm_crtc *mtk_crtc,
 					enum mtk_ddp_comp_id next,
 					struct cmdq_pkt *handle)
 {
-	unsigned int addr, reg, mask = 0;
+	unsigned int addr = 0, reg, mask = 0;
 	unsigned int addr1, reg1;
 	int value;
 	const struct mtk_mmsys_reg_data *reg_data = mtk_crtc->mmsys_reg_data;
@@ -26586,8 +26600,10 @@ void mtk_ddp_add_comp_to_path_with_cmdq(struct mtk_drm_crtc *mtk_crtc,
 		reg1 = 0;
 		/* decide which dispsys need to config */
 		if (mtk_crtc->dispsys_num > 1 && reg_data->dispsys_map &&
-				reg_data->dispsys_map[cur] == 1)
+				reg_data->dispsys_map[cur] == 1) {
 			config_regs_pa = mtk_crtc->side_config_regs_pa;
+			addr = MT6991_DISPSYS1_BYPASS_MUX_SHADOW;
+		}
 		if (reg_data) {
 			if (reg_data->dispsys_map &&
 				(reg_data->dispsys_map[cur] == OVLSYS0 ||
@@ -26987,7 +27003,7 @@ void mtk_ddp_remove_comp_from_path(struct mtk_drm_crtc *mtk_crtc,
 				   enum mtk_ddp_comp_id cur,
 				   enum mtk_ddp_comp_id next)
 {
-	unsigned int addr, reg, mask = 0;
+	unsigned int addr = 0, reg, mask = 0;
 	int value;
 	void __iomem *config_regs = NULL;
 	const struct mtk_mmsys_reg_data *reg_data  = NULL;
@@ -27310,7 +27326,7 @@ void mtk_ddp_remove_comp_from_path_with_cmdq(struct mtk_drm_crtc *mtk_crtc,
 					     enum mtk_ddp_comp_id next,
 					     struct cmdq_pkt *handle)
 {
-	unsigned int addr, mask = 0;
+	unsigned int addr = 0, mask = 0;
 	int value;
 	struct mtk_drm_private *priv = mtk_crtc->base.dev->dev_private;
 	const struct mtk_mmsys_reg_data *reg_data  = mtk_crtc->mmsys_reg_data;
@@ -30223,11 +30239,13 @@ void mtk_disp_mutex_add_comp_with_cmdq(struct mtk_drm_crtc *mtk_crtc,
 	resource_size_t regs_pa = 0;
 	resource_size_t ovlsys_regs_pa = 0;
 	unsigned int mmsys_id = 0;
-	struct mtk_drm_private *drm_priv = mtk_crtc->base.dev->dev_private;
+	struct mtk_drm_private *drm_priv;
 	unsigned int sof;
 
-	if (mtk_crtc)
+	if (mtk_crtc) {
+		drm_priv = mtk_crtc->base.dev->dev_private;
 		mmsys_id = mtk_get_mmsys_id(&mtk_crtc->base);
+	}
 	else {
 		DDPPR_ERR("%s, mtk_crtc is NULL\n", __func__);
 		return;
@@ -30877,7 +30895,8 @@ static irqreturn_t mtk_disp_mutex_irq_handler(int irq, void *dev_id)
 		DDPPR_ERR("%s private is null\n", __func__);
 		return IRQ_NONE;
 	}
-
+	if (!priv)
+		return IRQ_NONE;
 	irq_time[irq_time_index].comp = NULL;
 	irq_time[irq_time_index].time = sched_clock();
 	irq_time_index++;
@@ -33261,6 +33280,8 @@ void mmsys_config_dump_reg_mt6991(void __iomem *config_regs)
 
 	for (off = 0xC30; off <= 0xC40; off += 0x10)
 		mtk_serial_dump_reg(config_regs, off, 4);
+
+	mtk_serial_dump_reg(config_regs, 0xCF8, 1);
 
 	for (off = 0xD00; off <= 0xFF0; off += 0x10)
 		mtk_serial_dump_reg(config_regs, off, 4);

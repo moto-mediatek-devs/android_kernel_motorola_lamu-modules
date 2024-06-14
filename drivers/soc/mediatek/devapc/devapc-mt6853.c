@@ -138,14 +138,11 @@ static const char *mt6853_bus_id_to_master(uint32_t bus_id, uint32_t vio_addr,
 		int slave_type, int shift_sta_bit, uint32_t domain)
 {
 	const char *err_master = "UNKNOWN_MASTER";
-	uint8_t h_1byte;
 
 	pr_debug(PFX "[DEVAPC] %s:0x%x, %s:0x%x, %s:0x%x, %s:%d\n",
 		"bus_id", bus_id, "vio_addr", vio_addr,
 		"slave_type", slave_type,
 		"shift_sta_bit", shift_sta_bit);
-
-	h_1byte = (vio_addr >> 24) & 0xFF;
 
 	if ((vio_addr >= TINYSYS_START_ADDR && vio_addr <= TINYSYS_END_ADDR) ||
 	    (vio_addr >= MD_START_ADDR && vio_addr <= MD_END_ADDR)) {
@@ -323,7 +320,7 @@ static void mm2nd_vio_handler(void __iomem *infracfg,
 static uint32_t mt6853_shift_group_get(int slave_type, uint32_t vio_idx)
 {
 	if (slave_type == SLAVE_TYPE_INFRA) {
-		if (vio_idx >= 0 && vio_idx <= 3)
+		if (vio_idx <= 3)
 			return 0;
 		else if (vio_idx >= 4 && vio_idx <= 5)
 			return 1;
@@ -350,7 +347,7 @@ static uint32_t mt6853_shift_group_get(int slave_type, uint32_t vio_idx)
 				__func__, __LINE__, vio_idx);
 
 	} else if (slave_type == SLAVE_TYPE_PERI) {
-		if ((vio_idx >= 0 && vio_idx <= 2) ||
+		if ((vio_idx <= 2) ||
 		    (vio_idx >= 132 && vio_idx <= 135) ||
 		    vio_idx == 186)
 			return 0;
@@ -390,7 +387,7 @@ static uint32_t mt6853_shift_group_get(int slave_type, uint32_t vio_idx)
 				__func__, __LINE__, vio_idx);
 
 	} else if (slave_type == SLAVE_TYPE_PERI2) {
-		if ((vio_idx >= 0 && vio_idx <= 2) ||
+		if ((vio_idx <= 2) ||
 		    (vio_idx >= 106 && vio_idx <= 109) ||
 		    vio_idx == 212)
 			return 0;
@@ -431,7 +428,7 @@ static uint32_t mt6853_shift_group_get(int slave_type, uint32_t vio_idx)
 				__func__, __LINE__, vio_idx);
 
 	} else if (slave_type == SLAVE_TYPE_PERI_PAR) {
-		if ((vio_idx >= 0 && vio_idx <= 2) ||
+		if ((vio_idx <= 2) ||
 		    (vio_idx >= 29 && vio_idx <= 30) ||
 		    vio_idx == 60)
 			return 0;

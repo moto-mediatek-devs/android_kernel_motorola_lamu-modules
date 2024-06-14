@@ -40,13 +40,14 @@ void mml_dpc_mtcmos_vote(const enum mtk_dpc_subsys subsys,
 			 const u8 thread, const bool en);
 int mml_dpc_power_keep(u32 sysid);
 void mml_dpc_power_release(u32 sysid);
-int mml_dpc_power_keep_gce(u32 sysid, struct cmdq_pkt *pkt);
+int mml_dpc_power_keep_gce(u32 sysid, struct cmdq_pkt *pkt, u16 gpr, struct cmdq_reuse *reuse);
 void mml_dpc_power_release_gce(u32 sysid, struct cmdq_pkt *pkt);
 void mml_dpc_hrt_bw_set(u32 sysid, const u32 bw_in_mb, bool force_keep);
 void mml_dpc_srt_bw_set(u32 sysid, const u32 bw_in_mb, bool force_keep);
 void mml_dpc_dvfs_set(const u8 level, bool force);
 void mml_dpc_dvfs_both_set(u32 sysid, const u8 level, bool force_keep, const u32 bw_in_mb);
 void mml_dpc_dvfs_trigger(void);
+void mml_dpc_channel_bw_set_by_idx(u32 sysid, u32 bw, bool hrt);
 
 void mml_dpc_dump(void);
 

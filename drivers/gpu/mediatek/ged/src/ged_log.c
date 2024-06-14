@@ -855,7 +855,7 @@ GED_ERROR ged_log_buf_print(GED_LOG_BUF_HANDLE hLogBuf, const char *fmt, ...)
 		err = __ged_log_buf_vprint(psGEDLogBuf,
 			fmt, args, psGEDLogBuf->attrs);
 		if (err != GED_OK)
-			GED_LOGD("@%s err:%d\n", err, __func__);
+			GED_LOGD("@%s err:%d\n", __func__, err);
 		va_end(args);
 	}
 
@@ -878,7 +878,7 @@ GED_ERROR ged_log_buf_print2(GED_LOG_BUF_HANDLE hLogBuf,
 		err = __ged_log_buf_vprint(psGEDLogBuf, fmt,
 			args, psGEDLogBuf->attrs | i32LogAttrs);
 		if (err != GED_OK)
-			GED_LOGD("@%s err:%d\n", err, __func__);
+			GED_LOGD("@%s err:%d\n", __func__, err);
 		va_end(args);
 	}
 
@@ -1234,3 +1234,62 @@ static const struct kernel_param_ops ged_log_perf_trace_enable_ops = {
 
 module_param_cb(ged_log_perf_trace_enable, &ged_log_perf_trace_enable_ops,
 	&ged_log_perf_trace_enable, 0644);
+
+static int sys_get_process_name_by_pid(int pid, char *buf, int len)
+{
+	struct task_struct *task;
+	char *name = NULL;
+
+	rcu_read_lock();
+	task = find_task_by_vpid(pid);
+	rcu_read_unlock();
+
+	if (task != NULL) {
+		// name = task->comm;
+		name = kstrdup_quotable_cmdline(task, GFP_KERNEL);
+		strscpy(buf, name, len);
+	}
+
+	if(name != NULL)
+		kfree(name);
+	if (strstr(buf, "/system/bin/sh") != NULL)
+		return 1;
+	else if (strstr(buf, "mtkpower") != NULL)
+		return 2;
+
+	return 0;
+}
+
+void init_cmd_info(struct cmd_info *cmd, unsigned int value)
+{
+	char *initial = "initial";
+
+	cmd->pid = 0;
+	cmd->value = value;
+	cmd->ori_value = value;
+	cmd->ts = 0;
+	strscpy(cmd->buffer, initial, MAX_NAME_SIZE);
+	cmd->user_id = 0;
+}
+
+void set_cmd_info(struct cmd_info *cmd, unsigned int ori_value, unsigned int value)
+{
+	cmd->pid = current->tgid;
+	cmd->value = value;
+	cmd->ori_value = ori_value;
+	cmd->ts = ged_get_time();
+	cmd->user_id = sys_get_process_name_by_pid(cmd->pid, cmd->buffer, MAX_NAME_SIZE);
+}
+
+ssize_t get_cmd_info_dump(char *buf, int sz, ssize_t pos, struct cmd_info *cmd)
+{
+	int length;
+
+	length = scnprintf(buf + pos, sz - pos,
+					  "%llu:pid:%u ori:%u value:%u user_id:%d(%s) ",
+					  cmd->ts, cmd->pid, cmd->value, cmd->ori_value, cmd->user_id, cmd->buffer);
+	pos += length;
+
+	return pos;
+}
+

@@ -299,7 +299,7 @@ repeat:
 	ret = tcpm_inquire_pd_source_apdo(info->tcpc[active_idx],
 					  TCPM_POWER_CAP_APDO_TYPE_PPS,
 					  &cap_idx, &apdo_cap);
-	if (ret != TCPM_SUCCESS)
+	if (ret != (int) TCPM_SUCCESS)
 		goto out;
 
 	/* If TA has PDP, we set pwr_limit as true */
@@ -333,18 +333,18 @@ out:
 static inline int pd_get_cap_pdo(struct mtk_pd_adapter_info *info,
 				 int active_idx, struct adapter_power_cap *cap)
 {
-	struct tcpm_remote_power_cap pd_cap;
+	struct tcpm_remote_power_cap pd_cap = {0};
 	int ret = 0, i = 0, j = 0;
 
 	ret = tcpm_get_remote_power_cap(info->tcpc[active_idx], &pd_cap);
-	if (ret != TCPM_SUCCESS || pd_cap.nr == 0)
+	if (ret != (int) TCPM_SUCCESS || pd_cap.nr == 0)
 		return MTK_ADAPTER_ERROR;
 
 	dev_info(info->dev, "%s nr:%d idx:%d\n",
 			    __func__, pd_cap.nr, pd_cap.selected_cap_idx);
 	cap->selected_cap_idx = pd_cap.selected_cap_idx - 1;
 	for (i = 0, j = 0; i < pd_cap.nr && j < ADAPTER_CAP_MAX_NR; i++) {
-		if (pd_cap.type[i] != TCPM_POWER_CAP_VAL_TYPE_FIXED)
+		if (pd_cap.type[i] != (int) TCPM_POWER_CAP_VAL_TYPE_FIXED)
 			continue;
 
 		cap->max_mv[j] = pd_cap.max_mv[i];
@@ -384,7 +384,7 @@ static int pd_get_cap(struct adapter_device *dev, enum adapter_cap_type type,
 
 	ret = tcpm_dpm_pd_get_source_cap_ext(info->tcpc[active_idx],
 					     NULL, &src_cap_ext);
-	if (ret == TCP_DPM_RET_SUCCESS)
+	if (ret == (int) TCP_DPM_RET_SUCCESS)
 		cap->pdp = src_cap_ext.source_pdp;
 
 	if (type == MTK_PD_APDO)
@@ -465,7 +465,7 @@ repeat:
 	ret = tcpm_inquire_pd_source_apdo(info->tcpc[active_idx],
 					  TCPM_POWER_CAP_APDO_TYPE_PPS,
 					  &cap_idx, &apdo_cap);
-	if (ret != TCPM_SUCCESS) {
+	if (ret != (int) TCPM_SUCCESS) {
 		if (apdo_idx == 0)
 			dev_notice(info->dev, "%s inquire pd apdo fail(%d)\n",
 					      __func__, ret);
@@ -716,6 +716,11 @@ static int mtk_pd_adapter_probe(struct platform_device *pdev)
 
 	return 0;
 out:
+	if (!info->tcpc) {
+		ret = -ENODEV;
+		mutex_destroy(&info->idx_lock);
+		return ret;
+	}
 	mtk_pd_adapter_remove_helper(info);
 
 	return ret;

@@ -19,6 +19,7 @@
 #include <linux/vmalloc.h>
 #include <linux/sched/clock.h>
 #include <linux/sched.h>
+#include <linux/kmemleak.h>
 #include <asm/div64.h>
 #include <mt-plat/fpsgo_common.h>
 #include "../fbt/include/fbt_cpu.h"
@@ -28,6 +29,7 @@
 #include "fstb.h"
 #include "fstb_usedext.h"
 #include "fpsgo_usedext.h"
+#include "fps_composer.h"
 
 #if IS_ENABLED(CONFIG_MTK_GPU_SUPPORT)
 #include "ged_kpi.h"
@@ -789,11 +791,27 @@ static void switch_fstb_active(void)
 	enable_fstb_timer();
 }
 
+static int is_exceed_max_fstb_frame_info_num(void)
+{
+	int num = 0;
+	struct FSTB_FRAME_INFO *iter = NULL;
+	struct hlist_node *h = NULL;
+
+	hlist_for_each_entry_safe(iter, h, &fstb_frame_infos, hlist) {
+		num++;
+	}
+
+	return (num > FPSGO_MAX_RENDER_INFO_SIZE);
+}
+
 static struct FSTB_FRAME_INFO *add_new_frame_info(int pid, unsigned long long bufID,
 	int hwui_flag, unsigned long master_type)
 {
 	struct task_struct *tsk = NULL, *gtsk = NULL;
 	struct FSTB_FRAME_INFO *new_frame_info;
+
+	if (is_exceed_max_fstb_frame_info_num())
+		return NULL;
 
 	new_frame_info = vmalloc(sizeof(*new_frame_info));
 	if (new_frame_info == NULL)
@@ -846,6 +864,8 @@ static struct FSTB_FRAME_INFO *add_new_frame_info(int pid, unsigned long long bu
 		new_frame_info->proc_name[0] = '\0';
 		new_frame_info->proc_id = 0;
 	}
+
+	kmemleak_not_leak(new_frame_info);
 
 out:
 	return new_frame_info;
@@ -1883,9 +1903,14 @@ void fpsgo_comp2fstb_notify_info(int pid, unsigned long long bufID,
 	fstb_post_process_target_fps(local_final_tfps, local_fps_margin,
 		iter->target_fps_diff, &local_final_tfps, NULL, NULL);
 
-	if (!test_bit(USER_TYPE, &iter->master_type))
-		ged_kpi_set_target_FPS_margin(iter->bufid, local_final_tfps,
-			local_fps_margin, iter->target_fps_diff, iter->cpu_time);
+	if (!test_bit(USER_TYPE, &iter->master_type)) {
+		if (!fpsgo_com_get_mfrc_is_on())
+			ged_kpi_set_target_FPS_margin(iter->bufid, local_final_tfps,
+				local_fps_margin, iter->target_fps_diff, iter->cpu_time);
+		else
+			ged_kpi_set_target_FPS_margin(iter->bufid, local_final_tfps * 2,
+				local_fps_margin, iter->target_fps_diff, iter->cpu_time);
+	}
 
 	if (fpsgo2msync_hint_frameinfo_fp)
 		fpsgo2msync_hint_frameinfo_fp(pid, bufID,
@@ -2523,7 +2548,6 @@ static ssize_t set_render_max_fps_store(struct kobject *kobj,
 {
 	char *acBuffer = NULL;
 	int arg;
-	int ret = 0;
 
 	acBuffer = kcalloc(FPSGO_SYSFS_MAX_BUFF_SIZE, sizeof(char), GFP_KERNEL);
 	if (!acBuffer)
@@ -2536,9 +2560,9 @@ static ssize_t set_render_max_fps_store(struct kobject *kobj,
 			fpsgo_systrace_c_fstb_man(arg > 0 ? arg : -arg,
 				0, arg > 0, "force_max_fps");
 			if (arg > 0)
-				ret = switch_thread_max_fps(arg, 1);
+				switch_thread_max_fps(arg, 1);
 			else
-				ret = switch_thread_max_fps(-arg, 0);
+				switch_thread_max_fps(-arg, 0);
 		}
 	}
 
@@ -2601,7 +2625,6 @@ static ssize_t fstb_fps_list_store(struct kobject *kobj,
 	int  nr_level, start_fps, end_fps;
 	int mode = 1;
 	int pid = 0;
-	int ret = 0;
 	struct fps_level level[MAX_NR_RENDER_FPS_LEVELS];
 
 	acBuffer = kcalloc(FPSGO_SYSFS_MAX_BUFF_SIZE, sizeof(char), GFP_KERNEL);
@@ -2614,10 +2637,9 @@ static ssize_t fstb_fps_list_store(struct kobject *kobj,
 			sepstr = acBuffer;
 
 			substr = strsep(&sepstr, " ");
-			if (!substr || !strncpy(proc_name, substr, 16)) {
-				ret = -EINVAL;
+			if (!substr || strscpy(proc_name, substr, 16) <= 0)
 				goto err;
-			}
+
 			proc_name[15] = '\0';
 
 			if (kstrtoint(proc_name, 10, &pid) != 0)
@@ -2627,37 +2649,28 @@ static ssize_t fstb_fps_list_store(struct kobject *kobj,
 
 			if (!substr || kstrtoint(substr, 10, &nr_level) != 0 ||
 					nr_level > MAX_NR_RENDER_FPS_LEVELS ||
-					nr_level < 0) {
-				ret = -EINVAL;
+					nr_level < 0)
 				goto err;
-			}
 
 			for (i = 0; i < nr_level; i++) {
 				substr = strsep(&sepstr, " ");
-				if (!substr) {
-					ret = -EINVAL;
+				if (!substr)
 					goto err;
-				}
 
 				if (sscanf(substr, "%d-%d",
-					&start_fps, &end_fps) != 2) {
-					ret = -EINVAL;
+					&start_fps, &end_fps) != 2)
 					goto err;
-				}
+
 				level[i].start = start_fps;
 				level[i].end = end_fps;
 			}
 
-			if (mode == 0) {
-				if (switch_process_fps_range(proc_name,
-					nr_level, level))
-					ret = -EINVAL;
-			} else {
-				if (switch_thread_fps_range(pid,
-					nr_level, level))
-					ret = -EINVAL;
-			}
-
+			if (mode == 0)
+				switch_process_fps_range(proc_name,
+					nr_level, level);
+			else
+				switch_thread_fps_range(pid,
+					nr_level, level);
 		}
 	}
 

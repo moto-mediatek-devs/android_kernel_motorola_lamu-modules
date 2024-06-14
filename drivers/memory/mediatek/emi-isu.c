@@ -22,6 +22,7 @@ struct emi_isu {
 	void __iomem *ver_addr;
 	void __iomem *con_addr;
 	unsigned int ctrl_intf;
+	unsigned int enable;
 };
 
 /* global pointer for sysfs operations*/
@@ -45,6 +46,28 @@ void mtk_emiisu_record_off(void)
 	dsb(sy);
 }
 EXPORT_SYMBOL(mtk_emiisu_record_off);
+
+void mtk_emiisu_record_on(void)
+{
+	struct emi_isu *isu;
+
+	if (!global_emi_isu)
+		return;
+
+	isu = global_emi_isu;
+
+	if (!(isu->con_addr))
+		return;
+
+	if (!(isu->enable))
+		return;
+
+	writel(0xDECDDECDU, isu->con_addr);
+	pr_info("%s: Turn on EMIISU dump\n", __func__);
+
+	dsb(sy);
+}
+EXPORT_SYMBOL(mtk_emiisu_record_on);
 
 static ssize_t emiisu_ctrl_show(struct device_driver *driver, char *buf)
 {
@@ -225,6 +248,10 @@ static int emiisu_probe(struct platform_device *pdev)
 		isu->con_addr = ioremap((phys_addr_t)addr_temp, 4);
 	else
 		isu->con_addr = NULL;
+
+	if (isu->con_addr)
+		if (readl(isu->con_addr) == 0xDECDDECD)
+			isu->enable = 1;
 
 	ret = of_property_read_u32(emiisu_node,
 		"ctrl-intf", &(isu->ctrl_intf));

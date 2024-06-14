@@ -40,6 +40,9 @@ module_param_array(debug_channel_bw, int, NULL, 0644);
 int debug_ostdl;
 module_param(debug_ostdl, int, 0644);
 
+int debug_deteriorate;
+module_param(debug_deteriorate, int, 0644);
+
 #if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
 #define CRTC_NUM		7
 #else
@@ -215,11 +218,16 @@ int __mtk_disp_pmqos_slot_look_up(int comp_id, int mode)
 	return -EINVAL;
 }
 
+void mtk_disp_clr_debug_deteriorate(void)
+{
+	debug_deteriorate = 0;
+}
+
 int __mtk_disp_set_module_srt(struct icc_path *request, int comp_id,
 				unsigned int bandwidth, unsigned int peak_bw, unsigned int bw_mode,
 				bool real_srt_ostdl)
 {
-	DDPDBG("%s set %s/%d bw = %u peak %u, srt_ostdl %d\n", __func__,
+	DDPQOS("%s set %s/%d bw = %u peak %u, srt_ostdl %d\n", __func__,
 			mtk_dump_comp_str_id(comp_id), comp_id, bandwidth, peak_bw, real_srt_ostdl);
 	if (real_srt_ostdl != true)
 		bandwidth = bandwidth * 133 / 100;
@@ -236,8 +244,13 @@ void __mtk_disp_set_module_hrt(struct icc_path *request, int comp_id,
 {
 	unsigned int icc = MBps_to_icc(bandwidth);
 
+	DDPQOS("%s set %s/%d peak %u\n", __func__,
+			mtk_dump_comp_str_id(comp_id), comp_id, bandwidth);
+
 	if (bandwidth > 0 && respective_ostdl != true)
 		icc = MTK_MMQOS_MAX_BW;
+	else if (debug_deteriorate)
+		icc = 0;
 
 	mtk_icc_set_bw(request, 0, icc);
 	if (debug_ostdl)
@@ -389,6 +402,9 @@ void mtk_disp_set_channel_hrt_bw(struct mtk_drm_crtc *mtk_crtc, unsigned int bw,
 
 	for (j = 0; j < MAX_CRTC; j++)
 		total += priv->req_hrt_channel_bw[j][i];
+
+	if (debug_deteriorate)
+		total = 0;
 
 	idx = priv->data->get_channel_idx(CHANNEL_HRT_READ, i);
 	mtk_vidle_channel_bw_set(total, idx);
@@ -738,83 +754,6 @@ void mtk_disp_total_srt_bw(struct mtk_drm_crtc *mtk_crtc, unsigned int bw)
 	mtk_vidle_srt_bw_set(total_srt_sum);
 }
 
-void mtk_disp_set_module_hrt(struct mtk_drm_crtc *mtk_crtc, unsigned int bw_base)
-{
-	static u32 pre_rpo_lye;
-	struct drm_crtc *crtc = &mtk_crtc->base;
-	struct mtk_crtc_state *mtk_crtc_state = to_mtk_crtc_state(crtc->state);
-	struct mtk_drm_private *priv = crtc->dev->dev_private;
-	struct mtk_ddp_comp *comp;
-	int i, j, ret = 0;
-
-	if (mtk_crtc == NULL)
-		return;
-
-	if (mtk_crtc->ddp_mode >= DDP_MODE_NR)
-		return;
-
-	for (i = 0; i < DDP_PATH_NR; i++) {
-		if (mtk_crtc->ddp_mode >= DDP_MODE_NR)
-			continue;
-		if (!(mtk_crtc->ddp_ctx[mtk_crtc->ddp_mode].req_hrt[i]))
-			continue;
-
-		if ((priv->data->mmsys_id == MMSYS_MT6991) && mtk_crtc_state->lye_state.rpo_lye) {
-			mtk_ddp_comp_io_cmd(priv->ddp_comp[DDP_COMPONENT_OVL_EXDMA2],
-				NULL, PMQOS_SET_HRT_BW, &bw_base);
-		} else if ((priv->data->mmsys_id == MMSYS_MT6991) && pre_rpo_lye) { //exit RPO
-			unsigned int bw_zero = 0;
-
-			mtk_ddp_comp_io_cmd(priv->ddp_comp[DDP_COMPONENT_OVL_EXDMA2],
-				NULL, PMQOS_SET_HRT_BW, &bw_zero);
-		}
-		pre_rpo_lye = mtk_crtc_state->lye_state.rpo_lye;
-
-		for_each_comp_in_crtc_target_path(comp, mtk_crtc, j, i) {
-			mtk_ddp_comp_io_cmd(comp, NULL, PMQOS_SET_HRT_BW,
-						   &bw_base);
-		}
-		if (!mtk_crtc->is_dual_pipe)
-			continue;
-		for_each_comp_in_dual_pipe(comp, mtk_crtc, j, i)
-			mtk_ddp_comp_io_cmd(comp, NULL, PMQOS_SET_HRT_BW,
-					&bw_base);
-	}
-}
-
-void mtk_disp_clr_module_hrt(struct mtk_drm_crtc *mtk_crtc)
-{
-	struct drm_crtc *crtc = &mtk_crtc->base;
-	struct mtk_crtc_state *mtk_crtc_state = to_mtk_crtc_state(crtc->state);
-	struct mtk_drm_private *priv = crtc->dev->dev_private;
-	struct mtk_ddp_comp *comp;
-	int i, j, ret = 0;
-
-	if (mtk_crtc == NULL)
-		return;
-
-	if (mtk_crtc->ddp_mode >= DDP_MODE_NR)
-		return;
-
-	for (i = 0; i < DDP_PATH_NR; i++) {
-		if (mtk_crtc->ddp_mode >= DDP_MODE_NR)
-			continue;
-		if (!(mtk_crtc->ddp_ctx[mtk_crtc->ddp_mode].req_hrt[i]))
-			continue;
-
-		mtk_ddp_comp_io_cmd(priv->ddp_comp[DDP_COMPONENT_OVL_EXDMA2],
-			NULL, PMQOS_CLR_HRT_BW, NULL);
-
-		for_each_comp_in_crtc_target_path(comp, mtk_crtc, j, i) {
-			mtk_ddp_comp_io_cmd(comp, NULL, PMQOS_CLR_HRT_BW, NULL);
-		}
-		if (!mtk_crtc->is_dual_pipe)
-			continue;
-		for_each_comp_in_dual_pipe(comp, mtk_crtc, j, i)
-			mtk_ddp_comp_io_cmd(comp, NULL, PMQOS_CLR_HRT_BW, NULL);
-	}
-}
-
 int mtk_disp_set_hrt_bw(struct mtk_drm_crtc *mtk_crtc, unsigned int bw)
 {
 	struct drm_crtc *crtc = &mtk_crtc->base;
@@ -837,7 +776,7 @@ int mtk_disp_set_hrt_bw(struct mtk_drm_crtc *mtk_crtc, unsigned int bw)
 		priv->data->mmsys_id == MMSYS_MT6765) {
 		DDPMSG("%s: no need to set module hrt bw for legacy!\n", __func__);
 	} else if (!priv->data->respective_ostdl)
-		mtk_disp_set_module_hrt(mtk_crtc, bw);
+		mtk_disp_set_module_hrt(mtk_crtc, bw, NULL, PMQOS_SET_HRT_BW);
 
 	/* skip same HRT BW */
 	if (priv->req_hrt[crtc_idx] == tmp)
@@ -851,6 +790,9 @@ int mtk_disp_set_hrt_bw(struct mtk_drm_crtc *mtk_crtc, unsigned int bw)
 	if (bw == MAX_MMCLK) {
 		DDPMSG("%s,total:%d->65535\n", __func__, total);
 		total = 65535;
+	} else if (debug_deteriorate) {
+		DDPMSG("%s,total:%d->0\n", __func__, total);
+		total = 0;
 	}
 
 #ifdef CONFIG_MTK_FB_MMDVFS_SUPPORT
@@ -904,7 +846,8 @@ int mtk_disp_set_hrt_bw(struct mtk_drm_crtc *mtk_crtc, unsigned int bw)
 			mtk_crtc->qos_ctx->last_larb_hrt_req = tmp1;
 			DDPINFO("%s, CRTC%d HRT bw=%u total=%u larb bw=%u ovl_num=%d bw_base=%d\n",
 				__func__, crtc_idx, tmp, total, tmp1, ovl_num, bw_base);
-		}
+		} else
+			DDPINFO("set CRTC %d HRT bw %u %u\n", crtc_idx, tmp, total);
 	} else
 		DDPINFO("set CRTC %d HRT bw %u %u\n", crtc_idx, tmp, total);
 
@@ -1010,7 +953,7 @@ void mtk_drm_pan_disp_set_hrt_bw(struct drm_crtc *crtc, const char *caller)
 
 	if (priv->data->respective_ostdl) {
 		bw_base = mtk_drm_primary_frame_bw(crtc);
-		mtk_disp_set_module_hrt(mtk_crtc, bw_base);
+		mtk_disp_set_module_hrt(mtk_crtc, bw_base, NULL, PMQOS_SET_HRT_BW);
 	}
 }
 

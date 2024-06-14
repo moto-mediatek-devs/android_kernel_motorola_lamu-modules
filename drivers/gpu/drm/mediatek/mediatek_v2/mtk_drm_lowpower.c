@@ -2287,7 +2287,7 @@ static void mtk_drm_idlemgr_enable_crtc(struct drm_crtc *crtc)
 
 	if (priv->data->respective_ostdl) {
 		bw_base = mtk_drm_primary_frame_bw(crtc);
-		mtk_disp_set_module_hrt(mtk_crtc, bw_base);
+		mtk_disp_set_module_hrt(mtk_crtc, bw_base, NULL, PMQOS_SET_HRT_BW);
 	}
 
 	mtk_drm_idlemgr_perf_detail_check(perf_detail, crtc,
@@ -2449,7 +2449,7 @@ static void mtk_drm_idlemgr_wb_cmdq_cb(struct cmdq_cb_data data)
 			mtk_ddp_comp_io_cmd(cb_data->comp, NULL, PMQOS_SET_HRT_BW, &wdma_bw);
 		}
 		if (cb_data->comp_dual) {
-			DDPINFO("%s,comp:%d clear BW request\n", __func__, cb_data->comp->id);
+			DDPINFO("%s,comp:%d clear BW request\n", __func__, cb_data->comp_dual->id);
 			mtk_ddp_comp_io_cmd(cb_data->comp_dual, NULL, PMQOS_UPDATE_BW, &flag);
 			mtk_ddp_comp_io_cmd(cb_data->comp_dual, NULL, PMQOS_SET_HRT_BW, &wdma_bw);
 		}
@@ -2469,6 +2469,16 @@ bool mtk_drm_idlemgr_wb_is_entered(struct mtk_drm_crtc *mtk_crtc)
 	if (!mtk_crtc->idlemgr)
 		return false;
 	return mtk_crtc->idlemgr->idlemgr_ctx->wb_entered;
+}
+
+bool mtk_drm_idlemgr_wb_is_using(struct mtk_drm_crtc *mtk_crtc)
+{
+	unsigned int *wb_status;
+
+	wb_status = mtk_get_gce_backup_slot_va(mtk_crtc, DISP_SLOT_IDLEMGR_BY_WB_STATUS);
+	if (*wb_status == MTK_DRM_IDLEMGR_BY_WB_USING)
+		return true;
+	return false;
 }
 
 void mtk_drm_idlemgr_wb_capture(struct mtk_drm_crtc *mtk_crtc, struct cmdq_pkt *cmdq_handle,

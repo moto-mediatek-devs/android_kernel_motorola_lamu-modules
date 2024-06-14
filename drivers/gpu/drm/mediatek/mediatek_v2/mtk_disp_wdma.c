@@ -130,6 +130,7 @@
 #define DISP_REG_WDMA_URGENT_CON2 0x0268
 #define FLD_WDMA_URGENT_LOW_V REG_FLD_MSB_LSB(9, 0)
 #define FLD_WDMA_URGENT_HIGH_V REG_FLD_MSB_LSB(25, 16)
+#define DISP_REG_WDMA_VCSEL 0x0F44
 
 #define DISP_REG_WDMA_DST_ADDRX(n) (0x0f00 + 0x04 * (n))
 #define DISP_REG_WDMA_DST_ADDRX_MSB(n) (0x0f20 + 0x04 * (n))
@@ -1644,6 +1645,7 @@ static void mtk_wdma_config(struct mtk_ddp_comp *comp,
 
 	gsc = cfg->p_golden_setting_context;
 	mtk_wdma_golden_setting(comp, gsc, handle);
+	mtk_ddp_write(comp, 0x1, DISP_REG_WDMA_VCSEL, handle);
 
 	cfg_info->addr = addr;
 	cfg_info->width = cfg->w;
@@ -2491,6 +2493,11 @@ static int mtk_disp_wdma_probe(struct platform_device *pdev)
 	priv->info_data->fifo_size_uv_2plane = priv->data->fifo_size_uv_2plane;
 	priv->info_data->fifo_size_3plane = priv->data->fifo_size_3plane;
 	priv->info_data->fifo_size_uv_3plane = priv->data->fifo_size_uv_3plane;
+	priv->info_data->force_ostdl_bw = priv->data->force_ostdl_bw;
+	priv->info_data->buf_con1_fld_fifo_pseudo_size =
+			priv->data->buf_con1_fld_fifo_pseudo_size;
+	priv->info_data->buf_con1_fld_fifo_pseudo_size_uv =
+			priv->data->buf_con1_fld_fifo_pseudo_size_uv;
 
 	if (priv->data->fifo_size_1plane == PARSE_FROM_DTS) {
 		ret = of_property_read_u32(dev->of_node,

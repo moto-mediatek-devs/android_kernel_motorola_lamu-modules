@@ -99,7 +99,7 @@ int dsu_freq_changed(void *private)
 
 void (*eenv_dsu_init_hook)(void *private, int quant, unsigned int wl,
 		int PERCORE_L3_BW, unsigned int cpumask_val,
-		void __iomem *base, unsigned long *pd_base_freq,
+		void __iomem *base, void __iomem *dsu_ctrl_base, unsigned long *pd_base_freq,
 		unsigned int dsu_ceiling_freq, int dsu_temp,
 		unsigned int *val, unsigned int *output);
 EXPORT_SYMBOL(eenv_dsu_init_hook);
@@ -119,7 +119,7 @@ void eenv_dsu_init(void *private, int quant, unsigned int wl,
 
 		(*eenv_dsu_init_hook)(private, quant, wl,
 			PERCORE_L3_BW, cpumask_val,
-			get_l3ctl_sram_base_addr(), pd_base_freq,
+			get_l3ctl_sram_base_addr(), get_cdsu_sram_base_addr(), pd_base_freq,
 			dsu_freq_thermal, dsu_temp,
 			val, output);
 	}
@@ -138,7 +138,7 @@ unsigned long update_dsu_status(struct energy_env *eenv, int quant,
 		unsigned int output[6];
 
 		dsu_volt = update_dsu_status_hook(eenv->android_vendor_data1, quant,
-			eenv->wl, eenv->gear_idx, freq, this_cpu, dst_cpu, output);
+			eenv->wl_dsu, eenv->gear_idx, freq, this_cpu, dst_cpu, output);
 
 		if (trace_sched_dsu_freq_enabled())
 			trace_sched_dsu_freq(eenv->gear_idx, dst_cpu, output[0], output[1],

@@ -419,6 +419,7 @@ static long handle_process_stat(unsigned long arg, void *mbraink_data)
 	long ret = 0;
 
 	pid_t pid = 1;
+	unsigned int current_cnt = 0;
 
 	if (copy_from_user(process_stat_buffer,
 			(struct mbraink_process_stat_data *)arg,
@@ -433,8 +434,9 @@ static long handle_process_stat(unsigned long arg, void *mbraink_data)
 		return -EINVAL;
 	}
 	pid = process_stat_buffer->pid;
+	current_cnt = process_stat_buffer->current_cnt;
 
-	mbraink_get_process_stat_info(pid, process_stat_buffer);
+	mbraink_get_process_stat_info(pid, current_cnt, process_stat_buffer);
 
 	if (copy_to_user((struct mbraink_process_stat_data *)arg,
 			process_stat_buffer,
@@ -514,6 +516,7 @@ static long handle_thread_stat(unsigned long arg, void *mbraink_data)
 		(struct mbraink_thread_stat_data *)(mbraink_data);
 	long ret = 0;
 	pid_t pid_idx = 0, tid = 0;
+	unsigned int current_cnt = 0;
 
 	if (copy_from_user(thread_stat_buffer,
 			(struct mbraink_thread_stat_data *)arg,
@@ -530,8 +533,9 @@ static long handle_thread_stat(unsigned long arg, void *mbraink_data)
 	}
 	pid_idx = thread_stat_buffer->pid_idx;
 	tid = thread_stat_buffer->tid;
+	current_cnt = thread_stat_buffer->current_cnt;
 
-	mbraink_get_thread_stat_info(pid_idx, tid, thread_stat_buffer);
+	mbraink_get_thread_stat_info(pid_idx, tid, current_cnt, thread_stat_buffer);
 
 	if (copy_to_user((struct mbraink_thread_stat_data *)arg,
 			thread_stat_buffer,
@@ -1080,20 +1084,64 @@ static long handle_cpu_loading_info(unsigned long arg, void *mbraink_data)
 		}
 		case 2:
 		{
-			mbraink_auto_get_vcpu_record(cpu_loading_buf);
-			if (copy_to_user((struct nbl_trace_buf_trans *)arg,
-					cpu_loading_buf, sizeof(struct nbl_trace_buf_trans))) {
-				pr_notice("Copy cpu_loading_buf to UserSpace error!\n");
-				return -EPERM;
+			if (cpu_loading_buf->length == 0) {
+				pr_notice("length is 0. no need do anything\n");
+			} else {
+				void *vcpu_buffer = vmalloc(cpu_loading_buf->length *
+								sizeof(struct trace_vcpu_rec));
+
+				if (vcpu_buffer == NULL)
+					return -ENOMEM;
+				ret = mbraink_auto_get_vcpu_record(cpu_loading_buf, vcpu_buffer);
+
+				if (copy_to_user((struct nbl_trace_buf_trans *)arg,
+						cpu_loading_buf,
+						sizeof(struct nbl_trace_buf_trans))) {
+					pr_notice("Copy cpu_loading_buf to user error!\n");
+					vfree(vcpu_buffer);
+					return -EPERM;
+				}
+				if (copy_to_user(cpu_loading_buf->vcpu_data,
+						vcpu_buffer,
+						cpu_loading_buf->length *
+						sizeof(struct trace_vcpu_rec))) {
+					pr_notice("Copy vcpu_data to user error!\n");
+					vfree(vcpu_buffer);
+					return -EPERM;
+				}
+
+				vfree(vcpu_buffer);
 			}
 			break;
 		}
+		default:
+		{
+			pr_info("unknown vcpu type %d\n", cpu_loading_buf->trans_type);
+			ret = -1;
+		}
 		}
 	}
-
 	return ret;
 }
 #endif
+
+static long handle_ufs_info(unsigned long arg, void *mbraink_data)
+{
+	struct mbraink_ufs_info *ufs_info_buffer =
+		(struct mbraink_ufs_info *)(mbraink_data);
+	long ret = 0;
+
+	memset(ufs_info_buffer, 0, sizeof(struct mbraink_ufs_info));
+
+	mbraink_get_ufs_info(ufs_info_buffer);
+	if (copy_to_user((struct mbraink_ufs_info *) arg,
+			ufs_info_buffer,
+			sizeof(struct mbraink_ufs_info))) {
+		pr_notice("Copy ufs_info_buffer to UserSpace error!\n");
+		return -EPERM;
+	}
+	return ret;
+}
 
 static long mbraink_ioctl(struct file *filp,
 							unsigned int cmd,
@@ -1478,11 +1526,22 @@ static long mbraink_ioctl(struct file *filp,
 	case RO_AUTO_CPULOAD_INFO:
 	{
 #if IS_ENABLED(CONFIG_MTK_MBRAINK_MT8678)
-		mbraink_data = vmalloc(sizeof(struct nbl_trace_buf_trans));
+		mbraink_data = kmalloc(sizeof(struct nbl_trace_buf_trans), GFP_KERNEL);
 		if (!mbraink_data)
 			goto End;
 		ret = handle_cpu_loading_info(arg, mbraink_data);
-		vfree(mbraink_data);
+		kfree(mbraink_data);
+#endif
+		break;
+	}
+	case RO_UFS_INFO:
+	{
+#if IS_ENABLED(CONFIG_DEVICE_MODULES_SCSI_UFS_MEDIATEK)
+		mbraink_data = kmalloc(sizeof(struct mbraink_ufs_info), GFP_KERNEL);
+		if (!mbraink_data)
+			goto End;
+		ret = handle_ufs_info(arg, mbraink_data);
+		kfree(mbraink_data);
 #endif
 		break;
 	}
@@ -1563,9 +1622,9 @@ static int mbraink_post_suspend(void)
 	struct timespec64 tv = { 0 };
 	ktime_t resume_ktime;
 	char netlink_buf[MAX_BUF_SZ] = {'\0'};
-	int n = 0;
 	long long last_resume_ktime = 0;
 	struct mbraink_battery_data resume_battery_buffer;
+	int n = 0;
 
 #if IS_ENABLED(CONFIG_MTK_LOW_POWER_MODULE)
 	struct lpm_logger_mbrain_dbg_ops *logger_mbrain_ops = NULL;
@@ -1598,33 +1657,36 @@ static int mbraink_post_suspend(void)
 	wakeup_event = 0;
 #endif
 
-	n += snprintf(netlink_buf, MAX_BUF_SZ,
-			"%s %lld:%lld:%lld:%lld:%lld %d:%d:%d:%d:%d:%d:%d:%d %d:%d:%d:%d:%d:%d:%d:%d",
-			NETLINK_EVENT_SYSRESUME,
-			mbraink_priv.last_suspend_timestamp,
-			mbraink_priv.last_resume_timestamp,
-			mbraink_priv.last_suspend_ktime,
-			last_resume_ktime,
-			wakeup_event,
-			mbraink_priv.suspend_battery_buffer.quse,
-			mbraink_priv.suspend_battery_buffer.qmaxt,
-			mbraink_priv.suspend_battery_buffer.precise_soc,
-			mbraink_priv.suspend_battery_buffer.precise_uisoc,
-			mbraink_priv.suspend_battery_buffer.quse2,
-			mbraink_priv.suspend_battery_buffer.qmaxt2,
-			mbraink_priv.suspend_battery_buffer.precise_soc2,
-			mbraink_priv.suspend_battery_buffer.precise_uisoc2,
-			resume_battery_buffer.quse,
-			resume_battery_buffer.qmaxt,
-			resume_battery_buffer.precise_soc,
-			resume_battery_buffer.precise_uisoc,
-			resume_battery_buffer.quse2,
-			resume_battery_buffer.qmaxt2,
-			resume_battery_buffer.precise_soc2,
-			resume_battery_buffer.precise_uisoc2
+	n = snprintf(netlink_buf, MAX_BUF_SZ,
+		"%s %lld:%lld:%lld:%lld:%lld %d:%d:%d:%d:%d:%d:%d:%d %d:%d:%d:%d:%d:%d:%d:%d",
+		NETLINK_EVENT_SYSRESUME,
+		mbraink_priv.last_suspend_timestamp,
+		mbraink_priv.last_resume_timestamp,
+		mbraink_priv.last_suspend_ktime,
+		last_resume_ktime,
+		wakeup_event,
+		mbraink_priv.suspend_battery_buffer.quse,
+		mbraink_priv.suspend_battery_buffer.qmaxt,
+		mbraink_priv.suspend_battery_buffer.precise_soc,
+		mbraink_priv.suspend_battery_buffer.precise_uisoc,
+		mbraink_priv.suspend_battery_buffer.quse2,
+		mbraink_priv.suspend_battery_buffer.qmaxt2,
+		mbraink_priv.suspend_battery_buffer.precise_soc2,
+		mbraink_priv.suspend_battery_buffer.precise_uisoc2,
+		resume_battery_buffer.quse,
+		resume_battery_buffer.qmaxt,
+		resume_battery_buffer.precise_soc,
+		resume_battery_buffer.precise_uisoc,
+		resume_battery_buffer.quse2,
+		resume_battery_buffer.qmaxt2,
+		resume_battery_buffer.precise_soc2,
+		resume_battery_buffer.precise_uisoc2
 	);
 
-	mbraink_netlink_send_msg(netlink_buf);
+	if (n < 0 || n > MAX_BUF_SZ)
+		pr_info("%s : snprintf error n = %d\n", __func__, n);
+	else
+		mbraink_netlink_send_msg(netlink_buf);
 
 	last_resume_timestamp = mbraink_priv.last_resume_timestamp;
 	mbraink_priv.last_resume_timestamp = 0;
@@ -1648,28 +1710,31 @@ static void mbraink_post_suspend_get_spm(void)
 	if (ret)
 		return;
 
-	n += snprintf(netlink_buf, MAX_BUF_SZ,
-			"%s %lld:%lld:%lld:%lld:%lld:%lld:%lld:%lld:%lld:%lld:%lld:%lld:%lld:%lld:%lld",
-			NETLINK_EVENT_SYSNOTIFIER_PS,
-			last_resume_timestamp,
-			spm_l1_info[0],
-			spm_l1_info[1],
-			spm_l1_info[2],
-			spm_l1_info[3],
-			spm_l1_info[4],
-			spm_l1_info[5],
-			spm_l1_info[6],
-			spm_l1_info[7],
-			spm_l1_info[8],
-			spm_l1_info[9],
-			spm_l1_info[10],
-			spm_l1_info[11],
-			spm_l1_info[12],
-			spm_l1_info[13]
+	n = snprintf(netlink_buf, MAX_BUF_SZ,
+		"%s %lld:%lld:%lld:%lld:%lld:%lld:%lld:%lld:%lld:%lld:%lld:%lld:%lld:%lld:%lld",
+		NETLINK_EVENT_SYSNOTIFIER_PS,
+		last_resume_timestamp,
+		spm_l1_info[0],
+		spm_l1_info[1],
+		spm_l1_info[2],
+		spm_l1_info[3],
+		spm_l1_info[4],
+		spm_l1_info[5],
+		spm_l1_info[6],
+		spm_l1_info[7],
+		spm_l1_info[8],
+		spm_l1_info[9],
+		spm_l1_info[10],
+		spm_l1_info[11],
+		spm_l1_info[12],
+		spm_l1_info[13]
 	);
 
 	last_resume_timestamp = 0;
-	mbraink_netlink_send_msg(netlink_buf);
+	if (n < 0 || n > MAX_BUF_SZ)
+		pr_info("%s : snprintf error n = %d\n", __func__, n);
+	else
+		mbraink_netlink_send_msg(netlink_buf);
 }
 
 static int mbraink_sys_res_pm_event(struct notifier_block *notifier,
@@ -1789,7 +1854,6 @@ static ssize_t mbraink_gpu_store(struct device *dev,
 
 	if (command == 5)
 		mbraink_gpu_setOpMode((int)value);
-
 
 	return count;
 }

@@ -82,9 +82,8 @@ ifneq ($(strip $(CONFIG_MTK_TINYSYS_SSPM_V0)),)
 ccflags-y += -DUSE_SSPM_VER_V1
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/sspm/v0/
 endif
-#sspm for mt6833
+#sspm for mt6833,mt6853,mt6781,mt6893
 ifneq ($(strip $(CONFIG_MTK_TINYSYS_SSPM_V2)),)
-#ccflags-y += -DUSE_SSPM_VER_V1
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/sspm/v2/
 endif
 
@@ -124,7 +123,29 @@ CPU_DVFS-y += plat_k6893/mtk_cpufreq_platform.o
 endif
 ifneq ($(strip $(CONFIG_MTK_PLAT_POWER_6781)),)
 ccflags-y += \
-	-I$(CPUFREQ_ROOT_DIR)/src/plat_k6781/	\
-	-I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/mcupm/include
+	-DUSE_SSPM_VER_V2	\
+	-I$(CPUFREQ_ROOT_DIR)/src/plat_k6781/
+
 CPU_DVFS-y += plat_k6781/mtk_cpufreq_platform.o
+endif
+
+ifneq ($(strip $(CONFIG_MTK_PLAT_POWER_6853)),)
+ccflags-y += \
+	-I$(CPUFREQ_ROOT_DIR)/src/plat_k6853/	\
+	-I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/mcupm/include
+
+	ifeq ($(findstring _qea,$(PROJECT_DTB_NAMES)),_qea)
+	subdir-ccflags-y = -DQEA
+	endif
+
+	ifeq ($(findstring k6853tv1,$(PROJECT_DTB_NAMES)),k6853tv1)
+	subdir-ccflags-y = -DK6853TV1
+	endif
+
+	ifeq ($(findstring _turbo,$(PROJECT_DTB_NAMES)),_turbo)
+	subdir-ccflags-y = -DTURBO
+	endif
+
+CPU_DVFS-y += plat_k6853/mtk_cpufreq_platform.o
+obj-${CONFIG_MTK_PLAT_POWER_6853} += plat_k6853/mtk_cpufreq_utils.o
 endif

@@ -181,20 +181,22 @@ static bool sugov_up_down_rate_limit(struct sugov_policy *sg_policy, u64 time,
 	return false;
 }
 
-static int wl_cnt_cached;
+static int wl_dsu_cnt_cached;
+static int wl_cpu_cnt_cached;
 static bool sugov_update_next_freq(struct sugov_policy *sg_policy, u64 time,
 				   unsigned int next_freq)
 {
 	if (sugov_up_down_rate_limit(sg_policy, time, next_freq))
 		return false;
 
-	if (sg_policy->need_freq_update || wl_cnt_cached != wl_delay_ch_cnt
-			|| enq_force_update_freq(sg_policy)) {
+	if (sg_policy->need_freq_update || wl_dsu_cnt_cached != wl_dsu_delay_ch_cnt ||
+		wl_cpu_cnt_cached != wl_cpu_delay_ch_cnt || enq_force_update_freq(sg_policy)) {
 		sg_policy->need_freq_update = false;
 	} else if (sg_policy->next_freq == next_freq)
 		return false;
 
-	wl_cnt_cached = wl_delay_ch_cnt;
+	wl_dsu_cnt_cached = wl_dsu_delay_ch_cnt;
+	wl_cpu_cnt_cached = wl_cpu_delay_ch_cnt;
 	sg_policy->next_freq = next_freq;
 	sg_policy->last_freq_update_time = time;
 
@@ -288,7 +290,6 @@ inline int curr_clamp(struct rq *rq, unsigned long *util)
 	return 0;
 }
 
-static bool ignore_irq_util;
 /*
  * This function computes an effective utilization for the given CPU, to be
  * used for frequency selection given the linear relation: f = u * f_max.
@@ -330,11 +331,9 @@ unsigned long mtk_cpu_util(unsigned int cpu, unsigned long util_cfs,
 	 * because of inaccuracies in how we track these -- see
 	 * update_irq_load_avg().
 	 */
-	if (likely(!ignore_irq_util)) {
-		irq = cpu_util_irq(rq);
-		if (unlikely(irq >= max))
-			return max;
-	}
+	irq = cpu_util_irq(rq);
+	if (unlikely(irq >= max))
+		return max;
 
 	/*
 	 * Because the time spend on RT/DL tasks is visible as 'lost' time to
@@ -440,12 +439,10 @@ skip_rq_uclamp:
 	 */
 	if (trace_sugov_ext_util_debug_enabled())
 		trace_sugov_ext_util_debug(cpu, util_cfs, cpu_util_rt(rq), dl_util,
-				irq, util, ignore_irq_util ? 0 : scale_irq_capacity(util, irq, max),
+				irq, util, scale_irq_capacity(util, irq, max),
 				cpu_bw_dl(rq));
-	if (likely(!ignore_irq_util)) {
-		util = scale_irq_capacity(util, irq, max);
-		util += irq;
-	}
+	util = scale_irq_capacity(util, irq, max);
+	util += irq;
 
 	/*
 	 * Bandwidth required by DEADLINE must always be granted while, for
@@ -1241,45 +1238,6 @@ int init_mtk_rq_data(void)
 	return 0;
 }
 
-static int ignore_irq_util_show(struct seq_file *m, void *v)
-{
-	seq_printf(m, "%s\n", ignore_irq_util ? "true" : "false");
-	return 0;
-}
-
-static int ignore_irq_util_open(struct inode *in, struct file *file)
-{
-	return single_open(file, ignore_irq_util_show, NULL);
-}
-
-static ssize_t ignore_irq_util_write(struct file *filp, const char *ubuf,
-	size_t count, loff_t *data)
-{
-	char buf[16] = {0};
-	int ret;
-	unsigned int input = 0;
-
-	if (!count)
-		return count;
-	if (count + 1 > 16)
-		return -ENOMEM;
-	ret = copy_from_user(buf, ubuf, count);
-	if (ret)
-		return -EFAULT;
-	buf[count] = '\0';
-	ret = kstrtouint(buf, 10, &input);
-	if (ret)
-		return -EFAULT;
-	ignore_irq_util = input > 0;
-	return count;
-}
-
-static const struct proc_ops ignore_irq_util_ops = {
-	.proc_open = ignore_irq_util_open,
-	.proc_read = seq_read,
-	.proc_write = ignore_irq_util_write
-};
-
 #if !IS_ENABLED(CONFIG_ARM64)
 static int __init get_cpu_for_node(struct device_node *node)
 {
@@ -1471,8 +1429,6 @@ static int __init cpufreq_mtk_init(void)
 	ret = init_sched_ctrl();
 	if(ret)
 		pr_info("register init_sched_ctrl failed\n");
-
-	proc_create("ignore_irq_util", 0644, dir, &ignore_irq_util_ops);
 
 #if !IS_ENABLED(CONFIG_ARM64)
 	ret = parse_dt_topology_arm();

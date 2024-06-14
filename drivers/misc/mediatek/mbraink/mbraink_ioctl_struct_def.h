@@ -30,6 +30,8 @@
 #define MAX_WIFI_RATE_SZ			32
 #define MAX_WIFI_LP_SZ				5
 #define MAX_LPM_STATE_NUM				16
+#define MAX_UFS_INFO_NUM				64
+
 
 #define NETLINK_EVENT_Q2QTIMEOUT		"NLEvent_Q2QTimeout"
 #define NETLINK_EVENT_UDMFETCH			"M&"
@@ -44,6 +46,7 @@
 #define NETLINK_EVENT_LOW_BATTERY_VOLTAGE_THROTTLE		"NLEvent_LBVThro"
 #define NETLINK_EVENT_BATTERY_OVER_CURRENT_THROTTLE		"NLEvent_BOCThro"
 #define NETLINK_EVENT_PPB_NOTIFY "NLEvent_PPBNotify"
+#define NETLINK_EVENT_UFS_NOTIFY "NLEvent_UFSNotify"
 
 #define NETLINK_EVENT_MESSAGE_SIZE		1024
 
@@ -75,8 +78,6 @@
 
 #define MAX_GPU_FENCE_RECORD_DATA 8
 
-#define MAX_VCPU_RECORD_LENGTH 1024
-
 enum mbraink_op_mode {
 	mbraink_op_mode_normal = 0,
 	mbraink_op_mode_sbe = 1,
@@ -95,6 +96,7 @@ struct mbraink_process_stat_struct {
 struct mbraink_process_stat_data {
 	unsigned short pid;
 	unsigned short pid_count;
+	unsigned int current_cnt;
 	struct mbraink_process_stat_struct drv_data[MAX_STRUCT_SZ];
 };
 
@@ -124,6 +126,7 @@ struct mbraink_thread_stat_data {
 	unsigned short pid_idx;
 	unsigned short tid;
 	unsigned short tid_count;
+	unsigned int current_cnt;
 	struct mbraink_thread_stat_struct drv_data[MAX_STRUCT_SZ];
 };
 
@@ -544,7 +547,13 @@ struct nbl_trace_buf_trans {
 	u64 current_time;
 	u64 cntcvt;
 	u64 cntfrq;
-	struct trace_vcpu_rec vcpu_data[MAX_VCPU_RECORD_LENGTH];
+	void *vcpu_data;
 };
+
+struct mbraink_ufs_info {
+	unsigned char model[MAX_UFS_INFO_NUM];
+	unsigned char rev[MAX_UFS_INFO_NUM];
+};
+
 
 #endif

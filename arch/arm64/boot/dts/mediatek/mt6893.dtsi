@@ -2098,45 +2098,6 @@ cpus {
 			compatible = "microtrust,tester-v1";
 		};
 
-		ssram1@10450000 {
-			compatible = "mmio-sram_1";
-			reg = <0x0 0x10450000 0x0 0x80>;
-
-			#address-cells = <1>;
-			#size-cells = <1>;
-			ranges = <0 0x0 0x10450000 0x80>;
-
-			scmi_tx_shmem: tiny_mbox@0 {
-				compatible = "arm,scmi-tx-shmem";
-				reg = <0x0 0x80>;
-			};
-		};
-
-		ssram2@10460000 {
-			compatible = "mmio-sram_2";
-			reg = <0x0 0x10460000 0x0 0x80>;
-
-			#address-cells = <1>;
-			#size-cells = <1>;
-			ranges = <0 0x0 0x10460000 0x80>;
-
-			scmi_rx_shmem: tiny_mbox@1 {
-				compatible = "arm,scmi-rx-shmem";
-				reg = <0x0 0x80>;
-			};
-		};
-
-		tinysys_mbox: tinysys_mbox@10451000 {
-			compatible = "mediatek,tinysys_mbox";
-			reg = <0 0x10451000 0 0x1000>,
-				  <0 0x10461000 0 0x1000>;
-			/* for profiling */
-			shmem = <&scmi_tx_shmem>, <&scmi_rx_shmem>;
-			interrupts = <GIC_SPI 244 IRQ_TYPE_LEVEL_HIGH 0>,
-					 <GIC_SPI 245 IRQ_TYPE_LEVEL_HIGH 0>;
-			#mbox-cells = <1>;
-		};
-
 		scp_adsp: scp_adsp@10720000 {
 			compatible = "mediatek,mt8192-scp_adsp", "syscon";
 			reg = <0 0x10720000 0 0x1000>;
@@ -3039,7 +3000,6 @@ cpus {
 			bootmode = <&chosen>;
 
 			mediatek,ufs-disable-ah8;
-			mediatek,ufs-qos;
 			mediatek,ufs-broken-vcc;
 			mediatek,ufs-perf-huristic;
 
@@ -4078,7 +4038,7 @@ cpus {
 		smi_larb0: smi-larb0@14118000 {
 			compatible = "mediatek,smi_larb0", "mediatek,mt6893-smi-larb",
 					 "mediatek,smi-larb";
-			mediatek,smi-supply = <&smi_common 0 &sysram_smi_common 0>;
+			mediatek,smi-supply = <&smi_common 0>;
 			reg = <0 0x14118000 0 0x1000>;
 			mediatek,larb-id = <0>;
 			power-domains = <&scpsys MT6893_POWER_DOMAIN_DISP>;
@@ -4092,7 +4052,7 @@ cpus {
 		smi_larb1: smi-larb1@14119000 {
 			compatible = "mediatek,smi_larb1", "mediatek,mt6893-smi-larb",
 					 "mediatek,smi-larb";
-			mediatek,smi-supply = <&smi_common 0 &sysram_smi_common 0>;
+			mediatek,smi-supply = <&smi_common 0>;
 			reg = <0 0x14119000 0 0x1000>;
 			mediatek,larb-id = <1>;
 			init-power-on;
@@ -5256,7 +5216,7 @@ cpus {
 		smi_larb7: smi-larb7@17010000 {
 			compatible = "mediatek,smi_larb7", "mediatek,mt6893-smi-larb",
 					 "mediatek,smi-larb";
-			mediatek,smi-supply = <&smi_common 0 &sysram_smi_common 0>;
+			mediatek,smi-supply = <&smi_common 0>;
 			reg = <0 0x17010000 0 0x1000>;
 			mediatek,larb-id = <7>;
 			power-domains = <&scpsys MT6893_POWER_DOMAIN_VENC>;
@@ -5344,7 +5304,7 @@ cpus {
 		smi_larb8: smi-larb8@17810000 {
 			compatible = "mediatek,smi_larb8", "mediatek,mt6893-smi-larb",
 					 "mediatek,smi-larb";
-			mediatek,smi-supply = <&mdp_smi_common 0 &sysram_smi_common 0>;
+			mediatek,smi-supply = <&mdp_smi_common 0>;
 			reg = <0 0x17810000 0 0x1000>;
 			mediatek,larb-id = <8>;
 			power-domains = <&scpsys MT6893_POWER_DOMAIN_VENC_CORE1>;
@@ -5510,7 +5470,7 @@ cpus {
 		};
 		mtk_mdla: mdla@19036000 {
 			compatible = "mediatek, mt6893-mdla";
-			core_num = <2>;
+			core-num = <2>;
 			version = <0x68930105>;
 			reg = <0 0x19034000 0 0x1000>,  /* dla0 config  */
 			      <0 0x19036000 0 0x1000>,  /* dla0 command */
@@ -6696,36 +6656,36 @@ cpus {
 				<&gce_m 22 0 CMDQ_THR_PRIO_1>;
 			mmsys-config = <&mdpsys_config>;
 			mm-mutex   = <&mdp_mutex>;
-			mdp_rdma0  = <&mdp_rdma0>;
-			mdp_rdma1  = <&mdp_rdma1>;
-			mdp_rdma2  = <&mdp_rdma2>;
-			mdp_rdma3  = <&mdp_rdma3>;
-			mdp_fg0    = <&mdp_fg0>;
-			mdp_fg1    = <&mdp_fg1>;
-			mdp_rsz0   = <&mdp_rsz0>;
-			mdp_rsz1   = <&mdp_rsz1>;
-			mdp_rsz2   = <&mdp_rsz2>;
-			mdp_rsz3   = <&mdp_rsz3>;
-			mdp_wrot0  = <&mdp_wrot0>;
-			mdp_wrot1  = <&mdp_wrot1>;
-			mdp_wrot2  = <&mdp_wrot2>;
-			mdp_wrot3  = <&mdp_wrot3>;
-			mdp_tdshp0 = <&mdp_tdshp0>;
-			mdp_tdshp1 = <&mdp_tdshp1>;
-			mdp_tdshp2 = <&mdp_tdshp2>;
-			mdp_tdshp3 = <&mdp_tdshp3>;
-			mdp_aal0   = <&mdp_aal0>;
-			mdp_aal1   = <&mdp_aal1>;
-			mdp_aal2   = <&mdp_aal2>;
-			mdp_aal3   = <&mdp_aal3>;
-			mdp_color0 = <&mdp_color0>;
-			mdp_color1 = <&mdp_color1>;
-			mdp_hdr0   = <&mdp_hdr0>;
-			mdp_hdr1   = <&mdp_hdr1>;
-			mdp_tcc0   = <&mdp_tcc0>;
-			mdp_tcc1   = <&mdp_tcc1>;
-			mdp_tcc2   = <&mdp_tcc2>;
-			mdp_tcc3   = <&mdp_tcc3>;
+			mdp-rdma0  = <&mdp_rdma0>;
+			mdp-rdma1  = <&mdp_rdma1>;
+			mdp-rdma2  = <&mdp_rdma2>;
+			mdp-rdma3  = <&mdp_rdma3>;
+			mdp-fg0    = <&mdp_fg0>;
+			mdp-fg1    = <&mdp_fg1>;
+			mdp-rsz0   = <&mdp_rsz0>;
+			mdp-rsz1   = <&mdp_rsz1>;
+			mdp-rsz2   = <&mdp_rsz2>;
+			mdp-rsz3   = <&mdp_rsz3>;
+			mdp-wrot0  = <&mdp_wrot0>;
+			mdp-wrot1  = <&mdp_wrot1>;
+			mdp-wrot2  = <&mdp_wrot2>;
+			mdp-wrot3  = <&mdp_wrot3>;
+			mdp-tdshp0 = <&mdp_tdshp0>;
+			mdp-tdshp1 = <&mdp_tdshp1>;
+			mdp-tdshp2 = <&mdp_tdshp2>;
+			mdp-tdshp3 = <&mdp_tdshp3>;
+			mdp-aal0   = <&mdp_aal0>;
+			mdp-aal1   = <&mdp_aal1>;
+			mdp-aal2   = <&mdp_aal2>;
+			mdp-aal3   = <&mdp_aal3>;
+			mdp-color0 = <&mdp_color0>;
+			mdp-color1 = <&mdp_color1>;
+			mdp-hdr0   = <&mdp_hdr0>;
+			mdp-hdr1   = <&mdp_hdr1>;
+			mdp-tcc0   = <&mdp_tcc0>;
+			mdp-tcc1   = <&mdp_tcc1>;
+			mdp-tcc2   = <&mdp_tcc2>;
+			mdp-tcc3   = <&mdp_tcc3>;
 			mediatek,larb = <&smi_larb2>, <&smi_larb3>;
 			disp_mutex_reg = <0x14120000 0x1000>;
 			g3d_config_base = <0x13000000 0 0xffff0000>;
@@ -7082,7 +7042,7 @@ cpus {
 			operating-points-v2 = <&opp_table_mdp>, <&opp_table_img>;
 			mdp-dvfsrc-vcore-supply = <&dvfsrc_vcore>;
 			isp-dvfsrc-vcore-supply = <&dvfsrc_vcore>;
-			dre30_hist_sram_start = /bits/ 16 <1536>;
+			dre30-hist-sram-start = /bits/ 16 <1536>;
 		};
 
 		mdp_mutex: mdp-mutex@1f001000 {
@@ -7350,7 +7310,7 @@ cpus {
 		smi_larb2: smi-larb2@1f003000 {
 			compatible = "mediatek,smi_larb2", "mediatek,mt6893-smi-larb",
 					 "mediatek,smi-larb";
-			mediatek,smi-supply = <&mdp_smi_common 0 &sysram_smi_common 0>;
+			mediatek,smi-supply = <&mdp_smi_common 0>;
 			reg = <0 0x1f003000 0 0x1000>;
 			mediatek,larb-id = <2>;
 			power-domains = <&scpsys MT6893_POWER_DOMAIN_MDP>;
@@ -7363,7 +7323,7 @@ cpus {
 		smi_larb3: smi-larb3@1f004000 {
 			compatible = "mediatek,smi_larb3", "mediatek,mt6893-smi-larb",
 					 "mediatek,smi-larb";
-			mediatek,smi-supply = <&mdp_smi_common 0 &sysram_smi_common 0>;
+			mediatek,smi-supply = <&mdp_smi_common 0>;
 			reg = <0 0x1f004000 0 0x1000>;
 			mediatek,larb-id = <3>;
 			power-domains = <&scpsys MT6893_POWER_DOMAIN_MDP>;
@@ -7543,7 +7503,7 @@ cpus {
 				<0>, /*MTK_DRM_OPT_DELAYED_TRIGGER*/
 				<1>, /*MTK_DRM_OPT_OVL_EXT_LAYER*/
 				<0>, /*MTK_DRM_OPT_AOD*/
-				<0>, /*MTK_DRM_OPT_RPO*/
+				<1>, /*MTK_DRM_OPT_RPO*/
 				<0>, /*MTK_DRM_OPT_DUAL_PIPE*/
 				<0>, /*MTK_DRM_OPT_DC_BY_HRT*/
 				<1>, /*MTK_DRM_OPT_OVL_WCG*/
@@ -7571,6 +7531,19 @@ cpus {
 				<0>, /*MTK_DRM_OPT_SDPA_OVL_SWITCH*/
 				<0>, /*MTK_DRM_OPT_OVL_BW_MONITOR*/
 				<0>; /*MTK_DRM_OPT_SHARE_SRAM*/
+		};
+
+		disp_mtee_sec: disp_mtee_sec {
+			compatible = "mediatek,disp_mtee";
+
+			mediatek,mailbox-gce = <&gce>;
+			mboxes = <&gce_sec 8 0 CMDQ_THR_PRIO_3>,
+				<&gce_sec 9 0 CMDQ_THR_PRIO_3>,
+				<&gce_sec 9 0 CMDQ_THR_PRIO_3>;
+
+			gce-client-names = "CLIENT_SEC_CFG0",
+					"CLIENT_SEC_CFG1",
+					"CLIENT_SEC_CFG2";
 		};
 
 		disp_mutex0: disp-mutex@14117000 {

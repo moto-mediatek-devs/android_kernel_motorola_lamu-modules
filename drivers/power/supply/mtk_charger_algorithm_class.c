@@ -241,7 +241,7 @@ struct chg_alg_device *chg_alg_device_register(const char *name,
 	chg_dev->dev.parent = parent;
 	chg_dev->dev.release = chg_alg_device_release;
 	algo_name = kasprintf(GFP_KERNEL, "%s", name);
-	dev_set_name(&chg_dev->dev, algo_name);
+	dev_set_name(&chg_dev->dev, "%s", algo_name);
 	dev_set_drvdata(&chg_dev->dev, devdata);
 	kfree(algo_name);
 
@@ -322,7 +322,11 @@ static int __init charger_algorithm_class_init(void)
 	return 0;
 }
 
+#if IS_BUILTIN(CONFIG_MTK_CHARGER)
+subsys_initcall(charger_algorithm_class_init);
+#else
 module_init(charger_algorithm_class_init);
+#endif
 module_exit(charger_algorithm_class_exit);
 
 MODULE_DESCRIPTION("Charger Algorithm Class Device");

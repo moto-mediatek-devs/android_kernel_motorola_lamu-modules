@@ -26,7 +26,7 @@
 /* allocate a memory chunk, and add it to pool */
 static int mdw_mem_pool_chunk_add(struct mdw_mem_pool *pool, uint32_t size)
 {
-	int ret = 0;
+	int ret = 0, len = 0;
 	struct mdw_mem *m;
 	char buf_name[DMA_BUF_NAME_LEN];
 
@@ -42,8 +42,14 @@ static int mdw_mem_pool_chunk_add(struct mdw_mem_pool *pool, uint32_t size)
 	}
 
 	memset(buf_name, 0, sizeof(buf_name));
-	snprintf(buf_name, sizeof(buf_name)-1, "APU_CMDBUF_POOL:%u/%u",
+	len = snprintf(buf_name, sizeof(buf_name), "APU_CMDBUF_POOL:%u/%u",
 		task_pid_nr(current), task_tgid_nr(current));
+	if (len >= sizeof(buf_name) || len < 0) {
+		mdw_drv_err("snprintf fail\n");
+		ret = -EINVAL;
+		goto out;
+	}
+
 	if (mdw_mem_set_name(m, buf_name)) {
 		mdw_drv_err("s(0x%llx) m(0x%llx) set name fail, size: %d\n",
 			(uint64_t)pool->mpriv, (uint64_t)m, size);
@@ -166,7 +172,6 @@ out:
 static void mdw_mem_pool_release(struct kref *ref)
 {
 	struct mdw_mem_pool *pool;
-	struct mdw_fpriv *mpriv;
 	struct mdw_mem *m = NULL, *tmp = NULL;
 
 	pool = container_of(ref, struct mdw_mem_pool, m_ref);
@@ -175,8 +180,6 @@ static void mdw_mem_pool_release(struct kref *ref)
 
 	mdw_trace_begin("apumdw:pool_release|size:%u align:%u",
 		pool->chunk_size, pool->align);
-
-	mpriv = pool->mpriv;
 
 	/* release all allocated memories */
 	list_for_each_entry_safe(m, tmp, &pool->m_list, d_node) {

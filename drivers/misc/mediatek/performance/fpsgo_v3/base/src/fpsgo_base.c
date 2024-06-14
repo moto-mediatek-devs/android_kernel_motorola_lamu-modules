@@ -21,6 +21,7 @@
 #include <linux/miscdevice.h>
 #include <linux/uaccess.h>
 #include <linux/wait.h>
+#include <linux/kmemleak.h>
 
 #include "fpsgo_base.h"
 #include "mt-plat/fpsgo_common.h"
@@ -538,11 +539,13 @@ void fpsgo_render_tree_lock(const char *tag)
 {
 	mutex_lock(&fpsgo_render_lock);
 }
+EXPORT_SYMBOL_GPL(fpsgo_render_tree_lock);
 
 void fpsgo_render_tree_unlock(const char *tag)
 {
 	mutex_unlock(&fpsgo_render_lock);
 }
+EXPORT_SYMBOL_GPL(fpsgo_render_tree_unlock);
 
 void fpsgo_lockprove(const char *tag)
 {
@@ -883,9 +886,13 @@ struct render_info *fpsgo_search_and_add_render_info(int pid,
 	iter_thr->powerRL.ruclamp = 100;
 	iter_thr->powerRL.uclamp_m = 100;
 	iter_thr->powerRL.ruclamp_m = 100;
+	iter_thr->frame_count = 0;
+
 
 	fbt_set_render_boost_attr(iter_thr);
 	fbt_init_ux(iter_thr);
+
+	kmemleak_not_leak(iter_thr);
 
 	rb_link_node(&iter_thr->render_key_node, parent, p);
 	rb_insert_color(&iter_thr->render_key_node, &render_pid_tree);
@@ -1758,7 +1765,6 @@ int fpsgo_check_thread_status(void)
 			iter->p_blc = NULL;
 			iter->dep_arr = NULL;
 			n = rb_first(&render_pid_tree);
-			fpsgo_ux_reset(iter);
 
 			if (fpsgo_base_is_finished(iter))
 				delete = 1;
@@ -4044,9 +4050,7 @@ void fpsgo_ktf_test_read_node(struct kobject *kobj,
 	struct kobj_attribute *attr, char *buf,
 	ssize_t (*target_func)(struct kobject *, struct kobj_attribute *, char *))
 {
-	int ret = 0;
-
-	ret = target_func(kobj, attr, buf);
+	target_func(kobj, attr, buf);
 	memset(buf, '\0' , FPSGO_SYSFS_MAX_BUFF_SIZE * sizeof(char));
 }
 
@@ -4055,14 +4059,13 @@ void fpsgo_ktf_test_write_node(struct kobject *kobj,
 	ssize_t (*target_func)(struct kobject *, struct kobj_attribute *, const char *, size_t))
 {
 	char *acBuffer = NULL;
-	int ret = 0;
 
 	acBuffer = kcalloc(FPSGO_SYSFS_MAX_BUFF_SIZE, sizeof(char), GFP_KERNEL);
 	if (!acBuffer)
 		goto out;
 
 	if (scnprintf(acBuffer, FPSGO_SYSFS_MAX_BUFF_SIZE, "%s", buf))
-		ret = target_func(kobj, attr, acBuffer, FPSGO_SYSFS_MAX_BUFF_SIZE - 1);
+		target_func(kobj, attr, acBuffer, FPSGO_SYSFS_MAX_BUFF_SIZE - 1);
 
 out:
 	kfree(acBuffer);

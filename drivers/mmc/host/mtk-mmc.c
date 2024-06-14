@@ -414,6 +414,84 @@ static const struct mtk_mmc_compatible mt6877_compat = {
 	},
 };
 
+static const struct mtk_mmc_compatible mt6833_compat = {
+	.clk_div_bits = 12,
+	.recheck_sdio_irq = false,
+	.hs400_tune = false,
+	.pad_tune_reg = MSDC_PAD_TUNE0,
+	.async_fifo = true,
+	.data_tune = true,
+	.busy_check = true,
+	.stop_clk_set = {
+		.enable = 1,
+		.stop_cnt = 3,
+		.pop_cnt = 8,
+	},
+	.enhance_rx = true,
+	.support_64g = true,
+	.clock_set = {
+		.need_gate_cg = true,
+		.set_type = MSDC_CLK_SET_V1,
+	},
+	.new_tx_ver = 0,
+	.new_rx_ver = 0,
+	.infra_check = {
+		.enable = false,
+	},
+};
+
+static const struct mtk_mmc_compatible mt6781_compat = {
+	.clk_div_bits = 12,
+	.recheck_sdio_irq = false,
+	.hs400_tune = false,
+	.pad_tune_reg = MSDC_PAD_TUNE0,
+	.async_fifo = true,
+	.data_tune = true,
+	.busy_check = true,
+	.stop_clk_set = {
+		.enable = 1,
+		.stop_cnt = 3,
+		.pop_cnt = 8,
+	},
+	.enhance_rx = true,
+	.support_64g = true,
+	.clock_set = {
+		.need_gate_cg = true,
+		.set_type = MSDC_CLK_SET_V1,
+	},
+	.new_tx_ver = 0,
+	.new_rx_ver = 0,
+	.infra_check = {
+		.enable = false,
+	},
+};
+
+static const struct mtk_mmc_compatible mt6853_compat = {
+	.clk_div_bits = 12,
+	.recheck_sdio_irq = false,
+	.hs400_tune = false,
+	.pad_tune_reg = MSDC_PAD_TUNE0,
+	.async_fifo = true,
+	.data_tune = true,
+	.busy_check = true,
+	.stop_clk_set = {
+		.enable = 1,
+		.stop_cnt = 3,
+		.pop_cnt = 8,
+	},
+	.enhance_rx = true,
+	.support_64g = true,
+	.clock_set = {
+		.need_gate_cg = true,
+		.set_type = MSDC_CLK_SET_V1,
+	},
+	.new_tx_ver = 0,
+	.new_rx_ver = 0,
+	.infra_check = {
+		.enable = false,
+	},
+};
+
 static const struct mtk_mmc_compatible mt6765_compat = {
 	.clk_div_bits = 12,
 	.recheck_sdio_irq = false,
@@ -616,6 +694,9 @@ static const struct of_device_id msdc_of_ids[] = {
 	{ .compatible = "mediatek,mt6897-mmc", .data = &mt6897_compat},
 	{ .compatible = "mediatek,mt6989-mmc", .data = &mt6989_compat},
 	{ .compatible = "mediatek,mt6991-mmc", .data = &mt6991_compat},
+	{ .compatible = "mediatek,mt6833-mmc", .data = &mt6833_compat},
+	{ .compatible = "mediatek,mt6853-mmc", .data = &mt6853_compat},
+	{ .compatible = "mediatek,mt6781-mmc", .data = &mt6781_compat},
 	{ .compatible = "mediatek,mt6765-mmc", .data = &mt6765_compat},
 	{}
 };
@@ -980,6 +1061,8 @@ static void msdc_new_tx_rx_setting(struct msdc_host *host, unsigned char timing)
 
 static int msdc_prepare_set_mclk(struct msdc_host *host, bool gate)
 {
+	int ret = 0;
+#if !IS_ENABLED(CONFIG_FPGA_EARLY_PORTING)
 	if (host->dev_comp->clock_set.need_gate_cg == false)
 		return 0;
 
@@ -1001,9 +1084,9 @@ V1:
 				clk_disable_unprepare(clk_get_parent(host->src_clk));
 		} else {
 			if (host->src_clk_cg)
-				clk_prepare_enable(host->src_clk_cg);
+				ret = clk_prepare_enable(host->src_clk_cg);
 			else
-				clk_prepare_enable(clk_get_parent(host->src_clk));
+				ret = clk_prepare_enable(clk_get_parent(host->src_clk));
 		}
 		break;
 	case MSDC_CLK_SET_V2:
@@ -1013,24 +1096,24 @@ V1:
 			if (host->src_clk_cg)
 				clk_disable_unprepare(host->src_clk);
 		} else {
-			clk_prepare_enable(host->src_clk);
-			if (host->src_clk_cg)
-				clk_prepare_enable(host->src_clk);
+			ret = clk_prepare_enable(host->src_clk);
+			if (host->src_clk_cg && ret == 0)
+				ret = clk_prepare_enable(host->src_clk);
 		}
 		break;
 	case MSDC_CLK_SET_MULTI:
 		if (host->sw_ver == CHIP_VER_E1)
-			return 0;
+			ret = 0;
 		else if (host->sw_ver == CHIP_VER_E2)
 			goto V1;
 		else
-			return 2;
+			ret = 2;
 		break;
 	default:
 		break;
 	}
-
-	return 0;
+#endif
+	return ret;
 }
 
 static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
@@ -2138,9 +2221,12 @@ static irqreturn_t msdc_thread_irq(int irq, void *dev_id)
 
 	for (i = 0; i < len; i++) {
 		spin_lock_irqsave(&host->err_info_lock, flags);
-		if (len != 0)
-			ret = kfifo_out(&host->err_info_bag_ring, &dump_bag, 1);
+		ret = kfifo_out(&host->err_info_bag_ring, &dump_bag, 1);
 		spin_unlock_irqrestore(&host->err_info_lock, flags);
+		if (ret != 1) {
+			dev_info(host->dev, "Err kfifo out is fail\n");
+			break;
+		}
 		if (dump_bag.err_bitmap[0] & (ERR_CMD_CRC | ERR_CMD_TMO)) {
 			if (dump_bag.err_bitmap[0] & ERR_CMD_CRC)
 				dev_info(host->dev, "At time:%lld cmd_crc happen cmd=%d arg=0x%X; rsp 0x%X;\n",

@@ -7,6 +7,7 @@
 #define pr_fmt(fmt) "MKP: " fmt
 
 #include <asm/kvm_pkvm_module.h>
+#include <asm/kvm_host.h>
 #include <asm/archrandom.h>
 #include <linux/of.h>
 #include <linux/of_reserved_mem.h>
@@ -32,6 +33,7 @@
 #include "selinux/mkp_policycap.h"
 
 #include "mkp_demo.h"
+#include "mkp_demo_host.h"
 
 #include "mkp.h"
 #include "trace_mkp.h"
@@ -44,8 +46,6 @@ DEBUG_SET_LEVEL(DEBUG_LEVEL_ERR);
 #define SUPPORT_FULL_KERNEL_CODE_2M
 #define DEFAULT_MAX_PID 32768
 
-int __kvm_nvhe_mkp_hyp_init(const struct pkvm_module_ops *ops);
-void __kvm_nvhe_handle__mkp_hyp_hvc(struct kvm_cpu_context *ctx);
 int hvc_number;
 
 struct work_struct *avc_work;
@@ -116,14 +116,13 @@ bool mkp_hook_trace_enabled(void)
 
 static void set_memory_rw(unsigned long addr, int nr_pages)
 {
-	int ret;
 	bool valid_addr = false;
 
 	if ((unsigned long)THIS_MODULE->mem[MOD_INIT_TEXT].base == addr)
 		return;
 	valid_addr = !!(is_vmalloc_or_module_addr((void *)addr));
 	if (valid_addr) {
-		ret = mkp_set_mapping_xxx_helper(addr, nr_pages, MKP_POLICY_DRV,
+		mkp_set_mapping_xxx_helper(addr, nr_pages, MKP_POLICY_DRV,
 			HELPER_MAPPING_RW);
 	} else
 		MKP_WARN("addr is not a module or vmalloc address\n");
@@ -131,7 +130,6 @@ static void set_memory_rw(unsigned long addr, int nr_pages)
 
 static void set_memory_nx(unsigned long addr, int nr_pages)
 {
-	int ret;
 	bool valid_addr = false;
 	int i = 0;
 	unsigned long pfn;
@@ -145,7 +143,7 @@ static void set_memory_nx(unsigned long addr, int nr_pages)
 
 	valid_addr = !!(is_vmalloc_or_module_addr((void *)addr));
 	if (valid_addr) {
-		ret = mkp_set_mapping_xxx_helper(addr, nr_pages, MKP_POLICY_DRV,
+		mkp_set_mapping_xxx_helper(addr, nr_pages, MKP_POLICY_DRV,
 			HELPER_MAPPING_NX);
 		policy = MKP_POLICY_DRV;
 	} else {
@@ -159,8 +157,8 @@ static void set_memory_nx(unsigned long addr, int nr_pages)
 		write_lock_irqsave(&mkp_rbtree_rwlock, flags);
 		found = mkp_rbtree_search(&mkp_rbtree, phys_addr);
 		if (found != NULL && found->addr != 0 && found->size != 0) {
-			ret = mkp_destroy_handle(policy, found->handle);
-			ret = mkp_rbtree_erase(&mkp_rbtree, phys_addr);
+			mkp_destroy_handle(policy, found->handle);
+			mkp_rbtree_erase(&mkp_rbtree, phys_addr);
 		}
 		write_unlock_irqrestore(&mkp_rbtree_rwlock, flags);
 	}
@@ -195,7 +193,6 @@ static DECLARE_DELAYED_WORK(mkp_pk_work, mkp_protect_kernel_work_fn);
 static int retry_num = 100;
 static void mkp_protect_kernel_work_fn(struct work_struct *work)
 {
-	int ret = 0;
 	uint32_t policy = 0;
 	uint32_t handle = 0;
 	unsigned long addr_start;
@@ -289,8 +286,8 @@ static void mkp_protect_kernel_work_fn(struct work_struct *work)
 		if (handle == 0) {
 			MKP_ERR("%s:%d: Create handle fail\n", __func__, __LINE__);
 		} else {
-			ret = mkp_set_mapping_x(policy, handle);
-			ret = mkp_set_mapping_ro(policy, handle);
+			mkp_set_mapping_x(policy, handle);
+			mkp_set_mapping_ro(policy, handle);
 			pr_info("mkp: protect krn code done\n");
 		}
 	}
@@ -320,7 +317,7 @@ static void mkp_protect_kernel_work_fn(struct work_struct *work)
 		if (handle == 0)
 			MKP_ERR("%s:%d: Create handle fail\n", __func__, __LINE__);
 		else {
-			ret = mkp_set_mapping_ro(policy, handle);
+			mkp_set_mapping_ro(policy, handle);
 			pr_info("mkp: protect krn rodata done\n");
 		}
 	}
@@ -333,28 +330,9 @@ protect_krn_fail:
 #endif
 #endif
 
-static void probe_android_rvh_set_module_permit_before_init(void *ignore,
-	const struct module *mod)
-{
-	if (mod == THIS_MODULE && policy_ctrl[MKP_POLICY_MKP] != 0) {
-		module_enable_ro(mod, false, MKP_POLICY_MKP);
-		module_enable_nx(mod, MKP_POLICY_MKP);
-		module_enable_x(mod, MKP_POLICY_MKP);
-		return;
-	}
-	if (mod != THIS_MODULE && policy_ctrl[MKP_POLICY_DRV] != 0) {
-		if (drv_skip((char *)mod->name))
-			return;
-		module_enable_ro(mod, false, MKP_POLICY_DRV);
-		module_enable_nx(mod, MKP_POLICY_DRV);
-		module_enable_x(mod, MKP_POLICY_DRV);
-	}
-}
-
 static void probe_android_rvh_commit_creds(void *ignore, const struct task_struct *task,
 	const struct cred *new)
 {
-	int ret = -1;
 	struct cred_sbuf_content c;
 
 	if (g_ro_cred_handle == 0)
@@ -375,7 +353,7 @@ static void probe_android_rvh_commit_creds(void *ignore, const struct task_struc
 	c.csc.fsuid.val = new->fsuid.val;
 	c.csc.fsgid.val = new->fsgid.val;
 	c.csc.security = new->security;
-	ret = mkp_update_sharebuf_4_argu(MKP_POLICY_TASK_CRED, g_ro_cred_handle,
+	mkp_update_sharebuf_4_argu(MKP_POLICY_TASK_CRED, g_ro_cred_handle,
 		(unsigned long)task->pid,
 		c.args[0], c.args[1], c.args[2], c.args[3]);
 
@@ -385,8 +363,6 @@ static void probe_android_rvh_commit_creds(void *ignore, const struct task_struc
 static void probe_android_rvh_exit_creds(void *ignore, const struct task_struct *task,
 	const struct cred *cred)
 {
-	int ret = -1;
-
 	if (g_ro_cred_handle == 0)
 		return;
 
@@ -398,7 +374,7 @@ static void probe_android_rvh_exit_creds(void *ignore, const struct task_struct 
 
 	MKP_HOOK_BEGIN(__func__);
 
-	ret = mkp_update_sharebuf_4_argu(MKP_POLICY_TASK_CRED, g_ro_cred_handle,
+	mkp_update_sharebuf_4_argu(MKP_POLICY_TASK_CRED, g_ro_cred_handle,
 		(unsigned long)task->pid, 0, 0, 0, 0);
 
 	MKP_HOOK_END(__func__);
@@ -407,7 +383,6 @@ static void probe_android_rvh_exit_creds(void *ignore, const struct task_struct 
 static void probe_android_rvh_override_creds(void *ignore, const struct task_struct *task,
 	const struct cred *new)
 {
-	int ret = -1;
 	struct cred_sbuf_content c;
 
 	if (g_ro_cred_handle == 0)
@@ -428,7 +403,7 @@ static void probe_android_rvh_override_creds(void *ignore, const struct task_str
 	c.csc.fsuid.val = new->fsuid.val;
 	c.csc.fsgid.val = new->fsgid.val;
 	c.csc.security = new->security;
-	ret = mkp_update_sharebuf_4_argu(MKP_POLICY_TASK_CRED, g_ro_cred_handle,
+	mkp_update_sharebuf_4_argu(MKP_POLICY_TASK_CRED, g_ro_cred_handle,
 		(unsigned long)task->pid,
 		c.args[0], c.args[1], c.args[2], c.args[3]);
 
@@ -438,7 +413,6 @@ static void probe_android_rvh_override_creds(void *ignore, const struct task_str
 static void probe_android_rvh_revert_creds(void *ignore, const struct task_struct *task,
 	const struct cred *old)
 {
-	int ret = -1;
 	struct cred_sbuf_content c;
 
 	if (g_ro_cred_handle == 0)
@@ -459,7 +433,7 @@ static void probe_android_rvh_revert_creds(void *ignore, const struct task_struc
 	c.csc.fsuid.val = old->fsuid.val;
 	c.csc.fsgid.val = old->fsgid.val;
 	c.csc.security = old->security;
-	ret = mkp_update_sharebuf_4_argu(MKP_POLICY_TASK_CRED, g_ro_cred_handle,
+	mkp_update_sharebuf_4_argu(MKP_POLICY_TASK_CRED, g_ro_cred_handle,
 		(unsigned long)task->pid,
 		c.args[0], c.args[1], c.args[2], c.args[3]);
 
@@ -543,14 +517,12 @@ static void probe_android_rvh_selinux_avc_insert(void *ignore, const struct avc_
 static void probe_android_rvh_selinux_avc_node_delete(void *ignore,
 	const struct avc_node *node)
 {
-	int ret = -1;
-
 	if (g_ro_avc_handle == 0)
 		return;
 
 	MKP_HOOK_BEGIN(__func__);
 
-	ret = mkp_update_sharebuf_4_argu(MKP_POLICY_SELINUX_AVC, g_ro_avc_handle,
+	mkp_update_sharebuf_4_argu(MKP_POLICY_SELINUX_AVC, g_ro_avc_handle,
 		(unsigned long)node, 0, 0, 0, 0);
 
 	MKP_HOOK_END(__func__);
@@ -898,7 +870,6 @@ struct tracepoints_table {
 
 static void mkp_task_newtask(void *ignore, struct task_struct *task, unsigned long clone_flags)
 {
-	int ret = -1;
 	struct cred_sbuf_content c;
 
 	if (g_ro_cred_handle == 0)
@@ -914,16 +885,11 @@ static void mkp_task_newtask(void *ignore, struct task_struct *task, unsigned lo
 	c.csc.fsgid.val = task->cred->fsgid.val;
 	c.csc.security = task->cred->security;
 
-	ret = mkp_update_sharebuf_4_argu(MKP_POLICY_TASK_CRED, g_ro_cred_handle,
+	mkp_update_sharebuf_4_argu(MKP_POLICY_TASK_CRED, g_ro_cred_handle,
 			(unsigned long)task->pid,
 			c.args[0], c.args[1], c.args[2], c.args[3]);
 
 	MKP_HOOK_END(__func__);
-}
-
-static void mkp_module_load(void *ignore, struct module *mod)
-{
-	probe_android_rvh_set_module_permit_before_init(NULL, mod);
 }
 
 static void mkp_module_free(void *ignore, struct module *mod)
@@ -936,9 +902,17 @@ static void mkp_module_free(void *ignore, struct module *mod)
 
 static struct tracepoints_table mkp_tracepoints[] = {
 {.name = "task_newtask", .func = mkp_task_newtask, .tp = NULL, .policy = MKP_POLICY_TASK_CRED},
+{.name = "module_free", .func = mkp_module_free, .tp = NULL, .policy = MKP_POLICY_DRV},
+};
+
+/* Beacause there are some issue for module_load tracepoint, we bypass this as a workaround */
+/*
+static struct tracepoints_table mkp_tracepoints[] = {
+{.name = "task_newtask", .func = mkp_task_newtask, .tp = NULL, .policy = MKP_POLICY_TASK_CRED},
 {.name = "module_load", .func = mkp_module_load, .tp = NULL, .policy = MKP_POLICY_DRV},
 {.name = "module_free", .func = mkp_module_free, .tp = NULL, .policy = MKP_POLICY_DRV},
 };
+*/
 
 #define FOR_EACH_INTEREST(i) \
 	for (i = 0; i < sizeof(mkp_tracepoints) / sizeof(struct tracepoints_table); i++)
@@ -985,8 +959,8 @@ static void __init mkp_hookup_tracepoints(void)
 	// Probing found tracepoints
 	FOR_EACH_INTEREST(i) {
 		if (policy_ctrl[i] != 0 && mkp_tracepoints[i].tp != NULL) {
-			ret = tracepoint_probe_register(mkp_tracepoints[0].tp,
-							mkp_tracepoints[0].func,  NULL);
+			ret = tracepoint_probe_register(mkp_tracepoints[i].tp,
+							mkp_tracepoints[i].func,  NULL);
 			if (ret) {
 				MKP_ERR("Failed to register %s for policy %d\n",
 					mkp_tracepoints[i].name, mkp_tracepoints[i].policy);
@@ -1079,10 +1053,8 @@ int __init mkp_demo_init(void)
 	bool smccc_trng_available;
 	unsigned long token;
 	struct reserved_mem *rmem = NULL;
-	unsigned long start_pfn = 0;
-	unsigned long end_pfn = 0;
+	unsigned long start_pa = 0;
 	phys_addr_t rmem_base, rmem_size;
-	struct arm_smccc_res res;
 
 	ret = platform_driver_register(&mkp_driver);
 	if (ret)
@@ -1114,14 +1086,14 @@ int __init mkp_demo_init(void)
 	}
 
 	/* load mkp el2 module */
-	ret = pkvm_load_el2_module(__kvm_nvhe_mkp_hyp_init, &token);
+	ret = pkvm_load_el2_module(kvm_nvhe_sym(mkp_hyp_init), &token);
 	if (ret) {
 		pr_info("%s:%d, ret: %d\n", __func__, __LINE__, ret);
 		return ret;
 	}
 
 	/* register hvc call  */
-	ret = pkvm_register_el2_mod_call(__kvm_nvhe_handle__mkp_hyp_hvc, token);
+	ret = pkvm_register_el2_mod_call(kvm_nvhe_sym(handle__mkp_hyp_hvc), token);
 	if (ret < 0)
 		return ret;
 
@@ -1132,8 +1104,7 @@ int __init mkp_demo_init(void)
 
 	// Get Dram size
 	pgdat = NODE_DATA(nid);
-	start_pfn = pgdat->node_start_pfn;
-	end_pfn = start_pfn + pgdat->node_spanned_pages - 1;
+	start_pa = (pgdat->node_start_pfn) << PAGE_SHIFT;
 	DRAM_SIZE = (pgdat->node_spanned_pages) << PAGE_SHIFT;
 
 	// Get mkp reserved memory information
@@ -1143,8 +1114,10 @@ int __init mkp_demo_init(void)
 	rmem_size = rmem->size;
 
 	// mkp prepare
-	res = mkp_el2_mod_call(hvc_number, MKP_HVC_CALL_ID(0, HVC_FUNC_MKP_HYP_PREPARE),
+	mkp_el2_mod_call(hvc_number, MKP_HVC_CALL_ID(0, HVC_FUNC_MKP_HYP_PREPARE1), start_pa,
 				DRAM_SIZE, rmem_base, rmem_size, smccc_trng_available);
+	mkp_el2_mod_call(hvc_number, MKP_HVC_CALL_ID(0, HVC_FUNC_MKP_HYP_PREPARE2), FIXADDR_TOP,
+				__fix_to_virt(__end_of_fixed_addresses - 1));
 
 	/* Set policy control */
 	mkp_set_policy(mkp_policy & mkp_policy_default);

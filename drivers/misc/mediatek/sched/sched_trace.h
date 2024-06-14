@@ -99,11 +99,12 @@ TRACE_EVENT(sched_fits_cap_ceiling,
 	TP_PROTO(int fit, int cpu, unsigned long util, unsigned long uclamp_min,
 		unsigned long uclamp_max, unsigned long cap,
 		unsigned long ceiling, unsigned int sugov_margin,
-		unsigned int capacity_dn_margin, unsigned int capacity_up_margin, bool AM_enabled),
+		unsigned int capacity_dn_margin, unsigned int capacity_up_margin, bool AM_enabled,
+		int uclamp_involve),
 
 	TP_ARGS(fit, cpu, util, uclamp_min, uclamp_max, cap,
 			ceiling, sugov_margin,
-			capacity_dn_margin, capacity_up_margin, AM_enabled),
+			capacity_dn_margin, capacity_up_margin, AM_enabled, uclamp_involve),
 
 	TP_STRUCT__entry(
 		__field(int, fit)
@@ -119,6 +120,7 @@ TRACE_EVENT(sched_fits_cap_ceiling,
 		__field(unsigned int,   capacity_up_margin)
 		__field(unsigned long,   capacity_orig)
 		__field(bool,			AM_enabled)
+		__field(int,			uclamp_involve)
 		),
 
 	TP_fast_assign(
@@ -135,10 +137,11 @@ TRACE_EVENT(sched_fits_cap_ceiling,
 		__entry->capacity_up_margin	= capacity_up_margin;
 		__entry->capacity_orig		= capacity_orig_of(cpu);
 		__entry->AM_enabled			= AM_enabled;
+		__entry->uclamp_involve			= uclamp_involve;
 		),
 
 	TP_printk(
-		"fit=%d cpu=%d util=%ld uclamp_min=%lu uclamp_max=%lu cap_normal=%lu thermal=%lu ceiling=%ld capacity_dn_margin=%d capacity_up_margin=%d sugov_margin=%d cap_origin=%ld adaptive_margin_ctrl=%d",
+		"fit=%d cpu=%d util=%ld uclamp_min=%lu uclamp_max=%lu cap_normal=%lu thermal=%lu ceiling=%ld capacity_dn_margin=%d capacity_up_margin=%d sugov_margin=%d cap_origin=%ld uclamp_involve=%d adaptive_margin_ctrl=%d",
 		__entry->fit,
 		__entry->cpu,
 		__entry->util,
@@ -151,6 +154,7 @@ TRACE_EVENT(sched_fits_cap_ceiling,
 		__entry->capacity_up_margin,
 		__entry->sugov_margin,
 		__entry->capacity_orig,
+		__entry->uclamp_involve,
 		__entry->AM_enabled)
 );
 #endif
@@ -297,10 +301,10 @@ TRACE_EVENT(sched_find_best_candidates,
 TRACE_EVENT(sched_target_max_spare_cpu,
 
 	TP_PROTO(const char *type, int best_cpu, int new_cpu, int replace,
-		long spare_cap, long target_max_spare_cap, int fit, int best_fit),
+		long spare_cap, long target_max_spare_cap),
 
 	TP_ARGS(type, best_cpu, new_cpu, replace,
-		spare_cap, target_max_spare_cap, fit, best_fit),
+		spare_cap, target_max_spare_cap),
 
 	TP_STRUCT__entry(
 		__string(type, type)
@@ -309,8 +313,6 @@ TRACE_EVENT(sched_target_max_spare_cpu,
 		__field(int, replace)
 		__field(long, spare_cap)
 		__field(long, target_max_spare_cap)
-		__field(int, fit)
-		__field(int, best_fit)
 		),
 
 	TP_fast_assign(
@@ -320,19 +322,15 @@ TRACE_EVENT(sched_target_max_spare_cpu,
 		__entry->replace        = replace;
 		__entry->spare_cap        = spare_cap;
 		__entry->target_max_spare_cap        = target_max_spare_cap;
-		__entry->fit            = fit;
-		__entry->best_fit        = best_fit;
 		),
 
-	TP_printk("type=%s best_cpu=%d new_cpu=%d replace=%d spare_cap=%ld target_max_spare_cap=%ld fit=%d best_fit=%d",
+	TP_printk("type=%s best_cpu=%d new_cpu=%d replace=%d spare_cap=%ld target_max_spare_cap=%ld",
 		__get_str(type),
 		__entry->best_cpu,
 		__entry->new_cpu,
 		__entry->replace,
 		__entry->spare_cap,
-		__entry->target_max_spare_cap,
-		__entry->fit,
-		__entry->best_fit)
+		__entry->target_max_spare_cap)
 );
 
 TRACE_EVENT(sched_select_task_rq,
@@ -476,32 +474,41 @@ TRACE_EVENT(sched_energy_init,
 
 TRACE_EVENT(sched_eenv_init,
 
-	TP_PROTO(unsigned int dsu_freq_base, unsigned int dsu_volt_base, unsigned int dsu_freq_thermal,
-			unsigned int dsu_bw_base, unsigned int emi_bw_base, unsigned int gear_idx),
+	TP_PROTO(unsigned int dsu_freq_base, unsigned int dsu_volt_base,
+			unsigned int dsu_freq_floor, unsigned int dsu_freq_ceil,
+			unsigned int dsu_freq_thermal, unsigned int dsu_bw_base,
+			unsigned int emi_bw_base, unsigned int gear_idx),
 
-	TP_ARGS(dsu_freq_base, dsu_volt_base, dsu_freq_thermal, dsu_bw_base, emi_bw_base, gear_idx),
+	TP_ARGS(dsu_freq_base, dsu_volt_base, dsu_freq_floor, dsu_freq_ceil,
+			dsu_freq_thermal, dsu_bw_base, emi_bw_base, gear_idx),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, dsu_freq_base)
-		__field(unsigned int, dsu_volt_base)
-		__field(unsigned int, dsu_freq_thermal)
-		__field(unsigned int, dsu_bw_base)
-		__field(unsigned int, emi_bw_base)
+		__field(int, dsu_freq_base)
+		__field(int, dsu_volt_base)
+		__field(int, dsu_freq_floor)
+		__field(int, dsu_freq_ceil)
+		__field(int, dsu_freq_thermal)
+		__field(int, dsu_bw_base)
+		__field(int, emi_bw_base)
 		__field(unsigned int, gear_idx)
 		),
 
 	TP_fast_assign(
-		__entry->dsu_freq_base = dsu_freq_base;
-		__entry->dsu_volt_base = dsu_volt_base;
-		__entry->dsu_freq_thermal = dsu_freq_thermal;
-		__entry->dsu_bw_base = dsu_bw_base;
-		__entry->emi_bw_base = emi_bw_base;
+		__entry->dsu_freq_base = (int) dsu_freq_base;
+		__entry->dsu_volt_base = (int) dsu_volt_base;
+		__entry->dsu_freq_floor = (int) dsu_freq_floor;
+		__entry->dsu_freq_ceil = (int) dsu_freq_ceil;
+		__entry->dsu_freq_thermal = (int) dsu_freq_thermal;
+		__entry->dsu_bw_base = (int) dsu_bw_base;
+		__entry->emi_bw_base = (int) emi_bw_base;
 		__entry->gear_idx = gear_idx;
 		),
 
-	TP_printk("dsu_freq_base=%u dsu_volt_base=%u dsu_freq_thermal=%u dsu_bw_base=%u emi_bw_base=%u share_buck_idx=%u",
+	TP_printk("dsu_freq_base=%d dsu_volt_base=%d dsu_freq_floor=%d dsu_freq_ceil=%d dsu_freq_thermal=%d dsu_bw_base=%d emi_bw_base=%d share_buck_idx=%u",
 		__entry->dsu_freq_base,
 		__entry->dsu_volt_base,
+		__entry->dsu_freq_floor,
+		__entry->dsu_freq_ceil,
 		__entry->dsu_freq_thermal,
 		__entry->dsu_bw_base,
 		__entry->emi_bw_base,
@@ -542,17 +549,17 @@ TRACE_EVENT(sched_per_core_BW,
 
 	TP_STRUCT__entry(
 		__field(int, cpu)
-		__field(unsigned int, bw)
-		__field(unsigned int, sum_bw)
+		__field(int, bw)
+		__field(int, sum_bw)
 		),
 
 	TP_fast_assign(
 		__entry->cpu        = cpu;
-		__entry->bw         = bw;
-		__entry->sum_bw     = sum_bw;
+		__entry->bw         = (int) bw;
+		__entry->sum_bw     = (int) sum_bw;
 		),
 
-	TP_printk("cpu=%d bw=%u sum_bw=%u",
+	TP_printk("cpu=%d bw=%d sum_bw=%d",
 		__entry->cpu,
 		__entry->bw,
 		__entry->sum_bw)

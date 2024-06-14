@@ -187,7 +187,8 @@
 #define PCIE_MSI_GRPX_PER_SET_OFFSET	4
 #define PCIE_MSI_GRP3_SET_OFFSET	0xDE0
 
-#define PCIE_RES_STATUS                 0xd28
+#define PCIE_RES_STATUS			0xd28
+#define ALL_RES_ACK			0xef
 
 #define PCIE_AXI0_ERR_ADDR_L		0xe00
 #define PCIE_AXI0_ERR_INFO		0xe08
@@ -206,8 +207,10 @@
 
 #define PCIE_AXI_IF_CTRL		0x1a8
 #define PCIE_AXI0_SLV_RESP_MASK		BIT(12)
-#define CPLTO_ALWAYS_EN			BIT(26)
-#define WR_CPLTO_ALWAYS_EN		BIT(27)
+#define PCIE_CPLTO_SCALE_R2_L		16
+#define PCIE_CPLTO_SCALE_R5_L		20
+#define PCIE_SW_CPLTO_TIMER		GENMASK(25, 16)
+#define SW_CPLTO_DATA_SEL		BIT(28)
 
 #define PCIE_ISTATUS_PENDING_ADT	0x1d4
 
@@ -245,8 +248,11 @@
 /* pcie read completion timeout */
 #define PCIE_CONF_DEV2_CTL_STS		0x10a8
 #define PCIE_DCR2_CPL_TO		GENMASK(3, 0)
+#define PCIE_CPL_TIMEOUT_50MS		0x0
 #define PCIE_CPL_TIMEOUT_64US		0x1
 #define PCIE_CPL_TIMEOUT_4MS		0x2
+#define PCIE_CPL_TIMEOUT_32MS		0x5
+#define PCIE_CPLTO_SCALE_29MS		29
 
 #define PCIE_CONF_EXP_LNKCTL2_REG	0x10b0
 
@@ -468,9 +474,8 @@ static int mtk_pcie_config_read(struct pci_bus *bus, unsigned int devfn,
 		reg = readl_relaxed(port->base + PCIE_AER_CO_STATUS);
 		if (reg & AER_CO_RE) {
 			mtk_pcie_dump_link_info(port->port_num);
-			reg = readl_relaxed(port->base + PCIE_AXI_IF_CTRL);
-			reg |= (CPLTO_ALWAYS_EN | WR_CPLTO_ALWAYS_EN);
-			writel_relaxed(reg, port->base + PCIE_AXI_IF_CTRL);
+			mtk_pcie_disable_data_trans(port->port_num);
+			dev_info(port->dev, "PCIe Rxerr detected!\n");
 		}
 	}
 
@@ -744,6 +749,53 @@ static void mtk_pcie_clkbuf_force_26m(struct mtk_pcie_port *port, bool enable)
 	mtk_pcie_dump_pextp_info(port);
 }
 
+/*
+ * mtk_pcie_adjust_cplto_scale() - Adujst cplto timeout
+ * @port: PCIe port information
+ * @cplto: modify the Completion Timeout value(ms)
+ * R2_1MS_10M/R5_16MS_55MS: the two ranges have adjustable precision by 0x1a8.
+ */
+static void mtk_pcie_adjust_cplto_scale(struct mtk_pcie_port *port, u32 cplto)
+{
+	u32 range = 0, scale = 0, value = 0;
+
+	if (!port)
+		return;
+
+	if (cplto >= 1 && cplto <= 10) {
+		range = R2_1MS_10MS;
+	} else if (cplto >= 16 && cplto <= 55) {
+		range = R5_16MS_55MS;
+	} else {
+		dev_info(port->dev, "Completion timeout value %d out of range\n", cplto);
+		return;
+	}
+
+	value = readl_relaxed(port->base + PCIE_CONF_DEV2_CTL_STS);
+	value &= ~PCIE_DCR2_CPL_TO;
+	scale = readl_relaxed(port->base + PCIE_AXI_IF_CTRL);
+	scale &= ~PCIE_SW_CPLTO_TIMER;
+
+	switch (range) {
+	case R2_1MS_10MS:
+		value |= PCIE_CPL_TIMEOUT_4MS;
+		scale |= cplto << PCIE_CPLTO_SCALE_R2_L;
+		break;
+	case R5_16MS_55MS:
+		value |= PCIE_CPL_TIMEOUT_32MS;
+		scale |= cplto << PCIE_CPLTO_SCALE_R5_L;
+		break;
+	default:
+		dev_info(port->dev, "Undefined range: %d\n", range);
+	}
+
+	writel_relaxed(value, port->base + PCIE_CONF_DEV2_CTL_STS);
+	writel_relaxed(scale, port->base + PCIE_AXI_IF_CTRL);
+	dev_info(port->dev, "PCIe RC control 2 register=%#x, precision of timeout=%#x\n",
+		readl_relaxed(port->base + PCIE_CONF_DEV2_CTL_STS),
+		readl_relaxed(port->base + PCIE_AXI_IF_CTRL));
+}
+
 static int mtk_pcie_set_link_speed(struct mtk_pcie_port *port)
 {
 	u32 val;
@@ -869,15 +921,8 @@ static int mtk_pcie_startup_port(struct mtk_pcie_port *port)
 	val |= PCIE_AXI_POST_ERR_ENABLE;
 	writel_relaxed(val, port->base + PCIE_INT_ENABLE_REG);
 
-	if (port->pextpcfg) {
-		/* PCIe read completion timeout is adjusted to 4ms */
-		val = readl_relaxed(port->base + PCIE_CONF_DEV2_CTL_STS);
-		val &= ~PCIE_DCR2_CPL_TO;
-		val |= PCIE_CPL_TIMEOUT_4MS;
-		writel_relaxed(val, port->base + PCIE_CONF_DEV2_CTL_STS);
-		dev_info(port->dev, "PCIe RC control 2 register=%#x",
-			readl_relaxed(port->base + PCIE_CONF_DEV2_CTL_STS));
-	}
+	/* PCIe read completion timeout is adjusted to 4ms */
+	mtk_pcie_adjust_cplto_scale(port, PCIE_CPL_TIMEOUT_4MS);
 
 	if (port->data && port->data->post_init) {
 		err = port->data->post_init(port);
@@ -1661,17 +1706,20 @@ static int __maybe_unused avoid_kmemleak_false_alarm(struct pci_dev *dev,
 						     void *data)
 {
 	kmemleak_not_leak(dev);
-	kmemleak_not_leak(&dev->dev);
+
 	return 0;
 }
 
 static void mtk_pcie_avoid_kmemleak_false_alarm(struct pci_host_bridge *host)
 {
+	struct pci_bus_resource *bus_res;
+
 	kmemleak_not_leak(host);
 	kmemleak_not_leak(&host->dev);
 	kmemleak_not_leak(host->bus);
-	kmemleak_not_leak(&host->bus->dev);
-	kmemleak_not_leak(&host->bus->resources);
+
+	list_for_each_entry(bus_res, &host->bus->resources, list)
+		kmemleak_not_leak(bus_res);
 
 	pci_walk_bus(host->bus, avoid_kmemleak_false_alarm, NULL);
 }
@@ -2905,17 +2953,59 @@ static int mtk_pcie_suspend_l12_6991(struct mtk_pcie_port *port)
 	val |= RG_PCIE26M_BYPASS;
 	writel_relaxed(val, port->pextpcfg + PEXTP_REQ_CTRL);
 
+	/* force mac sleep to 0 when switch lowpower clk */
+	val = readl_relaxed(port->base + PCIE_MISC_CTRL_REG);
+	val |= PCIE_MAC_SLP_DIS;
+	writel_relaxed(val, port->base + PCIE_MISC_CTRL_REG);
+
+	err = readl_poll_timeout(port->base + PCIE_RES_STATUS, val,
+				 ((val & ALL_RES_ACK) == ALL_RES_ACK),
+				 20, 1000);
+	if (err)
+		dev_info(port->dev, "Polling resource ack fail\n");
+
+	/* PCIe lowpower clock sel to 32K */
+	val = readl_relaxed(port->pextpcfg + PEXTP_CLOCK_CON);
+	val |= P0_LOWPOWER_CK_SEL;
+	writel_relaxed(val, port->pextpcfg + PEXTP_CLOCK_CON);
+	dev_info(port->dev, "Switch clock sel to %x\n", val);
+
+	val = readl_relaxed(port->base + PCIE_MISC_CTRL_REG);
+	val &= ~PCIE_MAC_SLP_DIS;
+	writel_relaxed(val, port->base + PCIE_MISC_CTRL_REG);
+
 	return 0;
 }
 
 static int mtk_pcie_resume_l12_6991(struct mtk_pcie_port *port)
 {
 	int err;
+	u32 val;
 
 	/* Unbinding of BBCK1 and BBCK2 */
 	err = clkbuf_xo_ctrl("SET_XO_VOTER", PCIE_CLKBUF_XO_ID, LIBER_BBCK2_UNBIND);
 	if (err)
 		dev_info(port->dev, "Fail to unbind BBCK2 with BBCK1\n");
+
+	val = readl_relaxed(port->base + PCIE_MISC_CTRL_REG);
+	val |= PCIE_MAC_SLP_DIS;
+	writel_relaxed(val, port->base + PCIE_MISC_CTRL_REG);
+
+	err = readl_poll_timeout(port->base + PCIE_RES_STATUS, val,
+				 ((val & ALL_RES_ACK) == ALL_RES_ACK),
+				 20, 1000);
+	if (err)
+		dev_info(port->dev, "Polling resource ack fail\n");
+
+	/* PCIe lowpower clock sel to 26M */
+	val = readl_relaxed(port->pextpcfg + PEXTP_CLOCK_CON);
+	val &= ~P0_LOWPOWER_CK_SEL;
+	writel_relaxed(val, port->pextpcfg + PEXTP_CLOCK_CON);
+	dev_info(port->dev, "Switch clock sel to %x\n", val);
+
+	val = readl_relaxed(port->base + PCIE_MISC_CTRL_REG);
+	val &= ~PCIE_MAC_SLP_DIS;
+	writel_relaxed(val, port->base + PCIE_MISC_CTRL_REG);
 
 	return 0;
 }
@@ -2960,6 +3050,13 @@ static int mtk_pcie_pre_init_6991(struct mtk_pcie_port *port)
 
 	writel_relaxed(val, port->pextpcfg + PEXTP_CLOCK_CON);
 
+	/* wifi request response data is all zero when completion timeout */
+	if (port->port_num == 0) {
+		val = readl_relaxed(port->base + PCIE_AXI_IF_CTRL);
+		val |= SW_CPLTO_DATA_SEL;
+		writel_relaxed(val, port->base + PCIE_AXI_IF_CTRL);
+	}
+
 	/* bypass PMRC signal */
 	val = readl_relaxed(port->pextpcfg + PEXTP_REQ_CTRL);
 	val |= RG_PCIE26M_BYPASS;
@@ -2985,6 +3082,9 @@ static int mtk_pcie_post_init_6991(struct mtk_pcie_port *port)
 		val = readl_relaxed(port->base + PCIE_INT_ENABLE_REG);
 		val |= PCIE_AER_EVT_EN;
 		writel_relaxed(val, port->base + PCIE_INT_ENABLE_REG);
+
+		/* Adujst port1 completion timeout to 29ms */
+		mtk_pcie_adjust_cplto_scale(port, PCIE_CPLTO_SCALE_29MS);
 	}
 
 	return 0;

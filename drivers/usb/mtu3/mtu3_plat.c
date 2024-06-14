@@ -296,8 +296,10 @@ void ssusb_set_noise_still_tr(struct ssusb_mtk *ssusb)
 	/* set noise still transfer */
 	if (ssusb->noise_still_tr) {
 		mtu3_setbits(ssusb->mac_base, U3D_USB_BUS_PERFORMANCE,
-			NOISE_STILL_TRANSFER | SSUSB_SOF_KEEP);
+			NOISE_STILL_TRANSFER);
 	}
+
+	mtu3_setbits(ssusb->mac_base, U3D_USB_BUS_PERFORMANCE, SSUSB_SOF_KEEP);
 }
 
 void ssusb_vsvoter_set(struct ssusb_mtk *ssusb)
@@ -1477,6 +1479,7 @@ static int mtu3_suspend_common(struct device *dev, pm_message_t msg)
 		return 0;
 
 	ssusb->is_suspended = true;
+	ssusb->host_dev_speed = ssusb_host_get_speed(ssusb);
 
 	if (mtu3_readl(ssusb->mac_base, U3D_USB20_OPSTATE) == OPM_A_WRCON)
 		ssusb->host_dev = false;
@@ -1502,8 +1505,6 @@ static int mtu3_suspend_common(struct device *dev, pm_message_t msg)
 	default:
 		break;
 	}
-
-	ssusb_set_power_state(ssusb, MTU3_STATE_SUSPEND);
 
 	switch (ssusb->dr_mode) {
 	case USB_DR_MODE_PERIPHERAL:
@@ -1542,7 +1543,12 @@ static int mtu3_suspend_common(struct device *dev, pm_message_t msg)
 		PHY_MODE_SUSPEND_NO_DEV);
 	}
 
-	ssusb_phy_power_off(ssusb);
+	if (!of_device_is_compatible(ssusb->dev->of_node, "mediatek,mt6991-mtu3") ||
+		(ssusb->host_dev_speed != USB_SPEED_LOW)) {
+		ssusb_phy_power_off(ssusb);
+	}
+
+	ssusb_set_power_state(ssusb, MTU3_STATE_SUSPEND);
 	clk_bulk_disable_unprepare(BULK_CLKS_CNT, ssusb->clks);
 	ssusb_wakeup_set(ssusb, true);
 suspend:
@@ -1594,23 +1600,23 @@ static int mtu3_resume_common(struct device *dev, pm_message_t msg)
 	if (ret)
 		goto clks_err;
 
-	if (ssusb->host_dev) {
-		dev_info(ssusb->dev, "%s device connected\n", __func__);
-		phy_set_mode_ext(ssusb->phys[0], PHY_MODE_USB_HOST,
-		PHY_MODE_SUSPEND_DEV);
-	} else {
-		dev_info(ssusb->dev, "%s no device connected\n", __func__);
-		phy_set_mode_ext(ssusb->phys[0], PHY_MODE_USB_HOST,
-		PHY_MODE_SUSPEND_NO_DEV);
+	ssusb_set_power_state(ssusb, MTU3_STATE_RESUME);
+	if (!of_device_is_compatible(ssusb->dev->of_node, "mediatek,mt6991-mtu3") ||
+		(ssusb->host_dev_speed != USB_SPEED_LOW)) {
+		ret = ssusb_phy_power_on(ssusb);
+		if (ret)
+			goto phy_err;
 	}
 
-	ret = ssusb_phy_power_on(ssusb);
-	if (ret)
-		goto phy_err;
+	if (!ssusb->host_dev) {
+		if (of_device_is_compatible(ssusb->dev->of_node, "mediatek,mt6991-mtu3")) {
+			ssusb_host_disable(ssusb);
+			ssusb_host_enable(ssusb);
+		}
+	}
 
 	ret = resume_ip_and_ports(ssusb, msg);
 
-	ssusb_set_power_state(ssusb, MTU3_STATE_RESUME);
 resume:
 	ssusb->is_suspended = false;
 	return ret;

@@ -1301,7 +1301,7 @@ static ssize_t cli_store(struct kobject *kobj, struct kobj_attribute *attr,
 #define pcie_test_attr(_name) \
 	static struct kobj_attribute _name##_attr = {   \
 		.attr	= {.name = __stringify(_name),  \
-			   .mode = 0644,                \
+			   .mode = 0600,                \
 		},                                      \
 		.show	= _name##_show,                 \
 		.store	= _name##_store,                \
@@ -1435,7 +1435,7 @@ static int __init mtk_pcie_test_init(void)
 {
 	struct cdev *dev_ctx;
 	struct device_node *np;
-	dev_t dev;
+	dev_t dev = 0;
 	int ret, size, i, j;
 
 	pcie_smt = kzalloc(sizeof(*pcie_smt), GFP_KERNEL);
@@ -1518,7 +1518,7 @@ static int __init mtk_pcie_test_init(void)
 	}
 
 	pcie_smt->f_class = class_create(pcie_smt->name);
-	device_create(pcie_smt->f_class, NULL, dev_ctx->dev, NULL, (const char *)pcie_smt->name);
+	device_create(pcie_smt->f_class, NULL, dev_ctx->dev, NULL, "%s", pcie_smt->name);
 
 	/* sysfs support */
 	pcie_smt->pcie_test_kobj = kobject_create_and_add(PCIE_SYSFS_NAME, NULL);

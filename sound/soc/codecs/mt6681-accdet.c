@@ -75,6 +75,9 @@ struct accdet_ipi_rx_info_t {
 #define EINT_PIN_PLUG_OUT		(0)
 #define EINT_PIN_MOISTURE_DETECTED	(2)
 
+/* Define the minimum allowed wakelock time in ms */
+#define MIN_APP_WAKELOCK_TIME_MS	(1000)
+
 struct mt63xx_accdet_data {
 	struct snd_soc_jack jack;
 	struct platform_device *pdev;
@@ -825,6 +828,9 @@ static void accdet_get_efuse(void)
 		}
 	}
 	pr_info("%s efuse=0x%x,auxadc_val=%dmv\n", __func__, efuseval, accdet->auxadc_offset);
+
+	// Mark variables as used to prevent warnings
+	(void)ret;
 }
 
 static void accdet_get_efuse_4key(void)
@@ -860,6 +866,9 @@ static void accdet_get_efuse_4key(void)
 	pr_info("accdet key thresh: mid=%dmv,voice=%dmv,up=%dmv,down=%dmv\n",
 		accdet_dts.four_key.mid, accdet_dts.four_key.voice,
 		accdet_dts.four_key.up, accdet_dts.four_key.down);
+
+	// Mark variables as used to prevent warnings
+	(void)ret;
 }
 
 static u32 key_check(u32 v)
@@ -1897,7 +1906,7 @@ static void accdet_work_callback(struct work_struct *work)
 {
 	u32 pre_cable_type = accdet->cable_type;
 
-	__pm_wakeup_event(accdet->wake_lock,1000);
+	__pm_wakeup_event(accdet->wake_lock, accdet_dts.app_wakelock_time);
 	check_cable_type();
 
 	mutex_lock(&accdet->res_lock);
@@ -2117,6 +2126,9 @@ static u32 config_moisture_detect_2_1(void)
 	pmic_write_mset(MT6681_RG_EINT0CTURBO_ADDR, MT6681_RG_EINT0CTURBO_SHIFT,
 			0x1F, cturbo);
 
+	// Mark variables as used to prevent warnings
+	(void)ret;
+
 	return 0;
 }
 
@@ -2141,6 +2153,9 @@ static u32 config_moisture_detect_2_1_1(void)
 			0x1, ((vref_1v >> 5) & 0x1));
 	pmic_write_mset(MT6681_RG_ACCDETSPARE_ADDR, 0x3,
 			0x1F, vref_1v);
+
+	// Mark variables as used to prevent warnings
+	(void)ret;
 
 	return 0;
 }
@@ -2208,6 +2223,9 @@ static irqreturn_t ext_eint_handler(int irq, void *data)
 
 	mutex_unlock(&accdet->gpio_res_lock);
 	__pm_relax(accdet->gpio_wake_lock);
+
+	// Mark variables as used to prevent warnings
+	(void)irq_status;
 
 	return IRQ_HANDLED;
 }
@@ -2560,6 +2578,14 @@ static int accdet_get_dts_data(void)
 			pr_notice("(%s) default accdet use SCP EINT\n", __func__);
 		}
 	}
+
+	ret = of_property_read_u32(node, "app-wakelock-time",
+		&accdet_dts.app_wakelock_time);
+
+	/* make sure app-wakelock-time >= 1sec to avoid known issue */
+	if (ret || (accdet_dts.app_wakelock_time < MIN_APP_WAKELOCK_TIME_MS))
+		accdet_dts.app_wakelock_time = MIN_APP_WAKELOCK_TIME_MS;
+	pr_notice("(%s) app_wakelock_time=%d ms\n", __func__, accdet_dts.app_wakelock_time);
 
 	return 0;
 }
@@ -3021,6 +3047,9 @@ static void accdet_ipi_rx_internal(unsigned int *msg_data)
 	int ret;
 
 	ret = queue_work(accdet->ipi_workqueue, &accdet->ipi_work);
+
+	// Mark variables as used to prevent warnings
+	(void)ret;
 }
 
 static int accdet_ipi_rx_handler(unsigned int id,
@@ -3215,6 +3244,9 @@ static int accdet_probe(struct platform_device *pdev)
 	}
 	atomic_set(&accdet_first, 1);
 	mod_timer(&accdet_init_timer, (jiffies + ACCDET_INIT_WAIT_TIMER));
+
+	// Mark variables as used to prevent warnings
+	(void)res;
 
 	return 0;
 

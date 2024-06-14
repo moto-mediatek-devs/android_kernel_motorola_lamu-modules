@@ -36,6 +36,8 @@
 
 #define MAX_BIN_NUM	7
 #define MAX_BINSET_NUM 32
+#define DMR_LINE_BUFFER 19
+#define MAX_PID_LENGTH 256
 
 enum ODDMR_STATE {
 	ODDMR_INVALID = 0,
@@ -120,7 +122,7 @@ struct mtk_drm_oddmr_partial_update_params {
 	unsigned int partial_update_dmr_is_compression_mode;
 	unsigned int partial_update_dmr_slice_size; //byte base
 	unsigned int partial_update_dmr_slice_height; //pixel base
-	unsigned int dummy0;
+	unsigned int compression_mode_ln_offset;
 	unsigned int dummy1;
 	unsigned int dummy2;
 	unsigned int dummy3;
@@ -130,6 +132,13 @@ struct mtk_drm_oddmr_partial_update_params {
 struct mtk_drm_dmr_static_cfg {
 	unsigned int reg_num;
 	unsigned int *reg_offset;
+	unsigned int *reg_mask;
+	unsigned int *reg_value;
+};
+
+struct mtk_drm_oddmr_reg_tuning {
+	unsigned int reg_num;
+	unsigned int *reg_addr;
 	unsigned int *reg_mask;
 	unsigned int *reg_value;
 };
@@ -195,6 +204,11 @@ struct mtk_drm_oddmr_dbv_chg_cfg {
 	unsigned int *reg_value;
 };
 
+struct mtk_drm_oddmr_panel_ID {
+	uint32_t data_byte_num;
+	uint8_t data[MAX_PID_LENGTH];
+};
+
 struct mtk_drm_dmr_cfg_info {
 	struct mtk_drm_dmr_basic_info basic_info;
 	struct mtk_drm_dmr_static_cfg static_cfg;
@@ -203,6 +217,7 @@ struct mtk_drm_dmr_cfg_info {
 	struct mtk_drm_dmr_table_index table_index;
 	struct mtk_drm_dmr_table_content table_content;
 	struct mtk_drm_oddmr_partial_update_params dmr_pu_info;
+	struct mtk_drm_oddmr_panel_ID panel_id;
 };
 
 struct mtk_drm_oddmr_binset_info {
@@ -216,6 +231,8 @@ struct mtk_drm_oddmr_binset_cfg_info {
 	unsigned int binset_num;
 	struct mtk_drm_dmr_basic_info basic_info;
 	struct mtk_drm_oddmr_binset_info binset_list[MAX_BINSET_NUM];
+	struct mtk_drm_oddmr_panel_ID panel_id;
+	struct mtk_drm_dmr_fps_dbv_node remap_params;
 };
 
 struct mtk_drm_dbi_cfg_info {
@@ -401,6 +418,7 @@ struct mtk_disp_oddmr {
 	int od_force_off;
 	int dmr_enable_req;
 	int dmr_enable;
+	atomic_t reg_tuning_en;
 	int dbi_enable_req;
 	int dbi_enable;
 	unsigned int spr_enable;
@@ -435,6 +453,7 @@ struct mtk_disp_oddmr {
 	struct mtk_drm_dmr_cfg_info dmr_cfg_info;
 	struct mtk_drm_dmr_cfg_info dmr_multi_bin[MAX_BIN_NUM];
 	struct mtk_drm_oddmr_binset_cfg_info dmr_binset_cfg_info;
+	struct mtk_drm_oddmr_reg_tuning oddmr_reg_tuning_info;
 	struct mtk_drm_dbi_cfg_info dbi_cfg_info;
 	struct mtk_drm_dbi_cfg_info dbi_cfg_info_tb1;
 	uint32_t od_user_gain;

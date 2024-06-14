@@ -42,6 +42,19 @@ static const struct resource mt6323_rtc_resources[] = {
 	DEFINE_RES_IRQ(MT6323_IRQ_STATUS_RTC),
 };
 
+static const struct resource mt6357_rtc_resources[] = {
+	{
+		.start = MT6358_RTC_BASE,
+		.end   = MT6358_RTC_BASE + MT6358_RTC_SIZE,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.start = MT6357_IRQ_RTC,
+		.end   = MT6357_IRQ_RTC,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
 static const struct resource mt6358_rtc_resources[] = {
 	DEFINE_RES_MEM(MT6358_RTC_BASE, MT6358_RTC_SIZE),
 	DEFINE_RES_IRQ(MT6358_IRQ_RTC),
@@ -303,6 +316,11 @@ static const struct resource mt6357_chrdet_resources[] = {
 	DEFINE_RES_IRQ_NAMED(MT6357_IRQ_CHRDET_EDGE, "chrdet"),
 };
 
+static const struct resource mt6366_accdet_resources[] = {
+	DEFINE_RES_IRQ_NAMED(MT6366_IRQ_ACCDET, "ACCDET_IRQ"),
+	DEFINE_RES_IRQ_NAMED(MT6366_IRQ_ACCDET_EINT0, "ACCDET_EINT0"),
+	DEFINE_RES_IRQ_NAMED(MT6366_IRQ_ACCDET_EINT1, "ACCDET_EINT1"),
+};
 
 static const struct resource mt6366_regulators_resources[] = {
 	DEFINE_RES_IRQ_NAMED(MT6366_IRQ_VPROC11_OC, "VPROC11"),
@@ -437,8 +455,16 @@ static const struct mfd_cell mt6357_devs[] = {
 		.name = "mt63xx-oc-debug",
 		.of_compatible = "mediatek,mt63xx-oc-debug",
 	}, {
+		.name = "mt6397-rtc",
+		.num_resources = ARRAY_SIZE(mt6357_rtc_resources),
+		.resources = mt6357_rtc_resources,
+		.of_compatible = "mediatek,mt6357-rtc",
+	}, {
 		.name = "mt6357-pulse-charger",
 		.of_compatible = "mediatek,mt6357-pulse-charger"
+	},{
+		.name = "mtk-clock-buffer",
+		.of_compatible = "mediatek,mt6357-clkbuf",
 	},
 };
 
@@ -604,6 +630,11 @@ static const struct mfd_cell mt6366_devs[] = {
 		.name = "mt-pmic",
 		.of_compatible = "mediatek,mt63xx-debug",
 	}, {
+		.name = "mediatek,pmic-accdet",
+		.of_compatible = "mediatek,mt6358-accdet",
+		.num_resources = ARRAY_SIZE(mt6366_accdet_resources),
+		.resources = mt6366_accdet_resources,
+	}, {
 		.name = "mt635x-auxadc",
 		.of_compatible = "mediatek,mt6358-auxadc",
 	}, {
@@ -615,6 +646,14 @@ static const struct mfd_cell mt6366_devs[] = {
 		.num_resources = ARRAY_SIZE(mt6366_regulators_resources),
 		.resources = mt6366_regulators_resources,
 	}, {
+		.name = "mtk-battery-oc-throttling",
+		.of_compatible = "mediatek,mt6358-battery_oc_throttling",
+		.num_resources = ARRAY_SIZE(mt6366_battery_oc_resources),
+		.resources = mt6366_battery_oc_resources,
+	}, {
+		.name = "mtk-dynamic-loading-throttling",
+		.of_compatible = "mediatek,mt6358-dynamic_loading_throttling",
+	}, {
 		.name = "mtk-lbat_service",
 		.of_compatible = "mediatek,mt6358-lbat_service",
 		.num_resources = ARRAY_SIZE(mt6366_lbat_service_resources),
@@ -623,10 +662,26 @@ static const struct mfd_cell mt6366_devs[] = {
 		.name = "mt63xx-oc-debug",
 		.of_compatible = "mediatek,mt63xx-oc-debug",
 	}, {
+		.name = "mt6358-sound",
+		.of_compatible = "mediatek,mt6366-sound"
+	}, {
+		.name = "mtk-pmic-keys",
+		.num_resources = ARRAY_SIZE(mt6366_keys_resources),
+		.resources = mt6366_keys_resources,
+		.of_compatible = "mediatek,mt6366-keys"
+	}, {
 		.name = "mt6358-gauge",
 		.num_resources = ARRAY_SIZE(mt6366_gauge_resources),
 		.resources = mt6366_gauge_resources,
 		.of_compatible = "mediatek,mt6358-gauge",
+	}, {
+		.name = "mtk-clock-buffer",
+		.of_compatible = "mediatek,clock_buffer",
+	}, {
+		.name = "mt6358-rtc",
+		.num_resources = ARRAY_SIZE(mt6358_rtc_resources),
+		.resources = mt6358_rtc_resources,
+		.of_compatible = "mediatek,mt6358-rtc",
 	},
 };
 

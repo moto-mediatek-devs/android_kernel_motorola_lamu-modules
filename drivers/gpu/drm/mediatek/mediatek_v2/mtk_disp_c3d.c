@@ -278,7 +278,6 @@ static void disp_c3d_write_3dlut_sram(struct mtk_ddp_comp *comp,
 	struct cmdq_pkt *handle = NULL;
 	unsigned int *cfg;
 	struct cmdq_reuse *reuse;
-	unsigned int reuse_buf_size;
 	unsigned int sram_offset = 0;
 	unsigned int write_value = 0;
 
@@ -287,11 +286,8 @@ static void disp_c3d_write_3dlut_sram(struct mtk_ddp_comp *comp,
 		return;
 
 	cfg = primary_data->c3d_sram_cfg;
-	reuse_buf_size = DISP_C3D_SRAM_SIZE_17BIN + 1;
 
-	if (c3d_data->bin_num == 9)
-		reuse_buf_size = DISP_C3D_SRAM_SIZE_9BIN + 1;
-	else if (c3d_data->bin_num != 17)
+	if ((c3d_data->bin_num != 17) && (c3d_data->bin_num != 9))
 		DDPMSG("%s: %d bin Not support!", __func__, c3d_data->bin_num);
 
 	reuse = c3d_data->reuse_c3d;
@@ -331,13 +327,29 @@ static void disp_c3d_write_3dlut_sram(struct mtk_ddp_comp *comp,
 
 static bool disp_c3d_flush_3dlut_sram(struct mtk_ddp_comp *comp, int cmd_type)
 {
-	struct mtk_drm_crtc *mtk_crtc = comp->mtk_crtc;
-	struct mtk_disp_c3d *c3d_data = comp_to_c3d(comp);
-	struct mtk_disp_c3d_primary *primary_data = c3d_data->primary_data;
-	struct cmdq_pkt *cmdq_handle = primary_data->sram_pkt;
+	struct mtk_drm_crtc *mtk_crtc = NULL;
+	struct mtk_disp_c3d *c3d_data = NULL;
+	struct mtk_disp_c3d_primary *primary_data = NULL;
+	struct cmdq_pkt *cmdq_handle = NULL;
 	struct cmdq_client *client = NULL;
-	struct drm_crtc *crtc = &mtk_crtc->base;
+	struct drm_crtc *crtc = NULL;
 	bool async = false;
+
+	mtk_crtc = comp->mtk_crtc;
+	if (IS_ERR_OR_NULL(mtk_crtc)) {
+		DDPMSG("%s: mtk_crtc is NULL\n", __func__);
+		return false;
+	}
+
+	crtc = &mtk_crtc->base;
+	if (IS_ERR_OR_NULL(crtc)) {
+		DDPMSG("%s: crtc is NULL\n", __func__);
+		return false;
+	}
+
+	c3d_data = comp_to_c3d(comp);
+	primary_data = c3d_data->primary_data;
+	cmdq_handle = primary_data->sram_pkt;
 
 	if (!cmdq_handle) {
 		DDPMSG("%s: cmdq handle is null.\n", __func__);
@@ -422,13 +434,29 @@ void disp_c3d_flip_3dlut_sram(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle
 static int disp_c3d_set_3dlut(struct mtk_ddp_comp *comp,
 	struct cmdq_pkt *handle, const struct DISP_C3D_LUT *c3d_lut)
 {
-	struct mtk_disp_c3d *c3d = comp_to_c3d(comp);
-	struct mtk_disp_c3d_primary *primary_data = c3d->primary_data;
-	struct mtk_ddp_comp *comp_c3d1 = c3d->companion;
-	struct mtk_disp_c3d *companion_data = comp_to_c3d(comp_c3d1);
-	struct mtk_drm_crtc *mtk_crtc = comp->mtk_crtc;
 	int i;
 	int copysize = 0;
+	struct mtk_disp_c3d *c3d = NULL;
+	struct mtk_disp_c3d_primary *primary_data = NULL;
+	struct mtk_ddp_comp *comp_c3d1 = NULL;
+	struct mtk_disp_c3d *companion_data = NULL;
+	struct mtk_drm_crtc *mtk_crtc = NULL;
+
+	if (IS_ERR_OR_NULL(comp)) {
+		DDPMSG("%s: comp is NULL\n", __func__);
+		return -1;
+	}
+
+	c3d = comp_to_c3d(comp);
+	primary_data = c3d->primary_data;
+	comp_c3d1 = c3d->companion;
+	companion_data = comp_to_c3d(comp_c3d1);
+	mtk_crtc = comp->mtk_crtc;
+
+	if (IS_ERR_OR_NULL(mtk_crtc)) {
+		DDPMSG("%s: mtk_crtc is NULL\n", __func__);
+		return -1;
+	}
 
 	if ((c3d->bin_num != 9) && (c3d->bin_num != 17)) {
 		pr_notice("%s, c3d bin num: %d not support", __func__, c3d->bin_num);
@@ -453,7 +481,7 @@ static int disp_c3d_set_3dlut(struct mtk_ddp_comp *comp,
 	}
 
 	disp_c3d_write_3dlut_sram(comp, true);
-	if ((comp->mtk_crtc) && (comp->mtk_crtc->is_dual_pipe)) {
+	if (mtk_crtc->is_dual_pipe) {
 		if ((atomic_read(&companion_data->c3d_is_clock_on) == 1)
 				&& (mtk_crtc->enabled))
 			disp_c3d_write_3dlut_sram(comp_c3d1, true);
@@ -476,7 +504,7 @@ static int disp_c3d_set_3dlut(struct mtk_ddp_comp *comp,
 	}
 
 	disp_c3d_flip_3dlut_sram(comp, handle, __func__);
-	if (comp->mtk_crtc->is_dual_pipe && comp_c3d1)
+	if (mtk_crtc->is_dual_pipe)
 		disp_c3d_flip_3dlut_sram(comp_c3d1, handle, __func__);
 
 	return 0;

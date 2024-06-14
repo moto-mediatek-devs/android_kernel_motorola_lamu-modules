@@ -550,6 +550,7 @@ static int mtk_drm_esd_recover(struct drm_crtc *crtc)
 		mtk_crtc_pkt_create(&cmdq_handle, &mtk_crtc->base,
 			mtk_crtc->gce_obj.client[CLIENT_CFG]);
 
+		CRTC_MMP_MARK(index, set_dirty, ESD_RECOVERY, (unsigned long)cmdq_handle);
 		cmdq_pkt_set_event(cmdq_handle,
 			mtk_crtc->gce_obj.event[EVENT_STREAM_DIRTY]);
 		cmdq_pkt_set_event(cmdq_handle,
@@ -879,7 +880,7 @@ void mtk_disp_chk_recover_init(struct drm_crtc *crtc)
 	bool mode = true;
 
 	output_comp = (mtk_crtc) ? mtk_ddp_comp_request_output(mtk_crtc) : NULL;
-	if (priv->data->mmsys_id == MMSYS_MT6991)
+	if (priv->data->mmsys_id == MMSYS_MT6991 && output_comp)
 		mode = mtk_dsi_is_cmd_mode(output_comp);
 
 	/* only support ESD check for DSI output interface */

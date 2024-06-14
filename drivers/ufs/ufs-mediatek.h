@@ -6,14 +6,18 @@
 #ifndef _UFS_MEDIATEK_H
 #define _UFS_MEDIATEK_H
 
-#include "linux/spinlock_types.h"
 #include <linux/bitops.h>
-#include <linux/pm_qos.h>
-#include <linux/of_device.h>
 #include <linux/cdev.h>
+#include <linux/of_device.h>
+#include <linux/pm_qos.h>
+#include <linux/spinlock_types.h>
+#include <linux/workqueue.h>
+
 #include <ufs/ufs.h>
-#include <ufs/ufshci.h>
 #include <ufs/ufshcd.h>
+#include <ufs/ufshci.h>
+
+#include "ufs-mediatek-mbrain.h"
 #include "ufs-mediatek-rpmb.h"
 
 /*
@@ -255,6 +259,7 @@ enum rpmb_key_state {
 
 struct tag_ufs {
 	enum rpmb_key_state rpmb_r2_kst;  /* RPMB Region 2 Key State*/
+	enum rpmb_key_state rpmb_r3_kst;  /* RPMB Region 3 Key State*/
 };
 
 struct ufs_mtk_mcq_intr_info {
@@ -318,6 +323,11 @@ struct ufs_mtk_host {
 	spinlock_t purge_lock;
 	struct timer_list purge_timer;
 	bool purge_active;
+
+	/* mbrain */
+	struct ufs_mbrain_entry mb_entries[UFS_EVT_DME_ERR + 1][UFS_EVENT_HIST_LENGTH];
+	struct workqueue_struct *mb_workq;
+	ufs_mb_event_notify mb_notify;
 
 	bool mcq_set_intr;
 	bool is_mcq_intr_enabled;

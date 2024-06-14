@@ -441,13 +441,12 @@ static int handle_enc_get_bs_buf(struct venc_vcu_inst *vcu, void *data)
 	struct venc_vsi *vsi = (struct venc_vsi *)vcu->vsi;
 	struct venc_vcu_ipi_msg_get_bs *msg = (struct venc_vcu_ipi_msg_get_bs *)data;
 	long timeout_jiff;
-	int ret = 1;
 
 	pbs_buf =  mtk_vcodec_get_bs(ctx);
 	timeout_jiff = msecs_to_jiffies(1000);
 
 	while (pbs_buf == NULL) {
-		ret = wait_event_interruptible_timeout(
+		wait_event_interruptible_timeout(
 			vcu->ctx->bs_wq,
 			v4l2_m2m_num_dst_bufs_ready(vcu->ctx->m2m_ctx) > 0 ||
 				vcu->ctx->state == MTK_STATE_FLUSH,
@@ -583,13 +582,22 @@ int vcp_enc_ipi_handler(void *arg)
 				break;
 			}
 		}
-		mutex_unlock(&dev->ctx_mutex);
 		if (!msg_valid) {
-			mtk_v4l2_err(" msg vcu not exist %p\n", vcu);
+			if (vcu) {
+				inst = container_of(vcu, struct venc_inst, vcu_inst);
+				ctx = vcu->ctx;
+			} else {
+				inst = NULL;
+				ctx = NULL;
+			}
+			mtk_v4l2_err(" msg msg_id %X vcu not exist 0x%lx (ctx 0x%lx, inst 0x%lx)\n", msg->msg_id,
+				(unsigned long)vcu, (unsigned long)ctx, (unsigned long)inst);
+			mtk_vcodec_dump_ctx_list(dev, 0);
 			mutex_unlock(&dev->ctx_mutex);
 			venc_vcp_free_mq_node(dev, mq_node);
 			continue;
 		}
+		mutex_unlock(&dev->ctx_mutex);
 
 		if (vcu->abort || vcu->daemon_pid != vcp_cmd_ex(VENC_FEATURE_ID, VCP_GET_GEN, "venc_srv")) {
 			mtk_vcodec_err(vcu, " msg msg_id %X vcu abort %d %d\n",

@@ -260,15 +260,23 @@ module_param_array(debug_module_bw, int, NULL, 0644);
 	#define FLD_ELn_IGAMMA_SEL(n)	REG_FLD_MSB_LSB((n)*4 + 17, (n)*4 + 16)
 	#define FLD_ELn_GAMMA_SEL(n)	REG_FLD_MSB_LSB((n)*4 + 19, (n)*4 + 18)
 
+#define DISP_REG_OVL_L0_GUSER_EXT	(0x2FCUL)
+#define OVL_RDMA0_L0_VCSEL BIT(5)
+#define OVL_RDMA0_HDR_L0_VCSEL BIT(21)
+
 #define DISP_REG_OVL_DATAPATH_EXT_CON	(0x324UL)
 #define DISP_REG_OVL_EL_CON(n)			(0x330UL + 0x20 * (n))
 #define DISP_REG_OVL_EL_SRCKEY(n)		(0x334UL + 0x20 * (n))
 #define DISP_REG_OVL_EL_SRC_SIZE(n)		(0x078UL + 0x30 * (n))
 #define DISP_REG_OVL_EL_OFFSET(n)		(0x074UL + 0x30 * (n))
 #define DISP_REG_OVL_EL_ADDR(module, n) (0xFB0UL + (module)->data->el_addr_offset * (n))
-#define DISP_REG_OVL_EL_PITCH_MSB(n)	(0x340U + 0x20 * (n))
-#define DISP_REG_OVL_EL_PITCH(n)		(0x344U + 0x20 * (n))
+#define DISP_REG_OVL_EL_PITCH_MSB(n)	(0x340UL + 0x20 * (n))
+#define DISP_REG_OVL_EL_PITCH(n)		(0x344UL + 0x20 * (n))
 #define DISP_REG_OVL_EL_TILE(n)			(0x348UL + 0x20 * (n))
+#define DISP_REG_OVL_EL_GUSER_EXT(n)	(0x34CUL + 0x20 * (n))
+#define OVL_RDMA0_EL_VCSEL BIT(5)
+#define OVL_RDMA0_HDR_EL_VCSEL BIT(21)
+
 #define DISP_REG_OVL_EL_CLIP(n)			(0x07CUL + 0x30 * (n))
 #define DISP_REG_OVL_EL0_CLR(n)			(0x390UL + 0x4 * (n))
 #define DISP_REG_OVL_ADDR(module, n)	((module)->data->addr + 0x20 * (n))
@@ -279,12 +287,16 @@ module_param_array(debug_module_bw, int, NULL, 0644);
 #define EL2_STASH_EN BIT(6)
 
 #define DISP_REG_OVL_STASH_CFG1			(0xAE4UL)
-#define STASH_LINE_IGNORE			REG_FLD_MSB_LSB(7, 0)
-#define STASH_GMC_LINE_STALL		REG_FLD_MSB_LSB(15, 8)
-#define STASH_ROI_LINE_STALL		REG_FLD_MSB_LSB(23, 16)
-#define STASH_HDR_ROI_LINE_STALL	REG_FLD_MSB_LSB(31, 24)
+#define STASH_LINE_IGNORE				REG_FLD_MSB_LSB(7, 0)
+#define STASH_GMC_LINE_STALL			REG_FLD_MSB_LSB(15, 8)
+#define STASH_ROI_LINE_STALL			REG_FLD_MSB_LSB(23, 16)
+#define STASH_HDR_ROI_LINE_STALL		REG_FLD_MSB_LSB(31, 24)
 
 #define DISP_REG_OVL_STASH_CFG2			(0xAE8UL)
+#define STASH_ULTRA_MAN					BIT(16)
+#define STASH_ULTRA						BIT(18)
+#define STASH_HDR_ULTRA_MAN				BIT(20)
+#define STASH_HDR_ULTRA					BIT(22)
 
 /* OVL Bandwidth monitor */
 #define DISP_REG_OVL_BURST_MON_CFG		(0x97CUL)
@@ -360,7 +372,9 @@ module_param_array(debug_module_bw, int, NULL, 0644);
 #define OVL_CON_MTX_BT601_TO_RGB		(0x6UL << 16)
 #define OVL_CON_MTX_BT709_TO_RGB		(0x7UL << 16)
 #define OVL_CON_MTX_BT2020_FULL_TO_RGB	(0x8UL << 16)
+#define OVL_CON_MTX_BT2020_TO_RGB		(0x9UL << 16)
 #define OVL_CON_MTX_P3_FULL_TO_RGB		(0xAUL << 16)
+#define OVL_CON_MTX_P3_TO_RGB			(0xBUL << 16)
 	#define OVL_CON_CLRFMT_RGB (1UL)
 	#define OVL_CON_CLRFMT_RGBA8888 (2)
 	#define OVL_CON_CLRFMT_ARGB8888 (3)
@@ -1058,7 +1072,8 @@ static void mtk_ovl_exdma_stash_off(struct mtk_ddp_comp *comp, struct cmdq_pkt *
 	if (mtk_crtc->panel_ext && mtk_crtc->panel_ext->params)
 		te_duration = mtk_crtc->panel_ext->params->real_te_duration;
 
-	if ((te_duration && te_duration <= 2778) && priv->sw_ver == A0_CHIP)
+	if (priv->data->mmsys_id == MMSYS_MT6991 &&
+		priv->sw_ver == A0_CHIP && (te_duration && te_duration <= 2778))
 		return;
 
 	cmdq_pkt_write(handle, comp->cmdq_base, comp->regs_pa + DISP_REG_OVL_STASH_CFG1,
@@ -1822,6 +1837,7 @@ static int mtk_ovl_yuv_matrix_convert(enum mtk_drm_dataspace plane_ds)
 	case MTK_DRM_DATASPACE_STANDARD_BT601_625_UNADJUSTED:
 	case MTK_DRM_DATASPACE_STANDARD_BT601_525:
 	case MTK_DRM_DATASPACE_STANDARD_BT601_525_UNADJUSTED:
+	case MTK_DRM_DATASPACE_STANDARD_DCI_P3://P3 Must align AOSP use BT601 FULL to do Y2R convert
 		switch (plane_ds & MTK_DRM_DATASPACE_RANGE_MASK) {
 		case MTK_DRM_DATASPACE_RANGE_UNSPECIFIED:
 		case MTK_DRM_DATASPACE_RANGE_LIMITED:
@@ -1844,16 +1860,18 @@ static int mtk_ovl_yuv_matrix_convert(enum mtk_drm_dataspace plane_ds)
 			break;
 		}
 		break;
-	case MTK_DRM_DATASPACE_STANDARD_DCI_P3:
-		ret = OVL_CON_MTX_P3_FULL_TO_RGB;
-		break;
 	case MTK_DRM_DATASPACE_STANDARD_BT2020:
-		ret = OVL_CON_MTX_BT2020_FULL_TO_RGB;
-		break;
 	case MTK_DRM_DATASPACE_STANDARD_BT2020_CONSTANT_LUMINANCE:
-		ret = OVL_CON_MTX_BT709_TO_RGB;
+		switch (plane_ds & MTK_DRM_DATASPACE_RANGE_MASK) {
+		case MTK_DRM_DATASPACE_RANGE_UNSPECIFIED:
+		case MTK_DRM_DATASPACE_RANGE_LIMITED:
+			ret = OVL_CON_MTX_BT2020_TO_RGB;
+			break;
+		default:
+			ret = OVL_CON_MTX_BT2020_FULL_TO_RGB;
+			break;
+		}
 		break;
-
 	case 0:
 		switch (plane_ds & 0xffff) {
 		case MTK_DRM_DATASPACE_JFIF:
@@ -2160,6 +2178,26 @@ static void _ovl_exdma_common_config(struct mtk_ddp_comp *comp, unsigned int idx
 	}
 }
 
+static void mtk_ovl_exdma_vcsel_config(struct mtk_ddp_comp *comp, unsigned int enable,
+		struct cmdq_pkt *handle)
+{
+	unsigned int value0 = 0, mask0 = (OVL_RDMA0_L0_VCSEL | OVL_RDMA0_HDR_L0_VCSEL);
+	unsigned int value1 = 0, mask1 = (OVL_RDMA0_EL_VCSEL | OVL_RDMA0_HDR_EL_VCSEL);
+	unsigned int i;
+
+	if (enable) {
+		value0 = (OVL_RDMA0_L0_VCSEL | OVL_RDMA0_HDR_L0_VCSEL);
+		value1 = (OVL_RDMA0_EL_VCSEL | OVL_RDMA0_HDR_EL_VCSEL);
+	}
+
+	cmdq_pkt_write(handle, comp->cmdq_base, comp->regs_pa + DISP_REG_OVL_L0_GUSER_EXT,
+			   value0, mask0);
+
+	for (i = 0; i < 3; i++)
+		cmdq_pkt_write(handle, comp->cmdq_base, comp->regs_pa + DISP_REG_OVL_EL_GUSER_EXT(i),
+				value1, mask1);
+}
+
 static void mtk_ovl_exdma_stash_config(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle)
 {
 	unsigned int vrefresh = 0;
@@ -2183,8 +2221,9 @@ static void mtk_ovl_exdma_stash_config(struct mtk_ddp_comp *comp, struct cmdq_pk
 	if (mtk_crtc->panel_ext && mtk_crtc->panel_ext->params)
 		te_duration = mtk_crtc->panel_ext->params->real_te_duration;
 
-	/* 360TE && A0 chip, not enable stash cmd */
-	if ((te_duration && te_duration <= 2778) && priv->sw_ver == A0_CHIP)
+	/* MT6991 && A0 chip && 360TE, not enable stash cmd */
+	if (priv->data->mmsys_id == MMSYS_MT6991 &&
+		priv->sw_ver == A0_CHIP && (te_duration && te_duration <= 2778))
 		return;
 
 	if (mtk_crtc->panel_ext && mtk_crtc->panel_ext->params &&
@@ -2233,6 +2272,10 @@ static void mtk_ovl_exdma_stash_config(struct mtk_ddp_comp *comp, struct cmdq_pk
 	cmdq_pkt_write(handle, comp->cmdq_base, comp->regs_pa + DISP_REG_OVL_STASH_CFG0,
 			   (L0_STASH_EN | EL0_STASH_EN | EL1_STASH_EN | EL2_STASH_EN),
 			   (L0_STASH_EN | EL0_STASH_EN | EL1_STASH_EN | EL2_STASH_EN));
+
+	cmdq_pkt_write(handle, comp->cmdq_base, comp->regs_pa + DISP_REG_OVL_STASH_CFG2,
+			   (STASH_ULTRA_MAN | STASH_ULTRA | STASH_HDR_ULTRA_MAN | STASH_HDR_ULTRA),
+			   (STASH_ULTRA_MAN | STASH_ULTRA | STASH_HDR_ULTRA_MAN | STASH_HDR_ULTRA));
 }
 
 static void mtk_ovl_exdma_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
@@ -2563,6 +2606,7 @@ static void mtk_ovl_exdma_layer_config(struct mtk_ddp_comp *comp, unsigned int i
 
 		mtk_ovl_exdma_layer_on(comp, lye_idx, ext_lye_idx, handle);
 		mtk_ovl_exdma_stash_config(comp, handle);
+		mtk_ovl_exdma_vcsel_config(comp, 1, handle);
 
 		/*constant color :non RDMA source*/
 		/* TODO: cause RPO abnormal */
@@ -2573,10 +2617,7 @@ static void mtk_ovl_exdma_layer_config(struct mtk_ddp_comp *comp, unsigned int i
 		 */
 		/* use full frame size's peak BW request bus capability, because tiny region layer */
 		/* peak BW should be the same with full frame */
-		if (mode)
-			temp_bw = (unsigned long long)mode->vdisplay * mode->hdisplay;
-		else
-			temp_bw = (unsigned long long)pending->width * pending->height;
+		temp_bw = (unsigned long long)pending->width * pending->height;
 		temp_bw *= mtk_get_format_bpp(fmt);
 
 		if (crtc->state)
@@ -3352,13 +3393,6 @@ void mtk_ovl_exdma_cal_golden_setting(bool cfg_dc,
 	gs[GS_OVL_BLOCK_EXT_ULTRA] = (!is_dc) ? 0 : 1;
 	gs[GS_OVL_BLOCK_EXT_PRE_ULTRA] = (!is_dc) ? 0 : 1;
 
-	if (data->stash_en)
-		gs[GS_OVL_STASH_EN] = data->stash_en;
-	else
-		gs[GS_OVL_STASH_EN] = 0;
-
-	gs[GS_OVL_STASH_CFG] = (data->stash_cfg) ? (data->stash_cfg) : 0;
-
 }
 
 static int mtk_ovl_exdma_golden_setting(struct mtk_ddp_comp *comp,
@@ -3446,19 +3480,6 @@ static int mtk_ovl_exdma_golden_setting(struct mtk_ddp_comp *comp,
 		 (gs[GS_OVL_BLOCK_EXT_PRE_ULTRA] << 19);
 	cmdq_pkt_write(handle, comp->cmdq_base, baddr + DISP_REG_OVL_EN_CON,
 		       regval, 0x3 << 18);
-
-	/* OVL_STASH_EN */
-	regval = gs[GS_OVL_STASH_EN];
-	if (regval) {
-		cmdq_pkt_write(handle, comp->cmdq_base,
-		       baddr + DISP_REG_OVL_STASH_CFG0, regval, ~0);
-	}
-
-	regval = gs[GS_OVL_STASH_CFG];
-	if (regval) {
-		cmdq_pkt_write(handle, comp->cmdq_base,
-		       baddr + DISP_REG_OVL_STASH_CFG1, regval, ~0);
-	}
 
 	return 0;
 }
@@ -3743,13 +3764,14 @@ static int mtk_ovl_exdma_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *hand
 		struct mtk_drm_crtc *mtk_crtc = comp->mtk_crtc;
 		u32 hdr_bw_val = 0;
 		u32 stash_bw_val = 0;
+		u32 hdr_stash_bw_val = 0;
 
 		if (!mtk_drm_helper_get_opt(priv->helper_opt,
 				MTK_DRM_OPT_MMQOS_SUPPORT))
 			break;
 
 		if (!priv->data->respective_ostdl) {
-			DDPPR_ERR("PMQOS_SET_HRT_BW respective_ostdl do not set 1\n");
+			DDPPR_ERR("respective_ostdl do not set\n");
 			break;
 		}
 
@@ -3759,29 +3781,30 @@ static int mtk_ovl_exdma_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *hand
 		usage_ovl_fmt = mtk_crtc->usage_ovl_fmt[phy_id];
 		usage_ovl_compr = mtk_crtc->usage_ovl_compr[phy_id];
 
-		if (!usage_ovl_fmt)
-			break;
-
 		bw_val = (bw_val * usage_ovl_fmt) >> 2;
 
 		if (debug_module_bw[phy_id])
 			bw_val = debug_module_bw[phy_id];
 
-		if (bw_val == comp->last_hrt_bw && usage_ovl_compr == comp->last_compr)
-			break;
-
-		__mtk_disp_set_module_hrt(comp->hrt_qos_req, comp->id, bw_val,
-			priv->data->respective_ostdl);
-		comp->last_hrt_bw = bw_val;
-		comp->last_compr = usage_ovl_compr;
+		if (bw_val != comp->last_hrt_bw) {
+			DDPDBG("%s/%d bw_val %u -> %u\n",
+				mtk_dump_comp_str_id(comp->id), comp->last_hrt_bw, bw_val);
+			__mtk_disp_set_module_hrt(comp->hrt_qos_req, comp->id, bw_val,
+				priv->data->respective_ostdl);
+			comp->last_hrt_bw = bw_val;
+		}
 
 		if (!IS_ERR(comp->hdr_qos_req)) {
-			if (bw_val)
-				if (usage_ovl_compr)
-					hdr_bw_val = (bw_val > 32) ? (bw_val / 32) : 1;
+			if (bw_val && usage_ovl_compr)
+				hdr_bw_val = (bw_val > 32) ? (bw_val / 32) : 1;
 
-			__mtk_disp_set_module_hrt(comp->hdr_qos_req, comp->id, hdr_bw_val,
-				priv->data->respective_ostdl);
+			if (hdr_bw_val != comp->last_hdr_bw) {
+				DDPDBG("%s hdr_bw_val %u -> %u\n",
+					mtk_dump_comp_str_id(comp->id), comp->last_hdr_bw, hdr_bw_val);
+				__mtk_disp_set_module_hrt(comp->hdr_qos_req, comp->id, hdr_bw_val,
+					priv->data->respective_ostdl);
+				comp->last_hdr_bw = hdr_bw_val;
+			}
 		}
 
 		if (!IS_ERR(comp->stash_qos_req)) {
@@ -3793,24 +3816,58 @@ static int mtk_ovl_exdma_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *hand
 
 				stash_bw_val = stash_bw_val > 17 ? stash_bw_val : 17; //set low bound
 			}
-			__mtk_disp_set_module_hrt(comp->stash_qos_req, comp->id, stash_bw_val,
+
+			if (stash_bw_val != comp->last_stash_bw) {
+				DDPDBG("%s stash_bw_val %u -> %u\n",
+					mtk_dump_comp_str_id(comp->id), comp->last_stash_bw, stash_bw_val);
+				__mtk_disp_set_module_hrt(comp->stash_qos_req, comp->id, stash_bw_val,
 					priv->data->respective_ostdl);
+				comp->last_stash_bw = stash_bw_val;
+			}
+		}
+
+		if (!IS_ERR(comp->hdr_stash_qos_req)) {
+			if (bw_val) {
+				if (usage_ovl_compr)
+					hdr_stash_bw_val = bw_val * 2 / 32 / 256;
+				else
+					hdr_stash_bw_val = bw_val / 32 / 256;
+
+				hdr_stash_bw_val = hdr_stash_bw_val > 17 ? hdr_stash_bw_val : 17; //set low bound
+			}
+
+			if (hdr_stash_bw_val != comp->last_hdr_stash_bw) {
+				DDPDBG("%s hdr_stash_bw_val %u -> %u\n",
+					mtk_dump_comp_str_id(comp->id), comp->last_hdr_stash_bw, hdr_stash_bw_val);
+				__mtk_disp_set_module_hrt(comp->hdr_stash_qos_req, comp->id, hdr_stash_bw_val,
+					priv->data->respective_ostdl);
+				comp->last_hdr_stash_bw = hdr_stash_bw_val;
+			}
 		}
 
 		ret = OVL_REQ_HRT;
 		break;
 	}
-	case PMQOS_CLR_HRT_BW: {
+	case PMQOS_SET_HRT_BW_DELAY: {
+		u32 bw_val = *(unsigned int *)params;
 		struct mtk_disp_ovl_exdma *ovl = comp_to_ovl_exdma(comp);
-		unsigned int phy_id = 0, usage_ovl_fmt = 0;
+		unsigned int phy_id = 0, usage_ovl_fmt = 0, usage_ovl_compr = 0;
 		struct mtk_drm_crtc *mtk_crtc = comp->mtk_crtc;
+		u32 hdr_bw_val = 0;
+		u32 stash_bw_val = 0;
+		u32 hdr_stash_bw_val = 0;
 
 		if (!mtk_drm_helper_get_opt(priv->helper_opt,
 				MTK_DRM_OPT_MMQOS_SUPPORT))
 			break;
 
 		if (!priv->data->respective_ostdl) {
-			DDPPR_ERR("PMQOS_CLR_HRT_BW respective_ostdl do not set 1\n");
+			DDPPR_ERR("respective_ostdl do not set\n");
+			break;
+		}
+
+		if (!handle) {
+			DDPPR_ERR("no cmdq handle\n");
 			break;
 		}
 
@@ -3818,25 +3875,181 @@ static int mtk_ovl_exdma_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *hand
 			phy_id = ovl->data->ovl_phy_mapping(comp);
 
 		usage_ovl_fmt = mtk_crtc->usage_ovl_fmt[phy_id];
+		usage_ovl_compr = mtk_crtc->usage_ovl_compr[phy_id];
 
-		if (usage_ovl_fmt)
+		bw_val = (bw_val * usage_ovl_fmt) >> 2;
+
+		if (debug_module_bw[phy_id])
+			bw_val = debug_module_bw[phy_id];
+
+		if (bw_val > comp->last_hrt_bw) {
+			DDPDBG("%s bw_val fast up %u -> %u\n",
+				mtk_dump_comp_str_id(comp->id), comp->last_hrt_bw, bw_val);
+			__mtk_disp_set_module_hrt(comp->hrt_qos_req, comp->id, bw_val,
+				priv->data->respective_ostdl);
+			cmdq_pkt_write(handle, mtk_crtc->gce_obj.base,
+				mtk_get_gce_backup_slot_pa(mtk_crtc, DISP_SLOT_CUR_BW_VAL(phy_id)),
+				NO_PENDING_HRT, ~0);
+		} else if (bw_val < comp->last_hrt_bw) {
+			DDPDBG("%s bw_val will slow down %u -> %u\n",
+				mtk_dump_comp_str_id(comp->id), comp->last_hrt_bw, bw_val);
+			cmdq_pkt_write(handle, mtk_crtc->gce_obj.base,
+				mtk_get_gce_backup_slot_pa(mtk_crtc, DISP_SLOT_CUR_BW_VAL(phy_id)),
+				bw_val, ~0);
+		}
+		comp->last_hrt_bw = bw_val;
+
+		if (!IS_ERR(comp->hdr_qos_req)) {
+			if (bw_val && usage_ovl_compr)
+				hdr_bw_val = (bw_val > 32) ? (bw_val / 32) : 1;
+
+			if (hdr_bw_val > comp->last_hdr_bw) {
+				DDPDBG("%s hdr_bw fast up %u -> %u\n",
+					mtk_dump_comp_str_id(comp->id), comp->last_hdr_bw, hdr_bw_val);
+				__mtk_disp_set_module_hrt(comp->hdr_qos_req, comp->id, hdr_bw_val,
+					priv->data->respective_ostdl);
+				cmdq_pkt_write(handle, mtk_crtc->gce_obj.base,
+				mtk_get_gce_backup_slot_pa(mtk_crtc, DISP_SLOT_CUR_HDR_BW_VAL(phy_id)),
+					NO_PENDING_HRT, ~0);
+			} else if (hdr_bw_val < comp->last_hdr_bw) {
+				DDPDBG("%s hdr_bw_val will slow down %u -> %u\n",
+					mtk_dump_comp_str_id(comp->id), comp->last_hdr_bw, hdr_bw_val);
+				cmdq_pkt_write(handle, mtk_crtc->gce_obj.base,
+				mtk_get_gce_backup_slot_pa(mtk_crtc, DISP_SLOT_CUR_HDR_BW_VAL(phy_id)),
+					hdr_bw_val, ~0);
+			}
+			comp->last_hdr_bw = hdr_bw_val;
+		}
+
+		if (!IS_ERR(comp->stash_qos_req)) {
+			if (bw_val) {
+				if (usage_ovl_compr)
+					stash_bw_val = bw_val * 2 / 256;
+				else
+					stash_bw_val = bw_val / 256;
+
+				stash_bw_val = stash_bw_val > 17 ? stash_bw_val : 17; //set low bound
+			}
+
+			if (stash_bw_val > comp->last_stash_bw) {
+				DDPDBG("%s stash_bw_val fast up %u -> %u\n",
+					mtk_dump_comp_str_id(comp->id), comp->last_stash_bw, stash_bw_val);
+				__mtk_disp_set_module_hrt(comp->stash_qos_req, comp->id, stash_bw_val,
+					priv->data->respective_ostdl);
+				cmdq_pkt_write(handle, mtk_crtc->gce_obj.base,
+				mtk_get_gce_backup_slot_pa(mtk_crtc, DISP_SLOT_CUR_STASH_BW_VAL(phy_id)),
+					NO_PENDING_HRT, ~0);
+			} else if (stash_bw_val < comp->last_stash_bw) {
+				DDPDBG("%s stash_bw_val will slow down %u -> %u\n",
+					mtk_dump_comp_str_id(comp->id), comp->last_stash_bw, stash_bw_val);
+				cmdq_pkt_write(handle, mtk_crtc->gce_obj.base,
+				mtk_get_gce_backup_slot_pa(mtk_crtc, DISP_SLOT_CUR_STASH_BW_VAL(phy_id)),
+					stash_bw_val, ~0);
+			}
+			comp->last_stash_bw = stash_bw_val;
+		}
+
+		if (!IS_ERR(comp->hdr_stash_qos_req)) {
+			if (bw_val) {
+				if (usage_ovl_compr)
+					hdr_stash_bw_val = bw_val * 2 / 32 / 256;
+				else
+					hdr_stash_bw_val = bw_val / 32 / 256;
+
+				hdr_stash_bw_val = hdr_stash_bw_val > 17 ? hdr_stash_bw_val : 17; //set low bound
+			}
+
+			if (hdr_stash_bw_val > comp->last_hdr_stash_bw) {
+				DDPDBG("%s hdr_stash_bw_val fast up %u -> %u\n",
+					mtk_dump_comp_str_id(comp->id), comp->last_hdr_stash_bw, hdr_stash_bw_val);
+				__mtk_disp_set_module_hrt(comp->hdr_stash_qos_req, comp->id, hdr_stash_bw_val,
+					priv->data->respective_ostdl);
+				cmdq_pkt_write(handle, mtk_crtc->gce_obj.base,
+				mtk_get_gce_backup_slot_pa(mtk_crtc, DISP_SLOT_CUR_HDR_STASH_BW_VAL(phy_id)),
+					NO_PENDING_HRT, ~0);
+			} else if (hdr_stash_bw_val < comp->last_hdr_stash_bw) {
+				DDPDBG("%s hdr_stash_bw_val will slow down %u -> %u\n",
+					mtk_dump_comp_str_id(comp->id), comp->last_hdr_stash_bw, hdr_stash_bw_val);
+				cmdq_pkt_write(handle, mtk_crtc->gce_obj.base,
+				mtk_get_gce_backup_slot_pa(mtk_crtc, DISP_SLOT_CUR_HDR_STASH_BW_VAL(phy_id)),
+					hdr_stash_bw_val, ~0);
+			}
+			comp->last_hdr_stash_bw = hdr_stash_bw_val;
+		}
+
+		ret = OVL_REQ_HRT;
+		break;
+	}
+	case PMQOS_SET_HRT_BW_DELAY_POST: {
+		u32 bw_val = 0;
+		struct mtk_disp_ovl_exdma *ovl = comp_to_ovl_exdma(comp);
+		unsigned int phy_id = 0, usage_ovl_fmt = 0, usage_ovl_compr = 0;
+		struct mtk_drm_crtc *mtk_crtc = comp->mtk_crtc;
+		u32 hdr_bw_val = 0;
+		u32 stash_bw_val = 0;
+		u32 hdr_stash_bw_val = 0;
+
+		if (!mtk_drm_helper_get_opt(priv->helper_opt,
+				MTK_DRM_OPT_MMQOS_SUPPORT))
 			break;
 
-		if (comp->last_hrt_bw == 0)
+		if (!priv->data->respective_ostdl) {
+			DDPPR_ERR("respective_ostdl do not set\n");
 			break;
+		}
 
-		__mtk_disp_set_module_hrt(comp->hrt_qos_req, comp->id, 0,
-			priv->data->respective_ostdl);
-		comp->last_hrt_bw = 0;
-		comp->last_compr = 0;
+		if (ovl->data->ovl_phy_mapping)
+			phy_id = ovl->data->ovl_phy_mapping(comp);
 
-		if (!IS_ERR(comp->hdr_qos_req))
-			__mtk_disp_set_module_hrt(comp->hdr_qos_req, comp->id, 0,
-				priv->data->respective_ostdl);
+		bw_val = *(unsigned int *)mtk_get_gce_backup_slot_va(mtk_crtc,
+			DISP_SLOT_CUR_BW_VAL(phy_id));
+		if (bw_val != NO_PENDING_HRT && bw_val <= comp->last_hrt_bw) {
+			DDPINFO("%s bw_val slow down to %u\n",
+						mtk_dump_comp_str_id(comp->id), comp->last_hrt_bw);
+			__mtk_disp_set_module_hrt(comp->hrt_qos_req, comp->id, comp->last_hrt_bw,
+					priv->data->respective_ostdl);
+			*(unsigned int *)mtk_get_gce_backup_slot_va(mtk_crtc,
+				DISP_SLOT_CUR_BW_VAL(phy_id)) =	NO_PENDING_HRT;
+		}
 
-		if (!IS_ERR(comp->stash_qos_req))
-			__mtk_disp_set_module_hrt(comp->stash_qos_req, comp->id, 0,
-				priv->data->respective_ostdl);
+		if (!IS_ERR(comp->hdr_qos_req)) {
+			hdr_bw_val = *(unsigned int *)mtk_get_gce_backup_slot_va(mtk_crtc,
+				DISP_SLOT_CUR_HDR_BW_VAL(phy_id));
+			if (hdr_bw_val != NO_PENDING_HRT && hdr_bw_val <= comp->last_hdr_bw) {
+				DDPINFO("%s hdr_bw_val slow down to %u\n",
+					mtk_dump_comp_str_id(comp->id), comp->last_hdr_bw);
+				__mtk_disp_set_module_hrt(comp->hdr_qos_req, comp->id, comp->last_hdr_bw,
+					priv->data->respective_ostdl);
+				*(unsigned int *)mtk_get_gce_backup_slot_va(mtk_crtc,
+					DISP_SLOT_CUR_HDR_BW_VAL(phy_id)) = NO_PENDING_HRT;
+			}
+		}
+
+		if (!IS_ERR(comp->stash_qos_req)) {
+			stash_bw_val = *(unsigned int *)mtk_get_gce_backup_slot_va(mtk_crtc,
+				DISP_SLOT_CUR_STASH_BW_VAL(phy_id));
+			if (stash_bw_val != NO_PENDING_HRT && stash_bw_val <= comp->last_stash_bw) {
+				DDPINFO("%s stash_bw_val slow down to %u\n",
+					mtk_dump_comp_str_id(comp->id), comp->last_stash_bw);
+				__mtk_disp_set_module_hrt(comp->stash_qos_req, comp->id, comp->last_stash_bw,
+					priv->data->respective_ostdl);
+				*(unsigned int *)mtk_get_gce_backup_slot_va(mtk_crtc,
+					DISP_SLOT_CUR_STASH_BW_VAL(phy_id)) = NO_PENDING_HRT;
+			}
+		}
+
+		if (!IS_ERR(comp->hdr_stash_qos_req)) {
+			hdr_stash_bw_val = *(unsigned int *)mtk_get_gce_backup_slot_va(mtk_crtc,
+				DISP_SLOT_CUR_HDR_STASH_BW_VAL(phy_id));
+			if (hdr_stash_bw_val != NO_PENDING_HRT && hdr_stash_bw_val <= comp->last_hdr_stash_bw) {
+				DDPINFO("%s hdr_stash_bw_val slow down to %u\n",
+					mtk_dump_comp_str_id(comp->id), comp->last_hdr_stash_bw);
+				__mtk_disp_set_module_hrt(comp->hdr_stash_qos_req, comp->id, comp->last_hdr_stash_bw,
+					priv->data->respective_ostdl);
+				*(unsigned int *)mtk_get_gce_backup_slot_va(mtk_crtc,
+					DISP_SLOT_CUR_HDR_STASH_BW_VAL(phy_id)) = NO_PENDING_HRT;
+			}
+		}
 
 		ret = OVL_REQ_HRT;
 		break;
@@ -3898,6 +4111,7 @@ static int mtk_ovl_exdma_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *hand
 		struct mtk_ddp_fb_info *fb_info =
 			(struct mtk_ddp_fb_info *)params;
 
+		mtk_ovl_exdma_stash_config(comp, handle);
 		mtk_ovl_replace_bootup_mva(comp, handle, params, fb_info);
 		if (priv->data->mmsys_id == MMSYS_MT6989 ||
 			priv->data->mmsys_id == MMSYS_MT6991)
@@ -4119,6 +4333,8 @@ void mtk_ovl_exdma_dump_golden_setting(struct mtk_ddp_comp *comp)
 	DDPDUMP("OVL_STASH_CFG0:0x%08x\n", value);
 	value = readl(DISP_REG_OVL_STASH_CFG1 + baddr);
 	DDPDUMP("OVL_STASH_CFG1:0x%08x\n", value);
+	value = readl(DISP_REG_OVL_STASH_CFG2 + baddr);
+	DDPDUMP("OVL_STASH_CFG2:0x%08x\n", value);
 
 }
 
@@ -4145,6 +4361,8 @@ int mtk_ovl_exdma_dump(struct mtk_ddp_comp *comp)
 			continue;
 		mtk_serial_dump_reg(baddr, offset, 4);
 	}
+	mtk_cust_dump_reg(baddr, 0x940, 0x950, 0x954, 0x958);
+	mtk_cust_dump_reg(baddr, 0x960, 0x970, 0x974, 0x978);
 	mtk_cust_dump_reg(baddr, 0xF40, 0xF44, 0xF48, 0xF4C);
 	mtk_cust_dump_reg(baddr, 0xFF0, 0xFF4, 0xFF8, 0xFFC);
 
@@ -4662,6 +4880,12 @@ static int mtk_disp_ovl_exdma_bind(struct device *dev, struct device *master,
 						&priv->ddp_comp, "stash_qos");
 		priv->ddp_comp.stash_qos_req = of_mtk_icc_get(dev, buf);
 		if (!IS_ERR(priv->ddp_comp.stash_qos_req))
+			DDPMSG("%s, %s create success, dev:%s\n", __func__, buf, dev_name(dev));
+
+		mtk_disp_pmqos_get_icc_path_name(buf, sizeof(buf),
+						&priv->ddp_comp, "hdr_stash_qos");
+		priv->ddp_comp.hdr_stash_qos_req = of_mtk_icc_get(dev, buf);
+		if (!IS_ERR(priv->ddp_comp.hdr_stash_qos_req))
 			DDPMSG("%s, %s create success, dev:%s\n", __func__, buf, dev_name(dev));
 
 		mtk_disp_pmqos_get_icc_path_name(buf, sizeof(buf),

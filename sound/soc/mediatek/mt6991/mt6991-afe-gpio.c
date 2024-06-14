@@ -40,6 +40,8 @@ static struct audio_gpio_attr aud_gpios[MT6991_AFE_GPIO_GPIO_NUM] = {
 	[MT6991_AFE_GPIO_I2SIN5_ON] = {"aud-gpio-i2sin5-on", false, NULL},
 	[MT6991_AFE_GPIO_I2SIN6_OFF] = {"aud-gpio-i2sin6-off", false, NULL},
 	[MT6991_AFE_GPIO_I2SIN6_ON] = {"aud-gpio-i2sin6-on", false, NULL},
+	[MT6991_AFE_GPIO_I2SOUT6_OFF] = {"aud-gpio-i2sout6-off", false, NULL},
+	[MT6991_AFE_GPIO_I2SOUT6_ON] = {"aud-gpio-i2sout6-on", false, NULL},
 #ifndef SKIP_SB_VOW
 	[MT6991_AFE_GPIO_VOW_SCP_DMIC_DAT_OFF] = {"vow-scp-dmic-dat-off", false, NULL},
 	[MT6991_AFE_GPIO_VOW_SCP_DMIC_DAT_ON] = {"vow-scp-dmic-dat-on", false, NULL},
@@ -213,6 +215,18 @@ static int mt6991_afe_gpio_adda_ch56_ul(struct mtk_base_afe *afe, bool enable)
 int mt6991_afe_gpio_request(struct mtk_base_afe *afe, bool enable,
 			    int dai, int uplink)
 {
+#if IS_ENABLED(CONFIG_SND_SOC_MTK_AUTO_AUDIO)
+	struct mt6991_afe_private *afe_priv = afe->platform_priv;
+	struct mtk_clk_ao_attr *dai_attr;
+	bool clk_ao;
+
+	if (dai >= MT6991_DAI_I2S_IN0 && dai <= MT6991_DAI_I2S_OUT6) {
+		dai_attr = &(afe_priv->clk_ao_data[dai]);
+		clk_ao = dai_attr->apll_ao || dai_attr->mclk_ao ||
+				dai_attr->bclk_ao || dai_attr->lrck_ao;
+	}
+#endif
+
 	mutex_lock(&gpio_request_mutex);
 	switch (dai) {
 	case MT6991_DAI_ADDA:
@@ -255,21 +269,30 @@ int mt6991_afe_gpio_request(struct mtk_base_afe *afe, bool enable,
 		}
 		break;
 	case MT6991_DAI_I2S_IN5:
-	case MT6991_DAI_I2S_OUT5:
-		if (enable) {
-			mt6991_afe_gpio_select(afe, MT6991_AFE_GPIO_I2SOUT5_ON);
+		if (enable)
 			mt6991_afe_gpio_select(afe, MT6991_AFE_GPIO_I2SIN5_ON);
-		} else {
-			mt6991_afe_gpio_select(afe, MT6991_AFE_GPIO_I2SOUT5_OFF);
+		else
 			mt6991_afe_gpio_select(afe, MT6991_AFE_GPIO_I2SIN5_OFF);
+		break;
+	case MT6991_DAI_I2S_OUT5:
+		if (enable)
+			mt6991_afe_gpio_select(afe, MT6991_AFE_GPIO_I2SOUT5_ON);
+		else {
+#if IS_ENABLED(CONFIG_SND_SOC_MTK_AUTO_AUDIO)
+			if (!clk_ao)
+#endif
+				mt6991_afe_gpio_select(afe, MT6991_AFE_GPIO_I2SOUT5_OFF);
 		}
 		break;
 	case MT6991_DAI_I2S_IN6:
 	case MT6991_DAI_I2S_OUT6:
-		if (enable)
+		if (enable) {
 			mt6991_afe_gpio_select(afe, MT6991_AFE_GPIO_I2SIN6_ON);
-		else
+			mt6991_afe_gpio_select(afe, MT6991_AFE_GPIO_I2SOUT6_ON);
+		} else {
 			mt6991_afe_gpio_select(afe, MT6991_AFE_GPIO_I2SIN6_OFF);
+			mt6991_afe_gpio_select(afe, MT6991_AFE_GPIO_I2SOUT6_OFF);
+		}
 		break;
 	case MT6991_DAI_VOW:
 		break;

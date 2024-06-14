@@ -105,14 +105,17 @@ struct cpu_dsu_freq_state {
 
 extern struct dsu_state *dsu_get_opp_ps(int wl, int opp);
 extern unsigned int dsu_get_freq_opp(unsigned int freq);
-
 extern void update_wl_tbl(unsigned int cpu, bool *is_cpu_to_update_thermal);
 extern int get_curr_wl(void);
+extern int get_curr_wl_dsu(void);
 extern int get_classify_wl(void);
 extern int get_em_wl(void);
 extern void set_wl_manual(int val);
+extern void set_wl_cpu_manual(int val);
+extern void set_wl_dsu_manual(int val);
 extern void set_wl_type_manual(int val);
 extern int get_wl_manual(void);
+extern int get_wl_dsu_manual(void);
 extern int get_nr_wl(void);
 extern int get_nr_wl_type(void);
 extern int get_nr_cpu_type(void);
@@ -210,7 +213,8 @@ extern unsigned int get_nr_gears(void);
 extern struct cpumask *get_gear_cpumask(unsigned int gear);
 extern bool is_gearless_support(void);
 /* dsu ctrl */
-extern int wl_delay_ch_cnt;
+extern int wl_dsu_delay_ch_cnt;
+extern int wl_cpu_delay_ch_cnt;
 extern bool get_eas_dsu_ctrl(void);
 extern void set_eas_dsu_ctrl(bool set);
 extern void set_dsu_ctrl(bool set);
@@ -244,6 +248,8 @@ DECLARE_PER_CPU(unsigned int, gear_id);
 DECLARE_PER_CPU(struct sbb_cpu_data *, sbb);
 DECLARE_PER_CPU(struct mtk_rq *, rq_data);
 
+#define DEFAULT_MARGIN 1280
+extern int mtk_uclamp_involve(unsigned long uclamp_min, unsigned long uclamp_max, int is_multiply_by_margin);
 /* DPT */
 struct curr_collab_state_struct {
 	int state;
@@ -251,6 +257,7 @@ struct curr_collab_state_struct {
 };
 
 void hook_update_cpu_capacity(void *data, int cpu, unsigned long *capacity);
+extern int get_wl_dsu(void);
 extern void *get_dpt_sram_base(void);
 extern struct curr_collab_state_struct *get_curr_collab_state(void);
 extern void update_curr_collab_state(bool *is_cpu_to_update_thermal);
@@ -292,6 +299,7 @@ extern int get_sys_max_cap_cluster(void);
 #define DPT_CALL_PD_GET_UTIL_FREQ 24
 #define DPT_CALL_PD_GET_CPU_OPP 25
 #define DPT_CALL_MTK_EM_CPU_ENERGY 26
+#define DPT_CALL_INIT_UCLAMP_INVOLVE 27
 
 #define DPT_CALL_DEBUG1 98
 #define DPT_CALL_DEBUG2 99

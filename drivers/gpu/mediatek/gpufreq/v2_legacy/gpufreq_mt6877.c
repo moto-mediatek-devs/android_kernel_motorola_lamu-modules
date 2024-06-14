@@ -493,28 +493,34 @@ static void __mt_gpufreq_vgpu_set_mode(unsigned int mode)
 	}
 }
 
-static void __mt_gpufreq_volt_switch_without_vsram_volt(unsigned int volt_old, unsigned int volt_new)
+static void __gpufreq_volt_switch_by_ptpod(unsigned int volt_old, unsigned int volt_new)
 {
 	unsigned int vsram_volt_new, vsram_volt_old;
 	int ret = GPUFREQ_SUCCESS;
-
+	bool g_fixed_freq_volt_state = g_dvfs_state & DVFS_FIX_FREQ_VOLT;
 	volt_new = VOLT_NORMALIZATION(volt_new);
 
 	GPUFREQ_LOGD("volt_new = %d, volt_old = %d\n", volt_new, volt_old);
 
-	vsram_volt_new = __gpufreq_get_vsram_by_vgpu(volt_new);
-	vsram_volt_old = __gpufreq_get_vsram_by_vgpu(volt_old);
+	mutex_lock(&gpufreq_lock);
+	if(__gpufreq_get_power_state() && !g_fixed_freq_volt_state){
 
-		/* voltage scaling */
-	ret = __gpufreq_volt_scale_gpu(
-		volt_old, volt_new, vsram_volt_old, vsram_volt_new);
-	if (unlikely(ret)) {
-		GPUFREQ_LOGE("fail to scale Vgpu: (%d->%d), Vsram_gpu: (%d->%d)",
+		vsram_volt_new = __gpufreq_get_vsram_by_vgpu(volt_new);
+		vsram_volt_old = __gpufreq_get_vsram_by_vgpu(volt_old);
+
+			/* voltage scaling */
+		ret = __gpufreq_volt_scale_gpu(
 			volt_old, volt_new, vsram_volt_old, vsram_volt_new);
-	} else {
-		g_gpu.cur_volt = volt_new;
-		g_gpu.cur_vsram = vsram_volt_new;
+
+		if (unlikely(ret)) {
+			GPUFREQ_LOGE("fail to scale Vgpu: (%d->%d), Vsram_gpu: (%d->%d)",
+				volt_old, volt_new, vsram_volt_old, vsram_volt_new);
+		} else {
+			g_gpu.cur_volt = volt_new;
+			g_gpu.cur_vsram = vsram_volt_new;
+		}
 	}
+	mutex_unlock(&gpufreq_lock);
 }
 
 /*
@@ -562,26 +568,6 @@ void mt_gpufreq_update_volt_interpolation(void)
 }
 
 /*
- * switch voltage and vsram via PMIC
- */
-static void _gpufreq_volt_switch_without_vsram_gpu(
-		unsigned int vgpu_old, unsigned int vgpu_new)
-{
-	unsigned int vsram_gpu_new, vsram_gpu_old;
-
-	vgpu_new = VOLT_NORMALIZATION(vgpu_new);
-
-	vsram_gpu_new = __gpufreq_get_vsram_by_vgpu(vgpu_new);
-	vsram_gpu_old = __gpufreq_get_vsram_by_vgpu(vgpu_old);
-
-	__gpufreq_volt_scale_gpu(
-			vgpu_old,
-			vgpu_new,
-			vsram_gpu_old,
-			vsram_gpu_new);
-}
-
-/*
  * API : update OPP and switch back to default voltage setting
  */
 void mt_gpufreq_restore_default_volt(void)
@@ -610,7 +596,7 @@ void mt_gpufreq_restore_default_volt(void)
 
 	__gpufreq_set_springboard();
 
-	__mt_gpufreq_volt_switch_without_vsram_volt(g_gpu.cur_volt,
+	__gpufreq_volt_switch_by_ptpod(g_gpu.cur_volt,
 		g_gpu.working_table[g_gpu.cur_oppidx].volt);
 
 	mutex_unlock(&ptpod_lock);
@@ -679,7 +665,6 @@ unsigned int mt_gpufreq_update_volt(unsigned int pmic_volt[], unsigned int array
 	int i;
 	int target_idx;
 	struct gpufreq_opp_info *signed_table = g_gpu.signed_table;
-	bool g_fixed_freq_volt_state = g_dvfs_state & DVFS_FIX_FREQ_VOLT;
 
 	//__mt_gpufreq_update_table_by_asensor();
 
@@ -705,14 +690,9 @@ unsigned int mt_gpufreq_update_volt(unsigned int pmic_volt[], unsigned int array
 	__gpufreq_update_gpu_working_table();
 
 	/* update volt if powered */
-	if (__gpufreq_get_power_state() && !g_fixed_freq_volt_state) {
-		_gpufreq_volt_switch_without_vsram_gpu(
-			g_gpu.cur_volt,
-			signed_table[g_gpu.cur_oppidx].volt);
-
-		g_gpu.cur_volt = signed_table[g_gpu.cur_oppidx].volt;
-		g_gpu.cur_vsram = signed_table[g_gpu.cur_oppidx].vsram;
-	}
+	__gpufreq_volt_switch_by_ptpod(
+		g_gpu.cur_volt,
+		signed_table[g_gpu.cur_oppidx].volt);
 
 	mutex_unlock(&ptpod_lock);
 
@@ -880,11 +860,13 @@ void _gpufreq_clock_parking_lock(unsigned long *pFlags)
 	spin_lock_irqsave(&mt_gpufreq_clksrc_parking_lock, *pFlags);
 }
 EXPORT_SYMBOL(_gpufreq_clock_parking_lock);
+
 void _gpufreq_clock_parking_unlock(unsigned long *pFlags)
 {
 	spin_unlock_irqrestore(&mt_gpufreq_clksrc_parking_lock, *pFlags);
 }
 EXPORT_SYMBOL(_gpufreq_clock_parking_unlock);
+
 unsigned int _gpufreq_clock_parking(int clksrc)
 {
 	/*
@@ -1481,7 +1463,8 @@ void __gpufreq_set_timestamp(void)
 void __gpufreq_check_bus_idle(void)
 {
 	u32 val;
-
+	int i = 0;
+	int timeout = 200;
 	/* MFG_QCHANNEL_CON (0x130000b4) bit [1:0] = 0x1 */
 	writel(0x00000001, g_MFG_base + 0xb4);
 	GPUFREQ_LOGD("0x130000b4 val = 0x%x\n", readl(g_MFG_base + 0xb4));
@@ -1496,7 +1479,13 @@ void __gpufreq_check_bus_idle(void)
 	do {
 		val = readl(g_MFG_base + 0x178);
 		GPUFREQ_LOGD("0x13000178 val = 0x%x\n", val);
-	} while ((val & 0x4) != 0x4);
+		// wait for about 200ms then timeout, GPU can power off directly
+		if(i > 100)
+			udelay(1000); //1ms
+		if(i == timeout)
+			GPUFREQ_LOGE("timeout waiting for 0x13000178 val = 0x%x\n", val);
+		i++;
+	} while ((val & 0x4) != 0x4 && (i <= timeout));
 }
 
 void __gpufreq_dump_infra_status(char *log_buf, int *log_len, int log_size)
@@ -2010,9 +1999,7 @@ static int __gpufreq_volt_scale_gpu(
 	unsigned int t_settle_vsram = 0;
 	unsigned int t_settle = 0;
 	int ret = GPUFREQ_SUCCESS;
-	ktime_t start, end;
-	s64 time_diff;
-	unsigned int last_volt = 0;
+
 	GPUFREQ_TRACE_START("vgpu_old=%d, vgpu_new=%d, vsram_old=%d, vsram_new=%d",
 		vgpu_old, vgpu_new, vsram_old, vsram_new);
 
@@ -2083,29 +2070,10 @@ static int __gpufreq_volt_scale_gpu(
 	udelay(t_settle);
 
 	g_gpu.cur_volt = __gpufreq_get_real_vgpu();
-	start = ktime_get();
-	last_volt = g_gpu.cur_volt;
-	while (unlikely(g_gpu.cur_volt != vgpu_new)) {
-		udelay(1000);
-		end = ktime_get();
-		time_diff = ktime_to_us(ktime_sub(end, start));
+	if (unlikely(g_gpu.cur_volt != vgpu_new))
+		__gpufreq_abort("inconsistent scaled Vgpu, cur_volt: %d, target_volt: %d, vgpu_old: %d",
+		g_gpu.cur_volt, vgpu_new, vgpu_old);
 
-		g_gpu.cur_volt = __gpufreq_get_real_vgpu();
-		if(g_gpu.cur_volt != last_volt) {
-			last_volt = g_gpu.cur_volt;
-			GPUFREQ_LOGE("update cur_volt: %d",g_gpu.cur_volt);
-		}
-		if (g_gpu.cur_volt == vgpu_new) {
-			__gpufreq_abort("consistent scaled Vgpu, cur_volt: %d, target_volt: %d used %lld microseconds",
-			g_gpu.cur_volt, vgpu_new, time_diff);
-		}
-		//timeout is 1s
-		if(time_diff > 1*1000*1000) {
-			GPUFREQ_LOGE("timeout time_diff > 1s");
-			__gpufreq_abort("scaled Vgpu timeout, cur_volt: %d, target_volt: %d used %lld microseconds",
-			g_gpu.cur_volt, vgpu_new, time_diff);
-		}
-	}
 	g_gpu.cur_vsram = __gpufreq_get_real_vsram();
 	if (unlikely(g_gpu.cur_vsram != vsram_new))
 		__gpufreq_abort("inconsistent scaled Vsram, cur_vsram: %d, target_vsram: %d, vsram_old: %d",
@@ -3039,6 +3007,10 @@ static int __gpufreq_init_clk(struct platform_device *pdev)
 		return PTR_ERR(g_clk->mtcmos_mfg5);
 	}
 
+	#if MT_GPUFREQ_SHADER_PWR_CTL_WA
+		spin_lock_init(&mt_gpufreq_clksrc_parking_lock);
+	#endif
+
 	// 0x1020E000
 	g_infracfg_base = __gpufreq_of_ioremap("mediatek,infracfg", 0);
 	if (!g_infracfg_base) {
@@ -3098,63 +3070,6 @@ static void __gpufreq_init_acp(void)
 	writel(val, g_infracfg_ao + 0x290);
 }
 
-/*
- * VGPU slew rate calculation
- * false : falling rate
- * true : rising rate
- */
-static unsigned int __calculate_vgpu_sfchg_rate(bool isRising)
-{
-	unsigned int sfchg_rate_vgpu;
-
-	/* [MT6358] RG_BUCK_VGPU_SFCHG_RRATE and RG_BUCK_VGPU_SFCHG_FRATE
-	 * Rising soft change rate
-	 * Ref clock = 26MHz (0.038us)
-	 * Step = ( code + 1 ) * 0.038 us
-	 */
-
-	if (isRising) {
-		/* sfchg_rate_reg is 19, (19+1)*0.038 = 0.76us */
-		sfchg_rate_vgpu = 1;
-	} else {
-		/* sfchg_rate_reg is 39, (39+1)*0.038 = 1.52us */
-		sfchg_rate_vgpu = 2;
-	}
-
-	GPUFREQ_LOGD("isRising = %d, sfchg_rate_vgpu = %d\n",
-			isRising, sfchg_rate_vgpu);
-
-	return sfchg_rate_vgpu;
-}
-
-/*
- * VSRAM slew rate calculation
- * false : falling rate
- * true : rising rate
- */
-static unsigned int __calculate_vsram_sfchg_rate(bool isRising)
-{
-	unsigned int sfchg_rate_vsram;
-
-	/* [MT6358] RG_LDO_VSRAM_GPU_SFCHG_RRATE and RG_LDO_VSRAM_GPU_SFCHG_FRATE
-	 *    7'd4 : 0.19us
-	 *    7'd8 : 0.34us
-	 *    7'd11 : 0.46us
-	 *    7'd17 : 0.69us
-	 *    7'd23 : 0.92us
-	 *    7'd25 : 1us
-	 */
-
-	/* sfchg_rate_reg is 7 for rising, (7+1)*0.038 = 0.304us */
-	/* sfchg_rate_reg is 15 for falling, (15+1)*0.038 = 0.608us */
-	sfchg_rate_vsram = 1;
-
-	GPUFREQ_LOGD("isRising = %d, sfchg_rate_vsram = %d\n",
-			isRising, sfchg_rate_vsram);
-
-	return sfchg_rate_vsram;
-}
-
 static int __gpufreq_init_pmic(struct platform_device *pdev)
 {
 	int ret = GPUFREQ_SUCCESS;
@@ -3178,41 +3093,6 @@ static int __gpufreq_init_pmic(struct platform_device *pdev)
 		GPUFREQ_LOGE("cannot get VSRAM_GPU\n");
 		return PTR_ERR(g_pmic->reg_vsram_gpu);
 	}
-
-	/* setup PMIC init value */
-	g_vgpu_sfchg_rrate = __calculate_vgpu_sfchg_rate(true);
-	g_vgpu_sfchg_frate = __calculate_vgpu_sfchg_rate(false);
-	g_vsram_sfchg_rrate = __calculate_vsram_sfchg_rate(true);
-	g_vsram_sfchg_frate = __calculate_vsram_sfchg_rate(false);
-
-	/* set VSRAM_GPU */
-	regulator_set_voltage(g_pmic->reg_vsram_gpu, VSRAM_MAX_VOLT * 10, VSRAM_MAX_VOLT * 10 + 125);
-	/* set VGPU */
-	regulator_set_voltage(g_pmic->reg_vgpu, VGPU_MAX_VOLT * 10, VGPU_MAX_VOLT * 10 + 125);
-
-	/* enable bucks (VGPU && VSRAM_GPU) enforcement */
-	if (regulator_enable(g_pmic->reg_vsram_gpu))
-		GPUFREQ_LOGE("enable VSRAM_GPU failed\n");
-	if (regulator_enable(g_pmic->reg_vgpu))
-		GPUFREQ_LOGE("enable VGPU failed\n");
-
-	GPUFREQ_LOGI("VGPU sfchg raising rate: %d us, VGPU sfchg falling rate: %d us, \t"
-			"VSRAM_GPU sfchg raising rate: %d us, VSRAM_GPU sfchg falling rate: %d us\n"
-			, g_vgpu_sfchg_rrate, g_vgpu_sfchg_frate,
-			g_vsram_sfchg_rrate, g_vsram_sfchg_frate);
-
-	GPUFREQ_LOGI("VGPU is enabled = %d (%d mV), VSRAM_GPU is enabled = %d (%d mV)\n",
-			regulator_is_enabled(g_pmic->reg_vgpu),
-			(regulator_get_voltage(g_pmic->reg_vgpu) / 1000),
-			regulator_is_enabled(g_pmic->reg_vsram_gpu),
-			(regulator_get_voltage(g_pmic->reg_vsram_gpu) / 1000));
-
-	udelay(80);
-
-	if (regulator_disable(g_pmic->reg_vgpu))
-		GPUFREQ_LOGE("disable VGPU failed\n");
-	if (regulator_disable(g_pmic->reg_vsram_gpu))
-		GPUFREQ_LOGE("disable VSRAM_GPU failed\n");
 
 	return ret;
 }

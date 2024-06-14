@@ -675,7 +675,6 @@ int vcp_dec_ipi_handler(void *arg)
 	struct vdec_vcu_inst *vcu = NULL;
 	struct vdec_inst *inst = NULL;
 	struct share_obj *obj;
-	struct vdec_vsi *vsi;
 	int ret = 0;
 	struct mtk_vcodec_msg_node *mq_node;
 	struct vdec_vcu_ipi_mem_op *shem_msg;
@@ -772,12 +771,22 @@ int vcp_dec_ipi_handler(void *arg)
 				break;
 			}
 		}
-		mutex_unlock(&dev->ctx_mutex);
 		if (!msg_valid) {
-			mtk_v4l2_err(" msg msg_id %X vcu not exist %p\n", msg->msg_id, vcu);
+			if (vcu) {
+				inst = container_of(vcu, struct vdec_inst, vcu);
+				ctx = vcu->ctx;
+			} else {
+				inst = NULL;
+				ctx = NULL;
+			}
+			mtk_v4l2_err(" msg msg_id %X vcu not exist 0x%lx (ctx 0x%lx, inst 0x%lx)\n", msg->msg_id,
+				(unsigned long)vcu, (unsigned long)ctx, (unsigned long)inst);
+			mtk_vcodec_dump_ctx_list(dev, 0);
+			mutex_unlock(&dev->ctx_mutex);
 			vdec_vcp_free_mq_node(dev, mq_node);
 			continue;
 		}
+		mutex_unlock(&dev->ctx_mutex);
 
 		if (vcu->abort || vcu->daemon_pid != vcp_cmd_ex(VDEC_FEATURE_ID, VCP_GET_GEN, "vdec_srv")) {
 			mtk_vcodec_err(vcu, " msg msg_id %X vcu abort %d %d\n",
@@ -789,7 +798,6 @@ int vcp_dec_ipi_handler(void *arg)
 		mtk_v4l2_debug(2, "[%d] pop msg_id %X ml_cnt %d, vcu %lx, status %d", vcu->ctx->id,
 			msg->msg_id, atomic_read(&dev->mq.cnt), (unsigned long)vcu, msg->status);
 
-		vsi = (struct vdec_vsi *)vcu->vsi;
 		inst = container_of(vcu, struct vdec_inst, vcu);
 
 		if (msg->msg_id == VCU_IPIMSG_DEC_CHECK_CODEC_ID) {

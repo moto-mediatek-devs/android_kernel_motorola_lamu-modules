@@ -25,11 +25,11 @@
 #include <linux/vmalloc.h>
 #if IS_ENABLED(CONFIG_MTK_PKVM_TMEM)
 #include <asm/kvm_pkvm_module.h>
-#include "../../../misc/mediatek/include/pkvm_mgmt/pkvm_mgmt.h"
+#include <pkvm_mgmt/pkvm_mgmt.h>
 #endif
 #if IS_ENABLED(CONFIG_MTK_PKVM_SMMU)
 #include <asm/kvm_pkvm_module.h>
-#include "../../../misc/mediatek/include/pkvm_mgmt/pkvm_mgmt.h"
+#include <pkvm_mgmt/pkvm_mgmt.h>
 #endif
 #include <public/trusted_mem_api.h>
 #include "page_pool.h"
@@ -356,6 +356,30 @@ static int region_base_free(struct secure_heap_region *sec_heap,
 		 atomic64_read(&sec_heap->total_size));
 	return ret;
 }
+/* Merge SMMU normal VM page table into large page, when exit secure feature */
+static void pkvm_smmu_merge_page_table(void)
+{
+#if IS_ENABLED(CONFIG_MTK_PKVM_SMMU)
+	struct arm_smccc_res res;
+	static uint32_t hvc_id_merge_table;
+	int ret = 0;
+
+	if (!hvc_id_merge_table) {
+		arm_smccc_1_1_smc(SMC_ID_MTK_PKVM_SMMU_PAGE_TABLE_MERGE, 0, 0,
+				  0, 0, 0, 0, &res);
+		hvc_id_merge_table = res.a1;
+	}
+
+	if (hvc_id_merge_table != 0) {
+		ret = pkvm_el2_mod_call(hvc_id_merge_table);
+
+		if (ret != 0)
+			pr_info("hvc_id=%#x smmu_ret=%x\n", hvc_id_merge_table,
+				ret);
+	} else
+		pr_info("%s hvc is invalid\n", __func__);
+#endif
+}
 
 static int page_base_free_v2(struct secure_heap_page *sec_heap,
 			     struct mtk_sec_heap_buffer *buffer)
@@ -437,8 +461,7 @@ static int page_base_free_v2(struct secure_heap_page *sec_heap,
 				pr_debug("%#4x: %#32x ", i, bitmap[i]);
 		}
 		if (is_pkvm_enabled()) {
-			/* pkvm doesn't need to merge cpu pgtbl, so directly do nothing */
-			pr_info("%s: pkvm already merged the cpu pgtbl\n", __func__);
+			pkvm_smmu_merge_page_table();
 		} else {
 			arm_smccc_smc(HYP_PMM_MERGED_TABLE, page_to_pfn(sec_heap->bitmap),
 					0, 0, 0, 0, 0, 0, &smc_res);
@@ -1289,23 +1312,31 @@ static void pkvm_smmu_mapping(struct page *pmm_page, u8 pmm_attr,
 			      uint32_t tmp_count, int lock)
 {
 #if IS_ENABLED(CONFIG_MTK_PKVM_SMMU)
+	static uint32_t hvc_id_map;
+	static uint32_t hvc_id_unmap;
 	struct arm_smccc_res res;
-	uint32_t smc_id;
+	uint32_t hvc_id;
 	int ret;
 
-	if (lock == 1)
-		arm_smccc_1_1_smc(SMC_ID_MTK_PKVM_SMMU_SEC_MAP, 0, 0, 0, 0, 0,
-				  0, &res);
-	else
-		arm_smccc_1_1_smc(SMC_ID_MTK_PKVM_SMMU_SEC_UNMAP, 0, 0, 0, 0, 0,
-				  0, &res);
-	smc_id = res.a1;
-	if (smc_id != 0) {
-		ret = pkvm_el2_mod_call(smc_id, page_to_pfn(pmm_page), pmm_attr,
+	if (!hvc_id_map) {
+		arm_smccc_1_1_smc(SMC_ID_MTK_PKVM_SMMU_SEC_MAP,
+			0, 0, 0, 0, 0, 0, &res);
+		hvc_id_map = res.a1;
+	}
+
+	if (!hvc_id_unmap) {
+		arm_smccc_1_1_smc(SMC_ID_MTK_PKVM_SMMU_SEC_UNMAP,
+			0, 0, 0, 0, 0, 0, &res);
+		hvc_id_unmap = res.a1;
+	}
+
+	hvc_id = (lock == 1) ? hvc_id_map : hvc_id_unmap;
+	if (hvc_id != 0) {
+		ret = pkvm_el2_mod_call(hvc_id, page_to_pfn(pmm_page), pmm_attr,
 					tmp_count);
 
 		if (ret != 0)
-			pr_info("smc_id=%#x smmu_ret=%x\n", smc_id, ret);
+			pr_info("hvc_id=%#x smmu_ret=%x\n", hvc_id, ret);
 	} else
 		pr_info("%s hvc is invalid\n", __func__);
 #endif
@@ -1374,16 +1405,13 @@ static int mtee_unassign_buffer_v2(struct ssheap_buf_info *ssheap, u8 pmm_attr)
 static inline void set_pmm_msg_entry(uint32_t *pmm_msg, uint32_t index,
 				     struct page *page)
 {
-	int size, order;
+	int order;
 	phys_addr_t pa;
 
-	size = page_size(page);
 	order = compound_order(page);
 	pa = page_to_phys(page);
 
 	pmm_msg[index] = PMM_MSG_ENTRY(pa, order);
-//	pr_info("%s: pmm_msg[%d]=%#x (size=%d order=%d pa=0x%llx)\n",
-//		__func__, index, pmm_msg[index], size, order, pa);
 }
 
 struct page *alloc_pmm_msg_v2(struct sg_table *table,

@@ -37,6 +37,7 @@
 /* MediaTek UFS facilities */
 #include "ufs-mediatek-btag.h"
 #include "ufs-mediatek-dbg.h"
+#include "ufs-mediatek-mbrain.h"
 #include "ufs-mediatek-mimic.h"
 #include "ufs-mediatek-priv.h"
 #include "ufs-mediatek-rpmb.h"
@@ -1609,8 +1610,11 @@ static int ufs_mtk_init(struct ufs_hba *hba)
 			"atag,ufs", NULL);
 	if (!atag)
 		dev_err(hba->dev, "cannot find atag,ufs");
-	else
+	else {
 		host->atag = atag;
+		dev_info(hba->dev, "atag,rpmb region 2 key state=%d", atag->rpmb_r2_kst);
+		dev_info(hba->dev, "atag,rpmb region 3 key state=%d", atag->rpmb_r3_kst);
+	}
 
 	id = of_match_device(ufs_mtk_of_match, dev);
 	if (!id) {
@@ -1715,6 +1719,7 @@ static int ufs_mtk_init(struct ufs_hba *hba)
 	ufs_mtk_dbg_register(hba);
 
 	ufs_mtk_rpmb_init(hba);
+	ufs_mb_init(hba);
 
 	host->cpuhp_state = cpuhp_setup_state_multi(CPUHP_AP_ONLINE_DYN, "ufs:online",
 					ufs_mtk_cpu_online_notify, ufs_mtk_cpu_offline_notify);
@@ -1899,13 +1904,20 @@ static int ufs_mtk_pwr_change_notify(struct ufs_hba *hba,
 				     struct ufs_pa_layer_attr *dev_req_params)
 {
 	int ret = 0;
+	static u32 reg;
 
 	switch (stage) {
 	case PRE_CHANGE:
+		if (ufshcd_is_auto_hibern8_supported(hba)) {
+			reg = ufshcd_readl(hba, REG_AUTO_HIBERNATE_IDLE_TIMER);
+			ufs_mtk_auto_hibern8_disable(hba);
+		}
 		ret = ufs_mtk_pre_pwr_change(hba, dev_max_params,
 					     dev_req_params);
 		break;
 	case POST_CHANGE:
+		if (ufshcd_is_auto_hibern8_supported(hba))
+			ufshcd_writel(hba, reg, REG_AUTO_HIBERNATE_IDLE_TIMER);
 		break;
 	default:
 		ret = -EINVAL;
@@ -2722,11 +2734,33 @@ static void ufs_mtk_event_notify(struct ufs_hba *hba,
 	unsigned long reg;
 	uint8_t bit;
 	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
+	struct ufs_mbrain_entry *entry;
+	struct timespec64 tv = { 0 };
+	struct ufs_event_hist *e;
 
 	trace_ufs_mtk_event(evt, val);
 
 	/* Print details of UIC Errors */
 	if (evt <= UFS_EVT_DME_ERR) {
+		e = &hba->ufs_stats.event[evt];
+		entry = &host->mb_entries[evt][e->pos];
+		if (entry->busy) {
+			dev_info(hba->dev, "mb event %d has no free entry\n", evt);
+			goto out_uic;
+		}
+
+		entry->busy = true;
+
+		ktime_get_real_ts64(&tv);
+		entry->data.mb_ts = (tv.tv_sec * 1000) + (tv.tv_nsec / 1000000);
+		entry->data.event = evt;
+		entry->data.gear_rx = hba->pwr_info.gear_rx;
+		entry->data.gear_tx = hba->pwr_info.gear_tx;
+		entry->data.reg_val = val;
+
+		/* Queue work to write error to mbrain. */
+		ufs_mb_queue_error(hba, entry);
+out_uic:
 		dev_info(hba->dev,
 			 "Host UIC Error Code (%s): %08x\n",
 			 ufs_uic_err_str[evt], val);
@@ -3115,8 +3149,6 @@ static void ufs_mtk_config_scsi_dev(struct scsi_device *sdev)
 {
 	struct ufs_hba *hba = shost_priv(sdev->host);
 	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
-
-	sdev->broken_fua = 1;
 
 	dev_dbg(hba->dev, "lu %llu slave configured", sdev->lun);
 

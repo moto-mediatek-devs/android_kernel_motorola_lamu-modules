@@ -69,6 +69,11 @@ aliases {
 			};
 		};
 
+		eas_info: eas-info {
+			compatible = "mediatek,eas-info";
+			legacy-api-support = <1>;
+		};
+
 		fpsgo: fpsgo {
 			compatible = "mediatek,fpsgo";
 			interconnects = <&dvfsrc MT6873_MASTER_MCUSYS &dvfsrc MT6873_SLAVE_DDR_EMI>;
@@ -4603,11 +4608,10 @@ pwrap: pwrap@1000d000 {
 	};
 
 	pmic_clock_buffer_ctrl: pmic_clock_buffer_ctrl {
-		compatible = "mediatek,clock_buffer_ctrl";
-		mediatek,xo-buf-hwbblpm-mask = <1 0 0 0 0 0 0>;
-		mediatek,xo-buf-hwbblpm-bypass = <0 0 0 0 0 0 0>;
+		pmic-supply = <&mt6357_clkbuf>;
+		compatible = "mediatek,mt6765-clkbuf";
+		pmic = <&mt6357_clkbuf>;
 		pmif = <&pwrap 0>;
-		mediatek,enable;
 	};
 
 	battery_manager: battery-manager {

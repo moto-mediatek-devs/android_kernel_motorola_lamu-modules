@@ -1929,6 +1929,7 @@ static void ged_kpi_work_cb(struct work_struct *psWork)
 		if (g_force_gpu_dvfs_fallback) {   // main producer ratio < thresh (LB)
 			// use LB policy
 			ged_set_policy_state(POLICY_STATE_LB);
+			ged_eb_dvfs_task(EB_UPDATE_POLICY_STATE, GED_DVFS_LOADING_BASE_COMMIT);
 			set_lb_timeout(psKPI->t_gpu_target);
 		} else {   // main producer ratio >= thresh (FB)
 			if (main_head == psHead) {   // is main head
@@ -2893,6 +2894,20 @@ void ged_kpi_set_target_FPS_margin(u64 ulID, int target_FPS,
 #endif /* MTK_GED_KPI */
 }
 EXPORT_SYMBOL(ged_kpi_set_target_FPS_margin);
+/* ------------------------------------------------------------------- */
+GED_ERROR ged_kpi_target_fps_hint(int promotion_enable, int target_fps)
+{
+	int ret = GED_OK;
+
+	prom_enable = promotion_enable;
+	g_target_fps_vsync = target_fps;
+
+	//ret = ged_kpi_push_timestamp(GED_SET_VSYNC_TARGET_FPS, 0, -1, promotion_enable,
+		//0, target_fps, -1, NULL);
+	trace_tracing_mark_write(5566, "promotion_enable", prom_enable);
+	trace_tracing_mark_write(5566, "vsync_target_fps", g_target_fps_vsync);
+	return ret;
+}
 /* ------------------------------------------------------------------- */
 void ged_kpi_set_target_FPS_api(u64 ulID, int target_FPS, int target_FPS_margin)
 {

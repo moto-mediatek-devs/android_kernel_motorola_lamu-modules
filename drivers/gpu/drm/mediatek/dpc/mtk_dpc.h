@@ -33,6 +33,14 @@ enum mtk_vidle_voter_user {
 	DISP_VIDLE_USER_DPC_DUMP = 29,
 	DISP_VIDLE_USER_SMI_DUMP = 30,
 	DISP_VIDLE_FORCE_KEEP = 31,
+	DISP_VIDLE_USER_MASK = 0x1f,
+};
+
+enum mtk_vidle_voter_status {
+	VOTER_PM_FAILED = -1,
+	VOTER_PM_DONE = 0,
+	VOTER_PM_LATER,
+	VOTER_ONLY = 0x1000,
 };
 
 enum mtk_panel_type {
@@ -108,7 +116,8 @@ struct dpc_funcs {
 	int (*dpc_vidle_power_keep)(const enum mtk_vidle_voter_user);
 	void (*dpc_vidle_power_release)(const enum mtk_vidle_voter_user);
 	void (*dpc_vidle_power_keep_by_gce)(struct cmdq_pkt *pkt,
-					    const enum mtk_vidle_voter_user user, const u16 gpr);
+					    const enum mtk_vidle_voter_user user, const u16 gpr,
+					    struct cmdq_reuse *reuse);
 	void (*dpc_vidle_power_release_by_gce)(struct cmdq_pkt *pkt,
 					    const enum mtk_vidle_voter_user user);
 

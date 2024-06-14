@@ -93,7 +93,6 @@ EXPORT_SYMBOL_GPL(ufs_mtk_eh_unipro_set_lpm);
 
 void ufs_mtk_eh_err_cnt(void)
 {
-	static int err_count;
 	static ktime_t err_ktime;
 	ktime_t delta_ktime;
 	s64 delta_msecs;
@@ -102,21 +101,11 @@ void ufs_mtk_eh_err_cnt(void)
 	delta_msecs = ktime_to_ms(delta_ktime);
 
 	/* If last error happen more than 72 hrs, clear error count */
-	if (delta_msecs >= 72 * 60 * 60 * 1000)
-		err_count = 0;
-
 	/* Treat errors happen in 3000 ms as one time error */
 	if (delta_msecs >= 3000) {
 		err_ktime = local_clock();
-		err_count++;
+		ufs_mtk_aee_warning("UIC Error");
 	}
-
-	/*
-	 * Most uic error is recoverable, it should be minor.
-	 * Only dump db if uic error heppen frequently(>=6) in 72 hrs.
-	 */
-	if (err_count >= 6)
-		ufs_mtk_aee_warning("Error Dump %d", err_count);
 }
 EXPORT_SYMBOL_GPL(ufs_mtk_eh_err_cnt);
 
@@ -2216,6 +2205,7 @@ static ssize_t ufs_debug_proc_write(struct file *file, const char *buf,
 	unsigned long op = UFSDBG_UNKNOWN;
 	struct ufs_hba *hba = ufshba;
 	char cmd_buf[16];
+	u16 rnd;
 
 	if (count == 0 || count > 15)
 		return -EINVAL;
@@ -2240,6 +2230,14 @@ static ssize_t ufs_debug_proc_write(struct file *file, const char *buf,
 		dev_info(hba->dev, "ufs mphy reg debug dump\n");
 		ufs_mtk_dbg_phy_trace(hba, UFS_MPHY_DUMP);
 		ufs_mtk_dbg_phy_dump(hba);
+	} else if (op == UFSDBG_UIC_ERR_INJECT) {
+		ufshcd_rpm_get_sync(hba);
+		ufshcd_hold(hba);
+		get_random_bytes(&rnd, sizeof(rnd));
+		dev_info(hba->dev, "Inject UIC error %d, val=%d\n", rnd % (UFS_EVT_DME_ERR + 1), rnd);
+		ufshcd_update_evt_hist(hba, rnd %(UFS_EVT_DME_ERR + 1) , rnd);
+		ufshcd_release(hba);
+		ufshcd_rpm_put(hba);
 	}
 
 	return count;

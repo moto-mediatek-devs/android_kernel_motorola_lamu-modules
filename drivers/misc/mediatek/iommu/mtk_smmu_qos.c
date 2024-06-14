@@ -574,9 +574,8 @@ static void destroy_pmu_perf_event(int smmu_id)
 {
 	struct smmu_pmu_data *pmu_data;
 	struct perf_event *ev;
-	int j, k, size;
+	int j, k;
 
-	size = sizeof(struct perf_event_attr);
 	for (j = 0; j < SMMU_TBU_CNT(smmu_id) + 1; j++) {
 		pmu_data = &smmu_pmu_list[smmu_id][j];
 		if (pmu_data->pmu_id == U32_MAX ||
@@ -982,9 +981,8 @@ static void smmu_lmu_polling(u32 smmu_type)
 		}
 		written += ret;
 
-		if (ret >= 0 || ret < sizeof(trace_buf))
-			smmu_qos_print_trace(lmu_tbu_trace_func[smmu_type][i],
-					     trace_buf);
+		smmu_qos_print_trace(lmu_tbu_trace_func[smmu_type][i],
+				     trace_buf);
 	}
 }
 
@@ -994,7 +992,6 @@ static void update_mpam_perf_event_config(u32 smmu_id, u32 txu_id,
 	struct smmu_mpam_data *mpam_data;
 	struct perf_event_attr *ev_attr;
 	u32 ris, partid, pmg;
-	bool enable_pmg;
 
 	mpam_data = &smmu_mpam_list[smmu_id][txu_id];
 
@@ -1003,7 +1000,6 @@ static void update_mpam_perf_event_config(u32 smmu_id, u32 txu_id,
 	ris = mpam_data->ris[event_idx];
 	partid = mpam_data->partid[event_idx];
 	pmg = mpam_data->pmg[event_idx];
-	enable_pmg = mpam_data->enable_pmg[event_idx];
 
 	ev_attr->config1 = partid & 0xFFFF;
 	ev_attr->config1 |= ((u64)(pmg & 0xFFFF) << 16);
@@ -1052,9 +1048,8 @@ static void destroy_mpam_perf_event(int smmu_id)
 {
 	struct smmu_mpam_data *mpam_data;
 	struct perf_event *ev;
-	int j, k, size;
+	int j, k;
 
-	size = sizeof(struct perf_event_attr);
 	for (j = 0; j < SMMU_TBU_CNT(smmu_id) + 1; j++) {
 		mpam_data = &smmu_mpam_list[smmu_id][j];
 		if (mpam_data->mpam_id == U32_MAX ||
@@ -1862,7 +1857,7 @@ static int smmu_qos_lmu_set(const char *val, const struct kernel_param *kp)
 		ret = kstrtoint(tokenTmp, 10, &lmu_arr[idx]);
 		if (ret) {
 			pr_info("%s, parse failed:%d\n", __func__, ret);
-			return ret;
+			goto out_free;
 		}
 		idx++;
 	}

@@ -291,7 +291,7 @@ static s32 color_config_frame(struct mml_comp *comp, struct mml_task *task,
 		result->color_reg_cnt);
 	color_frm->config_success = true;
 	for (i = 0; i < result->color_reg_cnt; i++) {
-		mml_write(pkt, base_pa + regs[i].offset, regs[i].value,
+		mml_write(comp->id, pkt, base_pa + regs[i].offset, regs[i].value,
 			regs[i].mask, reuse, cache,
 			&color_frm->labels[i]);
 		mml_pq_msg("[color][config][%x] = %#x mask(%#x)",
@@ -391,7 +391,7 @@ static s32 color_reconfig_frame(struct mml_comp *comp, struct mml_task *task,
 	mml_pq_msg("%s:config color regs, count: %d", __func__,
 		result->color_reg_cnt);
 	for (i = 0; i < result->color_reg_cnt; i++) {
-		mml_update(reuse, color_frm->labels[i], regs[i].value);
+		mml_update(comp->id, reuse, color_frm->labels[i], regs[i].value);
 		mml_pq_msg("[color][config][%x] = %#x mask(%#x)",
 			regs[i].offset, regs[i].value, regs[i].mask);
 	}
@@ -509,9 +509,6 @@ static void mml_unbind(struct device *dev, struct device *master, void *data)
 static const struct component_ops mml_comp_ops = {
 	.bind	= mml_bind,
 	.unbind = mml_unbind,
-};
-
-static const struct mtk_ddp_comp_funcs ddp_comp_funcs = {
 };
 
 static struct mml_comp_color *dbg_probed_components[2];

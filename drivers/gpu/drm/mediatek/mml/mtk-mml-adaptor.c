@@ -490,9 +490,15 @@ dup_command:
 
 	task->reuse[pipe].labels = kcalloc(cfg->cache[pipe].label_cnt,
 		sizeof(*task->reuse[pipe].labels), GFP_KERNEL);
-	if (task->reuse[pipe].labels) {
+	task->reuse[pipe].label_mods = kcalloc(cfg->cache[pipe].label_cnt,
+		sizeof(*task->reuse[pipe].label_mods), GFP_KERNEL);
+	task->reuse[pipe].label_check = kcalloc(cfg->cache[pipe].label_cnt,
+		sizeof(*task->reuse[pipe].label_check), GFP_KERNEL);
+	if (task->reuse[pipe].labels && task->reuse[pipe].label_mods) {
 		memcpy(task->reuse[pipe].labels, src->reuse[pipe].labels,
 			sizeof(*task->reuse[pipe].labels) * cfg->cache[pipe].label_cnt);
+		memcpy(task->reuse[pipe].label_mods, src->reuse[pipe].label_mods,
+			sizeof(*task->reuse[pipe].label_mods) * cfg->cache[pipe].label_cnt);
 		task->reuse[pipe].label_idx = src->reuse[pipe].label_idx;
 		cmdq_reuse_refresh(task->pkts[pipe], task->reuse[pipe].labels,
 			task->reuse[pipe].label_idx);
@@ -548,7 +554,7 @@ int mml_ctx_init(struct mml_ctx *ctx, struct mml_dev *mml,
 	const char * const threads[])
 {
 	/* create taskdone kthread first cause it is more easy for fail case */
-	ctx->kt_done = kthread_create_worker(0, threads[0]);
+	ctx->kt_done = kthread_create_worker(0, "%s", threads[0]);
 	if (IS_ERR(ctx->kt_done)) {
 		mml_err("[adpt]fail to create kthread worker %d",
 			(s32)PTR_ERR(ctx->kt_done));
@@ -556,9 +562,9 @@ int mml_ctx_init(struct mml_ctx *ctx, struct mml_dev *mml,
 		goto err;
 
 	}
-	ctx->wq_destroy = alloc_ordered_workqueue(threads[1], 0);
+	ctx->wq_destroy = alloc_ordered_workqueue("%s", 0, threads[1]);
 	if (threads[2]) {
-		ctx->kt_config[0] = kthread_create_worker(0, threads[2]);
+		ctx->kt_config[0] = kthread_create_worker(0, "%s", threads[2]);
 		if (IS_ERR(ctx->kt_config[0])) {
 			mml_err("[adpt]fail to create config thread 0 %s err %pe",
 				threads[2], ctx->kt_config[0]);
@@ -567,7 +573,7 @@ int mml_ctx_init(struct mml_ctx *ctx, struct mml_dev *mml,
 		}
 	}
 	if (threads[3]) {
-		ctx->kt_config[0] = kthread_create_worker(0, threads[3]);
+		ctx->kt_config[1] = kthread_create_worker(0, "%s", threads[3]);
 		if (IS_ERR(ctx->kt_config[1])) {
 			mml_err("[adpt]fail to create config thread 1 %s err %pe",
 				threads[3], ctx->kt_config[1]);
@@ -582,14 +588,22 @@ int mml_ctx_init(struct mml_ctx *ctx, struct mml_dev *mml,
 	return 0;
 
 err:
-	if (ctx->kt_done)
+	if (ctx->kt_done) {
 		kthread_destroy_worker(ctx->kt_done);
-	if (ctx->wq_destroy)
+		ctx->kt_done = NULL;
+	}
+	if (ctx->wq_destroy) {
 		destroy_workqueue(ctx->wq_destroy);
-	if (ctx->kt_config[0])
+		ctx->wq_destroy = NULL;
+	}
+	if (ctx->kt_config[0]) {
 		kthread_destroy_worker(ctx->kt_config[0]);
-	if (ctx->kt_config[1])
+		ctx->kt_config[0] = NULL;
+	}
+	if (ctx->kt_config[1]) {
 		kthread_destroy_worker(ctx->kt_config[1]);
+		ctx->kt_config[1] = NULL;
+	}
 	return -EIO;
 }
 
@@ -613,11 +627,17 @@ void mml_ctx_deinit(struct mml_ctx *ctx)
 	}
 
 	destroy_workqueue(ctx->wq_destroy);
-	if (ctx->kt_config[0])
+	ctx->wq_destroy = NULL;
+	if (ctx->kt_config[0]) {
 		kthread_destroy_worker(ctx->kt_config[0]);
-	if (ctx->kt_config[1])
+		ctx->kt_config[0] = NULL;
+	}
+	if (ctx->kt_config[1]) {
 		kthread_destroy_worker(ctx->kt_config[1]);
+		ctx->kt_config[1] = NULL;
+	}
 	kthread_destroy_worker(ctx->kt_done);
+	ctx->kt_done = NULL;
 
 	for (i = 0; i < ARRAY_SIZE(ctx->tile_cache); i++)
 		for (j = 0; j < ARRAY_SIZE(ctx->tile_cache[i].func_list); j++)

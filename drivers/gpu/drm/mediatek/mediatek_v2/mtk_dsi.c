@@ -219,7 +219,6 @@
 #define CMD_TYPE1_HS_FLD_HFP_BLANKING_NULL_EN REG_FLD_MSB_LSB(17, 17)
 
 #define DSI_HSTX_CKL_WC(data)	(data->dsi_hstx_ckl_wc ? data->dsi_hstx_ckl_wc : 0x64)
-#define DSI_CMDQ_CON 0x60
 
 #define DSI_RX_DATA0(data)	(0x74 + data->reg_30_ofs)
 #define DSI_RX_DATA1(data)	(0x78 + data->reg_30_ofs)
@@ -229,10 +228,10 @@
 #define DSI_RACK(data)	(0x84 + data->reg_30_ofs)
 #define RACK BIT(0)
 
-#define DSI_RX_TRIG_STA 0x88
+#define DSI_RX_TRIG_STA(data)	(data->dsi_rx_trig_sta ? data->dsi_rx_trig_sta : 0x88)
 #define RX_POINTER REG_FLD_MSB_LSB(19, 8)
 
-#define DSI_RX_CON 0x08C
+#define DSI_RX_CON(data)	(data->dsi_rx_con ? data->dsi_rx_con : 0x8C)
 #define RX_DATA_SRAM_MODE BIT(0)
 
 #define DSI_MEM_CONTI(data)     (data->dsi_mem_conti ? data->dsi_mem_conti : 0x90)
@@ -328,7 +327,7 @@
 #define DSI_BYPASS_SHADOW BIT(1)
 #define DSI_READ_WORKING BIT(2)
 
-#define DSI_INPUT_DBG		0x1d4
+#define DSI_INPUT_DBG(data)	(data->reg_dsi_input_dbg_ofs ? data->reg_dsi_input_dbg_ofs : 0x1d4)
 #define DSI_DBG_FLD_ROI_X	REG_FLD_MSB_LSB(12, 0)
 #define DSI_DBG_FLD_ROI_Y	REG_FLD_MSB_LSB(28, 16)
 
@@ -353,8 +352,6 @@
 #define DSI_BUF_ULTRA_LOW(data)		(DSI_BUF_CON0(data) + 0x30)
 #define DSI_BUF_URGENT_HIGH(data)	(DSI_BUF_CON0(data) + 0x34)
 #define DSI_BUF_URGENT_LOW(data)	(DSI_BUF_CON0(data) + 0x38)
-
-#define DSI_CMDQ 0xD00
 
 #define CONFIG (0xff << 0)
 #define SHORT_PACKET 0
@@ -2180,9 +2177,26 @@ static bool mtk_dsi_clk_hs_state(struct mtk_dsi *dsi)
 
 static void mtk_dsi_clk_hs_mode(struct mtk_dsi *dsi, bool enter)
 {
-	struct mtk_drm_private *priv = dsi->is_slave ?
-		dsi->master_dsi->ddp_comp.mtk_crtc->base.dev->dev_private
-		: dsi->ddp_comp.mtk_crtc->base.dev->dev_private;
+	struct mtk_drm_private *priv = NULL;
+
+	if (IS_ERR_OR_NULL(dsi) || IS_ERR_OR_NULL(dsi->driver_data)) {
+		DDPPR_ERR("%s:%d NULL Pointer\n", __func__, __LINE__);
+		return;
+	}
+	if (dsi->is_slave) {
+		if (dsi->master_dsi &&
+			dsi->master_dsi->ddp_comp.mtk_crtc &&
+			dsi->master_dsi->ddp_comp.mtk_crtc->base.dev)
+			priv = dsi->master_dsi->ddp_comp.mtk_crtc->base.dev->dev_private;
+	} else {
+		if (dsi->ddp_comp.mtk_crtc &&
+			dsi->ddp_comp.mtk_crtc->base.dev)
+			priv = dsi->ddp_comp.mtk_crtc->base.dev->dev_private;
+	}
+	if (!priv || !priv->data) {
+		DDPPR_ERR("%s:%d NULL Pointer\n", __func__, __LINE__);
+		return;
+	}
 
 	//MIPI_TX_MT6983
 	if (priv->data->mmsys_id == MMSYS_MT6983 ||
@@ -2192,7 +2206,7 @@ static void mtk_dsi_clk_hs_mode(struct mtk_dsi *dsi, bool enter)
 		priv->data->mmsys_id == MMSYS_MT6897 ||
 		priv->data->mmsys_id == MMSYS_MT6895 ||
 		priv->data->mmsys_id == MMSYS_MT6886) {
-		if (dsi->ext && dsi->ext->params->is_cphy)
+		if (dsi->ext && dsi->ext->params && dsi->ext->params->is_cphy)
 			writel(0xAA, dsi->regs + DSI_PHY_LCPAT(dsi->driver_data));
 		else
 			writel(0x55, dsi->regs + DSI_PHY_LCPAT(dsi->driver_data));
@@ -2208,6 +2222,11 @@ static void mtk_dsi_set_mode(struct mtk_dsi *dsi)
 {
 	u32 vid_mode = CMD_MODE;
 
+	if (IS_ERR_OR_NULL(dsi) || IS_ERR_OR_NULL(dsi->driver_data)) {
+		DDPPR_ERR("%s:%d NULL Pointer\n", __func__, __LINE__);
+		return;
+	}
+
 	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO) {
 		if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
 			vid_mode = BURST_MODE;
@@ -2221,6 +2240,11 @@ static void mtk_dsi_set_mode(struct mtk_dsi *dsi)
 
 static void mtk_dsi_set_vm_cmd(struct mtk_dsi *dsi)
 {
+	if (IS_ERR_OR_NULL(dsi) || IS_ERR_OR_NULL(dsi->driver_data)) {
+		DDPPR_ERR("%s:%d NULL Pointer\n", __func__, __LINE__);
+		return;
+	}
+
 	mtk_dsi_mask(dsi, dsi->driver_data->reg_vm_cmd_con_ofs, VM_CMD_EN, VM_CMD_EN);
 	mtk_dsi_mask(dsi, dsi->driver_data->reg_vm_cmd_con_ofs, TS_VFP_EN, TS_VFP_EN);
 }
@@ -2563,7 +2587,7 @@ static void mtk_dsi_tx_buf_rw(struct mtk_dsi *dsi)
 	u32 fill_rate;
 	u32 sodi_hi, sodi_lo;
 	u32 sram_unit, buffer_unit;
-	u32 urgent_lo_fifo_us, urgent_hi_fifo_us;
+	u32 urgent_lo_fifo_us, urgent_hi_fifo_us, output_valid_us;
 	struct mtk_panel_ext *ext = mtk_dsi_get_panel_ext(&dsi->ddp_comp);
 	struct mtk_drm_crtc *mtk_crtc =	dsi->is_slave ?
 			dsi->master_dsi->ddp_comp.mtk_crtc : dsi->ddp_comp.mtk_crtc;
@@ -2612,6 +2636,8 @@ static void mtk_dsi_tx_buf_rw(struct mtk_dsi *dsi)
 				dsi->driver_data->urgent_lo_fifo_us : 11;
 	urgent_hi_fifo_us = dsi->driver_data->urgent_hi_fifo_us ?
 				dsi->driver_data->urgent_hi_fifo_us : 12;
+	output_valid_us = dsi->driver_data->output_valid_fifo_us ?
+				dsi->driver_data->output_valid_fifo_us : 25;
 
 	if (!IS_ERR_OR_NULL(priv) && !IS_ERR_OR_NULL(priv->data)
 		&& (priv->data->mmsys_id == MMSYS_MT6989 ||
@@ -2648,9 +2674,13 @@ static void mtk_dsi_tx_buf_rw(struct mtk_dsi *dsi)
 						0);
 
 		if (dsi->ext->params->is_cphy)
-			tmp = 25 * dsi->data_rate * 2 * dsi->lanes / 7 / buffer_unit;
+			tmp = output_valid_us * dsi->data_rate * 2 * dsi->lanes / 7 / buffer_unit;
 		else
-			tmp = 25 * dsi->data_rate * dsi->lanes / 8 / buffer_unit;
+			tmp = output_valid_us * dsi->data_rate * dsi->lanes / 8 / buffer_unit;
+
+		/* check output valid threshold exceed FIFO size if FIFO size is pre-defined */
+		if (buf_con)
+			tmp = (tmp >= (buf_con - 1)) ? (buf_con - 1) : tmp;
 	}
 
 	rw_times = mtk_dsi_calculate_rw_times(dsi, width, height);
@@ -2680,10 +2710,10 @@ static void mtk_dsi_tx_buf_rw(struct mtk_dsi *dsi)
 		sodi_hi = tmp - (12 * (fill_rate - dsi->data_rate * 2 * dsi->lanes / 7
 				/ buffer_unit) / 10);
 		sodi_lo = (23 + 5) * dsi->data_rate * 2 * dsi->lanes / 7 / buffer_unit;
-		preultra_hi = 26 * dsi->data_rate * 2 * dsi->lanes / 7 / buffer_unit;
-		preultra_lo = 25 * dsi->data_rate * 2 * dsi->lanes / 7 / buffer_unit;
-		ultra_hi = 25 * dsi->data_rate * 2 * dsi->lanes / 7 / buffer_unit;
-		ultra_lo = 23 * dsi->data_rate * 2 * dsi->lanes / 7 / buffer_unit;
+		preultra_hi = 36 * dsi->data_rate * 2 * dsi->lanes / 7 / buffer_unit;
+		preultra_lo = 35 * dsi->data_rate * 2 * dsi->lanes / 7 / buffer_unit;
+		ultra_hi = 26 * dsi->data_rate * 2 * dsi->lanes / 7 / buffer_unit;
+		ultra_lo = 25 * dsi->data_rate * 2 * dsi->lanes / 7 / buffer_unit;
 		urgent_hi = urgent_hi_fifo_us * dsi->data_rate * 2 * dsi->lanes / 7 / buffer_unit;
 		urgent_lo = urgent_lo_fifo_us * dsi->data_rate * 2 * dsi->lanes / 7 / buffer_unit;
 	} else {
@@ -2691,10 +2721,10 @@ static void mtk_dsi_tx_buf_rw(struct mtk_dsi *dsi)
 				/ buffer_unit) / 10);
 		/*dsi->driver_data*/
 		sodi_lo = (23 + 5) * dsi->data_rate * dsi->lanes / 8 / buffer_unit;
-		preultra_hi = 26 * dsi->data_rate * dsi->lanes / 8 / buffer_unit;
-		preultra_lo = 25 * dsi->data_rate * dsi->lanes / 8 / buffer_unit;
-		ultra_hi = 25 * dsi->data_rate * dsi->lanes / 8 / buffer_unit;
-		ultra_lo = 23 * dsi->data_rate * dsi->lanes / 8 / buffer_unit;
+		preultra_hi = 36 * dsi->data_rate * dsi->lanes / 8 / buffer_unit;
+		preultra_lo = 35 * dsi->data_rate * dsi->lanes / 8 / buffer_unit;
+		ultra_hi = 26 * dsi->data_rate * dsi->lanes / 8 / buffer_unit;
+		ultra_lo = 25 * dsi->data_rate * dsi->lanes / 8 / buffer_unit;
 		urgent_hi = urgent_hi_fifo_us * dsi->data_rate * dsi->lanes / 8 / buffer_unit;
 		urgent_lo = urgent_lo_fifo_us * dsi->data_rate * dsi->lanes / 8 / buffer_unit;
 	}
@@ -3248,6 +3278,10 @@ s32 mtk_dsi_poll_for_idle(struct mtk_dsi *dsi, struct cmdq_pkt *handle)
 static s32 mtk_dsi_wait_idle(struct mtk_dsi *dsi, u32 irq_flag,
 			     unsigned int timeout, struct cmdq_pkt *handle)
 {
+	if (IS_ERR_OR_NULL(dsi) || IS_ERR_OR_NULL(dsi->driver_data)) {
+		DDPPR_ERR("%s:%d NULL Pointer\n", __func__, __LINE__);
+		return -EINVAL;
+	}
 
 	if (dsi->driver_data->poll_for_idle)
 		return dsi->driver_data->poll_for_idle(dsi, handle);
@@ -3508,15 +3542,20 @@ void mtk_dsi_cur_pos_dump(struct mtk_ddp_comp *comp)
 {
 	void __iomem *baddr;
 	unsigned int reg_val;
+	unsigned long offset;
+	struct mtk_dsi *dsi;
 
 	if(!comp)
 		return;
+
 	baddr = comp->regs;
 	if (!baddr) {
 		DDPINFO("%s, %s is NULL!\n", __func__, mtk_dump_comp_str(comp));
 		return;
 	}
-	reg_val = readl(DSI_INPUT_DBG + baddr);
+
+	dsi = container_of(comp, struct mtk_dsi, ddp_comp);
+	reg_val = readl(DSI_INPUT_DBG(dsi->driver_data) + baddr);
 	DDPINFO("%s cur_pos(%u,%u)\n", mtk_dump_comp_str(comp),
 		REG_FLD_VAL_GET(DSI_DBG_FLD_ROI_X, reg_val),
 		REG_FLD_VAL_GET(DSI_DBG_FLD_ROI_Y, reg_val));
@@ -3551,9 +3590,10 @@ irqreturn_t mtk_dsi_irq_status(int irq, void *dev_id)
 	struct mtk_ddp_comp *comp = NULL;
 	unsigned int irq_mask = 0;
 
-	if (IS_ERR_OR_NULL(dsi))
+	if (IS_ERR_OR_NULL(dsi) || IS_ERR_OR_NULL(dsi->driver_data)) {
+		DDPPR_ERR("%s:%d NULL Pointer\n", __func__, __LINE__);
 		return IRQ_NONE;
-
+	}
 	comp = &dsi->ddp_comp;
 	if (mtk_drm_top_clk_isr_get(comp) == false) {
 		DDPIRQ("%s, top clk off\n", __func__);
@@ -3660,8 +3700,8 @@ irqreturn_t mtk_dsi_irq_status(int irq, void *dev_id)
 			}
 
 			/* could dump SMI register while dsi not attached to CRTC */
-			if (aee_cooldown && ((dsi->driver_data &&
-			    !dsi->driver_data->smi_dbg_disable) ||
+			if (aee_cooldown &&
+			    (!dsi->driver_data->smi_dbg_disable ||
 			    mtk_drm_helper_get_opt(priv->helper_opt, MTK_DRM_OPT_DSI_UNDERRUN_AEE)))
 				mtk_smi_dbg_hang_detect("dsi-underrun");
 
@@ -3682,6 +3722,8 @@ irqreturn_t mtk_dsi_irq_status(int irq, void *dev_id)
 
 			mtk_ddp_comp_io_cmd(comp, NULL, IRQ_UNDERRUN, &underrun_int_en);
 			++underrun_cnt;
+
+			mtk_disp_clr_debug_deteriorate();
 		}
 
 		//if (status & INP_UNFINISH_INT_EN)
@@ -3693,7 +3735,7 @@ irqreturn_t mtk_dsi_irq_status(int irq, void *dev_id)
 				wakeup_dsi_wq(&dsi->exit_ulps_done);
 			} else {
 				mtk_dsi_ulps_exit_end(dsi);
-				if (mtk_dsi_is_cmd_mode(comp) && dsi->driver_data)
+				if (mtk_dsi_is_cmd_mode(comp))
 					mtk_dsi_mask(dsi, DSI_TXRX_CTRL(dsi->driver_data), (EXT_TE_EN | HSTX_CKLP_EN),
 								(EXT_TE_EN | HSTX_CKLP_EN));
 				mtk_dsi_set_mode(dsi);
@@ -4038,7 +4080,7 @@ static void mtk_dsi_enter_ulps(struct mtk_dsi *dsi, bool async)
 
 static void mtk_dsi_exit_ulps(struct mtk_dsi *dsi, bool async)
 {
-	int wake_up_prd = (dsi->data_rate * 1000) / (1024 * 8) + 1; /* 1 ms */
+	int wake_up_prd = 0;
 	int ret = 0;
 	struct mtk_drm_crtc *mtk_crtc = NULL;
 	struct mtk_drm_private *priv = NULL;
@@ -4047,6 +4089,8 @@ static void mtk_dsi_exit_ulps(struct mtk_dsi *dsi, bool async)
 		DDPPR_ERR("%s:%d NULL Pointer\n", __func__, __LINE__);
 		return;
 	}
+	wake_up_prd = (dsi->data_rate * 1000) / (1024 * 8) + 1; /* 1 ms */
+
 	mtk_crtc = dsi->is_slave ?
 		dsi->master_dsi->ddp_comp.mtk_crtc
 		:dsi->ddp_comp.mtk_crtc;
@@ -5327,6 +5371,7 @@ static int mtk_dsi_wait_cmd_frame_done(struct mtk_dsi *dsi,
 	 * frame updating and wait for the latest frame done.
 	 */
 	if (new_doze_state && !force_lcm_update) {
+		CRTC_MMP_MARK(0, set_dirty, WAIT_CMD_FRAME_DONE, __LINE__);
 		cmdq_pkt_set_event(handle,
 			mtk_crtc->gce_obj.event[EVENT_STREAM_DIRTY]);
 		cmdq_pkt_wait_no_clear(handle,
@@ -5392,7 +5437,7 @@ SKIP_WAIT_FRAME_DONE:
 	if (dsi->slave_dsi)
 		mtk_dsi_dual_enable(dsi, false);
 
-	if (mtk_drm_helper_get_opt(priv->helper_opt, MTK_DRM_OPT_OVL_BW_MONITOR) &&
+	if (priv && mtk_drm_helper_get_opt(priv->helper_opt, MTK_DRM_OPT_OVL_BW_MONITOR) &&
 			priv->data->mmsys_id == MMSYS_MT6991 && crtc_idx == 0)
 		mtk_crtc_stop_bwm_ratio_loop(crtc);
 
@@ -6442,13 +6487,16 @@ int mtk_dsi_dump(struct mtk_ddp_comp *comp)
 	DDPDUMP("state9 LINE_COUNTER(cmd mode):%u\n", reg_val);
 
 	DDPDUMP("== %s REGS:0x%pa ==\n", mtk_dump_comp_str(comp), &comp->regs_pa);
-	for (k = 0; k < 0x1f0; k += 16) {
+	for (k = 0; k < 0x2b0; k += 16) {
 		DDPDUMP("0x%04x: 0x%08x 0x%08x 0x%08x 0x%08x\n", k,
 			readl(dsi->regs + k),
 			readl(dsi->regs + k + 0x4),
 			readl(dsi->regs + k + 0x8),
 			readl(dsi->regs + k + 0xc));
 	}
+
+	DDPDUMP("0x%04x: 0x%08x\n",
+		DSI_INPUT_DBG(dsi->driver_data), readl(dsi->regs + DSI_INPUT_DBG(dsi->driver_data)));
 
 	for (k = DSI_BUF_CON0(dsi->driver_data); k < DSI_BUF_CON0(dsi->driver_data) + 0x40; k += 16) {
 		DDPDUMP("0x%04x: 0x%08x 0x%08x 0x%08x 0x%08x\n", k,
@@ -6768,11 +6816,12 @@ static void mtk_dsi_set_rx_sram_mode(struct mtk_ddp_comp *comp,
 	struct cmdq_pkt *handle, unsigned int enable)
 {
 	u32 val = enable ? RX_DATA_SRAM_MODE : 0;
+	struct mtk_dsi *dsi = container_of(comp, struct mtk_dsi, ddp_comp);
 
 	if (handle)
-		mtk_ddp_write(comp, val, DSI_RX_CON, handle);
+		mtk_ddp_write(comp, val, DSI_RX_CON(dsi->driver_data), handle);
 	else
-		writel(val, comp->regs + DSI_RX_CON);
+		writel(val, comp->regs + DSI_RX_CON(dsi->driver_data));
 }
 
 static void mtk_dsi_ddp_config(struct mtk_ddp_comp *comp,
@@ -9332,6 +9381,12 @@ done:
 static ssize_t mtk_dsi_host_send_cmd(struct mtk_dsi *dsi,
 				     const struct mipi_dsi_msg *msg, u8 flag)
 {
+	if (IS_ERR_OR_NULL(dsi) || IS_ERR_OR_NULL(dsi->driver_data) ||
+		IS_ERR_OR_NULL(msg)) {
+		DDPPR_ERR("%s:%d NULL Pointer\n", __func__, __LINE__);
+		return -EINVAL;
+	}
+
 	mtk_dsi_wait_idle(dsi, flag, 2000, NULL);
 	mtk_dsi_irq_data_clear(dsi, flag);
 	mtk_dsi_cmdq(dsi, msg);
@@ -9438,7 +9493,7 @@ static ssize_t _mtk_dsi_host_transfer(struct mtk_dsi *dsi,
 	u32 recv_cnt, i;
 	u8 irq_flag;
 	void *src_addr;
-	#define RX_NUM 512
+#define RX_NUM 512
 	u8 read_data[RX_NUM];
 
 	if (!dsi || !dsi->driver_data || !msg) {
@@ -9457,7 +9512,6 @@ static ssize_t _mtk_dsi_host_transfer(struct mtk_dsi *dsi,
 		.tx_len = 0x1,
 		.type = MIPI_DSI_SET_MAXIMUM_RETURN_PACKET_SIZE,
 		};
-		DDPDBG("%s, %d, RX sram mode [%d]\n", __func__, __LINE__, readl(dsi->regs + DSI_RX_CON));
 
 		if (mtk_dsi_host_send_cmd(dsi, &set_rd_msg, irq_flag) < 0)
 			DDPPR_ERR("RX mtk_dsi_host_send_cmd fail\n");
@@ -9487,21 +9541,46 @@ static ssize_t _mtk_dsi_host_transfer(struct mtk_dsi *dsi,
 	}
 
 	if (dsi && dsi->driver_data && dsi->driver_data->support_512byte_rx) {
-		recv_cnt = DISP_REG_GET_FIELD(RX_POINTER, dsi->regs + DSI_RX_TRIG_STA);
-		DDPDBG("%s, %d, DSI RX recv_cnt[%d]\n", __func__, __LINE__, recv_cnt);
+		void __iomem *dsi_cmdq;
+		u32 j;
 
-		if (recv_cnt < RX_NUM) {
-			/* set cmdq page */
-			writel(0x00030000, dsi->regs + DSI_CMDQ_CON);
+		recv_cnt = DISP_REG_GET_FIELD(RX_POINTER,
+			dsi->regs + DSI_RX_TRIG_STA(dsi->driver_data));
 
-			for (i = 0; i < recv_cnt; i++) {
-				read_data[i] = readb(dsi->regs + DSI_CMDQ + 0x1FF - i);
-				DDPDBG("%s, %d, RX[%d] = [%d]\n",
-				__func__, __LINE__,
-				i, readb(dsi->regs + DSI_CMDQ + 0x1FF - i));
-			}
-			memcpy(msg->rx_buf, read_data, recv_cnt);
+		dsi_cmdq = dsi->regs + dsi->driver_data->reg_cmdq0_ofs;
+
+		if (recv_cnt > RX_NUM) {
+			DDPPR_ERR("%s, DSI RX recv_cnt=%d over max value(%d)\n",
+				__func__, recv_cnt, RX_NUM);
+			return -EINVAL;
 		}
+
+		/* set cmdq page */
+		writel(0x00030000, dsi->regs + DSI_CMDQ_SIZE(dsi->driver_data));
+
+		for (i = 0; i < ((recv_cnt + 3) / 4); i++) {
+			j = i * 4;
+			read_data[j] = readb(dsi_cmdq + 0x1FF - (j + 3));
+			read_data[j + 1] = readb(dsi_cmdq + 0x1FF - (j + 2));
+			read_data[j + 2] = readb(dsi_cmdq + 0x1FF - (j + 1));
+			read_data[j + 3] = readb(dsi_cmdq + 0x1FF - j);
+			DDPDBG("%s, RX[%d]=0x%x, RX[%d]=0x%x, RX[%d]=0x%x, RX[%d]=0x%x\n",
+				__func__,
+				j, read_data[j], j + 1, read_data[j + 1],
+				j + 2, read_data[j + 2], j + 3, read_data[j + 3]);
+		}
+
+		writel(0x00000000, dsi->regs + DSI_CMDQ_SIZE(dsi->driver_data));
+
+		recv_cnt = mtk_dsi_recv_cnt(read_data[0], read_data);
+
+		if (recv_cnt > 2)
+			src_addr = &read_data[4];
+		else
+			src_addr = &read_data[1];
+
+		if (recv_cnt)
+			memcpy(msg->rx_buf, src_addr, recv_cnt);
 	} else {
 		for (i = 0; i < 16; i++)
 			*(read_data + i) = readb(dsi->regs + DSI_RX_DATA0(dsi->driver_data) + i);
@@ -9688,6 +9767,7 @@ static int mtk_dsi_ddic_handler_by_gce(struct mtk_dsi *dsi,
 	if ((prop & MTK_LCM_DSI_CMD_PROP_ALIGN_FRAME) != 0 &&
 	    (prop & MTK_LCM_DSI_CMD_PROP_READ) == 0) {
 		if (dsi_mode == 0) {
+			CRTC_MMP_MARK(0, set_dirty, DDIC_HANDLER_BY_GCE, __LINE__);
 			cmdq_pkt_set_event(handle,
 				mtk_crtc->gce_obj.event[EVENT_STREAM_DIRTY]);
 			cmdq_pkt_set_event(handle,
@@ -10435,6 +10515,7 @@ unsigned long long mtk_dsi_get_frame_hrt_bw_base_by_datarate(
 	int vact = mtk_crtc->base.state->adjusted_mode.vdisplay;
 	int vrefresh = drm_mode_vrefresh(&mtk_crtc->base.state->adjusted_mode);
 	int crtc_idx = drm_crtc_index(&mtk_crtc->base);
+	int tmp_vact = 0;
 
 	//For CMD mode to calculate HRT BW
 	unsigned int compress_rate = mtk_dsi_get_dsc_compress_rate(dsi);
@@ -10459,8 +10540,12 @@ unsigned long long mtk_dsi_get_frame_hrt_bw_base_by_datarate(
 
 	if (!mtk_dsi_is_cmd_mode(&dsi->ddp_comp)) {
 		//vdo mode
-		if (mtk_crtc->res_switch == RES_SWITCH_ON_AP)
+		if (mtk_crtc->res_switch == RES_SWITCH_ON_AP) {
 			hact = mtk_crtc->scaling_ctx.lcm_width;
+			tmp_vact = vact;
+			vact = mtk_crtc->scaling_ctx.lcm_height;
+			vtotal = vtotal - tmp_vact + vact;
+		}
 
 		if (to_info.is_support) {
 			hact += (to_info.left_overhead + to_info.right_overhead);
@@ -10589,20 +10674,23 @@ unsigned long long mtk_dsi_get_frame_hrt_bw_base_by_mode(
 	if (!mtk_dsi_is_cmd_mode(&dsi->ddp_comp)) {
 		//vdo mode
 		u32 hact = mode->hdisplay;
+		u32 vact = mode->vdisplay;
+		u32 vtotal = mode->vtotal;
 
-		if (mtk_crtc->res_switch == RES_SWITCH_ON_AP)
+		if (mtk_crtc->res_switch == RES_SWITCH_ON_AP) {
 			hact = mtk_crtc->scaling_ctx.lcm_width;
-		else
-			hact = mode->hdisplay;
+			vact = mtk_crtc->scaling_ctx.lcm_height;
+			vtotal = vtotal - mode->vdisplay + vact;
+		}
 
 		if (to_info.is_support) {
 			hact += (to_info.left_overhead + to_info.right_overhead);
 			DDPDBG("%s vdo mode hact with total overhead %d\n", __func__, hact);
 		}
 
-		bw_base = DO_COMMON_DIV((unsigned long long) mode->vdisplay
+		bw_base = DO_COMMON_DIV((unsigned long long) vact
 			* hact * vrefresh * 4, 1000);
-		bw_base = DO_COMMON_DIV(bw_base * mode->vtotal, mode->vdisplay);
+		bw_base = DO_COMMON_DIV(bw_base * vtotal, vact);
 		bw_base = DO_COMMON_DIV(bw_base, 1000);
 
 		DDPDBG("%s vdo mode bw_base:%llu, vrefresh:%d\n",
@@ -12845,6 +12933,7 @@ static int mtk_dsi_hotplug_kthread(void *data)
 				mtk_crtc_pkt_create(&cmdq_handle, &mtk_crtc->base,
 					mtk_crtc->gce_obj.client[CLIENT_CFG]);
 
+				CRTC_MMP_MARK(0, set_dirty, HOT_PLUG_THREAD, __LINE__);
 				cmdq_pkt_set_event(cmdq_handle,
 					mtk_crtc->gce_obj.event[EVENT_STREAM_DIRTY]);
 				cmdq_pkt_set_event(cmdq_handle,
@@ -12997,6 +13086,7 @@ const struct mtk_dsi_driver_data mt6765_dsi_driver_data = {
 	.dsi_buffer = false,
 	.max_vfp = 0,
 };
+
 const struct mtk_dsi_driver_data mt6768_dsi_driver_data = {
 	.reg_cmdq0_ofs = 0x200,
 	.reg_cmdq1_ofs = 0x204,
@@ -13117,6 +13207,7 @@ static const struct mtk_dsi_driver_data mt6991_dsi_driver_data = {
 	.reg_vm_cmd_data10_ofs = 0x128,
 	.reg_vm_cmd_data20_ofs = 0x138,
 	.reg_vm_cmd_data30_ofs = 0x148,
+	.reg_dsi_input_dbg_ofs = 0x244,
 	.poll_for_idle = mtk_dsi_poll_for_idle,
 	.irq_handler = mtk_dsi_irq_status,
 	.esd_eint_compat = "mediatek, DSI_TE-eint",
@@ -13127,25 +13218,26 @@ static const struct mtk_dsi_driver_data mt6991_dsi_driver_data = {
 	.smi_dbg_disable = true,
 	.buffer_unit = 32,
 	.sram_unit = 32,
-	.urgent_lo_fifo_us = 14,
-	.urgent_hi_fifo_us = 15,
+	.urgent_lo_fifo_us = 11,
+	.urgent_hi_fifo_us = 12,
+	.output_valid_fifo_us = 35,
 	.max_vfp = 0xffe,
 	.mmclk_by_datarate = mtk_dsi_set_mmclk_by_datarate_V2,
 	.bubble_rate = 115,
 	.n_verion = VER_N3,
 	.require_phy_reset = true,
 	.reg_phy_base = 0x600,
-	.reg_20_ofs = 0x20,
-	.reg_30_ofs = 0x30,
-	.reg_40_ofs = 0x40,
+	.reg_20_ofs = 0x020,
+	.reg_30_ofs = 0x030,
+	.reg_40_ofs = 0x040,
 	.reg_100_ofs = 0x100,
-	.dsi_size_con = 0x2c,
+	.dsi_size_con = 0x02c,
 	.dsi_vfp_early_stop = 0x170,
 	.dsi_lfr_con = 0x1A0,
 	.dsi_cmdq_size = 0x44,
 	.dsi_type1_hs = 0x50,
 	.dsi_hstx_ckl_wc = 0x100,
-	.dsi_mem_conti = 0x48,
+	.dsi_mem_conti = 0x048,
 	.dsi_time_con = 0x200,
 	.dsi_reserved = 0x3f8,
 	.dsi_state_dbg6 = 0x274,
@@ -13157,8 +13249,10 @@ static const struct mtk_dsi_driver_data mt6991_dsi_driver_data = {
 	.dsi_phy_syncon = 0x1D8,
 	.dsi_ltpo_vdo_con = 0x1A8,
 	.dsi_ltpo_vdo_sq0 = 0x1AC,
-	.support_512byte_rx = 0,
 	.support_bl_at_te = 1,
+	.support_512byte_rx = 1,
+	.dsi_rx_trig_sta = 0x0B8,
+	.dsi_rx_con = 0x0A0,
 };
 
 static const struct mtk_dsi_driver_data mt6897_dsi_driver_data = {
@@ -13525,11 +13619,17 @@ static int mtk_dsi_probe(struct platform_device *pdev)
 			goto error;
 	}
 
-	dev_info(dev, "DSI_STATE_DGB6-9[%u %u %u %u]\n",
+	dev_info(dev, "DSI_STATE_DGB6-9[0x%x 0x%x 0x%x 0x%x]\n",
 		readl(dsi->regs + DSI_STATE_DBG6(dsi->driver_data)),
 		readl(dsi->regs + DSI_STATE_DBG7(dsi->driver_data)),
 		readl(dsi->regs + DSI_STATE_DBG8(dsi->driver_data)),
 		readl(dsi->regs + DSI_STATE_DBG9(dsi->driver_data)));
+
+	dev_info(dev, "DSI DEBUG log [0x%x 0x%x 0x%x 0x%x]\n",
+		readl(dsi->regs + DSI_INTSTA),
+		readl(dsi->regs + DSI_INTEN),
+		readl(dsi->regs + DSI_MODE_CTRL(dsi->driver_data)),
+		readl(dsi->regs + dsi->driver_data->reg_cmdq0_ofs));
 
 	dsi->phy = devm_phy_get(dev, "dphy");
 	if (IS_ERR(dsi->phy)) {
@@ -14275,6 +14375,7 @@ int fbconfig_get_esd_check_test(struct drm_crtc *crtc,
 		mtk_crtc_pkt_create(&cmdq_handle, &mtk_crtc->base,
 				mtk_crtc->gce_obj.client[CLIENT_CFG]);
 
+		CRTC_MMP_MARK(0, set_dirty, ESD_CHECK_TEST,__LINE__);
 		cmdq_pkt_set_event(cmdq_handle,
 				mtk_crtc->gce_obj.event[EVENT_STREAM_DIRTY]);
 		cmdq_pkt_set_event(cmdq_handle,

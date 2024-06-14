@@ -35,7 +35,7 @@ static void handle_init_ack_msg(struct vdec_vcu_inst *vcu, struct vdec_vcu_ipi_i
 	/* the content in vsi is initialized to 0 in VCU */
 	vcu->vsi = VCU_FPTR(vcu_mapping_dm_addr)(vcu->dev, msg->vcu_inst_addr);
 	vcu->inst_addr = msg->vcu_inst_addr;
-	mtk_vcodec_debug(vcu, "- vcu_inst_addr = 0x%llx", vcu->inst_addr);
+	mtk_v4l2_debug(0, "- vcu_inst_addr = 0x%llx", vcu->inst_addr);
 }
 
 static void handle_query_cap_ack_msg(struct vdec_vcu_inst *vcu,
@@ -726,7 +726,6 @@ int vcu_dec_set_frame_buffer(struct vdec_vcu_inst *vcu, void *fb)
 	struct vdec_ipi_fb ipi_fb;
 	struct vdec_fb *pfb = NULL;
 	bool dst_not_get = true;
-	struct vdec_vsi *vsi;
 
 	mtk_vcodec_debug(vcu, "+ id=%X", AP_IPIMSG_DEC_FRAME_BUFFER);
 
@@ -736,7 +735,6 @@ int vcu_dec_set_frame_buffer(struct vdec_vcu_inst *vcu, void *fb)
 	msg.id = 0;
 	msg.ctx_id = vcu->ctx->id;
 	msg.vcu_inst_addr = vcu->inst_addr;
-	vsi = (struct vdec_vsi *)vcu->vsi;
 
 	do {
 		if (fb == NULL) {

@@ -80,6 +80,8 @@ struct energy_env {
 	unsigned long gear_max_util[MAX_NR_CPUS][2]; /* 0: dst_cpu=-1 1: with dst_cpu*/
 	unsigned long pds_cpu_cap[MAX_NR_CPUS];
 	unsigned long pds_cap[MAX_NR_CPUS];
+	unsigned long pd_base_max_util[MAX_NR_CPUS];
+	unsigned long pd_base_freq[MAX_NR_CPUS];
 	unsigned long total_util;
 
 	/* temperature for each cpu*/
@@ -87,7 +89,8 @@ struct energy_env {
 
 	/* WL-based CPU+DSU ctrl */
 	unsigned int wl_support;
-	unsigned int wl;
+	unsigned int wl_cpu; /* wl for CPU */
+	unsigned int wl_dsu; /* wl for DSU */
 
 	int val_s[10];
 
@@ -171,11 +174,6 @@ extern void mtk_update_misfit_status(void *data, struct task_struct *p, struct r
 extern inline int util_fits_capacity(unsigned long util, unsigned long uclamp_min,
 	unsigned long uclamp_max, unsigned long capacity, int cpu);
 extern unsigned long task_h_load(struct task_struct *p);
-
-enum {
-	SKIP_COMPARE_FIT,
-	COMPARE_FIT
-};
 
 extern void set_wake_sync(unsigned int sync);
 extern unsigned int get_wake_sync(void);

@@ -354,7 +354,7 @@ struct rrot_frame_data {
 	u32 crc_inst_offset;
 };
 
-static s32 rrot_write_addr(struct cmdq_pkt *pkt,
+static s32 rrot_write_addr(u32 comp_id, struct cmdq_pkt *pkt,
 			   dma_addr_t addr, dma_addr_t addr_high, u64 value,
 			   struct mml_task_reuse *reuse,
 			   struct mml_pipe_cache *cache,
@@ -362,21 +362,21 @@ static s32 rrot_write_addr(struct cmdq_pkt *pkt,
 {
 	s32 ret;
 
-	ret = mml_write(pkt, addr, value & GENMASK_ULL(31, 0), U32_MAX,
+	ret = mml_write(comp_id, pkt, addr, value & GENMASK_ULL(31, 0), U32_MAX,
 			reuse, cache, label_idx);
 	if (ret)
 		return ret;
 
-	ret = mml_write(pkt, addr_high, value >> 32, U32_MAX,
+	ret = mml_write(comp_id, pkt, addr_high, value >> 32, U32_MAX,
 			reuse, cache, label_idx + 1);
 	return ret;
 }
 
-static void rrot_update_addr(struct mml_task_reuse *reuse,
+static void rrot_update_addr(u32 comp_id, struct mml_task_reuse *reuse,
 			     u16 label, u16 label_high, u64 value)
 {
-	mml_update(reuse, label, value & GENMASK_ULL(31, 0));
-	mml_update(reuse, label_high, value >> 32);
+	mml_update(comp_id, reuse, label, value & GENMASK_ULL(31, 0));
+	mml_update(comp_id, reuse, label_high, value >> 32);
 }
 
 static s32 rrot_write64(struct cmdq_pkt *pkt, phys_addr_t pa, phys_addr_t pa_msb, u64 value)
@@ -1115,7 +1115,7 @@ done:
 		con2 = (prefetch_line_cnt[2] << 16) | prefetch_line_cnt[3];
 
 	/* enable stash port urgent/ultra/pre-ultra, monitor normal threshold */
-	stash_con = 0x7f000000;	/* bit[29:26] always on, urgent/ultra/preultra */
+	stash_con = 0x7b000000;	/* bit[29:27] always on, preultra/ultra and sw trigger */
 
 	cmdq_pkt_write(pkt, NULL, comp->base_pa + RROT_PREFETCH_CONTROL_0, stash_con, U32_MAX);
 	cmdq_pkt_write(pkt, NULL, comp->base_pa + RROT_PREFETCH_CONTROL_1, con1, U32_MAX);
@@ -1179,7 +1179,7 @@ static s32 rrot_config_frame(struct mml_comp *comp, struct mml_task *task,
 	/* select vcsel for different mode */
 	if (rrot->data->vcsel)
 		cmdq_pkt_write(pkt, NULL, base_pa + RROT_VCSEL,
-			mml_iscouple(cfg->info.mode) ? 0x7 : 0x0, U32_MAX);
+			mml_iscouple(cfg->info.mode) ? 0x3 : 0x0, U32_MAX);
 
 	if (mml_rdma_crc) {
 		if (MML_FMT_COMPRESS(src->format))
@@ -1355,14 +1355,14 @@ static s32 rrot_config_frame(struct mml_comp *comp, struct mml_task *task,
 		calc_hyfbc(src_buf, src, &ufo_dec_length_y, &iova[0],
 			&ufo_dec_length_c, &iova[1]);
 
-		rrot_write_addr(pkt,
+		rrot_write_addr(comp->id, pkt,
 			base_pa + RROT_UFO_DEC_LENGTH_BASE_Y,
 			base_pa + RROT_UFO_DEC_LENGTH_BASE_Y_MSB,
 			ufo_dec_length_y,
 			reuse, cache,
 			&rrot_frm->labels[RROT_LABEL_UFO_DEC_BASE_Y]);
 
-		rrot_write_addr(pkt,
+		rrot_write_addr(comp->id, pkt,
 			base_pa + RROT_UFO_DEC_LENGTH_BASE_C,
 			base_pa + RROT_UFO_DEC_LENGTH_BASE_C_MSB,
 			ufo_dec_length_c,
@@ -1372,14 +1372,14 @@ static s32 rrot_config_frame(struct mml_comp *comp, struct mml_task *task,
 		calc_ufo(src_buf, src, &ufo_dec_length_y, &ufo_dec_length_c,
 			 &u4pic_size_bs, &u4pic_size_y_bs);
 
-		rrot_write_addr(pkt,
+		rrot_write_addr(comp->id, pkt,
 			base_pa + RROT_UFO_DEC_LENGTH_BASE_Y,
 			base_pa + RROT_UFO_DEC_LENGTH_BASE_Y_MSB,
 			ufo_dec_length_y,
 			reuse, cache,
 			&rrot_frm->labels[RROT_LABEL_UFO_DEC_BASE_Y]);
 
-		rrot_write_addr(pkt,
+		rrot_write_addr(comp->id, pkt,
 			base_pa + RROT_UFO_DEC_LENGTH_BASE_C,
 			base_pa + RROT_UFO_DEC_LENGTH_BASE_C_MSB,
 			ufo_dec_length_c,
@@ -1441,19 +1441,19 @@ static s32 rrot_config_frame(struct mml_comp *comp, struct mml_task *task,
 	}
 
 	if (!mml_slt) {
-		rrot_write_addr(pkt,
+		rrot_write_addr(comp->id, pkt,
 			base_pa + RROT_SRC_BASE_0,
 			base_pa + RROT_SRC_BASE_0_MSB,
 			iova[0],
 			reuse, cache,
 			&rrot_frm->labels[RROT_LABEL_BASE_0]);
-		rrot_write_addr(pkt,
+		rrot_write_addr(comp->id, pkt,
 			base_pa + RROT_SRC_BASE_1,
 			base_pa + RROT_SRC_BASE_1_MSB,
 			iova[1],
 			reuse, cache,
 			&rrot_frm->labels[RROT_LABEL_BASE_1]);
-		rrot_write_addr(pkt,
+		rrot_write_addr(comp->id, pkt,
 			base_pa + RROT_SRC_BASE_2,
 			base_pa + RROT_SRC_BASE_2_MSB,
 			iova[2],
@@ -2114,11 +2114,11 @@ static s32 rrot_reconfig_frame(struct mml_comp *comp, struct mml_task *task,
 		calc_hyfbc(src_buf, src, &ufo_dec_length_y, &iova[0],
 			&ufo_dec_length_c, &iova[1]);
 
-		rrot_update_addr(reuse,
+		rrot_update_addr(comp->id, reuse,
 				 rrot_frm->labels[RROT_LABEL_UFO_DEC_BASE_Y],
 				 rrot_frm->labels[RROT_LABEL_UFO_DEC_BASE_Y_MSB],
 				 ufo_dec_length_y);
-		rrot_update_addr(reuse,
+		rrot_update_addr(comp->id, reuse,
 				 rrot_frm->labels[RROT_LABEL_UFO_DEC_BASE_C],
 				 rrot_frm->labels[RROT_LABEL_UFO_DEC_BASE_C_MSB],
 				 ufo_dec_length_c);
@@ -2126,11 +2126,11 @@ static s32 rrot_reconfig_frame(struct mml_comp *comp, struct mml_task *task,
 		calc_ufo(src_buf, src, &ufo_dec_length_y, &ufo_dec_length_c,
 			 &u4pic_size_bs, &u4pic_size_y_bs);
 
-		rrot_update_addr(reuse,
+		rrot_update_addr(comp->id, reuse,
 				 rrot_frm->labels[RROT_LABEL_UFO_DEC_BASE_Y],
 				 rrot_frm->labels[RROT_LABEL_UFO_DEC_BASE_Y_MSB],
 				 ufo_dec_length_y);
-		rrot_update_addr(reuse,
+		rrot_update_addr(comp->id, reuse,
 				 rrot_frm->labels[RROT_LABEL_UFO_DEC_BASE_C],
 				 rrot_frm->labels[RROT_LABEL_UFO_DEC_BASE_C_MSB],
 				 ufo_dec_length_c);
@@ -2159,15 +2159,15 @@ static s32 rrot_reconfig_frame(struct mml_comp *comp, struct mml_task *task,
 		iova[2] = src_buf->dma[2].iova + src->plane_offset[2];
 	}
 
-	rrot_update_addr(reuse,
+	rrot_update_addr(comp->id, reuse,
 			 rrot_frm->labels[RROT_LABEL_BASE_0],
 			 rrot_frm->labels[RROT_LABEL_BASE_0_MSB],
 			 iova[0]);
-	rrot_update_addr(reuse,
+	rrot_update_addr(comp->id, reuse,
 			 rrot_frm->labels[RROT_LABEL_BASE_1],
 			 rrot_frm->labels[RROT_LABEL_BASE_1_MSB],
 			 iova[1]);
-	rrot_update_addr(reuse,
+	rrot_update_addr(comp->id, reuse,
 			 rrot_frm->labels[RROT_LABEL_BASE_2],
 			 rrot_frm->labels[RROT_LABEL_BASE_2_MSB],
 			 iova[2]);
@@ -2339,7 +2339,7 @@ static u32 rrot_qos_stash_bw_get(struct mml_comp *comp, struct mml_task *task,
 
 		if (rotate == MML_ROT_0 || rotate == MML_ROT_180) {
 			plane_y = w * h / pgsz;
-			plane_yv = w * h / pgsz;
+			plane_yv = w / 2 * h / 2 / pgsz;
 		} else {
 			u32 y_cmd_per_slice, uv_cmd_per_slice;
 			u32 y_slice_num, uv_slice_num;
@@ -2350,7 +2350,7 @@ static u32 rrot_qos_stash_bw_get(struct mml_comp *comp, struct mml_task *task,
 			uv_slice_num = w / 2 / 32 / bin_hor;
 
 			plane_y = y_cmd_per_slice * y_slice_num;
-			plane_yv = y_cmd_per_slice * uv_slice_num;
+			plane_yv = uv_cmd_per_slice * uv_slice_num;
 		}
 
 		stash_cmd_num = plane_y + plane_yv * 2;

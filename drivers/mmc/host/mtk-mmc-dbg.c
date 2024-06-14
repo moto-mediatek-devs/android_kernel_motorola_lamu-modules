@@ -230,20 +230,26 @@ void msdc_dump_ldo_sts(char **buff, unsigned long *size,
 	 * is correct.
 	 */
 	case MSDC_EMMC:
-		SPREAD_PRINTF(buff, size, m,
-			" VEMC_EN=0x%x, VEMC_VOL=%duV\n",
-			regulator_is_enabled(mmc->supply.vmmc),
-			regulator_get_voltage(mmc->supply.vmmc));
+		if (!IS_ERR_OR_NULL(mmc->supply.vmmc)) {
+			SPREAD_PRINTF(buff, size, m,
+				" VEMC_EN=0x%x, VEMC_VOL=%duV\n",
+				regulator_is_enabled(mmc->supply.vmmc),
+				regulator_get_voltage(mmc->supply.vmmc));
+		}
 		break;
 	case MSDC_SD:
-		SPREAD_PRINTF(buff, size, m,
-		" VMCH_EN=0x%x, VMCH_VOL=%duV\n",
-			regulator_is_enabled(mmc->supply.vmmc),
-			regulator_get_voltage(mmc->supply.vmmc));
-		SPREAD_PRINTF(buff, size, m,
-		" VMC_EN=0x%x, VMC_VOL=%duV\n",
-			regulator_is_enabled(mmc->supply.vqmmc),
-			regulator_get_voltage(mmc->supply.vqmmc));
+		if (!IS_ERR_OR_NULL(mmc->supply.vmmc)) {
+			SPREAD_PRINTF(buff, size, m,
+			" VMCH_EN=0x%x, VMCH_VOL=%duV\n",
+				regulator_is_enabled(mmc->supply.vmmc),
+				regulator_get_voltage(mmc->supply.vmmc));
+		}
+		if (!IS_ERR_OR_NULL(mmc->supply.vqmmc)) {
+			SPREAD_PRINTF(buff, size, m,
+			" VMC_EN=0x%x, VMC_VOL=%duV\n",
+				regulator_is_enabled(mmc->supply.vqmmc),
+				regulator_get_voltage(mmc->supply.vqmmc));
+		}
 		break;
 	default:
 		break;
@@ -261,6 +267,16 @@ void msdc_dump_register_core(char **buff, unsigned long *size,
 	char buffer[PRINTF_REGISTER_BUFFER_SIZE + 1];
 	char *buffer_cur_ptr = buffer;
 
+	if (IS_ERR_OR_NULL(host)) {
+		SPREAD_PRINTF(buff, size, m, "%s msdc host null\n", __func__);
+		return;
+	}
+
+	if (!host->base) {
+		SPREAD_PRINTF(buff, size, m, "%s illegal host->base addr\n", __func__);
+		return;
+	}
+
 	memset(buffer, 0, PRINTF_REGISTER_BUFFER_SIZE);
 	SPREAD_PRINTF(buff, size, m, "MSDC%d normal register\n", id);
 	for (i = 0; msdc_offsets[i] != (u16)0xFFFF; i++) {
@@ -271,8 +287,10 @@ void msdc_dump_register_core(char **buff, unsigned long *size,
 	}
 	SPREAD_PRINTF(buff, size, m, "%s\n", buffer);
 
-	if (!host->top_base)
+	if (!host->top_base) {
+		SPREAD_PRINTF(buff, size, m, "%s illegal host->top_base addr\n", __func__);
 		return;
+	}
 
 	MSDC_RST_REG_PRINT_BUF(msg_size,
 		PRINTF_REGISTER_BUFFER_SIZE, buffer, buffer_cur_ptr);
@@ -301,6 +319,16 @@ void msdc_dump_dbg_register(char **buff, unsigned long *size,
 	u16 i;
 	char buffer[PRINTF_REGISTER_BUFFER_SIZE + 1];
 	char *buffer_cur_ptr = buffer;
+
+	if (IS_ERR_OR_NULL(host)) {
+		SPREAD_PRINTF(buff, size, m, "%s msdc host null\n", __func__);
+		return;
+	}
+
+	if (!host->base) {
+		SPREAD_PRINTF(buff, size, m, "%s illegal host->base addr\n", __func__);
+		return;
+	}
 
 	memset(buffer, 0, PRINTF_REGISTER_BUFFER_SIZE);
 	SPREAD_PRINTF(buff, size, m, "MSDC debug register [set:out]\n");
@@ -525,7 +553,7 @@ static void __emmc_store_buf_start_swcqhci(struct mmc_host *mmc, struct mmc_requ
 static void __emmc_store_buf_start(void *__data, struct mmc_host *mmc,
 	struct mmc_request *mrq)
 {
-	unsigned long long t, tn;
+	unsigned long long t;
 	unsigned long long nanosec_rem = 0;
 	static int last_cmd, last_arg, skip;
 	int l_skip = 0;
@@ -540,7 +568,6 @@ static void __emmc_store_buf_start(void *__data, struct mmc_host *mmc,
 
 	host = mmc_priv(mmc);
 	t = cpu_clock(print_cpu_test);
-	tn = t;
 	nanosec_rem = do_div(t, 1000000000)/1000;
 
 	spin_lock_irqsave(&host->log_lock, flags);
@@ -683,7 +710,7 @@ static void __emmc_store_buf_end(void *__data, struct mmc_host *mmc,
 static void __sd_store_buf_start(void *__data, struct mmc_host *mmc,
 	struct mmc_request *mrq)
 {
-	unsigned long long t, tn;
+	unsigned long long t;
 	unsigned long long nanosec_rem;
 	unsigned long flags;
 	struct msdc_host *host = NULL;
@@ -696,7 +723,6 @@ static void __sd_store_buf_start(void *__data, struct mmc_host *mmc,
 
 	host = mmc_priv(mmc);
 	t = cpu_clock(print_cpu_test);
-	tn = t;
 	nanosec_rem = do_div(t, 1000000000)/1000;
 
 	spin_lock_irqsave(&host->log_lock, flags);
@@ -718,7 +744,7 @@ static void __sd_store_buf_start(void *__data, struct mmc_host *mmc,
 static void __sd_store_buf_end(void *__data, struct mmc_host *mmc,
 	struct mmc_request *mrq)
 {
-	unsigned long long t, tn;
+	unsigned long long t;
 	unsigned long long nanosec_rem;
 	static int last_cmd, last_arg, skip;
 	int l_skip = 0;
@@ -733,7 +759,6 @@ static void __sd_store_buf_end(void *__data, struct mmc_host *mmc,
 
 	host = mmc_priv(mmc);
 	t = cpu_clock(print_cpu_test);
-	tn = t;
 	nanosec_rem = do_div(t, 1000000000)/1000;
 
 	/* skip log if last cmd rsp are the same */
@@ -1051,6 +1076,11 @@ static void mmc_dbg_cleanup(void)
 int mmc_dbg_register(struct mmc_host *mmc)
 {
 	int i, ret;
+
+	if (IS_ERR_OR_NULL(mmc)) {
+		pr_info("%s mmc host null\n", __func__);
+		return -EINVAL;
+	}
 
 	if (!(mmc->caps2 & MMC_CAP2_NO_MMC)) {
 		mtk_mmc_host[0] = mmc;

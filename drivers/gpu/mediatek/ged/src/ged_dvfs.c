@@ -94,6 +94,9 @@ static unsigned int g_last_def_commit_freq_id;
 static unsigned int g_cust_upbound_freq_id;
 static unsigned int g_cust_boost_freq_id;
 
+static struct cmd_info g_cust_upbound_freq_id_info;
+static struct cmd_info g_cust_boost_freq_id_info;
+
 #define LIMITER_FPSGO 0
 #define LIMITER_APIBOOST 1
 #define ENABLE_ASYNC_RATIO 1
@@ -184,6 +187,9 @@ static int g_minfreq_idx;
 static int g_maxfreq_idx;
 static int api_sync_flag;
 static unsigned long long g_latest_api_sync_ts_ms;
+static unsigned long long g_latest_api_sync_done_ts_us;
+static unsigned int api_sync_counter;
+#define API_SYNC_DURATION_US 1000
 
 /* need to sync to EB */
 #define BATCH_MAX_READ_COUNT 32
@@ -304,6 +310,7 @@ static int g_fallback_idle;
 static int g_last_commit_type;
 static int g_last_commit_api_flag;
 static unsigned long g_last_commit_before_api_boost;
+static unsigned int g_last_api_boost_counter;
 
 static void ged_dvfs_early_force_fallback(struct GpuUtilization_Ex *Util_Ex)
 {
@@ -1283,6 +1290,23 @@ bool ged_dvfs_gpu_freq_commit(unsigned long ui32NewFreqID,
 			ged_get_cur_limiter_ceil());
 		trace_tracing_mark_write(5566, "limitter_floor",
 			ged_get_cur_limiter_floor());
+		if (ged_get_cur_limiter_ceil() == LIMIT_POWERHAL) {
+			trace_tracing_mark_write(5566, "limitter_ceil_pid",
+				g_cust_upbound_freq_id_info.pid);
+			trace_tracing_mark_write(5566, "limitter_ceil_id",
+				g_cust_upbound_freq_id_info.user_id);
+			trace_tracing_mark_write(5566, "limitter_ceil_cus_val",
+				g_cust_upbound_freq_id_info.value);
+		}
+
+		if (ged_get_cur_limiter_floor() == LIMIT_POWERHAL) {
+			trace_tracing_mark_write(5566, "limitter_floor_pid",
+				g_cust_boost_freq_id_info.pid);
+			trace_tracing_mark_write(5566, "limitter_floor_id",
+				g_cust_boost_freq_id_info.user_id);
+			trace_tracing_mark_write(5566, "limitter_floor_cus_val",
+				g_cust_boost_freq_id_info.value);
+		}
 		trace_tracing_mark_write(5566, "commit_type", eCommitType);
 		if (dcs_get_adjust_support() % 2 != 0)
 			trace_tracing_mark_write(5566, "preserve", g_force_disable_dcs);
@@ -1354,6 +1378,7 @@ bool ged_dvfs_gpu_freq_dual_commit(unsigned long stackNewFreqID,
 	ged_commit_freq = ui32NewFreq;
 	ged_commit_opp_freq = ged_get_freq_by_idx(stackNewFreqID);
 	g_last_commit_api_flag = api_sync_flag;
+	g_last_api_boost_counter = api_sync_counter;
 	// record commit freq ID if api boost disable
 	if (api_sync_flag == 0)
 		g_last_commit_before_api_boost = stackNewFreqID;
@@ -1418,6 +1443,23 @@ bool ged_dvfs_gpu_freq_dual_commit(unsigned long stackNewFreqID,
 		ged_get_cur_limiter_ceil());
 	trace_tracing_mark_write(5566, "limitter_floor",
 		ged_get_cur_limiter_floor());
+	if (ged_get_cur_limiter_ceil() == LIMIT_POWERHAL) {
+		trace_tracing_mark_write(5566, "limitter_ceil_pid",
+			g_cust_upbound_freq_id_info.pid);
+		trace_tracing_mark_write(5566, "limitter_ceil_id",
+			g_cust_upbound_freq_id_info.user_id);
+		trace_tracing_mark_write(5566, "limitter_ceil_cus_val",
+			g_cust_upbound_freq_id_info.value);
+	}
+
+	if (ged_get_cur_limiter_floor() == LIMIT_POWERHAL) {
+		trace_tracing_mark_write(5566, "limitter_floor_pid",
+			g_cust_boost_freq_id_info.pid);
+		trace_tracing_mark_write(5566, "limitter_floor_id",
+			g_cust_boost_freq_id_info.user_id);
+		trace_tracing_mark_write(5566, "limitter_floor_cus_val",
+			g_cust_boost_freq_id_info.value);
+	}
 	if (eCommitType != GED_DVFS_EB_DESIRE_COMMIT)
 		trace_tracing_mark_write(5566, "commit_type", eCommitType);
 	else
@@ -2489,11 +2531,26 @@ int get_api_sync_flag(void)
 }
 void set_api_sync_flag(int flag)
 {
+	unsigned int tmp_sysram_val = 0;
+	unsigned long long cur_ts_us = div_u64(ged_get_time(), 1000);
+
 	if (flag == 1 || flag == 0) {
+		// update counter when api sync finish (1 => 0)
+		if (api_sync_flag == 1 && flag == 0)
+			api_sync_counter = api_sync_counter == 0xFF ? 0 : api_sync_counter + 1;
+		// reset counter if the time since last api_sync < 1ms
+		if ((api_sync_flag == 0 && flag == 1) &&
+			(cur_ts_us - g_latest_api_sync_done_ts_us < API_SYNC_DURATION_US))
+			api_sync_counter = api_sync_counter == 0 ? 0xFF : api_sync_counter - 1;
 		api_sync_flag = flag;
-		ged_eb_dvfs_task(EB_UPDATE_API_BOOST, api_sync_flag);
+		// [0:7] for api_sync_flag, [8:15] for api_sync_counter
+		tmp_sysram_val = api_sync_flag << COMMON_LOW_BIT;
+		tmp_sysram_val += api_sync_counter << COMMON_MID_BIT;
+		ged_eb_dvfs_task(EB_UPDATE_API_BOOST, tmp_sysram_val);
 		if (flag)
-			g_latest_api_sync_ts_ms = div_u64(ged_get_time(), 1000000);
+			g_latest_api_sync_ts_ms = div_u64(cur_ts_us, 1000);
+		else
+			g_latest_api_sync_done_ts_us = cur_ts_us;
 	} else if (flag == 3) {
 		dcs_set_fix_num(8);
 		start_mewtwo_timer();
@@ -2838,7 +2895,9 @@ static bool ged_dvfs_policy(
 		trace_tracing_mark_write(5566, "t_gpu_target", t_gpu_target);
 
 		// set cur freq back to before api boost
-		if (g_last_commit_api_flag == 1 && api_sync_flag == 0) {
+		if ((g_last_commit_api_flag == 1 && api_sync_flag == 0) ||
+			(g_last_commit_api_flag == 1 && api_sync_flag == 1 &&
+			g_last_api_boost_counter != api_sync_counter)) {
 			ui32GPUFreq = g_last_commit_before_api_boost;
 			i32NewFreqID = ui32GPUFreq;
 		}
@@ -3088,6 +3147,8 @@ static unsigned int ged_dvfs_get_gpu_freq_level_count(void)
 static void ged_dvfs_custom_boost_gpu_freq(unsigned int ui32FreqLevel)
 {
 	int minfreq_idx;
+	unsigned int ui32FreqLevel_ori = ui32FreqLevel;
+	char buffer[MAX_NAME_SIZE];
 
 	minfreq_idx = ged_get_min_oppidx_real();
 
@@ -3112,12 +3173,18 @@ static void ged_dvfs_custom_boost_gpu_freq(unsigned int ui32FreqLevel)
 	}
 
 	mutex_unlock(&gsDVFSLock);
+
+	set_cmd_info(&g_cust_boost_freq_id_info, ui32FreqLevel_ori, ui32FreqLevel);
+	get_cmd_info_dump(buffer, sizeof(buffer), 0, &g_cust_boost_freq_id_info);
+	GED_LOGD("set_cmd %s", buffer);
 }
 
 /* set buttom gpufreq from PowerHal by MAX_FREQ */
 static void ged_dvfs_custom_ceiling_gpu_freq(unsigned int ui32FreqLevel)
 {
 	int minfreq_idx;
+	unsigned int ui32FreqLevel_ori = ui32FreqLevel;
+	char buffer[MAX_NAME_SIZE];
 
 	minfreq_idx = ged_get_min_oppidx_real();
 
@@ -3141,6 +3208,10 @@ static void ged_dvfs_custom_ceiling_gpu_freq(unsigned int ui32FreqLevel)
 		gpu_cust_upbound_freq, GED_DVFS_CUSTOM_CEIL_COMMIT);
 
 	mutex_unlock(&gsDVFSLock);
+
+	set_cmd_info(&g_cust_upbound_freq_id_info, ui32FreqLevel_ori, ui32FreqLevel);
+	get_cmd_info_dump(buffer, sizeof(buffer), 0, &g_cust_upbound_freq_id_info);
+	GED_LOGD("set_cmd %s", buffer);
 }
 
 static unsigned int ged_dvfs_get_bottom_gpu_freq(void)
@@ -3166,6 +3237,26 @@ unsigned int ged_dvfs_get_custom_ceiling_gpu_freq(void)
 unsigned int ged_dvfs_get_custom_boost_gpu_freq(void)
 {
 	return g_cust_boost_freq_id;
+}
+
+struct cmd_info ged_dvfs_get_custom_ceiling_gpu_freq_info(void)
+{
+	return g_cust_upbound_freq_id_info;
+}
+
+struct cmd_info ged_dvfs_get_custom_boost_gpu_freq_info(void)
+{
+	return g_cust_boost_freq_id_info;
+}
+
+ssize_t ged_dvfs_get_custom_ceiling_gpu_freq_info_str(char *buf,                    int sz, ssize_t pos)
+{
+	return get_cmd_info_dump(buf, sz, pos, &g_cust_upbound_freq_id_info);
+}
+
+ssize_t ged_dvfs_get_custom_boost_gpu_freq_info_str(char *buf, int sz, ssize_t pos)
+{
+	return get_cmd_info_dump(buf, sz, pos, &g_cust_boost_freq_id_info);
 }
 
 static void ged_dvfs_margin_value(int i32MarginValue)
@@ -4003,9 +4094,11 @@ GED_ERROR ged_dvfs_system_init(void)
 	gpu_bottom_freq = ged_get_freq_by_idx(g_bottom_freq_id);
 
 	g_cust_boost_freq_id = ged_get_min_oppidx_real();
+	init_cmd_info(&g_cust_upbound_freq_id_info, ged_get_min_oppidx_real());
 	gpu_cust_boost_freq = ged_get_freq_by_idx(g_cust_boost_freq_id);
 
 	g_cust_upbound_freq_id = 0;
+	init_cmd_info(&g_cust_upbound_freq_id_info, 0);
 	gpu_cust_upbound_freq = ged_get_freq_by_idx(g_cust_upbound_freq_id);
 
 	g_policy_tar_freq = 0;

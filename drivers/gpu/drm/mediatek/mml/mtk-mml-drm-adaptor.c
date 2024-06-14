@@ -49,6 +49,9 @@ module_param(mml_dc, int, 0644);
 int mml_hrt_overhead = 100;
 module_param(mml_hrt_overhead, int, 0644);
 
+int mml_max_layers = MML_MAX_LAYER;
+module_param(mml_max_layers, int, 0644);
+
 struct mml_drm_ctx {
 	struct mml_ctx ctx;
 	struct sync_timeline *timeline;
@@ -141,7 +144,7 @@ bool mml_drm_query_hw_support(const struct mml_frame_info *info)
 	}
 
 	if (info->dest_cnt > MML_MAX_OUTPUTS) {
-		mml_msg("[drm]info with issue, dest_cnt exceeds MML_MAX_OUTPUTS.");
+		mml_msg("[drm]dest count exceed %u", info->dest_cnt);
 		goto not_support;
 	}
 
@@ -151,6 +154,12 @@ bool mml_drm_query_hw_support(const struct mml_frame_info *info)
 		u32 desth = dest->data.height;
 		u32 crop_srcw = dest->crop.r.width ? dest->crop.r.width : info->src.width;
 		u32 crop_srch = dest->crop.r.height ? dest->crop.r.height : info->src.height;
+
+		if (!destw || !desth || !crop_srcw || !crop_srch) {
+			mml_msg("[drm]not support empty size %u %u %u %u",
+				crop_srcw, crop_srch, destw, desth);
+			goto not_support;
+		}
 
 		if (mml_sz_out(destw, desth)) {
 			mml_msg("[drm]not support dest size %u %u", destw, desth);
@@ -168,15 +177,15 @@ bool mml_drm_query_hw_support(const struct mml_frame_info *info)
 		if (dest->rotate == MML_ROT_90 || dest->rotate == MML_ROT_270)
 			swap(destw, desth);
 
-		if (crop_srcw / destw > 20 || crop_srch / desth > 24 ||
-			destw / crop_srcw > 32 || desth / crop_srch > 32) {
+		if (crop_srcw > destw * 20 || crop_srch > desth * 24 ||
+			destw > crop_srcw * 32 || desth > crop_srch * 32) {
 			mml_err("[drm]exceed HW limitation src %ux%u dest %ux%u",
 				crop_srcw, crop_srch, destw, desth);
 			goto not_support;
 		}
 
-		if ((crop_srcw * desth) / (destw * crop_srch) > 16 ||
-			(destw * crop_srch) / (crop_srcw * desth) > 16) {
+		if (crop_srcw * desth > destw * crop_srch * 16 ||
+			destw * crop_srch > crop_srcw * desth * 16) {
 			mml_err("[drm]exceed tile ratio limitation src %ux%u dest %ux%u",
 				crop_srcw, crop_srch, destw, desth);
 			goto not_support;
@@ -339,17 +348,20 @@ int mml_drm_query_multi_layer(struct mml_drm_ctx *dctx,
 	u32 remain[mml_max_sys] = {0};
 	u32 mml_layer_cnt = 0;
 	u32 i;
+	s32 max_layer = min(mml_max_layers, MML_MAX_LAYER);
 	bool couple_used = false;
 
 	if (!duration_us)
 		duration_us = MML_MAX_DUR;
-	mml_msg("[drm]%s duration %u", __func__, duration_us);
+	mml_msg("[drm][query]%s duration %u", __func__, duration_us);
 
 	remain[mml_sys_frame] = duration_us -  dc_sw_reserve;
 	remain[mml_sys_tile] = duration_us -  dc_sw_reserve;
 
 	for (i = 0; i < cnt; i++) {
-		if (mml_layer_cnt >= MML_MAX_LAYER) {
+		bool balance = false;
+
+		if (mml_layer_cnt >= max_layer) {
 			infos[i].mode = MML_MODE_NOT_SUPPORT;
 			continue;
 		}
@@ -360,28 +372,38 @@ int mml_drm_query_multi_layer(struct mml_drm_ctx *dctx,
 		/* use mml-frame remain time to compare dl/dc opp */
 		info_cache[mml_layer_cnt].remain = remain[mml_sys_frame];
 		mode = mml_drm_query_frame(dctx, &infos[i], &info_cache[mml_layer_cnt]);
-		if (mode == MML_MODE_MML_DECOUPLE) {
+		if (mode == MML_MODE_DIRECT_LINK)
+			mml_msg("[drm][query]layer %u mode dl active time %u",
+				i, infos[i].act_time);
+		else if (mode == MML_MODE_MML_DECOUPLE) {
 			if (remain[mml_sys_frame] < info_cache[mml_layer_cnt].duration) {
-				mml_msg("[drm]%s dc not support remain %u need %u",
-					__func__, remain[mml_sys_frame],
+				mml_msg("[drm][query]layer %u dc not support remain %u need %u",
+					i, remain[mml_sys_frame],
 					info_cache[mml_layer_cnt].duration);
 				mode = MML_MODE_MML_DECOUPLE2;
 			} else if (remain[mml_sys_frame] < remain[mml_sys_tile]) {
-				mml_msg("[drm]%s balance to dc2", __func__);
+				balance = true;
 				mode = MML_MODE_MML_DECOUPLE2;
-			} else
+			} else {
 				remain[mml_sys_frame] -= info_cache[mml_layer_cnt].duration;
+				mml_msg("[drm][query]layer %u mode dc  remain %u",
+					i, remain[mml_sys_frame]);
+			}
 		}
 
 		if (mode == MML_MODE_MML_DECOUPLE2) {
 			if (remain[mml_sys_tile] < info_cache[mml_layer_cnt].duration) {
 				mode = MML_MODE_NOT_SUPPORT;
-				mml_msg("[drm]%s dc2 not support remain %u need %u",
-					__func__, remain[mml_sys_tile],
+				mml_msg("[drm][query]layer %u dc2 not support remain %u need %u",
+					i, remain[mml_sys_tile],
 					info_cache[mml_layer_cnt].duration);
-			} else
+			} else {
 				remain[mml_sys_tile] -= info_cache[mml_layer_cnt].duration;
+				mml_msg("[drm][query]layer %u mode dc2 remain %u%s",
+					i, remain[mml_sys_tile], balance ? " (balanced)" : "");
+			}
 		}
+
 		infos[i].mode = mode;
 
 		if (mode == MML_MODE_DIRECT_LINK || mode == MML_MODE_RACING)
@@ -1145,7 +1167,7 @@ void mml_drm_put_context(struct mml_drm_ctx *ctx)
 {
 	if (IS_ERR_OR_NULL(ctx))
 		return;
-	mml_log("[drm]%s", __func__);
+	mml_log("[drm]%s instance %p", __func__, ctx);
 	mml_sys_put_dle_ctx(ctx->ctx.mml);
 	mml_dev_put_drm_ctx(ctx->ctx.mml, drm_ctx_release);
 }

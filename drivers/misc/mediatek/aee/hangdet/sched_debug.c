@@ -68,17 +68,23 @@ static char *task_group_path(struct task_group *tg)
 
 static DEFINE_SPINLOCK(sched_debug_lock);
 
+#if NO_EXPORT
 static const char * const sched_tunable_scaling_names[] = {
 	"none",
 	"logarithmic",
 	"linear"
 }; /* kernel/sched/debug.c */
+#endif
 
 char print_at_AEE_buffer[160];
 
 #define SEQ_printf_at_AEE(m, x...)		\
 do {						\
-	snprintf(print_at_AEE_buffer, sizeof(print_at_AEE_buffer), x);	\
+	int len = snprintf(print_at_AEE_buffer, sizeof(print_at_AEE_buffer), x);	\
+	if (len < 0)	\
+		aee_sram_fiq_log("sched_debug: snprintf error");	\
+	else if (len >= sizeof(print_at_AEE_buffer))	\
+		aee_sram_fiq_log("sched_debug: string was truncated\n");	\
 	aee_sram_fiq_log(print_at_AEE_buffer);	\
 } while (0)
 
@@ -445,8 +451,8 @@ void print_cfs_rq_at_AEE(struct seq_file *m, int cpu, struct cfs_rq *cfs_rq)
 			cfs_rq->avg.load_avg);
 	SEQ_printf_at_AEE(m, "  .%-30s: %lu\n", "util_avg",
 			cfs_rq->avg.util_avg);
-	SEQ_printf_at_AEE(m, "  .%-30s: %u\n", "util_est_enqueued",
-			cfs_rq->avg.util_est.enqueued);
+	SEQ_printf_at_AEE(m, "  .%-30s: %u\n", "util_est",
+			cfs_rq->avg.util_est);
 	SEQ_printf_at_AEE(m, "  .%-30s: %ld\n", "removed.load_avg",
 			cfs_rq->removed.load_avg);
 	SEQ_printf_at_AEE(m, "  .%-30s: %ld\n", "removed.util_avg",

@@ -33,22 +33,23 @@
 		__func__, __LINE__, ##args)
 
 // Time setting
-#define POLL_DELAY_US				(1)
-#define TIMEOUT_500US				(500)
-#define TIMEOUT_1000US				(1000)
-#define TIMEOUT_100000US			(100000)
+#define POLL_DELAY_US						(1)
+#define TIMEOUT_500US						(500)
+#define TIMEOUT_1000US						(1000)
+#define TIMEOUT_100000US					(100000)
 
 // HWCCF setting
-#define HW_CCF_AP_VOTER_BIT			(0)
-#define MM_HW_CCF_BASE				(0x31B00000)
-#define HW_CCF_BACKUP2_DONE			(MM_HW_CCF_BASE + 0x144C)
-#define HW_CCF_XPU0_BACKUP2_SET		(MM_HW_CCF_BASE + 0x238)
-#define HW_CCF_BACKUP2_SET_STATUS	(MM_HW_CCF_BASE + 0x148C)
-#define HW_CCF_XPU0_BACKUP2_CLR		(MM_HW_CCF_BASE + 0x23C)
-#define HW_CCF_BACKUP2_CLR_STATUS	(MM_HW_CCF_BASE + 0x1490)
-#define HW_CCF_BACKUP2_ENABLE		(MM_HW_CCF_BASE+0x1440)
-#define HW_CCF_BACKUP2_STATUS		(MM_HW_CCF_BASE+0x1444)
-#define HW_CCF_BACKUP2_STATUS_DBG	(MM_HW_CCF_BASE+0x1448)
+#define HW_CCF_AP_VOTER_BIT					(0)
+#define MM_HW_CCF_BASE						(0x31B00000)
+#define HW_CCF_BACKUP2_DONE_OFST			(0x144C)
+#define HW_CCF_XPU0_BACKUP2_SET_OFST		(0x238)
+#define HW_CCF_BACKUP2_SET_STATUS_OFST		(0x148C)
+#define HW_CCF_XPU0_BACKUP2_CLR_OFST		(0x23C)
+#define HW_CCF_BACKUP2_CLR_STATUS_OFST		(0x1490)
+#define HW_CCF_BACKUP2_ENABLE_OFST			(0x1440)
+#define HW_CCF_BACKUP2_STATUS_OFST			(0x1444)
+#define HW_CCF_BACKUP2_STATUS_DBG_OFST		(0x1448)
+static void __iomem *g_maped_hwccf_base;
 
 enum POWER_DOMAIN_ID {
 	PD_ISP_TRAW,	/*0*/
@@ -69,7 +70,8 @@ enum POWER_DOMAIN_ID {
 	PD_CAM_RMSC,	/*15*/
 	PD_CAM_MAIN,
 	PD_CAM_VCORE,
-	PD_NUM			/*18*/
+	PD_CAM_CCU,
+	PD_NUM			/*19*/
 };
 
 struct vmm_notifier_data {
@@ -84,19 +86,24 @@ struct vmm_notifier_data {
 static struct vmm_notifier_data global_data[PD_NUM];
 struct mutex ctrl_mutex;
 static int vmm_user_counter;
+struct device *pm_domain_devs[PD_NUM];
 
 static void vmm_notifier_timeout_debug_dump(void)
 {
-	ISP_LOGI("[%s]: set(0x%x),clr(0x%x),en(0x%x),st(0x%x),std(0x%x),done(0x%x),set_s(0x%x),clr_s(0x%x)\n",
-		__func__,
-		readl_relaxed(ioremap(HW_CCF_XPU0_BACKUP2_SET, 4)),
-		readl_relaxed(ioremap(HW_CCF_XPU0_BACKUP2_CLR, 4)),
-		readl_relaxed(ioremap(HW_CCF_BACKUP2_ENABLE, 4)),
-		readl_relaxed(ioremap(HW_CCF_BACKUP2_STATUS, 4)),
-		readl_relaxed(ioremap(HW_CCF_BACKUP2_STATUS_DBG, 4)),
-		readl_relaxed(ioremap(HW_CCF_BACKUP2_DONE, 4)),
-		readl_relaxed(ioremap(HW_CCF_BACKUP2_SET_STATUS, 4)),
-		readl_relaxed(ioremap(HW_CCF_BACKUP2_CLR_STATUS, 4)));
+	if (g_maped_hwccf_base) {
+		ISP_LOGI("[%s]: set(0x%x),clr(0x%x),en(0x%x),st(0x%x),std(0x%x),done(0x%x),set_s(0x%x),clr_s(0x%x)\n",
+			__func__,
+			readl_relaxed(g_maped_hwccf_base + HW_CCF_XPU0_BACKUP2_SET_OFST),
+			readl_relaxed(g_maped_hwccf_base + HW_CCF_XPU0_BACKUP2_CLR_OFST),
+			readl_relaxed(g_maped_hwccf_base + HW_CCF_BACKUP2_ENABLE_OFST),
+			readl_relaxed(g_maped_hwccf_base + HW_CCF_BACKUP2_STATUS_OFST),
+			readl_relaxed(g_maped_hwccf_base + HW_CCF_BACKUP2_STATUS_DBG_OFST),
+			readl_relaxed(g_maped_hwccf_base + HW_CCF_BACKUP2_DONE_OFST),
+			readl_relaxed(g_maped_hwccf_base + HW_CCF_BACKUP2_SET_STATUS_OFST),
+			readl_relaxed(g_maped_hwccf_base + HW_CCF_BACKUP2_CLR_STATUS_OFST));
+	} else {
+		ISP_LOGE("g_maped_hwccf_base is null, need to ioremap first\n");
+	}
 }
 
 static void vmm_locked_hwccf_ctrl(bool enable, unsigned int vote_bit)
@@ -107,35 +114,43 @@ static void vmm_locked_hwccf_ctrl(bool enable, unsigned int vote_bit)
 	unsigned int val = 0;
 	int tmp = 0;
 
-	hwccf_done = ioremap(HW_CCF_BACKUP2_DONE, 4);
-	ctrl_reg = (enable) ? ioremap(HW_CCF_XPU0_BACKUP2_SET, 4) : ioremap(HW_CCF_XPU0_BACKUP2_CLR, 4);
-	hwccf_ctrl_status = (enable) ? ioremap(HW_CCF_BACKUP2_SET_STATUS, 4) : ioremap(HW_CCF_BACKUP2_CLR_STATUS, 4);
-	val = (enable) ? BIT(vote_bit) : 0;
+	if (g_maped_hwccf_base) {
+		hwccf_done = g_maped_hwccf_base + HW_CCF_BACKUP2_DONE_OFST;
+		ctrl_reg = (enable) ?
+			(g_maped_hwccf_base + HW_CCF_XPU0_BACKUP2_SET_OFST) :
+			(g_maped_hwccf_base + HW_CCF_XPU0_BACKUP2_CLR_OFST);
+		hwccf_ctrl_status = (enable) ?
+			(g_maped_hwccf_base + HW_CCF_BACKUP2_SET_STATUS_OFST) :
+			(g_maped_hwccf_base + HW_CCF_BACKUP2_CLR_STATUS_OFST);
+		val = (enable) ? BIT(vote_bit) : 0;
 
-	// polling done
-	if (readl_poll_timeout_atomic
-		(hwccf_done, tmp, (tmp & BIT(vote_bit)) == BIT(vote_bit),
-		POLL_DELAY_US, TIMEOUT_1000US) < 0)
-		vmm_notifier_timeout_debug_dump();
+		// polling done
+		if (readl_poll_timeout_atomic
+			(hwccf_done, tmp, (tmp & BIT(vote_bit)) == BIT(vote_bit),
+			POLL_DELAY_US, TIMEOUT_1000US) < 0)
+			vmm_notifier_timeout_debug_dump();
 
-	// set/clr
-	writel_relaxed(BIT(vote_bit), ctrl_reg);
+		// set/clr
+		writel_relaxed(BIT(vote_bit), ctrl_reg);
 
-	// polling
-	if (readl_poll_timeout_atomic
-		(ctrl_reg, tmp, (tmp & BIT(vote_bit)) == val, POLL_DELAY_US, TIMEOUT_1000US) < 0)
-		vmm_notifier_timeout_debug_dump();
+		// polling
+		if (readl_poll_timeout_atomic
+			(ctrl_reg, tmp, (tmp & BIT(vote_bit)) == val, POLL_DELAY_US, TIMEOUT_1000US) < 0)
+			vmm_notifier_timeout_debug_dump();
 
-	// polling done
-	if (readl_poll_timeout_atomic
-		(hwccf_done, tmp, (tmp & BIT(vote_bit)) == BIT(vote_bit),
-		POLL_DELAY_US, TIMEOUT_1000US) < 0)
-		vmm_notifier_timeout_debug_dump();
+		// polling done
+		if (readl_poll_timeout_atomic
+			(hwccf_done, tmp, (tmp & BIT(vote_bit)) == BIT(vote_bit),
+			POLL_DELAY_US, TIMEOUT_1000US) < 0)
+			vmm_notifier_timeout_debug_dump();
 
-	// wait for current done
-	if (readl_poll_timeout_atomic
-		(hwccf_ctrl_status, tmp, (tmp & BIT(vote_bit)) == 0, POLL_DELAY_US, TIMEOUT_1000US) < 0)
-		vmm_notifier_timeout_debug_dump();
+		// wait for current done
+		if (readl_poll_timeout_atomic
+			(hwccf_ctrl_status, tmp, (tmp & BIT(vote_bit)) == 0, POLL_DELAY_US, TIMEOUT_1000US) < 0)
+			vmm_notifier_timeout_debug_dump();
+	} else {
+		ISP_LOGE("g_maped_hwccf_base is null, need to ioremap first\n");
+	}
 }
 
 static int vmm_locked_buck_ctrl(bool enable)
@@ -159,10 +174,8 @@ static int mtk_camera_pd_callback(struct notifier_block *nb,
 		unsigned long flags, void *data)
 {
 	int ret = 0;
-	struct vmm_notifier_data *priv;
 
 	mutex_lock(&ctrl_mutex);
-	priv = container_of(nb, struct vmm_notifier_data, notifier);
 
 	if (flags == GENPD_NOTIFY_PRE_ON)
 		ret = vmm_locked_buck_ctrl(true);
@@ -173,12 +186,49 @@ static int mtk_camera_pd_callback(struct notifier_block *nb,
 
 	return ret;
 }
+
+static int vmm_pm_runtime_enable(struct device *dev, u32 pd_id)
+{
+	int ret;
+	s32 err = 0;
+	struct vmm_notifier_data *data;
+
+	if (pd_id >= PD_NUM) {
+		ISP_LOGI("pd_id = %d. overflow\n", pd_id);
+		return 0;
+	}
+
+	data = &global_data[pd_id];
+	dev = dev_pm_domain_attach_by_id(dev, 0);
+	if (dev == NULL) {
+		ISP_LOGI("dev is null! id=%d\n", pd_id);
+		return 0;
+	}
+	if (IS_ERR(dev)) {
+		err = PTR_ERR(dev) ? : -ENODATA;
+		ISP_LOGI("failed to get vmm. error: %d.pd_id=%d\n", err, pd_id);
+		return 0;
+	}
+
+	pm_domain_devs[pd_id] = dev;
+	ret = pm_runtime_get_sync(dev);
+	if (ret < 0)
+		ISP_LOGE("vmm get sync fail pd_id=%d, ret=%d!!\n", pd_id, ret);
+
+	vmm_locked_buck_ctrl(true);
+	data->notifier.notifier_call = mtk_camera_pd_callback;
+	data->pd_id = pd_id;
+	ret = dev_pm_genpd_add_notifier(dev, &data->notifier);
+	if (ret)
+		ISP_LOGE("vmm gen pd add notifier fail(%d)\n", ret);
+	return 0;
+}
+
 static int vmm_notifier_probe(struct platform_device *pdev)
 {
 	int ret;
 	struct device *dev = &pdev->dev;
 	u32 pd_id;
-	struct vmm_notifier_data *data;
 
 	ret = of_property_read_u32(dev->of_node, "pd-id", &pd_id);
 	if (ret) {
@@ -190,18 +240,10 @@ static int vmm_notifier_probe(struct platform_device *pdev)
 		ISP_LOGE("vmm invalid pd_id in dts(%u)", pd_id);
 		return -ENODEV;
 	}
-	data = &global_data[pd_id];
 
-	ISP_LOGI("[%s][%d] pd_id[%d] start\n", __func__, __LINE__, pd_id);
+	vmm_pm_runtime_enable(dev, pd_id);
 
-	vmm_locked_buck_ctrl(true);
-	pm_runtime_enable(dev);
-	data->notifier.notifier_call = mtk_camera_pd_callback;
-	data->pd_id = pd_id;
-	ret = dev_pm_genpd_add_notifier(dev, &data->notifier);
-	if (ret)
-		ISP_LOGE("vmm gen pd add notifier fail(%d)\n", ret);
-	ISP_LOGI("[%s][%d] pd_id[%d] end\n", __func__, __LINE__, pd_id);
+	ISP_LOGI("[%s][%d] pd_id[%d] vmm_vnter[%d] end\n", __func__, __LINE__, pd_id, vmm_user_counter);
 	return 0;
 }
 
@@ -223,23 +265,46 @@ static struct platform_driver drv_vmm_notifier = {
 static int __init mtk_vmm_notifier_init(void)
 {
 	s32 status;
+	int id = 0;
+	int ret;
 
 	mutex_init(&ctrl_mutex);
+
 	ISP_LOGI("[%s][%d] start\n", __func__, __LINE__);
+	vmm_user_counter = 0;
+	g_maped_hwccf_base = ioremap(MM_HW_CCF_BASE, 0x10000);
+	if (g_maped_hwccf_base == NULL) {
+		pr_notice("Failed to ioremap reg(0x%x)\n", MM_HW_CCF_BASE);
+		return -ENODEV;
+	}
 	vmm_locked_buck_ctrl(true);
 	status = platform_driver_register(&drv_vmm_notifier);
 	if (status) {
 		pr_notice("Failed to register VMM dbg driver(%d)\n", status);
 		return -ENODEV;
 	}
+
+	for (id = 0; id < PD_NUM; id++) {
+		if (pm_domain_devs[id] == NULL) {
+			ISP_LOGI("pm_domain_devs[%d] is null\n", id);
+			continue;
+		}
+		ret = pm_runtime_put_sync(pm_domain_devs[id]);
+		if (ret < 0)
+			ISP_LOGI("fail to put_sync id=%d, ret=%d!!!\n", id, ret);
+	}
 	vmm_locked_buck_ctrl(false);
-	ISP_LOGI("[%s][%d] end\n", __func__, __LINE__);
+	mutex_lock(&ctrl_mutex);
+	ISP_LOGI("[%s][%d] end, vmm_user_counter=%d\n", __func__, __LINE__, vmm_user_counter);
+	mutex_unlock(&ctrl_mutex);
 
 	return 0;
 }
 
 static void __exit mtk_vmm_notifier_exit(void)
 {
+	if (g_maped_hwccf_base)
+		iounmap(g_maped_hwccf_base);
 	platform_driver_unregister(&drv_vmm_notifier);
 }
 
@@ -256,6 +321,10 @@ int mtk_vmm_notify_ut_ctrl(const char *val, const struct kernel_param *kp)
 	int ret;
 
 	ret = sscanf(val, "%u %u", &enable, &vote_bit);
+	if (ret <= 0) {
+		ISP_LOGI("sscanf ret is wrong %d\n", ret);
+		return 0;
+	}
 	ISP_LOGI("[%s][%d] en[%u] vote_bit[%u]\n", __func__, __LINE__, enable, vote_bit);
 
 	vmm_locked_hwccf_ctrl((enable > 0), vote_bit);

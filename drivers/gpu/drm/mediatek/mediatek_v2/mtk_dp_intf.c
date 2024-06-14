@@ -814,8 +814,10 @@ static void mtk_dp_intf_unprepare(struct mtk_ddp_comp *comp)
 		clk_disable_unprepare(dp_intf->hf_fdp_ck);
 		mtk_crtc = dp_intf->ddp_comp.mtk_crtc;
 		priv = mtk_crtc->base.dev->dev_private;
-		if (priv->data->mmsys_id == MMSYS_MT6989)
+		if (priv->data->mmsys_id == MMSYS_MT6989){
+			clk_disable_unprepare(dp_intf->pclk);
 			clk_disable_unprepare(dp_intf->vcore_pclk);
+		}
 		DPTXMSG("%s:succesed disable dp_intf clock\n", __func__);
 	} else
 		DPTXERR("Failed to disable dp_intf clock\n");
@@ -922,16 +924,16 @@ void mtk_dp_intf_prepare_clk(void)
 }
 EXPORT_SYMBOL(mtk_dp_intf_prepare_clk);
 
-static void void_mtk_dp_intf_golden_setting(struct mtk_ddp_comp *comp,
+static void mtk_dp_intf_golden_setting(struct mtk_ddp_comp *comp,
 					    struct cmdq_pkt *handle)
 {
 	struct mtk_dp_intf *dp_intf = comp_to_dp_intf(comp);
-	u32 dp_buf_sodi_high = 5255;
-	u32 dp_buf_sodi_low = 3899;
-	u32 dp_buf_preultra_high = 5687;
-	u32 dp_buf_preultra_low = 5468;
-	u32 dp_buf_ultra_high = 5468;
-	u32 dp_buf_ultra_low = 5031;
+	u32 dp_buf_sodi_high = 5295;
+	u32 dp_buf_sodi_low = 6561;
+	u32 dp_buf_preultra_high = 7874;
+	u32 dp_buf_preultra_low = 7655;
+	u32 dp_buf_ultra_high = 5687;
+	u32 dp_buf_ultra_low = 5468;
 	u32 dp_buf_urgent_high = 2625;
 	u32 dp_buf_urgent_low = 2406;
 
@@ -955,8 +957,8 @@ static void void_mtk_dp_intf_golden_setting(struct mtk_ddp_comp *comp,
 	mtk_ddp_write_relaxed(comp, dp_buf_ultra_high, DP_BUF_ULTRA_HIGH, handle);
 	mtk_ddp_write_relaxed(comp, dp_buf_ultra_low, DP_BUF_ULTRA_LOW, handle);
 
-	mtk_ddp_write_relaxed(comp, dp_buf_urgent_high, DP_BUF_ULTRA_HIGH, handle);
-	mtk_ddp_write_relaxed(comp, dp_buf_urgent_low, DP_BUF_ULTRA_LOW, handle);
+	mtk_ddp_write_relaxed(comp, dp_buf_urgent_high, DP_BUF_URGENT_HIGH, handle);
+	mtk_ddp_write_relaxed(comp, dp_buf_urgent_low, DP_BUF_URGENT_LOW, handle);
 }
 
 void mhal_DPTx_VideoClock(bool enable, int resolution)
@@ -1137,6 +1139,7 @@ static void mtk_dp_intf_config(struct mtk_ddp_comp *comp,
 			DP_BUF_CON0, BUF_BUF_FIFO_UNDERFLOW_DONT_BLOCK, handle);
 	mtk_ddp_write_relaxed(comp, dp_intf->driver_data->np_sel,
 			DP_SW_NP_SEL, handle);
+	mtk_dp_intf_golden_setting(comp, handle);
 
 	DPTXMSG("%s config done\n",
 			mtk_dump_comp_str(comp));
@@ -1280,7 +1283,7 @@ unsigned long long mtk_dpintf_get_frame_hrt_bw_base(
 	htotal = mtk_crtc->base.state->adjusted_mode.htotal;
 	vtotal = mtk_crtc->base.state->adjusted_mode.vtotal;
 	vrefresh = drm_mode_vrefresh(&mtk_crtc->base.state->adjusted_mode);
-	base_bw = (unsigned long long)div_u64(vtotal * htotal * vrefresh * bpp, 1000000);
+	base_bw = div_u64((unsigned long long)vtotal * htotal * vrefresh * bpp, 1000000);
 
 	if (dp_intf_bw != base_bw) {
 		dp_intf_bw = base_bw;
@@ -1306,7 +1309,7 @@ static unsigned long long mtk_dpintf_get_frame_hrt_bw_base_by_mode(
 	htotal = mtk_crtc->avail_modes->htotal ;
 	vtotal = mtk_crtc->avail_modes->vtotal;
 	vrefresh = drm_mode_vrefresh(mtk_crtc->avail_modes);
-	base_bw = (unsigned long long)div_u64(vtotal * htotal * vrefresh * bpp, 1000000);
+	base_bw = div_u64((unsigned long long)vtotal * htotal * vrefresh * bpp, 1000000);
 
 	if (dp_intf_bw != base_bw) {
 		dp_intf_bw = base_bw;

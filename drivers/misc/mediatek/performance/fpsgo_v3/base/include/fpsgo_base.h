@@ -49,6 +49,8 @@ enum FPSGO_FRAME_TYPE {
 	NON_VSYNC_ALIGNED_TYPE = 0,
 	BY_PASS_TYPE = 1,
 	FRAME_HINT_TYPE = 2,
+	MFRC_FRAME = 3,
+	MFRC_BY_PASS_FRAME = 4,
 };
 
 enum FPSGO_CONNECT_API {
@@ -187,6 +189,8 @@ struct fbt_thread_blc {
 	unsigned int blc;
 	unsigned int blc_b;
 	unsigned int blc_m;
+	int tp_set;
+	int b_vip_set;
 	int dep_num;
 	struct fpsgo_loading dep[MAX_DEP_NUM];
 	struct list_head entry;
@@ -439,6 +443,7 @@ struct render_info {
 	unsigned long long wall_b_runtime_us;
 	long frame_aa;
 	long dep_aa;
+	unsigned long long frame_count;
 
 	/*ux*/
 	unsigned long long t_last_start;

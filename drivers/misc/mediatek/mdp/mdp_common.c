@@ -2909,14 +2909,11 @@ static void cmdq_mdp_begin_task_virtual(struct cmdqRecStruct *handle,
 			} else {
 				struct cmdqRecStruct *prevTask =
 					handle_list[i - 1];
-				struct mdp_pmqos *mdp_prev_pmqos;
 				struct mdp_pmqos_record *mdp_prev_record;
 
 				if (!prevTask)
 					continue;
 
-				mdp_prev_pmqos =
-					(struct mdp_pmqos *)prevTask->prop_addr;
 				mdp_prev_record =
 					(struct mdp_pmqos_record *)
 					prevTask->user_private;
@@ -3098,7 +3095,6 @@ static void cmdq_mdp_end_task_virtual(struct cmdqRecStruct *handle,
 	s32 overdue;
 	u32 isp_curr_bandwidth = 0;
 	u32 mdp_curr_bandwidth = 0;
-	u32 curr_pixel_size = 0;
 	u32 total_pixel = 0;
 	bool expired;
 	ktime_get_real_ts64(&curr_time);
@@ -3147,13 +3143,14 @@ static void cmdq_mdp_end_task_virtual(struct cmdqRecStruct *handle,
 			continue;
 
 		mdp_list_pmqos = (struct mdp_pmqos *)curTask->prop_addr;
+		if (!mdp_list_pmqos)
+			continue;
+
 		pmqos_list_record =
 			(struct mdp_pmqos_record *)curTask->user_private;
 
 		if (first_task) {
 			target_pmqos = mdp_list_pmqos;
-			curr_pixel_size = max(mdp_list_pmqos->mdp_total_pixel,
-						mdp_list_pmqos->isp_total_pixel);
 			first_task = false;
 		}
 
@@ -3190,6 +3187,9 @@ static void cmdq_mdp_end_task_virtual(struct cmdqRecStruct *handle,
 				continue;
 
 			mdp_list_pmqos = (struct mdp_pmqos *)curTask->prop_addr;
+			if (!mdp_list_pmqos)
+				continue;
+
 			pmqos_list_record =
 				(struct mdp_pmqos_record *)
 					curTask->user_private;

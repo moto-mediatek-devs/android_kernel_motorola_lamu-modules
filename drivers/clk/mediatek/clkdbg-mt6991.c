@@ -1078,7 +1078,7 @@ static int start_clkdbg_test_task(void)
 	char thread_name[THREAD_LEN];
 	int ret = 0;
 
-	if (clkdbg_thread_cnt >= THREAD_NUM)
+	if (clkdbg_thread_cnt >= THREAD_NUM || clkdbg_thread_cnt < 0)
 		return 0;
 
 	if (clkdbg_test_thread[clkdbg_thread_cnt]) {
@@ -1086,13 +1086,14 @@ static int start_clkdbg_test_task(void)
 		return -EBUSY;
 	}
 
-	ret = snprintf(thread_name, THREAD_LEN, "clkdbg_thread_%d", clkdbg_thread_cnt);
-	if (ret) {
+	ret = snprintf(thread_name, THREAD_LEN, "clkdbg_thread%d", clkdbg_thread_cnt);
+
+	if (ret < 0) {
 		pr_info("%s snprintf error(%d)\n", __func__, ret);
 		return ret;
 	}
 
-	clkdbg_test_thread[clkdbg_thread_cnt] = kthread_run(clkdbg_thread_fn, NULL, thread_name);
+	clkdbg_test_thread[clkdbg_thread_cnt] = kthread_run(clkdbg_thread_fn, NULL, "%s", thread_name);
 	if (IS_ERR(clkdbg_test_thread[clkdbg_thread_cnt])) {
 		pr_info("%s Failed to start clkdbg_thread(%d)\n", __func__, clkdbg_thread_cnt);
 		return PTR_ERR(clkdbg_test_thread[clkdbg_thread_cnt]);
