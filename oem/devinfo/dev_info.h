@@ -77,5 +77,6 @@ extern unsigned int oem_pcba_sar_exist(void);
 extern unsigned int oem_pcba_chg_15w_exist(void);
 extern unsigned int oem_pcba_ca(void);
 extern char *oem_battery_sn(void);
+extern unsigned int oem_boot_mode(void);
 
 #endif

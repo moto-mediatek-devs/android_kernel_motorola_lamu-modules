@@ -34,10 +34,12 @@
  */
 
 static int pcba_devs = 0;
+static int boot_mode = 0;
 static char batterysn_buff[OEM_BUFF_SIZE_16] = {0};
 
 module_param_named(devs, pcba_devs, int, 0644);
 module_param_string(batterysn, batterysn_buff, OEM_BUFF_SIZE_16, 0644);
+module_param_named(bootmode, boot_mode, int, 0644);
 
 unsigned int oem_pcba_nfc_exist(void)
 {
@@ -62,6 +64,12 @@ unsigned int oem_pcba_ca(void)
 	return pcba_devs & (1 << 0x3);
 }
 EXPORT_SYMBOL(oem_pcba_ca);
+
+unsigned int oem_boot_mode(void)
+{
+	return boot_mode;
+}
+EXPORT_SYMBOL(oem_boot_mode);
 
 char *oem_battery_sn(void)
 {
