@@ -4,8 +4,8 @@ config OEM_PROJECT
 	help
 	  enable oem project config.
 
-config PROJECT_P329A
-	bool "oem project p329a"
+config PROJECT_LAMU
+	bool "oem project lamu"
 	default n
 	help
 	  config oem project name.

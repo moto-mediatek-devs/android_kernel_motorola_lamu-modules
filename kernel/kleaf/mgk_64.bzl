@@ -1883,7 +1883,7 @@ def get_overlay_modules_list():
         mgk_64_platform_device_modules.pop("drivers/soc/mediatek/devapc/device-apc-mt6989.ko")
         mgk_64_platform_device_modules.pop("drivers/soc/mediatek/devapc/device-apc-mt6991.ko")
 
-    if "p329a_overlay.config" in DEFCONFIG_OVERLAYS:
+    if "lamu_overlay.config" in DEFCONFIG_OVERLAYS:
         mgk_64_device_modules.append("oem/devinfo/oem_devinfo.ko")
 
     if "p325a_overlay.config" in DEFCONFIG_OVERLAYS:
