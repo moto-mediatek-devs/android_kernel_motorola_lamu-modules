@@ -75,6 +75,7 @@ obj-$(CONFIG_DRM_PANEL_NT37707_BOE_FHDPLUS_CMD) += k6991v1_64_alpha/panel-nt3770
 endif
 
 obj-$(CONFIG_DRM_PANEL_DJIN_FT8057S_VDO) += panel-djin-ft8057s-vdo.o
+obj-$(CONFIG_DRM_PANEL_BOE_ICNL9922C_VDO) += panel-boe-icnl9922c-vdo.o
 
 obj-$(CONFIG_DRM_PANEL_MAXIAM_MAX96851) += panel-maxiam-max96851.o
 obj-$(CONFIG_DRM_PANEL_SERDES) += panel-serdes-max96789.o bridge-serdes-max96789.o
