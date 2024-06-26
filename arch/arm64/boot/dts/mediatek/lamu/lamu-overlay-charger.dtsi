@@ -19,5 +19,20 @@
 		sgm,irq-gpio = <&pio 3 IRQ_TYPE_EDGE_FALLING>;     //irq num base on hardware design
 		sgm,chg-en-gpio = <&pio 150 0>;   //gpio num base on hardware design  1.MTK parent node name is pio  2.QUALCOMM parent node name is tlmm or other
 	};
+
+	husb320@21 {
+		status = "okay";
+		compatible = "hynetek,husb320";
+		reg = <0x21>;
+		husb320,int-gpio = <&pio 4 1>;
+		husb320,int-gpio_num = <4>;
+		husb320,init-mode = <20>;                       /* try sink, DRP */
+		husb320,host-current = <2>;                     /* 180uA host current */
+		husb320,drp-toggle-time =  <1>;                 /* 70ms */
+		husb320,drp-duty-time = <0>;                    /* 60 duty time */
+		husb320,autosink-threshold = <1>;               /* 3P1V */
+		husb320,cc-debounce-time = <3>;                 /* 150ms */
+	};
 };
+
 /*[TN.NJDC] charger overlay file.end*/

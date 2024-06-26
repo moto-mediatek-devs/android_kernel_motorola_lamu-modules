@@ -333,6 +333,8 @@ static int mtk_ctd_probe(struct platform_device *pdev)
 		if (ret >= sizeof(name))
 			dev_notice(mci->dev, "bc12-psy name is truncated\n");
 
+/* TN Begin modified by hao.jia/809321 20240627 CR/EKLAMU-202 */
+#if 0
 		mci->bc12_psy[i] = devm_power_supply_get_by_phandle(mci->dev,
 								    name);
 		if (IS_ERR_OR_NULL(mci->bc12_psy[i])) {
@@ -340,6 +342,8 @@ static int mtk_ctd_probe(struct platform_device *pdev)
 			ret = -ENODEV;
 			goto out;
 		}
+#endif
+/* TN End modified by hao.jia/809321 20240627 CR/EKLAMU-202 */
 skip_get_psy:
 		ret = snprintf(name, sizeof(name), "type_c_port%d", i);
 		if (ret >= sizeof(name))
