@@ -43,3 +43,10 @@ config OEM_LAMU_TOUCHSCREEN
 	default m
 	help
 	  support oem_touch
+
+config SND_SOC_FS1815
+	tristate "oem aduiopa"
+	depends on PROJECT_LAMU
+	default n
+	help
+	  support oem aduiopa

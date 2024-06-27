@@ -1,3 +1,19 @@
 /*[TN.NJDC] audio overlay file.start*/
+&i2c7 {
+	status = "ok";
 
+	fs18xx@34 {
+		status = "ok";
+		compatible = "foursemi,fs1815";
+		reg = <0x34>;
+	};
+	fs18xx@35 {
+		status = "ok";
+		compatible = "foursemi,fs1815";
+		reg = <0x35>;
+	};
+};
+&mt6660 {
+	status = "disabled";
+};
 /*[TN.NJDC] audio overlay file.end*/
