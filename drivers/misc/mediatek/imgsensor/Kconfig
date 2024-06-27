@@ -111,6 +111,12 @@ config MTK_IMGSENSOR_PLATFORM
 	  When MTK_PLATFORM is not set, imgsensor
 	  will use the config.
 
+config ARCH_MTK_PROJECT
+	  string "ARCH_MTK_PROJECT for MT6768"
+	  help
+	  This is a driver for the MediaTek
+	  image sensors.
+
 config MTK_V4L2_IMGSENSOR
 	tristate "MediaTek v4l2 image sensor support"
 	select VIDEO_V4L2_SUBDEV_API

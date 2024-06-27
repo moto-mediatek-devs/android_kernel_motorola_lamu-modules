@@ -147,13 +147,13 @@ static enum IMGSENSOR_RETURN imgsensor_hw_power_sequence(
 		if (pwr_status == IMGSENSOR_HW_POWER_STATUS_ON &&
 		   ppwr_info->pin != IMGSENSOR_HW_PIN_UNDEF) {
 			pdev = phw->pdev[psensor_pwr->id[ppwr_info->pin]];
-		/*pr_debug(
-		 *  "sensor_idx = %d, pin=%d, pin_state_on=%d, hw_id =%d\n",
-		 *  sensor_idx,
-		 *  ppwr_info->pin,
-		 *  ppwr_info->pin_state_on,
-		 * psensor_pwr->id[ppwr_info->pin]);
-		 */
+		pr_debug(
+		  "sensor_idx = %d, pin=%d, pin_state_on=%d, hw_id =%d\n",
+		  sensor_idx,
+		  ppwr_info->pin,
+		  ppwr_info->pin_state_on,
+		  psensor_pwr->id[ppwr_info->pin]);
+		 
 
 			if (pdev->set != NULL)
 				pdev->set(
@@ -161,6 +161,18 @@ static enum IMGSENSOR_RETURN imgsensor_hw_power_sequence(
 				    sensor_idx,
 				    ppwr_info->pin,
 				    ppwr_info->pin_state_on);
+
+			/* compatible scheme for AVDD power up and down by using gpio start */
+            // if (ppwr_info->pin == IMGSENSOR_HW_PIN_AVDD && pdev->set != NULL) {
+			// 	pr_info("main camera avdd on");
+            //     pdev = phw->pdev[IMGSENSOR_HW_ID_GPIO];
+            //     pdev->set(
+            //         pdev->pinstance,
+            //         sensor_idx,
+            //         ppwr_info->pin,
+            //         ppwr_info->pin_state_on);
+            // }
+            /* compatible scheme for AVDD power up and down by using gpio end */
 
 			mdelay(ppwr_info->pin_on_delay);
 		}
@@ -185,6 +197,18 @@ static enum IMGSENSOR_RETURN imgsensor_hw_power_sequence(
 					    sensor_idx,
 					    ppwr_info->pin,
 					    ppwr_info->pin_state_off);
+
+				/* compatible scheme for AVDD power up and down by using gpio start */
+                // if (ppwr_info->pin == IMGSENSOR_HW_PIN_AVDD && pdev->set != NULL) {
+				// 	pr_info("main camera avdd off");
+                //     pdev = phw->pdev[IMGSENSOR_HW_ID_GPIO];
+                //     pdev->set(
+                //         pdev->pinstance,
+                //         sensor_idx,
+                //         ppwr_info->pin,
+                //         ppwr_info->pin_state_off);
+                // }
+                /* compatible scheme for AVDD power up and down by using gpio end */
 			}
 		}
 	}
