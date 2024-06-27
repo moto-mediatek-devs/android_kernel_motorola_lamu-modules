@@ -123,6 +123,14 @@
 /************************************************************************
  *
  ************************************************************************/
+/* Lamu */
+#define S5KJNSSQ_SENSOR_ID                      0x38EE
+#define SENSOR_DRVNAME_S5KJNSSQ_MIPI_RAW        "s5kjnssq_mipi_raw"
+#define GC08A8_SENSOR_ID                        0x08a8
+#define SENSOR_DRVNAME_GC08A8_MIPI_RAW          "gc08a8_mipi_raw"
+#define SC520CS_SENSOR_ID                       0xee4b
+#define SENSOR_DRVNAME_SC520CS_MIPI_RAW         "sc520cs_mipi_raw"
+/* Lamu */
 #define HI1339_SENSOR_ID                          0x1339
 #define SENSOR_DRVNAME_HI1339_MIPI_RAW            "hi1339_mipi_raw"
 #define SENSOR_DRVNAME_HI1339SUBTXD_MIPI_RAW      "hi1339subtxd_mipi_raw"
@@ -719,6 +727,11 @@ void KD_IMGSENSOR_PROFILE_INIT(void);
 void KD_IMGSENSOR_PROFILE(char *tag);
 void KD_IMGSENSOR_PROFILE_INIT_I2C(void);
 void KD_IMGSENSOR_PROFILE_I2C(char *tag, int trans_num);
+
+void cam_debug_log(const char *flag, const char *func, const int line, const char *fmt, ...);
+#define STR_BUFFER_MAX_LENGTH  512
+#define CAM_DBG(__module, fmt, args...)                            \
+	cam_debug_log(__module, __func__, __LINE__, fmt, ##args)
 
 #define mDELAY(ms)     mdelay(ms)
 #define uDELAY(us)       udelay(us)

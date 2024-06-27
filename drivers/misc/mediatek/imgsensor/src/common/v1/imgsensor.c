@@ -88,6 +88,21 @@ struct mutex imgsensor_mutex;
 DEFINE_MUTEX(pinctrl_mutex);
 DEFINE_MUTEX(oc_mutex);
 
+static bool sensor_debug;
+module_param(sensor_debug, bool, 0644);
+MODULE_PARM_DESC(sensor_debug, "imgsensor_debug");
+
+void cam_debug_log(const char *flag, const char *func, const int line, const char *fmt, ...)
+{
+	//if (sensor_debug) {
+		char str_buffer[STR_BUFFER_MAX_LENGTH];
+		va_list args;
+		va_start(args, fmt);
+		vsnprintf(str_buffer, STR_BUFFER_MAX_LENGTH, fmt, args);
+		pr_err("%s: %s: %d: %s\n",flag, func, line, str_buffer);
+		va_end(args);
+	//}
+}
 
 /************************************************************************
  * Profiling
