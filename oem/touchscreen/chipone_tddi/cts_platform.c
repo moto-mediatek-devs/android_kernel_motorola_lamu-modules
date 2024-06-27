@@ -1044,8 +1044,6 @@ int cts_plat_process_touch_msg(struct cts_platform_data *pdata,
             input_report_abs(input_dev, ABS_MT_POSITION_Y, y);
             input_report_abs(input_dev, ABS_MT_TOUCH_MAJOR, msgs[i].pressure);
             input_report_abs(input_dev, ABS_MT_PRESSURE, msgs[i].pressure);
-	     printk("iker x = %d\n", x);
-	     printk("iker y = %d\n", y);
             break;
 
         case CTS_DEVICE_TOUCH_EVENT_UP:
@@ -1076,8 +1074,6 @@ int cts_plat_process_touch_msg(struct cts_platform_data *pdata,
             input_report_abs(input_dev, ABS_MT_POSITION_X, x);
             input_report_abs(input_dev, ABS_MT_POSITION_Y, y);
             input_mt_sync(input_dev);
-	     printk("iker 2 x = %d\n", x);
-	     printk("iker 2 y = %d\n", y);
             break;
 
         case CTS_DEVICE_TOUCH_EVENT_UP:
