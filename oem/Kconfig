@@ -37,3 +37,9 @@ config OEM_PANEL
 	help
 	  support oem_panel
 
+config OEM_LAMU_TOUCHSCREEN
+	tristate "oem touch"
+	depends on PROJECT_LAMU
+	default m
+	help
+	  support oem_touch

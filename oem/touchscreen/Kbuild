@@ -2,3 +2,8 @@ ifdef CONFIG_OEM_TOUCHSCREEN
 	obj-y += ILITEK9883C/
 	#obj-y += focaltech_touch/
 endif
+
+ifdef CONFIG_OEM_LAMU_TOUCHSCREEN
+	obj-y += chipone_tddi/
+	#obj-y += omnivision_tcm/
+endif

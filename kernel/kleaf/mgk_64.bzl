@@ -1886,6 +1886,7 @@ def get_overlay_modules_list():
     if "lamu_overlay.config" in DEFCONFIG_OVERLAYS:
         mgk_64_device_modules.append("oem/devinfo/oem_devinfo.ko")
         mgk_64_device_modules.append("drivers/gpu/drm/panel/panel-boe-icnl9922c-vdo.ko")
+        mgk_64_device_modules.append("oem/touchscreen/chipone_tddi/chipone_tddi.ko")
         mgk_64_device_modules.append("drivers/tinno_charger/oem_tinno_charger.ko")
         mgk_64_device_modules.append("drivers/tinno_charger/switch_charger/sgm41542/sgm41542.ko")
 
