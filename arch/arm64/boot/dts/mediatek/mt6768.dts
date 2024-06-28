@@ -2617,6 +2617,10 @@ transparent_hugepage=never";
 		compatible = "mediatek,goodix-fp";
 	};
 
+	fingerprint_fpc:fingerprint_fpc{
+	    compatible = "mediatek,fpsensor";
+    };
+
 	regulator_vibrator: regulator-vibrator {
 		compatible = "regulator-vibrator";
 		label = "vibrator";
