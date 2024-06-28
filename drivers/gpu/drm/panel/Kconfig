@@ -701,3 +701,14 @@ config DRM_PANEL_BOE_ICNL9922C_VDO
 	  icnl9922c boe fhdplus vdo panel. The panel has a 1080x2400
 	  resolution and uses 24-bits RGB per pixel. It provides a
 	  MIPI DSI interface to host.
+	  
+config DRM_PANEL_TXD_ILI9883C_VDO
+	tristate "mt6769 ili9883c txd fhdplus2400 vdo panel"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here if you want to enable support for mt6769
+	  icnl9922c boe fhdplus vdo panel. The panel has a 1080x2400
+	  resolution and uses 24-bits RGB per pixel. It provides a
+	  MIPI DSI interface to host.
