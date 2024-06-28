@@ -108,18 +108,6 @@
 			output-high;
 		};
 	};
-	// camera0_pdn_low: camera0_pdn_output_low@gpio98 {
-	// 	pins_cmd_dat {
-	// 		pinmux = <PINMUX_GPIO98__FUNC_GPIO98>;
-	// 		output-low;
-	// 	};
-	// };
-	// camera0_pdn_high: camera0_pdn_output_high@gpio98 {
-	// 	pins_cmd_dat {
-	// 		pinmux = <PINMUX_GPIO98__FUNC_GPIO98>;
-	// 		output-high;
-	// 	};
-	// };
 	camera1_rst_low: camera1_rst_output_low@gpio109 {
 		pins_cmd_dat {
 			pinmux = <PINMUX_GPIO109__FUNC_GPIO109>;
@@ -132,19 +120,6 @@
 			output-high;
 		};
 	};
-	// camera1_pdn_low: camera1_pdn_output_low@gpio97 {
-	// 	pins_cmd_dat {
-	// 		pinmux = <PINMUX_GPIO97__FUNC_GPIO97>;
-	// 		slew-rate = <1>;
-	// 		output-low;
-	// 	};
-	// };
-	// camera1_pdn_high: camera1_pdn_output_high@gpio97 {
-	// 	pins_cmd_dat {
-	// 		pinmux = <PINMUX_GPIO97__FUNC_GPIO97>;
-	// 		output-high;
-	// 	};
-	// };
 	camera2_rst_low: camera2_rst_output_low@gpio102 {
 		pins_cmd_dat {
 			pinmux = <PINMUX_GPIO102__FUNC_GPIO102>;
@@ -157,42 +132,6 @@
 			output-high;
 		};
 	};
-	// camera2_pdn_low: camera2_pdn_output_low@gpio110 {
-	// 	pins_cmd_dat {
-	// 		pinmux = <PINMUX_GPIO110__FUNC_GPIO110>;
-	// 		output-low;
-	// 	};
-	// };
-	// camera2_pdn_high: camera2_pdn_output_high@gpio110 {
-	// 	pins_cmd_dat {
-	// 		pinmux = <PINMUX_GPIO110__FUNC_GPIO110>;
-	// 		output-high;
-	// 	};
-	// };
-	// camera0_vcama_off: camera0_vcama_output_low@gpio97 {
-	// 	pins_cmd_dat {
-	// 		pinmux = <PINMUX_GPIO97__FUNC_GPIO97>;
-	// 		output-low;
-	// 	};
-	// };
-	// camera0_vcama_on: camera0_vcama_output_high@gpio97 {
-	// 	pins_cmd_dat {
-	// 		pinmux = <PINMUX_GPIO97__FUNC_GPIO97>;
-	// 		output-high;
-	// 	};
-	// };
-	// camera1_vcama_off: camera1_vcama_output_low@gpio111 {
-	// 	pins_cmd_dat {
-	// 		pinmux = <PINMUX_GPIO111__FUNC_GPIO111>;
-	// 		output-low;
-	// 	};
-	// };
-	// camera1_vcama_on: camera1_vcama_output_high@gpio111 {
-	// 	pins_cmd_dat {
-	// 		pinmux = <PINMUX_GPIO111__FUNC_GPIO111>;
-	// 		output-high;
-	// 	};
-	// };
 	camera1_vcamd_off: camera1_vcamd_output_low@gpio178 {
 		pins_cmd_dat {
 			pinmux = <PINMUX_GPIO178__FUNC_GPIO178>;
@@ -205,18 +144,6 @@
 			output-high;
 		};
 	};
-	// camera2_vcama_off: camera2_vcama_output_low@gpio111 {
-	// 	pins_cmd_dat {
-	// 		pinmux = <PINMUX_GPIO111__FUNC_GPIO111>;
-	// 		output-low;
-	// 	};
-	// };
-	// camera2_vcama_on: camera2_vcama_output_high@gpio111 {
-	// 	pins_cmd_dat {
-	// 		pinmux = <PINMUX_GPIO111__FUNC_GPIO111>;
-	// 		output-high;
-	// 	};
-	// };
 	camera2_vcamd_off: camera2_vcamd_output_low@gpio178 {
 		pins_cmd_dat {
 			pinmux = <PINMUX_GPIO178__FUNC_GPIO178>;
@@ -237,19 +164,10 @@
 &kd_camera_hw1 {
 	pinctrl-names = "default",
 			"cam0_rst0", "cam0_rst1",
-			//"cam0_pnd0", "cam0_pnd1",
 			"cam1_rst0", "cam1_rst1",
-			//"cam1_pnd0", "cam1_pnd1",
 			"cam2_rst0", "cam2_rst1",
-			//"cam2_pnd0", "cam2_pnd1",
-			//"cam0_vcama_on",
-			//"cam0_vcama_off",
-			//"cam1_vcama_on",
-			//"cam1_vcama_off",
 			"cam1_vcamd_on",
 			"cam1_vcamd_off",
-			//"cam2_vcama_on",
-			//"cam2_vcama_off",
 			"cam2_vcamd_on",
 			"cam2_vcamd_off",
 			"cam0_mclk_off",
@@ -265,24 +183,12 @@
 	pinctrl-0 = <&camera_pins_default>;
 	pinctrl-1 = <&camera0_rst_low>;
 	pinctrl-2 = <&camera0_rst_high>;
-	//pinctrl-3 = <&camera0_pdn_low>;
-	//pinctrl-4 = <&camera0_pdn_high>;
 	pinctrl-3 = <&camera1_rst_low>;
 	pinctrl-4 = <&camera1_rst_high>;
-	//pinctrl-7 = <&camera1_pdn_low>;
-	//pinctrl-8 = <&camera1_pdn_high>;
 	pinctrl-5 = <&camera2_rst_low>;
 	pinctrl-6 = <&camera2_rst_high>;
-	//pinctrl-11 = <&camera2_pdn_low>;
-	//pinctrl-12 = <&camera2_pdn_high>;
-	//pinctrl-7 = <&camera0_vcama_on>;
-	//pinctrl-8 = <&camera0_vcama_off>;
-	//pinctrl-7 = <&camera1_vcama_on>;
-	//pinctrl-8 = <&camera1_vcama_off>;
 	pinctrl-7 = <&camera1_vcamd_on>;
 	pinctrl-8 = <&camera1_vcamd_off>;
-	//pinctrl-11 = <&camera2_vcama_on>;
-	//pinctrl-12 = <&camera2_vcama_off>;
 	pinctrl-9 = <&camera2_vcamd_on>;
 	pinctrl-10 = <&camera2_vcamd_off>;
 	pinctrl-11 = <&camera0_mclk_off>;
@@ -316,8 +222,6 @@
 /* CAMERA AF */
 &camera_af_hw_node {
 	camaf_m1_pmic-supply = <&mt_pmic_vldo28_ldo_reg>;
-	//camaf_m2_pmic-supply = <&mt_pmic_vldo28_ldo_reg>;
-	//camaf_m3_pmic-supply = <&mt_pmic_vldo28_ldo_reg>;
 	status = "okay";
 };
 /* CAMERA AF end */
