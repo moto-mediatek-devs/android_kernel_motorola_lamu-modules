@@ -10,6 +10,7 @@ subdir-ccflags-y += -Werror \
 
 # TN Begin modified by yang.chen1/860621 20240606 CR/EKLAMU-4
 USERINCLUDE    += -I../$(DEVICE_MODULES_REL_DIR)/oem/devinfo/
+USERINCLUDE    += -I../$(DEVICE_MODULES_REL_DIR)/oem/aw_sar/
 # TN End modified by yang.chen1/860621 20240606 CR/EKLAMU-4
 
 obj-y += ../$(DEVICE_MODULES_REL_DIR)/drivers/memory/
