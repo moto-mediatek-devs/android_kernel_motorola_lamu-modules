@@ -2143,6 +2143,12 @@ transparent_hugepage=never";
 		cldma-infracfg = <&infracfg_ao>;
 	};
 
+/*TINNO BEGIN, Add swtp feature*/
+       swtp:swtp {
+                compatible = "mediatek, swtp-eint";
+        };
+/*TINNO END, Add swtp feature*/
+
 	mddriver:mddriver {
 		compatible = "mediatek,mddriver", "mediatek,mddriver-mt6768";
 		/* DTS/GIC_ID: MDWDT 75/107; CCIF0 164/196; CCIF0 165/197 */
