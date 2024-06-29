@@ -20,6 +20,20 @@
 		sgm,chg-en-gpio = <&pio 150 0>;   //gpio num base on hardware design  1.MTK parent node name is pio  2.QUALCOMM parent node name is tlmm or other
 	};
 
+	cx2589x_chg: cx2589x@6A {
+		status = "okay";
+		compatible = "suncore,cx25890h";
+		reg = <0x6A>;
+
+		io-channels = <&pmic_auxadc AUXADC_VCDT>;
+		io-channel-names = "pmic_vbus";
+		phys = <&u2port0 PHY_TYPE_USB2>;
+		phy-names = "usb2-phy";
+
+		cx,irq-gpio = <&pio 3 IRQ_TYPE_EDGE_FALLING>;     //irq num base on hardware design
+		cx,chg-en-gpio = <&pio 150 0>;   //gpio num base on hardware design  1.MTK parent node name is pio  2.QUALCOMM parent node name is tlmm or other
+	};
+
 	husb320@21 {
 		status = "okay";
 		compatible = "hynetek,husb320";
