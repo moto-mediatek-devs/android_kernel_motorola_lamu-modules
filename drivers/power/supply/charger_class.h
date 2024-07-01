@@ -107,6 +107,13 @@ struct charger_ops {
 	int (*set_dp)(struct charger_device *dev, u32 uV);
 	int (*set_dm)(struct charger_device *dev, u32 uV);
 #endif
+
+/* TN Begin modified by hao.jia/809321 20240701 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
+	int (*enable_adc)(struct charger_device *dev, bool enable);
+#endif /* CONFIG_OEM_CHARGER_PUMP */
+/* TN End modified by hao.jia/809321 20240701 CR/EKLAMU-202 */
+
 	/* set cv */
 	int (*set_constant_voltage)(struct charger_device *dev, u32 uV);
 	int (*get_constant_voltage)(struct charger_device *dev, u32 *uV);
@@ -450,5 +457,10 @@ extern int unregister_charger_device_notifier(
 extern int charger_dev_notify(
 	struct charger_device *charger_dev, int event);
 
+/* TN Begin modified by hao.jia/809321 20240701 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
+extern int charger_dev_enable_adc(struct charger_device *charger_dev, bool enable);
+#endif /* CONFIG_OEM_CHARGER_PUMP */
+/* TN End modified by hao.jia/809321 20240701 CR/EKLAMU-202 */
 
 #endif /*LINUX_POWER_CHARGER_CLASS_H*/

@@ -77,4 +77,17 @@
 	};
 };
 
+&i2c5 {
+	clock-frequency = <400000>;
+	status = "ok";
+
+	cps2011s@6E {
+		status = "ok";
+		compatible = "CPS,cps2011s";
+		reg = <0x6E>;
+		chg_name = "primary_dvchg";
+		rm_name = "cps2011s";
+		cps2011s,intr = <&pio 7 IRQ_TYPE_EDGE_RISING>;
+	};
+};
 /*[TN.NJDC] charger overlay file.end*/
