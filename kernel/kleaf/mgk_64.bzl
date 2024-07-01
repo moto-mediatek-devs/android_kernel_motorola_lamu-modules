@@ -1896,6 +1896,7 @@ def get_overlay_modules_list():
         mgk_64_device_modules.append("drivers/tinno_charger/typec/husb320/husb320.ko")
         mgk_64_device_modules.append("oem/audiopa/fs1815/snd-soc-fs1815.ko")
         mgk_64_device_modules.append("oem/aw_sar/awinic_sar.ko")
+        mgk_64_device_modules.append("drivers/tinno_charger/qc_logic/z350/z350.ko")
 
     if "p325a_overlay.config" in DEFCONFIG_OVERLAYS:
         mgk_64_device_modules.append("oem/devinfo/oem_devinfo.ko")
