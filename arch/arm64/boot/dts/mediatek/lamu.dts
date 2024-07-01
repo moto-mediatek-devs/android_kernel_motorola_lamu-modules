@@ -97,13 +97,59 @@
 	};
 };
 
+&i2c0 {
+	/* add flashlight */
+	status = "okay";
+	clock-frequency = <400000>;
+	strobe_main:strobe_main@63 {
+		compatible = "mediatek,strobe_main";
+		reg = <0x63>;
+		#cooling-cells = <2>;
+		pinctrl-names = "default", "hwen-high", "hwen-low";
+		pinctrl-0 = <&flashlight_pins_default>;
+		pinctrl-1 = <&flashlight_pins_hwen_high>;
+		pinctrl-2 = <&flashlight_pins_hwen_low>;
+        status = "okay";
+		decouple = <1>;
+	};
+};
+
+&pio {
+	flashlight_pins_default: default {
+	};
+
+	flashlight_pins_hwen_high: hwen-high {
+		pins-cmd-dat {
+			pinmux = <PINMUX_GPIO165__FUNC_GPIO165>;
+			slew-rate = <1>;
+			output-high;
+		};
+	};
+
+	flashlight_pins_hwen_low: hwen-low {
+		pins-cmd-dat {
+			pinmux = <PINMUX_GPIO165__FUNC_GPIO165>;
+			slew-rate = <1>;
+			output-low;
+		};
+	};
+};
+
+&flashlights_aw36515 {
+	pinctrl-names = "default", "hwen-high", "hwen-low";
+	pinctrl-0 = <&flashlight_pins_default>;
+	pinctrl-1 = <&flashlight_pins_hwen_high>;
+	pinctrl-2 = <&flashlight_pins_hwen_low>;
+	status = "okay";
+};
+
 &i2c2 {
 	clock-frequency = <400000>;
 
 	mtk-usb@60 {
 		compatible = "mediatek,mtk-usb";
 		reg = <0x60>;
-		status = "okay";
+        status = "okay";
 	};
 };
 

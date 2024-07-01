@@ -359,6 +359,7 @@ mgk_64_device_modules = [
     "drivers/misc/mediatek/flashlight/v4l2/k6983v1_64_alpha/sy7806.ko",
     "drivers/misc/mediatek/flashlight/v4l2/lm3643.ko",
     "drivers/misc/mediatek/flashlight/v4l2/lm3644.ko",
+    "drivers/misc/mediatek/flashlight/flashlights-aw36515.ko",
     "drivers/misc/mediatek/gate_ic/rt4831a_drv.ko",
     "drivers/misc/mediatek/geniezone/gz_main_mod.ko",
     "drivers/misc/mediatek/geniezone/gz-trusty/gz_ipc_mod.ko",

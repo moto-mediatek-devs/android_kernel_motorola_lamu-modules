@@ -4823,6 +4823,12 @@ transparent_hugepage=never";
 		};
 	};
 
+	/* add flashlight */
+	flashlights_aw36515: flashlights_aw36515 {
+		compatible = "mediatek,flashlights_aw36515";
+		decouple = <1>;
+	};
+
 	camera_af_hw_node: camera_af_hw_node {
 		compatible = "mediatek,camera_af_lens";
 	};
