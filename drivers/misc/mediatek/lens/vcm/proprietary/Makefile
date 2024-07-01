@@ -3,7 +3,7 @@
 #
 
 obj-y   += main/
-obj-y   += main2/
-obj-y   += main3/
-obj-y   += sub/
-obj-y   += sub2/
+#obj-y   += main2/
+#obj-y   += main3/
+#obj-y   += sub/
+#obj-y   += sub2/

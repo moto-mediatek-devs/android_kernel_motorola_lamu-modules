@@ -14,10 +14,8 @@ IMGSENSOR_DRIVER_OBJ +=	../common/$(COMMON_VERSION)/imgsensor_legacy.o
 IMGSENSOR_DRIVER_OBJ +=	../common/$(COMMON_VERSION)/imgsensor_proc.o
 ifeq ($(wildcard $(IMGSENSOR_DRIVER_PATH)/$(ARCH_MTK_PROJECT)/$(COMMON_VERSION)),)
 IMGSENSOR_DRIVER_OBJ += ../common/$(COMMON_VERSION)/imgsensor_sensor_list.o
-$(info yyyyy 111)
 else
 IMGSENSOR_DRIVER_OBJ +=	../$(ARCH_MTK_PROJECT)/$(COMMON_VERSION)/imgsensor_sensor_list.o
-$(info yyyyy 222)
 endif
 IMGSENSOR_DRIVER_OBJ +=	imgsensor_clk.o
 ifeq ($(CONFIG_MTK_IMGSENSOR_ISP4_T), m)
@@ -50,8 +48,7 @@ platform_drv += $(1)
 endif
 else
 project_drv += ../$(ARCH_MTK_PROJECT)/$(COMMON_VERSION)/$(1)
-$(info yyyyy)
-$(info project_drv yyyy : $(project_drv))
+$(info project_drv: $(project_drv))
 endif
 endef
 $(foreach drv,$(subst $\",,$(CONFIG_CUSTOM_KERNEL_IMGSENSOR)),$(eval $(call FILTER_DRV,$(drv))))
@@ -76,7 +73,6 @@ endif
 ifneq (,$(wildcard $(IMGSENSOR_DRIVER_PATH)/$(ARCH_MTK_PROJECT)/camera_hw))
 subdir-ccflags-y += -I$(IMGSENSOR_DRIVER_PATH)/$(ARCH_MTK_PROJECT)/camera_hw
 $(eval $(call add_subdrv,../$(ARCH_MTK_PROJECT)/camera_hw))
-$(info yyyyy camerahw)
 ifneq ($(project_drv),)
 #$(eval $(call add_subdrv,camera_project/$(MTK_SENSOR_PROJECT)/camera_hw))
 endif
