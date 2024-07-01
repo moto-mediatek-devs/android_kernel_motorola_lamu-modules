@@ -329,6 +329,20 @@ int charger_dev_kick_wdt(struct charger_device *chg_dev)
 }
 EXPORT_SYMBOL(charger_dev_kick_wdt);
 
+/* TN Begin modified by hao.jia/809321 20240701 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
+int charger_dev_enable_adc(struct charger_device *charger_dev, bool enable)
+{
+	if (charger_dev != NULL && charger_dev->ops != NULL &&
+	    charger_dev->ops->enable_adc)
+		return charger_dev->ops->enable_adc(charger_dev, enable);
+
+	return -EOPNOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_enable_adc);
+#endif /* CONFIG_OEM_CHARGER_PUMP */
+/* TN End modified by hao.jia/809321 20240701 CR/EKLAMU-202 */
+
 int charger_dev_set_constant_voltage(struct charger_device *chg_dev, u32 uV)
 {
 	if (chg_dev != NULL && chg_dev->ops != NULL &&
