@@ -2,7 +2,7 @@
 &spi2 {
     status = "ok";
     chipone_tddi@0 {
-        compatible = "chipone-tddi";
+        compatible = "chipone-tddi","novatek,NVT-ts-spi";
         reg = <0>;
         spi-max-frequency = <9600000>;
         interrupt-parent = <&pio>;
@@ -22,6 +22,9 @@
 
         chipone,touch-earjack-state-filepath = "/sys/bus/platform/drivers/Accdet_Driver/state";
         chipone,touch-earjack-poll-interval = <1000>;*/
+
+        novatek,reset-gpio = <&pio 36 0x00>;
+        novatek,irq-gpio =<&pio 0 0x00>;
     };
 };
 
