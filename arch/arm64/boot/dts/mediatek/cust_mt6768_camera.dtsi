@@ -309,7 +309,6 @@
 	cam2_vcamio-supply = <&mt_pmic_vcamio_ldo_reg>;
 	status = "okay";
     pmic = <&main_pmic>;
-
 };
 /* CAMERA GPIO end */
 
