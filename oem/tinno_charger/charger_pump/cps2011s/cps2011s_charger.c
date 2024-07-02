@@ -10,7 +10,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
 
- * Version:cps2011s_charger_V1.0.0_mtk_2024_04_11.
+ * Version:cps2011s_charger_V1.0.1_mtk_2024_07_02.
  */
 
 #include <linux/init.h>
@@ -47,7 +47,7 @@
 #endif /* LINUX_VERSION_CODE */
 
 /* Information */
-#define cps2011s_DRV_VERSION	"1.0.0_MTK"
+#define cps2011s_DRV_VERSION	"1.0.1_MTK"
 bool cps2011s_enable_flag = 0;
 static struct charger_device *primary_divider_charger;
 
@@ -1818,16 +1818,17 @@ static int __cps2011s_init_chip(struct cps2011s_chip *chip)
 {
 	dev_info(chip->dev, "%s\n", __func__);
 
-	cps2011s_set_switch_clk(chip, 500);
-	cps2011s_i2c_write8(chip, 0x00, 0x08);
+	cps2011s_i2c_write8(chip, 0x01, 0x40);   //switch frequency 500KHz
+	cps2011s_i2c_write8(chip, 0x00, 0x08);   //disable watchdog
 	cps2011s_i2c_write8(chip, 0x02, 0xF2);	//enable ENCOMP and set RLT UVP/OVP
-	cps2011s_i2c_write8(chip, 0x04, 0x1A);	//set vbuscon ovp 14V and vbuscon ovp enable
-	cps2011s_i2c_write8(chip, 0x06, 0xE4);	//set vbus ovp 14V and vbus ovp enable
-	cps2011s_i2c_write8(chip, 0x07, 0xBD);	//set ibus ucp/ocp enable
-	cps2011s_i2c_write8(chip, 0x08, 0x8E);	//set vbatovp is 4.35V & enable
+	cps2011s_i2c_write8(chip, 0x04, 0x18);	//set vbuscon ovp 12V and vbuscon ovp enable
+	cps2011s_i2c_write8(chip, 0x06, 0xCB);	//set vbus ovp 11.5V and vbus ovp enable
+	cps2011s_i2c_write8(chip, 0x07, 0xB5);	//set ibus ucp/ocp enable & ibusocp 5A
+	cps2011s_i2c_write8(chip, 0x08, 0x9D);	//set vbatovp is 4.725V & enable
 	cps2011s_i2c_write8(chip, 0x09, 0x2A);	//set ibatocp disabled
 	cps2011s_i2c_write8(chip, 0x11, 0x80);	//set adc enable
-	cps2011s_i2c_write8(chip, 0x0A, 0x00);
+	cps2011s_i2c_write8(chip, 0x0A, 0x00);  //set vbatreg and ibatreg disable
+	cps2011s_i2c_write8(chip, 0xE2, 0x00);  //set Automatic DPDM detection disable
 
 	return 0;
 }
@@ -2196,4 +2197,8 @@ MODULE_VERSION(cps2011s_DRV_VERSION);
 /*
  * 1.0.0_MTK
  * Initial release
+ *
+ * 1.0.1_MTK
+ * The initial configuration was updated
+ *
  */
