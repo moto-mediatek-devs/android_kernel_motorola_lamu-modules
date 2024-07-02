@@ -73,9 +73,7 @@ enum product_dev_info_attribute {
 extern int full_product_device_info(int id, const char *info, FuncPtr cb, void *args);
 
 extern unsigned int oem_pcba_nfc_exist(void);
-extern unsigned int oem_pcba_sar_exist(void);
-extern unsigned int oem_pcba_chg_15w_exist(void);
-extern unsigned int oem_pcba_ca(void);
+extern unsigned int oem_pcba_chg_power(void);
 extern char *oem_battery_sn(void);
 extern unsigned int oem_boot_mode(void);
 
