@@ -5111,6 +5111,11 @@ transparent_hugepage=never";
 	qc_eint: qc_eint {
 	};
 
+/* TN Begin modified by hao.jia/809321 20240702 CR/EKLAMU-202 */
+	turbo_charger: turbo_charger {
+	};
+/* TN End modified by hao.jia/809321 20240702 CR/EKLAMU-202 */
+
 	mtk_ctd: mtk_ctd {
 		compatible = "mediatek,mtk_ctd";
 		nr-port = <1>;

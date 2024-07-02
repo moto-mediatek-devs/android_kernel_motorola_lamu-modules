@@ -343,6 +343,47 @@ EXPORT_SYMBOL(charger_dev_enable_adc);
 #endif /* CONFIG_OEM_CHARGER_PUMP */
 /* TN End modified by hao.jia/809321 20240701 CR/EKLAMU-202 */
 
+/* TN Begin modified by hao.jia/809321 20240702 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+int charger_dev_is_vbushigher(struct charger_device *chg_dev, bool *err)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL &&
+		chg_dev->ops->is_vbushigher)
+		return chg_dev->ops->is_vbushigher(chg_dev, err);
+	return -EOPNOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_is_vbushigher);
+
+int charger_dev_is_vbat_present(struct charger_device *chg_dev, bool *present)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL &&
+	    chg_dev->ops->is_vbat_present)
+		return chg_dev->ops->is_vbat_present(chg_dev, present);
+	return -EOPNOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_is_vbat_present);
+
+int charger_dev_is_vbus_present(struct charger_device *chg_dev, bool *present)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL &&
+	    chg_dev->ops->is_vbus_present)
+		return chg_dev->ops->is_vbus_present(chg_dev, present);
+	return -EOPNOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_is_vbus_present);
+
+int charger_dev_enable_dpdm_hz(struct charger_device *chg_dev)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL &&
+	    chg_dev->ops->enable_dpdm_hz)
+		return chg_dev->ops->enable_dpdm_hz(chg_dev);
+
+	return -EOPNOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_enable_dpdm_hz);
+#endif /* CONFIG_OEM_TURBO_CHARGER */
+/* TN End modified by hao.jia/809321 20240702 CR/EKLAMU-202 */
+
 int charger_dev_set_constant_voltage(struct charger_device *chg_dev, u32 uV)
 {
 	if (chg_dev != NULL && chg_dev->ops != NULL &&

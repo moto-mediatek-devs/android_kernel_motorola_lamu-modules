@@ -66,6 +66,29 @@
 #include "mtk_charger.h"
 #include "mtk_battery.h"
 
+/*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+bool qc_logic_probe_done = 0;
+EXPORT_SYMBOL(qc_logic_probe_done);
+
+bool mtk_can_charging = true;
+EXPORT_SYMBOL(mtk_can_charging);
+
+int qc3p_charger_ready = 0;
+EXPORT_SYMBOL(qc3p_charger_ready);
+
+int g_thermal_charging_current_limit = -1;
+EXPORT_SYMBOL(g_thermal_charging_current_limit);
+
+bool is_qc3_charger_ready = false;
+EXPORT_SYMBOL(is_qc3_charger_ready);
+
+extern bool turbo_charger_active;
+extern int ffc_reduce_count;
+extern bool is_turbo_charger_ready;
+#endif /* CONFIG_OEM_TURBO_CHARGER */
+/*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+
 struct tag_bootmode {
 	u32 size;
 	u32 tag;
@@ -2610,6 +2633,12 @@ stop_charging:
 	else if (charging == false && chg_dev_chgen == true)
 		_mtk_enable_charging(info, charging);
 
+/*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+	mtk_can_charging = charging;
+#endif /* CONFIG_OEM_TURBO_CHARGER */
+/*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+
 	info->can_charging = charging;
 }
 
@@ -2892,6 +2921,12 @@ static int mtk_charger_plug_out(struct mtk_charger *info)
 	charger_dev_plug_out(info->chg1_dev);
 	mtk_charger_force_disable_power_path(info, CHG1_SETTING, true);
 
+/*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+	qc3p_charger_ready = 0;
+#endif /* CONFIG_OEM_TURBO_CHARGER */
+/*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202*/
+
 	if (info->enable_vbat_mon)
 		charger_dev_enable_6pin_battery_charging(info->chg1_dev, false);
 
@@ -3056,6 +3091,187 @@ static void charger_status_check(struct mtk_charger *info)
 	info->is_charging = charging;
 }
 
+/*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+static int ffc_bat_get_fv(struct mtk_charger *info, int temp_c)
+{
+	int ffc_max_fv;
+	int i = 0;
+	int temp = temp_c;
+	int num_zones;
+	struct ffc_bat_zone *zone;
+
+	//temp = charger->batt_info.batt_temp;
+	num_zones = info->num_ffc_zones;
+	if (info->ffc_zones == NULL) {
+		chr_err("[%s] ffc_zones is NULL\n", __func__);
+		return 0;
+	}
+	zone = info->ffc_zones;
+	while (i < num_zones && temp > zone[i++].temp);
+	zone = i > 0 ? &zone[i - 1] : NULL;
+
+	info->chrg_iterm = zone->ffc_chg_iterm;
+	ffc_max_fv = zone->ffc_max_mv; //mV to uV
+	chr_info("[%s] FFC temp zone %d, fv %d mV, chg iterm %d mA\n", __func__,
+		  ((i > 0) ? (i - 1) : 0), ffc_max_fv, info->chrg_iterm);
+
+	return ffc_max_fv;
+}
+
+#define TAPER_COUNT	2
+#define TAPER_DROP_MA	100
+static bool ffc_bat_check_chg_tapered(struct mtk_charger *info,
+	int batt_ma, int taper_ma)
+{
+	bool change_state = false;
+	int allowed_fcc, target_ma, rc;
+
+	if (!info) {
+		chr_err("[%s] called before info valid!\n", __func__);
+		return false;
+	}
+
+	rc = charger_dev_get_charging_current(info->chg1_dev, &allowed_fcc);
+	if (rc < 0)
+		chr_err("[%s] can't get charging current!\n", __func__);
+	else
+		allowed_fcc = allowed_fcc / 1000;
+
+	if (allowed_fcc >= taper_ma)
+		target_ma = taper_ma;
+	else
+		target_ma = allowed_fcc - TAPER_DROP_MA;
+
+	chr_info("[%s] curr target_ma = %d batt_ma = %d\n", __func__, target_ma, batt_ma);
+
+	if (batt_ma <= 0) {
+		if (info->chrg_taper_cnt >= TAPER_COUNT) {
+			change_state = true;
+			info->chrg_taper_cnt = 0;
+		} else
+			info->chrg_taper_cnt++;
+	} else {
+		if (batt_ma <= target_ma)
+			if (info->chrg_taper_cnt >= TAPER_COUNT) {
+				change_state = true;
+				info->chrg_taper_cnt = 0;
+			} else
+				info->chrg_taper_cnt++;
+		else
+			info->chrg_taper_cnt = 0;
+	}
+
+	return change_state;
+}
+
+#define FFC_RECHG_VOLT_MV	150
+static int ffc_bat_check_chg_done(struct mtk_charger *info)
+{
+	int ret;
+	int batt_mv, batt_ma, batt_soc;
+	int batt_temp = 0;
+	int usb_mv;
+	int target_mv;
+	int charger_present = 0;
+
+	struct power_supply *bat_psy = NULL;
+	struct power_supply *chg_psy = NULL;
+	union power_supply_propval prop = {0,};
+
+	bat_psy = power_supply_get_by_name("battery");
+	if (IS_ERR_OR_NULL(bat_psy)) {
+		pr_info("[%s] get bat_psy fail !!!", __func__);
+		return -EINVAL;
+	}
+
+#if IS_ENABLED(CONFIG_OEM_SWITCH_CHARGER)
+	chg_psy = power_supply_get_by_name("primary_chg");
+	if (IS_ERR_OR_NULL(chg_psy)) {
+		chr_err("%s get chg psy failed\n", __func__);
+	}
+#else
+	chg_psy = power_supply_get_by_name("mtk_charger_type");
+#endif /* CONFIG_OEM_SWITCH_CHARGER */
+	if (chg_psy == NULL || IS_ERR(chg_psy)) {
+		chr_err("%s Couldn't get chg_psy\n", __func__);
+		ret = -EINVAL;
+	} else {
+		ret = power_supply_get_property(chg_psy,
+				POWER_SUPPLY_PROP_ONLINE, &prop);
+		if (ret < 0) {
+			pr_err("[%s]Error getting charger online ret = %d\n", __func__, ret);
+			return -EINVAL;
+		} else
+			charger_present = prop.intval;
+	}
+
+	ret = power_supply_get_property(bat_psy,
+			POWER_SUPPLY_PROP_VOLTAGE_NOW, &prop);
+	if (ret < 0) {
+		pr_err("[%s]Error getting Batt Volt ret = %d\n", __func__, ret);
+		return -EINVAL;
+	} else
+		batt_mv = prop.intval / 1000;//uV to mV
+
+	ret = power_supply_get_property(bat_psy,
+			POWER_SUPPLY_PROP_CURRENT_NOW, &prop);
+	if (ret < 0) {
+		pr_err("[%s]Error getting Batt Curr now ret = %d\n", __func__, ret);
+		return -EINVAL;
+	} else
+		batt_ma = prop.intval / 1000;// uA to mA
+
+	ret = power_supply_get_property(bat_psy,
+			POWER_SUPPLY_PROP_CAPACITY, &prop);
+	if (ret < 0) {
+		pr_err("[%s]Error getting Batt Capacity ret = %d\n", __func__, ret);
+		return -EINVAL;
+	} else
+		batt_soc = prop.intval;
+
+	ret = power_supply_get_property(bat_psy,
+			POWER_SUPPLY_PROP_TEMP, &prop);
+	if (ret < 0) {
+		pr_err("[%s]Error getting Batt Temp ret = %d\n", __func__, ret);
+		return -EINVAL;
+	} else
+		batt_temp = prop.intval / 10;
+
+	pr_info("[%s] charger_present = %d batt_mv = %d mV batt_ma = %d mA,batt_soc = %d batt_temp = %d C\n",
+				__func__, charger_present, batt_mv, batt_ma, batt_soc, batt_temp);
+
+	usb_mv = get_vbus(info);
+
+	target_mv = ffc_bat_get_fv(info, batt_temp);
+	if (target_mv == 0)
+		info->target_mv = info->data.battery_cv;
+	else
+		info->target_mv = target_mv;
+
+	if (!charger_present) {
+		info->pres_chrg_step = STEP_NONE;
+	} else if (info->pres_chrg_step == STEP_NONE) {
+		if ((info->chrg_iterm > 0) || (batt_mv < target_mv))
+			info->pres_chrg_step = STEP_NORM;
+	} else if (info->pres_chrg_step == STEP_NORM) {
+		if (batt_mv < (target_mv  - FFC_RECHG_VOLT_MV / 2)) {
+			info->chrg_taper_cnt = 0;
+			info->pres_chrg_step = STEP_NORM;
+		} else if (ffc_bat_check_chg_tapered(info, batt_ma, info->chrg_iterm))
+			info->pres_chrg_step = STEP_FULL;
+	} else if (info->pres_chrg_step == STEP_FULL) {
+		if (batt_mv < (target_mv - FFC_RECHG_VOLT_MV)) {
+			info->chrg_taper_cnt = 0;
+			info->pres_chrg_step = STEP_NORM;
+		}
+	}
+
+	pr_info("[%s] info->pres_chrg_step = %d target_mv = %d\n", __func__, info->pres_chrg_step, target_mv);
+	return 0;
+}
+#endif
+/*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 
 static char *dump_charger_type(int chg_type, int usb_type)
 {
@@ -3182,6 +3398,18 @@ static int charger_routine_thread(void *arg)
 			if (info->algo.do_algorithm)
 				info->algo.do_algorithm(info);
 			charger_status_check(info);
+/* TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+			if (turbo_charger_active == true
+				&& info->sw_jeita.sm == TEMP_T2_TO_T3
+				&& (info->chg_data[CHG1_SETTING].thermal_charging_current_limit > 500000
+				|| info->chg_data[CHG1_SETTING].thermal_charging_current_limit == -1)) {
+				ret = ffc_bat_check_chg_done(info);
+				if (ret < 0)
+					chr_err("ffc_bat_check_chg_done ERR(%d)!!!\n", ret);
+			}
+#endif /* CONFIG_OEM_TURBO_CHARGER */
+/* TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 		} else {
 			chr_debug("disable charging %d %d %d\n",
 			    is_disable_charger(info), is_charger_on, info->can_charging);
@@ -3717,6 +3945,12 @@ static int psy_charger_set_property(struct power_supply *psy,
 			info->enable_hv_charging = false;
 		break;
 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX:
+/*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+		//g_thermal_charging_current_limit = val->intval;
+		g_thermal_charging_current_limit = -1;
+#endif /* CONFIG_OEM_TURBO_CHARGER */
+/*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 		info->chg_data[idx].thermal_charging_current_limit =
 			val->intval;
 		break;

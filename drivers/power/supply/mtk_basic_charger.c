@@ -59,6 +59,29 @@
 
 #include "mtk_charger.h"
 
+/*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+#define FFC_BAT_VOLT_COMP_MV	100
+#define FFC_BAT_REDU_CURR_MA	1500
+#define FFC_BAT_VOLT_MAX_UV	4620000
+#define FFC_BAT_VOLT_STEP_UV	5000
+bool is_turbo_charger_ready = false;
+EXPORT_SYMBOL(is_turbo_charger_ready);
+
+bool turbo_charger_active = false;
+EXPORT_SYMBOL(turbo_charger_active);
+
+bool ffc_batt_full = false;
+EXPORT_SYMBOL(ffc_batt_full);
+
+int ffc_reduce_count = 0;
+EXPORT_SYMBOL(ffc_reduce_count);
+#endif /* CONFIG_OEM_TURBO_CHARGER */
+
+#define SW_BAT_VOLT_COMP_UV	16000
+#define SW_BAT_REDU_CURR_MA	2000
+/*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+
 static int _uA_to_mA(int uA)
 {
 	if (uA == -1)
@@ -76,8 +99,26 @@ static void select_cv(struct mtk_charger *info)
 			info->setting.cv = info->sw_jeita.cv;
 			return;
 		}
+/*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+	int chg_current = get_battery_current(info); // mA
+	if ((turbo_charger_active == true) && (info->sw_jeita.sm == TEMP_T2_TO_T3)) {
+		constant_voltage = FFC_BAT_VOLT_MAX_UV;
+		if (chg_current < FFC_BAT_REDU_CURR_MA) {
+			constant_voltage -= FFC_BAT_VOLT_STEP_UV * ffc_reduce_count;
+			pr_info("%s:ffc_reduce_count = %d \n", __func__, ffc_reduce_count);
+			if (constant_voltage >= (info->target_mv * 1000))
+				ffc_reduce_count ++;
+		}
 
-	constant_voltage = info->data.battery_cv;
+		if (ffc_batt_full == true)
+			constant_voltage = (info->target_mv - FFC_BAT_VOLT_COMP_MV) * 1000;
+	} else
+#endif /* CONFIG_OEM_TURBO_CHARGER */
+	{
+		constant_voltage = info->data.battery_cv;
+	}
+/*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 	info->setting.cv = constant_voltage;
 }
 
@@ -188,6 +229,27 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		is_basic = true;
 
 	} else if (info->chr_type == POWER_SUPPLY_TYPE_USB_DCP) {
+/*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+		if (!is_turbo_charger_ready) {
+			pdata->input_current_limit =
+				info->data.ac_charger_input_current;
+			pdata->charging_current_limit =
+				info->data.ac_charger_current;
+			if (info->config == DUAL_CHARGERS_IN_SERIES) {
+				pdata2->input_current_limit =
+					pdata->input_current_limit;
+				pdata2->charging_current_limit = 2000000;
+			}
+		} else {
+			chr_info("%s: turbo charger is working, limit the switch charger current\n", __func__);
+			pdata->input_current_limit = 500000;  // mA
+			pdata->charging_current_limit = 500000;  // mA
+		}
+
+		if (ffc_batt_full == true)
+			pdata->charging_current_limit = 100000; // mA
+#else
 		pdata->input_current_limit =
 			info->data.ac_charger_input_current;
 		pdata->charging_current_limit =
@@ -197,6 +259,8 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 				pdata->input_current_limit;
 			pdata2->charging_current_limit = 2000000;
 		}
+#endif /* CONFIG_OEM_TURBO_CHARGER */
+/*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 	} else if (info->chr_type == POWER_SUPPLY_TYPE_USB &&
 	    info->usb_type == POWER_SUPPLY_USB_TYPE_DCP) {
 		/* NONSTANDARD_CHARGER */
@@ -381,7 +445,22 @@ static int do_algorithm(struct mtk_charger *info)
 	int cs_ir_cmp = 0;
 
 	pdata = &info->chg_data[CHG1_SETTING];
-	charger_dev_is_charging_done(info->chg1_dev, &chg_done);
+/*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+	if ((turbo_charger_active == true) && (info->sw_jeita.sm == TEMP_T2_TO_T3)) {
+		if (info->pres_chrg_step == STEP_FULL) {
+			chg_done = true;
+			ffc_batt_full = true;
+			ffc_reduce_count = 0;
+			chr_info("%s:ffc battery chg_done\n", __func__);
+		} else
+			ffc_batt_full = false;
+	} else
+#endif /* CONFIG_OEM_TURBO_CHARGER */
+	{
+		charger_dev_is_charging_done(info->chg1_dev, &chg_done);
+	}
+/*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 	is_basic = select_charging_current_limit(info, &info->setting);
 
 	if (info->cschg1_dev && info->cs_with_gauge
