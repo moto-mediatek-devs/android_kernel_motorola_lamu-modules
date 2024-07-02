@@ -66,6 +66,11 @@ thermal_monitor-y += common/thermal_zones/mtk_ts_pa.o
 thermal_monitor-y += common/thermal_zones/mtk_ts_pa_thput.o
 thermal_monitor-y += common/thermal_zones/mtk_ts_charger.o
 
+# p329 add board, usb, charger ntc
+thermal_monitor-y += common/thermal_zones/mtk_ts_board_p329.o
+thermal_monitor-y += common/thermal_zones/mtk_ts_btsusb_p329.o
+thermal_monitor-y += common/thermal_zones/mtk_ts_charger_p329.o
+
 
 ifeq ($(strip $(CONFIG_MTK_PLAT_POWER_6853)),)
 thermal_monitor-y += common/thermal_zones/mtk_ts_wmt.o

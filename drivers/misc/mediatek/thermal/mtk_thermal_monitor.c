@@ -2057,6 +2057,11 @@ static int __init thermal_monitor_init(void)
 		mtkts_dctm_init();
 		wmt_tm_init();
 		tsallts_init();
+		/*TN Begin modified by libei.guo/860712 20240702 CR/EKLAMU-1556*/
+		mtk_ts_board_init();
+		mtktsusb_init();
+		mtk_ts_charger_init();
+		/*TN end modified by libei.guo/860712 20240702 CR/EKLAMU-1556*/
 		return 0;
 }
 
@@ -2092,6 +2097,11 @@ static void __exit thermal_monitor_exit(void)
 	mtkts_dctm_exit();
 	wmt_tm_deinit();
 	tsallts_exit();
+	/*TN Begin modified by libei.guo/860712 20240702 CR/EKLAMU-1556*/
+	mtk_ts_board_exit();
+	mtktsusb_exit();
+	mtk_ts_charger_exit();
+	/*TN end modified by libei.guo/860712 20240702 CR/EKLAMU-1556*/
 }
 
 
