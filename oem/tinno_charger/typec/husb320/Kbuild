@@ -1,0 +1,6 @@
+ifdef CONFIG_OEM_TCPC_HUSB320
+	TCPC_HUSB320_OBJS += tcpc_husb320.o
+endif
+
+obj-$(CONFIG_OEM_TCPC_HUSB320) += husb320.o
+husb320-y := $(TCPC_HUSB320_OBJS)

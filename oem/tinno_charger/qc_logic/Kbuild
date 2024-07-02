@@ -1,0 +1,3 @@
+ifdef CONFIG_OEM_QC_LOGIC_Z350
+	obj-y += z350/
+endif
