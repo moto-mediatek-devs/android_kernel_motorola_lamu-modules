@@ -114,6 +114,15 @@ struct charger_ops {
 #endif /* CONFIG_OEM_CHARGER_PUMP */
 /* TN End modified by hao.jia/809321 20240701 CR/EKLAMU-202 */
 
+/* TN Begin modified by hao.jia/809321 20240702 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+	int (*is_vbushigher)(struct charger_device *dev, bool *err);
+	int (*is_vbat_present)(struct charger_device *dev, bool *present);
+	int (*is_vbus_present)(struct charger_device *dev, bool *present);
+	int (*enable_dpdm_hz)(struct charger_device *dev);
+#endif /* CONFIG_OEM_TURBO_CHARGER */
+/* TN End modified by hao.jia/809321 20240702 CR/EKLAMU-202 */
+
 	/* set cv */
 	int (*set_constant_voltage)(struct charger_device *dev, u32 uV);
 	int (*get_constant_voltage)(struct charger_device *dev, u32 *uV);
@@ -462,5 +471,14 @@ extern int charger_dev_notify(
 extern int charger_dev_enable_adc(struct charger_device *charger_dev, bool enable);
 #endif /* CONFIG_OEM_CHARGER_PUMP */
 /* TN End modified by hao.jia/809321 20240701 CR/EKLAMU-202 */
+
+/* TN Begin modified by hao.jia/809321 20240702 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+extern int charger_dev_is_vbushigher(struct charger_device *chg_dev, bool *err);
+extern int charger_dev_is_vbat_present(struct charger_device *chg_dev, bool *present);
+extern int charger_dev_is_vbus_present(struct charger_device *chg_dev, bool *present);
+extern int charger_dev_enable_dpdm_hz(struct charger_device *chg_dev);
+#endif /* CONFIG_OEM_TURBO_CHARGER */
+/* TN End modified by hao.jia/809321 20240702 CR/EKLAMU-202 */
 
 #endif /*LINUX_POWER_CHARGER_CLASS_H*/

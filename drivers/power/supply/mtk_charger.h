@@ -96,6 +96,22 @@ struct charger_data;
 
 #define RESET_BOOT_VOLT_TIME 50
 
+/*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+struct ffc_bat_zone {
+	int temp;
+	int ffc_max_mv;
+	int ffc_chg_iterm;
+};
+
+enum ffc_chrg_step {
+	STEP_NORM,
+	STEP_FULL,
+	STEP_NONE = 0xFF,
+};
+#endif /* CONFIG_OEM_TURBO_CHARGER */
+/*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+
 enum bat_temp_state_enum {
 	BAT_TEMP_LOW = 0,
 	BAT_TEMP_NORMAL,
@@ -487,6 +503,16 @@ struct mtk_charger {
 	int protocol_state;
 	int ta_capability;
 	int wait_times;
+/* TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+	struct ffc_bat_zone *ffc_zones;
+	int num_ffc_zones;
+	int chrg_iterm;
+	int pres_chrg_step;
+	int chrg_taper_cnt;
+	int target_mv;
+#endif /* CONFIG_OEM_TURBO_CHARGER */
+/* TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 };
 
 static inline int mtk_chg_alg_notify_call(struct mtk_charger *info,
