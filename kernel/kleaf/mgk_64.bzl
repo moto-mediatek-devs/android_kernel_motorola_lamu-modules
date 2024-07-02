@@ -1903,6 +1903,7 @@ def get_overlay_modules_list():
         mgk_64_device_modules.append("drivers/tinno_charger/switch_charger/sgm41542/sgm41542.ko")
         mgk_64_device_modules.append("drivers/tinno_charger/typec/aw35616/aw35616.ko")
         mgk_64_device_modules.append("drivers/tinno_charger/typec/husb320/husb320.ko")
+        mgk_64_device_modules.append("oem/aw_sar/awinic_sar.ko")
 
     if "mt6761_overlay.config" in DEFCONFIG_OVERLAYS:
         mgk_64_platform_device_modules.update({"drivers/regulator/mt6357-regulator.ko":"mt6761"})
