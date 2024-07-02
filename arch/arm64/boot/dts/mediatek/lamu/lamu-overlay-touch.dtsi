@@ -2,7 +2,7 @@
 &spi2 {
     status = "ok";
     chipone_tddi@0 {
-        compatible = "chipone-tddi","novatek,NVT-ts-spi";
+        compatible = "chipone-tddi","novatek,NVT-ts-spi","tchip,ilitek";
         reg = <0>;
         spi-max-frequency = <9600000>;
         interrupt-parent = <&pio>;
@@ -11,6 +11,9 @@
         chipone,irq-gpio = <&pio 0 0x00>;
         chipone,x-res = <4320>;
         chipone,y-res = <9600>;
+
+        touch,irq-gpio = <&pio 0 0x00>;
+        touch,reset-gpio = <&pio 36 0x00>;
 
         /*chipone,touch-charger-detect-enable;
         chipone,touch-charger-detect-type = "notify";
@@ -26,6 +29,7 @@
         novatek,reset-gpio = <&pio 36 0x00>;
         novatek,irq-gpio =<&pio 0 0x00>;
     };
+
 };
 
 /*[TN.NJDC] touch overlay file.end*/

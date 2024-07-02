@@ -6,5 +6,6 @@ endif
 ifdef CONFIG_OEM_LAMU_TOUCHSCREEN
 	obj-y += chipone_tddi/
 	obj-y += nt36672s/
+	obj-y += ILITEK9883C/
 	#obj-y += omnivision_tcm/
 endif

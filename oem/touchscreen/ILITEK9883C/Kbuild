@@ -1,4 +1,4 @@
-ifdef CONFIG_OEM_TOUCHSCREEN
+ifdef CONFIG_OEM_LAMU_TOUCHSCREEN
 	TP_OBJS += ilitek_v3.o
 	TP_OBJS += ilitek_v3_spi.o
 	TP_OBJS += ilitek_v3_mtk.o
@@ -10,6 +10,6 @@ ifdef CONFIG_OEM_TOUCHSCREEN
 	TP_OBJS += ilitek_v3_touch.o
 endif
 
-obj-$(CONFIG_OEM_TOUCHSCREEN) += tp_ilitek.o
+obj-$(CONFIG_OEM_LAMU_TOUCHSCREEN) += tp_ilitek.o
 tp_ilitek-y := $(TP_OBJS)
 
