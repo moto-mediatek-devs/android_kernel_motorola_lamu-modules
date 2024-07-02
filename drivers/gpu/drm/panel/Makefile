@@ -77,6 +77,7 @@ endif
 obj-$(CONFIG_DRM_PANEL_DJIN_FT8057S_VDO) += panel-djin-ft8057s-vdo.o
 obj-$(CONFIG_DRM_PANEL_BOE_ICNL9922C_VDO) += panel-boe-icnl9922c-vdo.o
 obj-$(CONFIG_DRM_PANEL_TXD_ILI9883C_VDO) += panel-txd-ili9883c-vdo.o
+obj-$(CONFIG_DRM_PANEL_TM_TD4376_VDO) += panel-tm-td4376-vdo.o
 obj-$(CONFIG_DRM_PANEL_DJN_NT36672S_VDO) += panel-djn-nt36672s-vdo.o
 
 obj-$(CONFIG_DRM_PANEL_MAXIAM_MAX96851) += panel-maxiam-max96851.o

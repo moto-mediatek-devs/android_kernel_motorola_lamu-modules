@@ -1890,6 +1890,7 @@ def get_overlay_modules_list():
         mgk_64_device_modules.append("oem/touchscreen/nt36672s/nt36672s.ko")
         mgk_64_device_modules.append("oem/fingerprint/fpc1560/fpc_fingerprint.ko")
         mgk_64_device_modules.append("drivers/gpu/drm/panel/panel-txd-ili9883c-vdo.ko")
+        mgk_64_device_modules.append("drivers/gpu/drm/panel/panel-tm-td4376-vdo.ko")
         mgk_64_device_modules.append("drivers/gpu/drm/panel/panel-djn-nt36672s-vdo.ko")
         mgk_64_device_modules.append("drivers/tinno_charger/oem_tinno_charger.ko")
         mgk_64_device_modules.append("drivers/tinno_charger/switch_charger/sgm41542/sgm41542.ko")

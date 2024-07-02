@@ -304,11 +304,12 @@
 	};
 
 	panel3@0 {
-		compatible = "djn,nt36672s,vdo";
+		compatible = "tm,td4376,vdo";
 		reg = <2>;
 
 		vddio-gpios = <&pio 12 0>;
 		reset-gpios = <&pio 45 0>;
+		tprst-gpios = <&pio 36 0>;
 		bias-gpios = <&pio 20 0>,
 		<&pio 151 0>;
 		//gate-ic = <4831>;
@@ -318,7 +319,26 @@
 				remote-endpoint = <&dsi_out>;
 			};
 		};
-	};	ports {
+	};
+
+	panel4@0 {
+		compatible = "djn,nt36672s,vdo";
+		reg = <3>;
+
+		vddio-gpios = <&pio 12 0>;
+		reset-gpios = <&pio 45 0>;
+		bias-gpios = <&pio 20 0>,
+		<&pio 151 0>;
+		//gate-ic = <4831>;
+		pinctrl-names = "default";
+		port {
+			panel_in4: endpoint {
+				remote-endpoint = <&dsi_out>;
+			};
+		};
+	};
+
+	ports {
 		port {
 			dsi_out: endpoint {
 				remote-endpoint = <&panel_in1>;
