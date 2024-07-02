@@ -218,6 +218,20 @@
 };
 /* CAMERA GPIO end */
 
+/* CAMERA EEPROM */
+&i2c2 {
+	status = "okay";
+	clock-frequency = <400000>;
+	#address-cells = <1>;
+	size-cells = <0>;
+	mtk_camera_eeprom0:camera_eeprom0@50 {
+		compatible = "mediatek,camera_eeprom";
+		reg = <0x50>;
+		status = "okay";
+	};
+};
+/* CAMERA EEPROM END */
+
 /* CAMERA AF */
 &camera_af_hw_node {
 	camaf_m1_pmic-supply = <&mt_pmic_vldo28_ldo_reg>;
