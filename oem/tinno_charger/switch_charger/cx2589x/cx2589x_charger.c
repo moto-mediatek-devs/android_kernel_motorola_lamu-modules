@@ -439,6 +439,42 @@ static int cx2589x_get_chrg_volt(struct charger_device *chg_dev,unsigned int *vo
 	return 0;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+static int charger_detect_init(struct cx2589x_device *cx)
+{
+	struct phy *phy;
+	int ret;
+	dev_err(cx->dev, " entry %s\n", __func__);
+	phy = phy_get(cx->dev, "usb2-phy");
+	if (IS_ERR_OR_NULL(phy)) {
+		dev_err(cx->dev, "failed to get usb2-phy\n");
+		return -ENODEV;
+	}
+	ret = phy_set_mode_ext(phy, PHY_MODE_USB_DEVICE, PHY_MODE_BC11_SET);
+	dev_err(cx->dev, "%s\n", __func__);
+	if (ret)
+		dev_err(cx->dev, "failed to set phy ext mode\n");
+	phy_put(cx->dev, phy);
+	return ret;
+}
+
+static int charger_detect_release(struct cx2589x_device *cx)
+{
+	struct phy *phy;
+	int ret;
+	phy = phy_get(cx->dev, "usb2-phy");
+	if (IS_ERR_OR_NULL(phy)) {
+		dev_err(cx->dev, "failed to get usb2-phy\n");
+		return -ENODEV;
+	}
+	ret = phy_set_mode_ext(phy, PHY_MODE_USB_DEVICE, PHY_MODE_BC11_CLR);
+	dev_err(cx->dev, "%s\n", __func__);
+	if (ret)
+		dev_err(cx->dev, "failed to set phy ext mode\n");
+	phy_put(cx->dev, phy);
+	return ret;
+}
+#endif
 
 static int cx2589x_force_vindpm(struct cx2589x_device *cx, bool en)
 {
@@ -895,10 +931,24 @@ static int cx2589x_charger_set_property(struct power_supply *psy,
 		enum power_supply_property prop,
 		const union power_supply_propval *val)
 {
-	//struct cx2589x_device *cx = power_supply_get_drvdata(psy);
-	int ret = -EINVAL;
+	struct cx2589x_device *cx = power_supply_get_drvdata(psy);
+	int ret = 0;
 
 	switch (prop) {
+	case POWER_SUPPLY_PROP_ONLINE:
+		if (val->intval == 2) {
+			dev_info(cx->dev, "%s: %d, start charger detection\n", __func__, val->intval);
+			schedule_delayed_work(&cx->charge_detect_delayed_work, msecs_to_jiffies(600));
+		} else if (val->intval == 0) {
+			dev_info(cx->dev, "%s: %d, vbus not online \n", __func__, val->intval);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
+			cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
+#endif
+			cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
+			cancel_delayed_work(&cx->charge_detect_delayed_work);
+			power_supply_changed(cx->charger);
+		}
+		break;
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
 		ret = cx2589x_set_input_curr_lim(s_chg_dev_otg, val->intval);
 		break;
@@ -1193,6 +1243,12 @@ static void charger_detect_work_func(struct work_struct *work)
 	if (!cx->charger_wakelock->active)
 		__pm_stay_awake(cx->charger_wakelock);
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+	charger_detect_init(cx);
+#else
+	Charger_Detect_Init();
+#endif
+
 	ret = cx2589x_get_state(cx, &state);
 	mutex_lock(&cx->lock);
 	cx->state = state;
@@ -1257,6 +1313,10 @@ static void charger_detect_work_func(struct work_struct *work)
 		cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB;
 		break;
 		//return;
+	}
+
+	if (cx->state.chrg_type == CX2589x_USB_SDP || cx->state.chrg_type == CX2589x_USB_CDP) {
+		charger_detect_release(cx);
 	}
 
 	dev_info(cx->dev, "Update: chg_type = %d, psy_usb_type = %d\n", cx->chg_type, cx->psy_usb_type);
@@ -1346,12 +1406,12 @@ static void charger_usb_detect_work_func(struct work_struct *work)
 
 static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
 {
-	struct cx2589x_device *cx = private;
+	//struct cx2589x_device *cx = private;
 
 	//lock wakelock
 	pr_info("[%s] entry\n", __func__);
 
-	schedule_delayed_work(&cx->charge_detect_delayed_work, 100);
+	//schedule_delayed_work(&cx->charge_detect_delayed_work, 100);
 
 	//power_supply_changed(cx->charger);
 

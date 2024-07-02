@@ -110,8 +110,6 @@ static bool usb_is_online(struct mtk_extcon_info *extcon)
 	union power_supply_propval tval;
 	int ret;
 
-	return true;
-
 	ret = power_supply_get_property(extcon->usb_psy,
 				POWER_SUPPLY_PROP_ONLINE, &pval);
 	if (ret < 0) {
