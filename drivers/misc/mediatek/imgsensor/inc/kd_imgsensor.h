@@ -132,6 +132,10 @@
 #define SENSOR_DRVNAME_SC820CS_MIPI_RAW         "sc820cs_mipi_raw"
 #define SC520CS_SENSOR_ID                       0xee4b
 #define SENSOR_DRVNAME_SC520CS_MIPI_RAW         "sc520cs_mipi_raw"
+#define OV08D10_SENSOR_ID                       0x560847
+#define SENSOR_DRVNAME_OV08D10_MIPI_RAW         "ov08d10_mipi_raw"
+#define GC05A2_SENSOR_ID                        0x05a2
+#define SENSOR_DRVNAME_GC05A2_MIPI_RAW          "gc05a2_mipi_raw"
 /* Lamu */
 #define HI1339_SENSOR_ID                          0x1339
 #define SENSOR_DRVNAME_HI1339_MIPI_RAW            "hi1339_mipi_raw"

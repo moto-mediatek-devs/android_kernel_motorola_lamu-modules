@@ -161,7 +161,7 @@ struct IMGSENSOR_HW_POWER_SEQ sensor_power_sequence[] = {
 #if defined(GC08A8_MIPI_RAW)
   	{
   		SENSOR_DRVNAME_GC08A8_MIPI_RAW,
-  		{	
+		{
   			{RST, Vol_Low, 1},
   			{DOVDD, Vol_1800, 0},
   			{AVDD, Vol_2800, 0},
@@ -185,6 +185,19 @@ struct IMGSENSOR_HW_POWER_SEQ sensor_power_sequence[] = {
 		},
 	},
 #endif
+#if defined(OV08D10_MIPI_RAW)
+	{
+		SENSOR_DRVNAME_OV08D10_MIPI_RAW,
+		{
+			{RST, Vol_Low, 0},
+            {SensorMCLK, Vol_High, 0},
+            {DOVDD, Vol_1800, 0},
+            {AVDD, Vol_2800, 0},
+            {DVDD, Vol_High, 5},
+            {RST, Vol_High, 8},
+		},
+	},
+#endif
 #if defined(SC520CS_MIPI_RAW)
     {
         SENSOR_DRVNAME_SC520CS_MIPI_RAW,
@@ -198,6 +211,19 @@ struct IMGSENSOR_HW_POWER_SEQ sensor_power_sequence[] = {
             {RST, Vol_High, 4},
         },
     },
+#endif
+#if defined(GC05A2_MIPI_RAW)
+	{
+		SENSOR_DRVNAME_GC05A2_MIPI_RAW,
+		{
+            {SensorMCLK, Vol_High, 1},
+            {RST, Vol_Low, 1},
+            {DOVDD, Vol_1800, 1},
+            {DVDD, Vol_1200, 5},
+            {AVDD, Vol_2800, 5},
+            {RST, Vol_High, 3},
+		},
+	},
 #endif
 	/*lamu*/
 	/* add new sensor before this line */
