@@ -224,6 +224,8 @@ static int td4376_panel_bias_disable(void)
 
 static void td4376_panel_init(struct td4376 *ctx)
 {
+
+#if 0
 	ctx->tprst_gpio =
 		devm_gpiod_get(ctx->dev, "tprst", GPIOD_OUT_HIGH);
 	if (IS_ERR(ctx->tprst_gpio)) {
@@ -255,6 +257,8 @@ static void td4376_panel_init(struct td4376 *ctx)
 	gpiod_set_value(ctx->reset_gpio, 1);
 	msleep(20);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
+#endif
+	msleep(20);
 
 	td4376_dcs_write_seq_static(ctx, 0xB0,0x04);
 	td4376_dcs_write_seq_static(ctx, 0xD6,0x00);
@@ -306,6 +310,9 @@ static int td4376_unprepare(struct drm_panel *panel)
 
 	ctx->error = 0;
 	ctx->prepared = false;
+
+	pr_info("%s ennnter +\n", __func__);
+	return 0;
 
 #ifdef TINNO_LCM_OEM_CONFIG
 	gesture_mode = fts_lcd_gesture_control();
@@ -418,6 +425,7 @@ static int td4376_prepare(struct drm_panel *panel)
 	udelay(5000);
 #endif
 
+#if 0
 	ctx->reset_gpio =
 		devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(ctx->reset_gpio)) {
@@ -454,6 +462,7 @@ static int td4376_prepare(struct drm_panel *panel)
 	}
 	gpiod_set_value(ctx->bias_neg, 1);
 	devm_gpiod_put(ctx->dev, ctx->bias_neg);
+#endif
 #endif
 
 	udelay(10000);
