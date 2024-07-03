@@ -32,6 +32,18 @@
 static DEFINE_SPINLOCK(g_spinLock);
 static struct i2c_client *g_pstI2CclientG;
 
+extern struct gc08a8_otp_t gc08a8_otp_info;
+struct gc08a8_otp_t {
+	u8  module_flag;
+	u8  module_param[18];
+	u8  moduleChksum;
+	u8  awb_flag;
+	u8  awb_param[12];
+	u8  awbChksum;
+	u8  lsc_flag;
+	u8  lsc_param[1868];
+	u8  lscChksum;
+};
 /************************************************************
  * I2C read function (Custom)
  * Customer's driver can put on here
@@ -109,4 +121,54 @@ unsigned int Custom_read_region(struct i2c_client *client, unsigned int addr,
 		return 0;
 }
 
+/*begin 20240702 add for otp check*/
+unsigned int gc08a8_dd_p329_read_region(struct i2c_client *client, unsigned int addr,
+                                unsigned char *data, unsigned int size)
+{
+    int i=0;
 
+    pr_err("[yy]addr =%x size %d\n", addr, size);
+	pr_err("module id = 0x%x", gc08a8_otp_info.module_param[0]);
+	pr_err("Year = 0x%x", gc08a8_otp_info.module_param[1]);
+
+	if (addr == 0x6)
+    {
+        *(u32 *)data = 0x00000088;
+		pr_err("gc08a8_read_region [yy]addr =%x data = %x  size = %x\n", addr, *(u32 *)data, size);
+    }
+
+    else if (addr == 0x1)
+    {
+        if ((gc08a8_otp_info.lsc_flag == 0x01) || (gc08a8_otp_info.lsc_flag == 0x04))
+        {
+            pr_err("[yy]lsc_flag valid\n");
+            for(i=0; i<size; i++){
+                data[i] = gc08a8_otp_info.lsc_param[i];
+            }
+        }
+    }
+	/*
+    else if (addr == 0x2)
+    {
+        if ((gc08a8_otp_info.awb_flag == 0x01) || (gc08a8_otp_info.awb_flag == 0x04))
+        {
+            *data = 1;
+        }
+    }
+	*/
+    else if (addr == 0x3)
+    {
+        for(i=0; i<size; i++){
+            data[i] = gc08a8_otp_info.awb_param[i];
+            pr_err("[yy]gc08a8_read_region awb data[%d] =%x \n", i, data[i]);
+        }
+    }
+    else
+    {
+        pr_err("add = 0x%x, size = %d ,read error !!!\n",addr,size);
+    }
+
+    return size;
+}
+
+/*end 20240702 add for otp check*/

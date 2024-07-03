@@ -57,35 +57,29 @@
 
 /*begin 20220402 add for otp check*/
 
-#define MODULE_GROUP_FLAG 0x15a0
-#define AWB_GROUP_FLAG 0x15a8
-#define LSC_GROUP_FLAG 0x15b8
-#define AF_GROUP_FLAG 0x15b0
+#define MODULE_GROUP_FLAG 0x15A0
+#define AWB_GROUP_FLAG 0x16D8
+#define LSC_GROUP_FLAG 0x17B0
 
-#define MODULE_INFO_FLAG 0x15c0
-#define AWB_INFO_FLAG 0x1600
-#define LSC_INFO_FLAG 0x16b0
-#define AF_INFO_FLAG 0x1668
+#define MODULE_INFO_FLAG 0x15A8
+#define AWB_INFO_FLAG 0x16E0
+#define LSC_INFO_FLAG 0x17B8
 
-#define GROUP_LENGTH 1899
-#define MODULE_LENGTH 8
+#define GROUP_LENGTH 1900
+#define MODULE_LENGTH 19
 #define AWB_LENGTH 13
 #define LSC_LENGTH 1869
-#define AF_LENGTH 9
 
 struct gc08a8_otp_t {
 	kal_uint8  module_flag;
-	kal_uint8  module_param[7];
+	kal_uint8  module_param[18];
 	kal_uint8  moduleChksum;
 	kal_uint8  awb_flag;
 	kal_uint8  awb_param[12];
-        kal_uint8  awbChksum;
+	kal_uint8  awbChksum;
 	kal_uint8  lsc_flag;
 	kal_uint8  lsc_param[1868];
-        kal_uint8  lscChksum;
-	kal_uint8  af_flag;
-	kal_uint8  af_param[8];
-        kal_uint8  afChksum;
+	kal_uint8  lscChksum;
 };
 enum IMGSENSOR_MODE {
 	IMGSENSOR_MODE_INIT,
