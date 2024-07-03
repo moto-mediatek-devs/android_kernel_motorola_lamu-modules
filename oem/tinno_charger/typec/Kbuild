@@ -13,3 +13,7 @@ endif
 ifdef CONFIG_OEM_TCPC_AW35616
 	obj-y += aw35616/
 endif
+
+ifdef CONFIG_OEM_TCPC_PD_SC2150
+	obj-y += sc2150/
+endif

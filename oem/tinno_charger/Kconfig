@@ -130,6 +130,13 @@ config OEM_TCPC_SGM7220
 	help
 	  support oem_tcpc_sgm7220
 
+config OEM_TCPC_PD_SC2150
+	tristate "oem tcpc pd sc2150"
+	depends on OEM_TCPC
+	default n
+	help
+	  support oem_tcpc_pd_sc2150
+
 config OEM_TCPC_PD_AW35615
 	tristate "oem tcpc pd aw35615"
 	depends on OEM_TCPC
