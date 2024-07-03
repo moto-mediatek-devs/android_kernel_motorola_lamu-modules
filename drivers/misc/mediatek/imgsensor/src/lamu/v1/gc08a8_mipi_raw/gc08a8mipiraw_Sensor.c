@@ -288,7 +288,7 @@ static void table_write_cmos_sensor(kal_uint16 *para, kal_uint32 len)
 	}
 }
 
-/*begin 20220402 add for otp check
+//begin 20220402 add for otp check
 struct gc08a8_otp_t gc08a8_otp_info;
 EXPORT_SYMBOL(gc08a8_otp_info);
 
@@ -326,9 +326,9 @@ static kal_uint16 gc08a8_otp_read_group(kal_uint16 addr, kal_uint8 *data, kal_ui
 
 	for (i = 0; i < length; i++) {
 		data[i] = read_cmos_sensor(0x0a6c);
-//#if GC08A8_OTP_DEBUG
-//	CAM_DBG(PFX,"addr = 0x%x, data = 0x%x\n", addr + i * 8, data[i]);
-//#endif
+#if GC08A8_OTP_DEBUG
+	CAM_DBG(PFX,"addr = 0x%x, data = 0x%x\n", addr + i * 8, data[i]);
+#endif
 	}
 	return 0;
 }
@@ -379,9 +379,9 @@ static bool check_sum(kal_uint8 *buf, unsigned int size, kal_uint8 chksum)
 		//CAM_DBG(PFX,"buf[%d] = 0x%x %d", i, buf[i], buf[i]);
 	}
 
-	if ((sum % 256) != chksum)
+	if (((sum % 255) + 1) != chksum)
 	{
-		CAM_DBG(PFX,"chksum fail size = %d sum=%d sum-in-eeprom=%d", size, (sum % 256), chksum);
+		CAM_DBG(PFX,"chksum fail size = %d sum=%d sum-in-eeprom=%d", size, ((sum % 255) + 1), chksum);
 		return false;
 	}
 	return true;
@@ -392,33 +392,29 @@ bool check_gc08a8_otp(void)
 
 	kal_uint8 moduleflag =0;
 	kal_uint8 awbflag =0;
-	kal_uint8 afflag =0;
 	kal_uint8 lscflag =0;
 	kal_uint8 checksum_module = 0;
 	kal_uint8 checksum_awb = 0;
-	kal_uint8 checksum_af = 0;
 	kal_uint8 checksum_lsc = 0;
 
     gc08a8_otp_init();
 
 	moduleflag = gc08a8_otp_read_byte(MODULE_GROUP_FLAG);
 	awbflag = gc08a8_otp_read_byte(AWB_GROUP_FLAG);
-	afflag = gc08a8_otp_read_byte(AF_GROUP_FLAG);
 	lscflag = gc08a8_otp_read_byte(LSC_GROUP_FLAG);
+	CAM_DBG(PFX,"moduleflag, = 0x%x", moduleflag);
 	CAM_DBG(PFX,"awbflag, = 0x%x", awbflag);
 	CAM_DBG(PFX,"lscflag, = 0x%x", lscflag);
 
 	//for module info otp read
     if ((moduleflag & 0x03) == 0x01) {
-    //  if ((moduleflag & 0x0c) == 0x04) {
         CAM_DBG(PFX,"group1_module, size %d, block flag 0x01", MODULE_LENGTH);
         gc08a8_iReadData(MODULE_INFO_FLAG, MODULE_LENGTH,&gc08a8_otp_info.module_param[0]);
-	gc08a8_iReadData(MODULE_INFO_FLAG + (MODULE_LENGTH-1) * 8, 1, &gc08a8_otp_info.moduleChksum);
+		gc08a8_iReadData(MODULE_INFO_FLAG + (MODULE_LENGTH-1) * 8, 1, &gc08a8_otp_info.moduleChksum);
     } else if ((moduleflag & 0x0c) == 0x04) {
-    //  } else if ((moduleflag & 0x03) == 0x01) {
         CAM_DBG(PFX,"group2_module, size %d, block flag 0x03", MODULE_LENGTH);
         gc08a8_iReadData(MODULE_INFO_FLAG + GROUP_LENGTH * 8, MODULE_LENGTH,&gc08a8_otp_info.module_param[0]);
-	gc08a8_iReadData(MODULE_INFO_FLAG + GROUP_LENGTH * 8 + (MODULE_LENGTH-1) * 8, 1, &gc08a8_otp_info.moduleChksum);
+		gc08a8_iReadData(MODULE_INFO_FLAG + GROUP_LENGTH * 8 + (MODULE_LENGTH-1) * 8, 1, &gc08a8_otp_info.moduleChksum);
     } else if ((moduleflag & 0x0f) == 0x00) {
         CAM_DBG(PFX,"module info is empty");
     } else {
@@ -428,7 +424,7 @@ bool check_gc08a8_otp(void)
 	//for muduleinfo checksum
 	if (check_sum(&gc08a8_otp_info.module_param[0], MODULE_LENGTH-1, gc08a8_otp_info.moduleChksum))
 	{
-		CAM_DBG(PFX,"[ljt]gc08a8OTP:module flag chksum pass");
+		CAM_DBG(PFX,"[yy]gc08a8OTP:module flag chksum pass");
 		checksum_module = 1;
 
 		CAM_DBG(PFX,"module id = 0x%x", gc08a8_otp_info.module_param[0]);
@@ -441,48 +437,15 @@ bool check_gc08a8_otp(void)
 
 	}
 
-	//for af otp read
-    if ((afflag & 0x03) == 0x01) {
-    //  if ((afflag & 0x0c) == 0x04) {
-        CAM_DBG(PFX,"group1_af, size %d, block flag 0x01", AF_LENGTH);
-        gc08a8_iReadData(AF_INFO_FLAG, AF_LENGTH,&gc08a8_otp_info.af_param[0]);
-		gc08a8_iReadData(AF_INFO_FLAG + (AF_LENGTH-1) * 8, 1, &gc08a8_otp_info.afChksum);
-    } else if ((afflag & 0x0c) == 0x04) {
-    //  } else if ((afflag & 0x03) == 0x01) {
-        CAM_DBG(PFX,"group2_af, size %d, block flag 0x03", AF_LENGTH);
-        gc08a8_iReadData(AF_INFO_FLAG + AF_LENGTH * 8, AF_LENGTH,&gc08a8_otp_info.af_param[0]);
-	gc08a8_iReadData(AF_INFO_FLAG + AF_LENGTH * 8 + (AF_LENGTH-1) * 8, 1, &gc08a8_otp_info.afChksum);
-    } else if ((afflag & 0x0f) == 0x00) {
-        CAM_DBG(PFX,"af info is empty");
-    } else {
-        CAM_DBG(PFX,"invalid block af flag 0x%x", afflag);
-    }
-
-	//for af checksum
-	if (check_sum(&gc08a8_otp_info.af_param[0], AF_LENGTH-1, gc08a8_otp_info.afChksum))
-	{
-		CAM_DBG(PFX,"[ljt]gc08a8OTP:af flag chksum pass");
-		checksum_af = 1;
-	}
-	else
-	{
-		int i;
-		for (i = 0; i < AF_LENGTH-1; i++)
-		     CAM_DBG(PFX,"[ljt]gc08a8OTP:af[%d]=0x%x  %d\n", i, gc08a8_otp_info.af_param[i], gc08a8_otp_info.af_param[i]);
-	}
-
-
 	//for awb otp read
     if ((awbflag & 0x03) == 0x01) {
-    //  if ((awbflag & 0x0c) == 0x04) {
         CAM_DBG(PFX,"group1_awb, size %d, block flag 0x01", AWB_LENGTH);
         gc08a8_iReadData(AWB_INFO_FLAG, AWB_LENGTH,&gc08a8_otp_info.awb_param[0]);
 		gc08a8_iReadData(AWB_INFO_FLAG + (AWB_LENGTH-1) * 8, 1, &gc08a8_otp_info.awbChksum);
     } else if ((awbflag & 0x0c) == 0x04) {
-    //  } else if ((awbflag & 0x03) == 0x01) {
         CAM_DBG(PFX,"group2_awb, size %d, block flag 0x03", AWB_LENGTH);
         gc08a8_iReadData(AWB_INFO_FLAG + GROUP_LENGTH * 8, AWB_LENGTH,&gc08a8_otp_info.awb_param[0]);
-	gc08a8_iReadData(AWB_INFO_FLAG + GROUP_LENGTH * 8 + (AWB_LENGTH-1) * 8, 1, &gc08a8_otp_info.awbChksum);
+		gc08a8_iReadData(AWB_INFO_FLAG + GROUP_LENGTH * 8 + (AWB_LENGTH-1) * 8, 1, &gc08a8_otp_info.awbChksum);
     } else if ((awbflag & 0x0f) == 0x00) {
         CAM_DBG(PFX,"awb info is empty");
     } else {
@@ -492,28 +455,26 @@ bool check_gc08a8_otp(void)
 	if (check_sum(&gc08a8_otp_info.awb_param[0], AWB_LENGTH-1, gc08a8_otp_info.awbChksum))
 	{
 		checksum_awb = 1;
-		CAM_DBG(PFX,"[ljt]gc08a8OTP:awb flag chksum pass");
+		CAM_DBG(PFX,"[yy]gc08a8OTP:awb flag chksum pass");
 	}
 	else
 	{
 		int i;
 		for (i = 0; i < AWB_LENGTH-1; i++)
-		     CAM_DBG(PFX,"[ljt]gc08a8OTP:awb[%d]=0x%x  %d\n", i, gc08a8_otp_info.awb_param[i], gc08a8_otp_info.awb_param[i]);
+		     CAM_DBG(PFX,"[yy]gc08a8OTP:awb[%d]=0x%x  %d\n", i, gc08a8_otp_info.awb_param[i], gc08a8_otp_info.awb_param[i]);
 	}
 
 	//for lsc otp read
     if ((lscflag & 0x03) == 0x01) {
-    //  if ((lscflag & 0x0c) == 0x04) {
         CAM_DBG(PFX,"group1_lsc, size %d, block flag 0x01", LSC_LENGTH);
-	gc08a8_otp_info.lsc_flag = 0x01;
+		gc08a8_otp_info.lsc_flag = 0x01;
         gc08a8_iReadData(LSC_INFO_FLAG, LSC_LENGTH,&gc08a8_otp_info.lsc_param[0]);
-	gc08a8_iReadData(LSC_INFO_FLAG + (LSC_LENGTH-1) * 8, 1, &gc08a8_otp_info.lscChksum);
+		gc08a8_iReadData(LSC_INFO_FLAG + (LSC_LENGTH-1) * 8, 1, &gc08a8_otp_info.lscChksum);
     } else if ((lscflag & 0x0c) == 0x04) {
-    //  } else if ((lscflag & 0x03) == 0x01) {
         CAM_DBG(PFX,"group2_lsc, size %d, block flag 0x03", LSC_LENGTH);
         gc08a8_otp_info.lsc_flag = 0x04;
         gc08a8_iReadData(LSC_INFO_FLAG + GROUP_LENGTH * 8, LSC_LENGTH,&gc08a8_otp_info.lsc_param[0]);
-	gc08a8_iReadData(LSC_INFO_FLAG + GROUP_LENGTH * 8 + (LSC_LENGTH-1) * 8, 1, &gc08a8_otp_info.lscChksum);
+		gc08a8_iReadData(LSC_INFO_FLAG + GROUP_LENGTH * 8 + (LSC_LENGTH-1) * 8, 1, &gc08a8_otp_info.lscChksum);
     } else if ((lscflag & 0x0f) == 0x00) {
         CAM_DBG(PFX,"lsc info is empty");
     } else {
@@ -524,12 +485,12 @@ bool check_gc08a8_otp(void)
 	if (check_sum(&gc08a8_otp_info.lsc_param[0], LSC_LENGTH-1, gc08a8_otp_info.lscChksum))
 	{
 		checksum_lsc = 1;
-		CAM_DBG(PFX,"[ljt]gc08a8OTP:lsc flag chksum pass");
+		CAM_DBG(PFX,"[yy]gc08a8OTP:lsc flag chksum pass");
 	}
 
     gc08a8_otp_close();
 
-	if (1 == (checksum_module & checksum_af & checksum_awb & checksum_lsc))
+	if (1 == (checksum_module & checksum_awb & checksum_lsc))
 	{
 		return true;
 	}
@@ -540,7 +501,7 @@ bool check_gc08a8_otp(void)
 	}
 }
 
-end 20220402 add for otp check*/
+//end 20220402 add for otp check
 
 static kal_uint32 return_sensor_id(void)
 {
@@ -1717,14 +1678,11 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 			if (*sensor_id == imgsensor_info.sensor_id) {
 				printk("[gc08a8_camera_sensor]get_imgsensor_id:i2c write id: 0x%x, sensor id: 0x%x\n",
 					imgsensor.i2c_write_id, *sensor_id);
-					/*
 			        if(check_gc08a8_otp())
 			        {
-			              CAM_DBG(PFX,"[ljt]gc08a8,check OTP pass\n");
+			              CAM_DBG(PFX,"[yy]gc08a8,check OTP pass\n");
 				      *sensor_id |= 0x01000000;
 			        }
-					*/
-											
 				return ERROR_NONE;
 			}
 			printk("[gc08a8_camera_sensor]get_imgsensor_id:Read sensor id fail, write id: 0x%x, id: 0x%x\n",
