@@ -3494,8 +3494,14 @@ transparent_hugepage=never";
 			clocks = <&clk26m>;
 			clock-names = "ref";
 			mediatek,discth = <0x7>;
-			mediatek,eye-vrt = <0x5>;
-			mediatek,eye-term = <0x5>;
+/* TN Begin modified by jirui.li/860702 20240702 CR/EKLAMU-202 */
+			mediatek,eye-vrt = <0x7>;
+			mediatek,eye-term = <0x3>;
+			mediatek,rev6 = <0x3>;
+			mediatek,eye-vrt-host = <0x7>;
+			mediatek,eye-term-host = <0x3>;
+			mediatek,rev6-host = <0x3>;
+/* TN End modified by jirui.li/860702 20240702 CR/EKLAMU-202 */
 			nvmem-cells = <&u2_phy_data>;
 			nvmem-cell-names = "intr_cal";
 			nvmem-cell-masks = <0x1f>;
