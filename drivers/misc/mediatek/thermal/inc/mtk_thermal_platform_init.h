@@ -52,6 +52,14 @@ extern void mtktspmic_exit(void);
 extern int mtktspmic_init(void);
 extern void mtkts_bif_exit(void);
 extern int mtkts_bif_init(void);
+/*TN Begin modified by libei.guo/860712 20240702 CR/EKLAMU-1556*/
+extern void mtk_ts_board_exit(void);
+extern int mtk_ts_board_init(void);
+extern void mtktsusb_exit(void);
+extern int mtktsusb_init(void);
+extern void mtk_ts_charger_exit(void);
+extern int mtk_ts_charger_init(void);
+/*TN end modified by libei.guo/860712 20240702 CR/EKLAMU-1556*/
 //for thermal cooler
 extern int ta_init(void);
 #if IS_ENABLED(CONFIG_MTK_THERMAL_PA_VIA_ATCMD)
