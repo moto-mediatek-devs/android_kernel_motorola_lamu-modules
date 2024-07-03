@@ -264,7 +264,7 @@ static void td4376_panel_init(struct td4376 *ctx)
 	td4376_dcs_write_seq_static(ctx, 0xD6,0x00);
 	td4376_dcs_write_seq_static(ctx, 0xF5,0xE6,0x3C);
 
-	td4376_dcs_write_seq_static(ctx, 0x51,0x07,0xFF);
+	td4376_dcs_write_seq_static(ctx, 0x51,0x00,0x00);
 	td4376_dcs_write_seq_static(ctx, 0x53,0x2C);
 	td4376_dcs_write_seq_static(ctx, 0x55,0x00);
 	td4376_dcs_write_seq_static(ctx, 0x35,0x00,0x00);
@@ -587,8 +587,8 @@ static int panel_ata_check(struct drm_panel *panel)
 static int td4376_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 	void *handle, unsigned int level)
 {
-	char bl_tb0[] = {0x51, 0xFF, 0x0E};
-	unsigned int bl_lvl = 0xFF0E;
+	char bl_tb0[] = {0x51, 0x07, 0xFF};
+	//unsigned int bl_lvl = 0xFF0E;
 	if (!cb)
 		return -1;
 
@@ -599,8 +599,8 @@ static int td4376_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
  */
 	//bl_lvl = ((level << 5) & 0xFF00) | (level & 0x0F);
 
-	bl_tb0[1] = (u8)((bl_lvl >> 8) & 0xFF);
-	bl_tb0[2] = (u8)(bl_lvl & 0x0F);
+	bl_tb0[1] = (u8)((level >> 8) & 0x0F);
+	bl_tb0[2] = (u8)(level & 0xFF);
 
 	cb(dsi, handle, bl_tb0, ARRAY_SIZE(bl_tb0));
 
