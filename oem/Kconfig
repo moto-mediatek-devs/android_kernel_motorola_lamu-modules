@@ -58,12 +58,5 @@ config SND_SOC_FS1815
 	help
 	  support oem aduiopa
 
-config AWINIC_SAR
-        tristate "AW Sar sensor"
-        depends on OEM_PROJECT
-        default m
-        help
-          support AW Sar sensor
-
 source "$(KCONFIG_EXT_PREFIX)/oem/sensors/Kconfig"
 
