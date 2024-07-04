@@ -615,7 +615,7 @@ static void djn_panel_init(struct djn *ctx)
 
 	djn_dcs_write_seq_static(ctx, 0xFF,0x10);   //11bit/20KHZ CABC
 	djn_dcs_write_seq_static(ctx, 0xFB,0x01);
-	djn_dcs_write_seq_static(ctx, 0x51,0x0F,0xFF);
+	djn_dcs_write_seq_static(ctx, 0x51,0x00,0x00);
 	djn_dcs_write_seq_static(ctx, 0x53,0x2C);
 	djn_dcs_write_seq_static(ctx, 0x55,0x01);
 	djn_dcs_write_seq_static(ctx, 0x35,0x00);
@@ -935,7 +935,7 @@ static int djn_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 	void *handle, unsigned int level)
 {
 	char bl_tb0[] = {0x51, 0x07,0xFF};
-	unsigned int bl_lvl = 0x07FF;
+	//unsigned int bl_lvl = 0xFF0E;
 	if (!cb)
 		return -1;
 
@@ -946,8 +946,8 @@ static int djn_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
  */
 	//bl_lvl = ((level << 5) & 0xFF00) | (level & 0x0F);
 
-	bl_tb0[1] = (u8)((bl_lvl >> 8) & 0x0F);
-	bl_tb0[2] = (u8)(bl_lvl & 0xFF);
+	bl_tb0[1] = (u8)((level >> 8) & 0x0F);
+	bl_tb0[2] = (u8)(level & 0xFF);
 
 	cb(dsi, handle, bl_tb0, ARRAY_SIZE(bl_tb0));
 
