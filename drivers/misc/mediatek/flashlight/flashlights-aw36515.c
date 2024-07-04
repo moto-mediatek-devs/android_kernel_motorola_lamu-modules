@@ -73,8 +73,7 @@
 #define AW36515_ENABLE_LED2          (0x02)
 #define AW36515_ENABLE_LED2_TORCH    (0x0A)
 #define AW36515_ENABLE_LED2_FLASH    (0x0E)
-#define AW36515_REG_DEVICES_ID       (0x0C)
-#define AW36515_VER_DEVICES_ID       (0x3A)
+#define AW36515_DEVICES_ID           (0x0C)
 
 #define AW36515_REG_TORCH_LEVEL_LED1 (0x05)
 #define AW36515_REG_FLASH_LEVEL_LED1 (0x03)
@@ -83,7 +82,7 @@
 
 #define AW36515_REG_TIMING_CONF      (0x08)
 #define AW36515_TORCH_RAMP_TIME      (0x10)
-#define AW36515_FLASH_TIMEOUT        (0x0F)
+#define AW36515_FLASH_TIMEOUT        (0x09)
 #define AW36515_CHIP_STANDBY         (0x80)
 
 #define AW36515_REG_FLAG1            (0x0A)
@@ -92,6 +91,7 @@
 /* define channel, level */
 #define AW36515_CHANNEL_NUM          1
 #define AW36515_CHANNEL_CH1          0
+#define AW36515_CHANNEL_CH2          0
 #define AW36515_LEVEL_NUM            26
 #define AW36515_LEVEL_TORCH          7
 
@@ -234,26 +234,39 @@ struct aw36515_chip_data {
  * aw36515 operations
  *****************************************************************************/
 static const int aw36515_current[AW36515_LEVEL_NUM] = {
-	 22,  46,  70,  93,  116, 140, 163, 198, 245, 304,
-	351, 398, 445, 503,  550, 597, 656, 703, 750, 796,
-	855, 902, 949, 996, 1054, 1101
+	 22,  70,  117,  164,  211, 258, 305, 352, 399, 446,
+	493, 540, 587, 635,  682, 729, 776, 823, 870, 917,
+	964, 1011, 1058, 1105, 1152, 1200
 };
 
 static const unsigned char aw36515_torch_level[AW36515_LEVEL_NUM] = {
-	0x1C, 0x1F, 0x23, 0x26, 0x29, 0x2D, 0x30, 0x00, 0x00, 0x00,
+	0x02, 0x0a, 0x14, 0x1e, 0x28, 0x33, 0x3d, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
 static const unsigned char aw36515_flash_level[AW36515_LEVEL_NUM] = {
-	0x01, 0x03, 0x05, 0x07, 0x09, 0x0B, 0x0D, 0x10, 0x14, 0x19,
-	0x1D, 0x21, 0x25, 0x2A, 0x2E, 0x32, 0x37, 0x3B, 0x3F, 0x43,
-	0x48, 0x4C, 0x50, 0x54, 0x59, 0x5D
+	0x02, 0x08, 0x0e, 0x14, 0x1a, 0x21, 0x27, 0x2d, 0x33, 0x39,
+	0x3f, 0x45, 0x4b, 0x51, 0x57, 0x5d, 0x63, 0x69, 0x6F, 0x75,
+	0x7b, 0x81, 0x87, 0x8d, 0x93, 0x99
 };
 
+static const unsigned char ocp81375_torch_level[AW36515_LEVEL_NUM] = {
+	0x00, 0x04, 0x09, 0x0e, 0x14, 0x19, 0x1e, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+
+static const unsigned char ocp81375_flash_level[AW36515_LEVEL_NUM] = {
+	0x00, 0x03, 0x06, 0x0a, 0x0d, 0x10, 0x13, 0x16, 0x19, 0x1c,
+	0x1f, 0x22, 0x25, 0x28, 0x2b, 0x2e, 0x31, 0x34, 0x37, 0x3a,
+	0x3d, 0x40, 0x43, 0x46, 0x49, 0x4c
+};
 
 static volatile unsigned char aw36515_reg_enable;
+
 static volatile int aw36515_level_ch1 = -1;
+static volatile int aw36515_level_ch2 = -1;
 
 static int aw36515_is_torch(int level)
 {
@@ -332,7 +345,7 @@ static void aw36515_soft_reset(void)
 	msleep(5);
 }
 
-/* flashlight enable function */
+/* flashlight led1 enable function */
 static int aw36515_enable_ch1(void)
 {
 	unsigned char reg, val;
@@ -351,11 +364,31 @@ static int aw36515_enable_ch1(void)
 	return aw36515_i2c_write(aw36515_i2c_client, reg, val);
 }
 
+/* flashlight led2 enable function */
+static int aw36515_enable_ch2(void)
+{
+	unsigned char reg, val;
+
+	reg = AW36515_REG_ENABLE;
+	if (!aw36515_is_torch(aw36515_level_ch2)) {
+		/* torch mode */
+		aw36515_reg_enable |= AW36515_ENABLE_LED2_TORCH;
+	} else {
+		/* flash mode */
+		aw36515_reg_enable |= AW36515_ENABLE_LED2_FLASH;
+	}
+
+	val = aw36515_reg_enable;
+
+	return aw36515_i2c_write(aw36515_i2c_client, reg, val);
+}
 static int aw36515_enable(int channel)
 {
 
 	if (channel == AW36515_CHANNEL_CH1)
 		aw36515_enable_ch1();
+	else if (channel == AW36515_CHANNEL_CH2)
+		aw36515_enable_ch2();
 	else {
 		pr_err("Error channel\n");
 		return -1;
@@ -364,7 +397,7 @@ static int aw36515_enable(int channel)
 	return 0;
 }
 
-/* flashlight disable function */
+/* flashlight led1 disable function */
 static int aw36515_disable_ch1(void)
 {
 	unsigned char reg, val;
@@ -382,11 +415,30 @@ static int aw36515_disable_ch1(void)
 	return aw36515_i2c_write(aw36515_i2c_client, reg, val);
 }
 
+/* flashlight led2 disable function */
+static int aw36515_disable_ch2(void)
+{
+	unsigned char reg, val;
+
+	reg = AW36515_REG_ENABLE;
+	if (aw36515_reg_enable & AW36515_MASK_ENABLE_LED1) {
+		/* if LED 2 is enable, disable LED 1 */
+		aw36515_reg_enable &= (~AW36515_ENABLE_LED2);
+	} else {
+		/* if LED 2 is enable, disable LED 1 and clear mode */
+		aw36515_reg_enable &= (~AW36515_ENABLE_LED2_FLASH);
+	}
+	val = aw36515_reg_enable;
+
+	return aw36515_i2c_write(aw36515_i2c_client, reg, val);
+}
 static int aw36515_disable(int channel)
 {
 
 	if (channel == AW36515_CHANNEL_CH1)
 		aw36515_disable_ch1();
+	else if (channel == AW36515_CHANNEL_CH2)
+		aw36515_disable_ch2();
 	else {
 		pr_err("Error channel\n");
 		return -1;
@@ -395,24 +447,78 @@ static int aw36515_disable(int channel)
 	return 0;
 }
 
-/* set flashlight level */
+/* set flashlight1 level */
 static int aw36515_set_level_ch1(int level)
 {
 	int ret;
 	unsigned char reg, val = 0;
+	unsigned char device_id;
+	int dev_id;
+
+	dev_id = aw36515_i2c_read(aw36515_i2c_client, AW36515_DEVICES_ID, &device_id);
+	pr_info("%s lllyAW36515_DEVICES_ID %d\n", __func__, dev_id);
 
 	level = aw36515_verify_level(level);
 
 	/* set torch brightness level */
 	reg = AW36515_REG_TORCH_LEVEL_LED1;
-	val = aw36515_torch_level[level];
+	/*select flash ic by devices id*/
+	if (dev_id == 58) {
+		val = ocp81375_torch_level[level];
+    } else {
+	    val = aw36515_torch_level[level];
+        pr_info("%s this is aw36515 torch\n", __func__);
+	}
 	ret = aw36515_i2c_write(aw36515_i2c_client, reg, val);
-
 	aw36515_level_ch1 = level;
 
 	/* set flash brightness level */
 	reg = AW36515_REG_FLASH_LEVEL_LED1;
-	val = aw36515_flash_level[level];
+	/*select flash ic by devices id*/
+	if (dev_id == 58) {
+		val = ocp81375_flash_level[level];
+    } else {
+	    val = aw36515_flash_level[level];
+        pr_info("%s this is aw36515 torch\n", __func__);
+	}
+	ret = aw36515_i2c_write(aw36515_i2c_client, reg, val);
+
+	return ret;
+}
+/* set flashlight2 level */
+static int aw36515_set_level_ch2(int level)
+{
+	int ret;
+	unsigned char reg, val = 0;
+	unsigned char device_id;
+	int dev_id;
+
+	dev_id = aw36515_i2c_read(aw36515_i2c_client, AW36515_DEVICES_ID, &device_id);
+	pr_info("%s lllyAW36515_DEVICES_ID %d\n", __func__, dev_id);
+
+	level = aw36515_verify_level(level);
+
+	/* set torch brightness level */
+	reg = AW36515_REG_TORCH_LEVEL_LED2;
+	/*select flash ic by devices id*/
+	if (dev_id == 58) {
+		val = ocp81375_torch_level[level];
+    } else {
+	    val = aw36515_torch_level[level];
+        pr_info("%s this is aw36515 torch\n", __func__);
+	}
+	ret = aw36515_i2c_write(aw36515_i2c_client, reg, val);
+	aw36515_level_ch2 = level;
+
+	/* set flash brightness level */
+	reg = AW36515_REG_FLASH_LEVEL_LED2;
+	/*select flash ic by devices id*/
+	if (dev_id == 58) {
+		val = ocp81375_flash_level[level];
+    } else {
+	    val = aw36515_flash_level[level];
+        pr_info("%s this is aw36515 torch\n", __func__);
+	}
 	ret = aw36515_i2c_write(aw36515_i2c_client, reg, val);
 
 	return ret;
@@ -422,6 +528,8 @@ static int aw36515_set_level(int channel, int level)
 {
 	if (channel == AW36515_CHANNEL_CH1)
 		aw36515_set_level_ch1(level);
+	else if (channel == AW36515_CHANNEL_CH2)
+		aw36515_set_level_ch2(level);
 	else {
 		pr_err("Error channel\n");
 		return -1;
@@ -457,6 +565,7 @@ int aw36515_init(void)
 int aw36515_uninit(void)
 {
 	aw36515_disable(AW36515_CHANNEL_CH1);
+	aw36515_disable(AW36515_CHANNEL_CH2);
 
 	return 0;
 }
@@ -666,8 +775,6 @@ aw36515_i2c_probe(struct i2c_client *client)
 	struct aw36515_chip_data *chip;
 	struct aw36515_platform_data *pdata = client->dev.platform_data;
 	int err, rval;
-//	unsigned char device_id;
-//	int dev_id;
 
 	pr_info("%s Probe start.\n", __func__);
 	/* check i2c */
@@ -717,15 +824,6 @@ aw36515_i2c_probe(struct i2c_client *client)
 	/* init chip hw */
 	aw36515_chip_init(chip);
 
-/*	dev_id = aw36515_i2c_read(aw36515_i2c_client, AW36515_REG_DEVICES_ID, &device_id);
-	pr_info("%s aw36515_DEVICES_ID 0x%2x\n", __func__, dev_id);
-
-	if (dev_id != AW36515_VER_DEVICES_ID) {
-		pr_info("%s is not aw36515 flashlight", __func__);
-		err = -ENODEV;
-		goto err_free;
-	}
-*/
 	/* register flashlight operations */
 	if (flashlight_dev_register(AW36515_NAME, &aw36515_ops)) {
 		pr_err("Failed to register flashlight device.\n");
@@ -766,7 +864,6 @@ static void aw36515_i2c_remove(struct i2c_client *client)
 
 	pr_info("Remove done.\n");
 
-//	return 0;
 }
 
 static void aw36515_i2c_shutdown(struct i2c_client *client)
