@@ -25,45 +25,27 @@
 #include "dev_info.h"
 //#include <linux/dev_info.h>
 
-/*
- * pcba_info:
- * bit 0: nfc
- * bit 1: sar
- * bit 2: 15w
- * bit 3: CA
- */
-
-static int pcba_devs = 0;
-static int boot_mode = 0;
+static unsigned int charge_power = 0;
+static unsigned int nfc_exist = 0;
+static unsigned int boot_mode = 0;
 static char batterysn_buff[OEM_BUFF_SIZE_16] = {0};
 
-module_param_named(devs, pcba_devs, int, 0644);
-module_param_string(batterysn, batterysn_buff, OEM_BUFF_SIZE_16, 0644);
+module_param_named(chgpower, charge_power, int, 0644);
+module_param_named(nfcexist, nfc_exist, int, 0644);
 module_param_named(bootmode, boot_mode, int, 0644);
+module_param_string(batterysn, batterysn_buff, OEM_BUFF_SIZE_16, 0644);
+
+unsigned int oem_pcba_charge_power(void)
+{
+	return charge_power;
+}
+EXPORT_SYMBOL(oem_pcba_charge_power);
 
 unsigned int oem_pcba_nfc_exist(void)
 {
-	return pcba_devs & (1 << 0x0);
+	return nfc_exist;
 }
 EXPORT_SYMBOL(oem_pcba_nfc_exist);
-
-unsigned int oem_pcba_sar_exist(void)
-{
-	return pcba_devs & (1 << 0x1);
-}
-EXPORT_SYMBOL(oem_pcba_sar_exist);
-
-unsigned int oem_pcba_chg_15w_exist(void)
-{
-	return pcba_devs & (1 << 0x2);
-}
-EXPORT_SYMBOL(oem_pcba_chg_15w_exist);
-
-unsigned int oem_pcba_ca(void)
-{
-	return pcba_devs & (1 << 0x3);
-}
-EXPORT_SYMBOL(oem_pcba_ca);
 
 unsigned int oem_boot_mode(void)
 {
@@ -196,8 +178,8 @@ static int dev_info_probe(struct platform_device *pdev)
 {
 	int i, rc;
 
-	pr_info( "[%s] oem pcba devs %d\n", __func__, pcba_devs);
-	pr_info( "[%s] oem battery sn %s\n", __func__, batterysn_buff);
+	pr_info( "[%s] charge power %d, nfc exist %d, boot mode %d, oem battery sn %s\n",
+		__func__, charge_power, nfc_exist, boot_mode, batterysn_buff);
 
 	for (i = 0; i < ARRAY_SIZE(product_dev_attr_array); i++) {
 		rc = device_create_file(&pdev->dev, &product_dev_attr_array[i]);
