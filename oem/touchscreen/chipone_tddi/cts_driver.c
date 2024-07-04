@@ -11,10 +11,10 @@
 #include "cts_charger_detect.h"
 #include "cts_earjack_detect.h"
 #include "cts_oem.h"
-/*
+
 #include "../../../drivers/gpu/drm/mediatek/mediatek_v2/mtk_disp_notify.h"
 #include "../../../drivers/gpu/drm/mediatek/mediatek_v2/mtk_panel_ext.h"
-*/
+
 static void cts_resume_work_func(struct work_struct *work);
 #ifdef CFG_CTS_DRM_NOTIFIER
 #include <drm/drm_panel.h>
@@ -336,32 +336,29 @@ static int cts_get_panel(void)
 }
 #endif
 
-#if 0
 static int cts_fb_disp_notifier_callback(struct notifier_block *nb,
         unsigned long action, void *data)
 {
-    volatile int blank;
-    const struct cts_platform_data *pdata =
-    container_of(nb, struct cts_platform_data, fb_notifier);
+    struct cts_platform_data *pdata =
+             container_of(nb, struct cts_platform_data, fb_notifier);
     struct chipone_ts_data *cts_data =
-    container_of(pdata->cts_dev, struct chipone_ts_data, cts_dev);
-    struct drm_panel_notifier *evdata = data;
+             container_of(pdata->cts_dev, struct chipone_ts_data, cts_dev);
+   int *cts_disp_status = (int *)data;
 
     cts_info("FB disp notifier callback");
-    if (!evdata || !cts_data)
+    /*if (!evdata || !cts_data)
         return 0;
 
     blank = *(int *)evdata->data;
-    cts_info("action=%lu, blank=%d\n", action, blank);
+    cts_info("action=%lu, blank=%d\n", action, blank);*/
 
-    if (action == MTK_DISP_EARLY_EVENT_BLANK) {
-        if (blank == MTK_DISP_BLANK_POWERDOWN)
+if (pdata  &&  cts_disp_status) {
+    if (action == MTK_DISP_EARLY_EVENT_BLANK  && 
+       *cts_disp_status == MTK_DISP_BLANK_POWERDOWN) {
             cts_suspend(cts_data);
-    } else if (evdata->data) {
-        blank = *(int *)evdata->data;
-        if (action == MTK_DISP_EVENT_BLANK) {
-            if (blank == MTK_DISP_BLANK_UNBLANK)
-                /* cts_resume(cts_data); */
+    }
+    else if  (action == MTK_DISP_EVENT_BLANK  &&
+               *cts_disp_status == MTK_DISP_BLANK_UNBLANK) {
                 queue_work(cts_data->workqueue,
                     &cts_data->ts_resume_work);
         }
@@ -376,9 +373,9 @@ static int cts_init_pm_disp_fb_notifier(struct chipone_ts_data *cts_data)
 
     cts_data->pdata->fb_notifier.notifier_call = cts_fb_disp_notifier_callback;
 
-    return mtk_disp_notifier_register("cts_ts", &cts_data->pdata->fb_notifier));
+    return mtk_disp_notifier_register("cts_ts", &cts_data->pdata->fb_notifier);
 }
-#endif
+
 
 #ifdef CONFIG_CTS_I2C_HOST
 static int cts_driver_probe(struct i2c_client *client,
@@ -540,13 +537,13 @@ static int cts_driver_probe(struct spi_device *client)
         goto err_deinit_sysfs;
     }
 #endif
-/*
+
     ret = cts_init_pm_disp_fb_notifier(cts_data);
     if (ret) {
         cts_err("Init disp FB notifier failed %d", ret);
-        goto err_deinit_sysfs;
+        //goto err_deinit_sysfs;
     }
-*/
+
     ret = cts_plat_request_irq(cts_data->pdata);
     if (ret < 0) {
         cts_err("Request IRQ failed %d", ret);

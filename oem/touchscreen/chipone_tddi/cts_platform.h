@@ -94,6 +94,7 @@ struct cts_platform_data {
 
     u32 res_x;
     u32 res_y;
+    struct notifier_block fb_notifier;
 
 #ifdef CONFIG_CTS_VIRTUALKEY
     u8 vkey_num;
