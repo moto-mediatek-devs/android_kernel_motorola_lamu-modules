@@ -2092,12 +2092,14 @@ static int turbo_charger_probe(struct platform_device *pdev)
 
 	TURBO_CHARGER_INFO("enter\n");
 
+#ifdef OEM_FIXED_ME //need define oem_pcba_chg_15w_exist() in dev_info driver
 	ret = oem_pcba_chg_15w_exist();
 	if (ret > 0) {
 		TURBO_CHARGER_ERR("only support 15W basic charger, "
 					"not init turbo charger algorithm\n");
 		return -ENODEV;
 	}
+#endif
 
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
 	if (!qc_logic_probe_done) {
