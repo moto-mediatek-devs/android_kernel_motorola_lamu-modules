@@ -40,6 +40,11 @@ static const char * const pd_ctrl_msg_name[] = {
 	"get_snk_cap_ext",
 	"ctrl17",
 	"get_rev",
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	"get_source_info",
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 #endif	/* CONFIG_USB_PD_REV30 */
 };
 
@@ -268,6 +273,11 @@ static inline void print_event(
 		break;
 
 	case PD_EVT_TIMER_MSG:
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+		if (pd_event->msg != PD_TIMER_INT_INVAILD)
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 		PE_EVT_INFO("timer\n");
 		break;
 
@@ -430,6 +440,19 @@ bool pd_process_protocol_error(
 			goto out;
 		}
 		break;
+
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	/* while send <request msg>, recevied <alert msg> ignore */
+	case PE_SNK_SELECT_CAPABILITY:
+		if (pd_event_msg_match(pd_event,
+				PD_EVT_DATA_MSG, PD_DATA_ALERT)) {
+			PE_INFO("Ignore Alert\n");
+			goto out;
+		}
+		break;
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 
 #if CONFIG_USB_PD_PR_SWAP
 	case PE_PRS_SRC_SNK_WAIT_SOURCE_ON:
@@ -641,6 +664,22 @@ static inline bool pe_is_valid_pd_msg_id(struct pd_port *pd_port,
 		return false;
 	}
 
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	if (((pd_port->pe_data.msg_id_rx[sop_type] + 2) % PD_MSG_ID_MAX)
+			== msg_id) {
+		PE_INFO("Miss Msg!!!\n");
+		pd_port->miss_msg = true;
+	}
+
+	if (pd_port->pe_pd_state == PE_SNK_SEND_SOFT_RESET &&
+			pd_port->pe_data.msg_id_rx[sop_type] == 1) {
+		PE_INFO("Miss Msg!!!\n");
+		pd_port->miss_msg = true;
+	}
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+
 	pd_port->pe_data.msg_id_rx[sop_type] = msg_id;
 	return true;
 }
@@ -755,11 +794,25 @@ static inline bool pe_transit_startup_state(
 {
 	uint8_t startup_state =
 		pe_get_startup_state(pd_port, pd_event);
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	int rv = 0;
+	uint32_t chip_pid = 0;
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 
 	if (startup_state == 0xff)
 		return false;
 
 	pd_dpm_notify_pe_startup(pd_port);
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	rv = tcpci_get_chip_pid(pd_port->tcpc, &chip_pid);
+	if (!rv &&  SC660X_PID == chip_pid) {
+		pd_enable_timer(pd_port, PD_TIMER_INT_INVAILD);
+	}
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 	PE_TRANSIT_STATE(pd_port, startup_state);
 
 	return true;
@@ -837,6 +890,13 @@ bool pd_process_event(
 	bool ret = false;
 	struct pd_msg *pd_msg = pd_event->pd_msg;
 	uint8_t tii = pe_check_trap_in_idle_state(pd_port, pd_event);
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	int rv = 0;
+	uint32_t chip_id = 0;
+	uint32_t chip_pid = 0;
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 
 	if (tii < TII_PE_RUNNING)
 		return tii;
@@ -862,6 +922,39 @@ bool pd_process_event(
 			PE_TRANSIT_STATE(pd_port, PE_ERROR_RECOVERY);
 			return true;
 		}
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+		rv = tcpci_get_chip_id(pd_port->tcpc, &chip_id);
+		rv |= tcpci_get_chip_pid(pd_port->tcpc, &chip_pid);
+		if (!rv && SC2150A_DID == chip_id &&
+			SC2150_PID == chip_pid && pd_port->miss_msg) {
+			pd_port->miss_msg = false;
+			if (pd_port->pe_pd_state == PE_SNK_TRANSITION_SINK) {
+				if (!(pd_event->msg == PD_CTRL_PS_RDY &&
+						pd_event->event_type == PD_EVT_CTRL_MSG)) {
+					pd_add_miss_msg(pd_port,pd_event,PD_CTRL_PS_RDY);
+					return false;
+				}
+			} else if (pd_port->pe_pd_state == PE_SNK_SELECT_CAPABILITY){
+				if (pd_event->msg == PD_CTRL_PS_RDY &&
+						pd_event->event_type == PD_EVT_CTRL_MSG) {
+					pd_add_miss_msg(pd_port,pd_event,PD_CTRL_ACCEPT);
+					return false;
+				} else if (pd_event->msg == PD_DATA_SOURCE_CAP &&
+						pd_event->event_type == PD_EVT_DATA_MSG) {
+					pd_add_miss_msg(pd_port,pd_event,PD_CTRL_REJECT);
+					return false;
+				}
+			} else if (pd_port->pe_pd_state == PE_SNK_SEND_SOFT_RESET) {
+				if (pd_event->msg == PD_DATA_SOURCE_CAP &&
+						pd_event->event_type == PD_EVT_DATA_MSG) {
+					pd_add_miss_msg(pd_port,pd_event,PD_CTRL_ACCEPT);
+					return false;
+				}
+			}
+		}
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 	}
 
 	if (pd_curr_is_vdm_evt(pd_port))

@@ -124,6 +124,17 @@ void pe_snk_ready_entry(struct pd_port *pd_port)
 
 void pe_snk_hard_reset_entry(struct pd_port *pd_port)
 {
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	int rv = 0;
+	uint32_t chip_vid = 0;
+
+	rv = tcpci_get_chip_vid(pd_port->tcpc, &chip_vid);
+	if (!rv &&  SOUTHCHIP_PD_VID == chip_vid) {
+		pd_enable_timer(pd_port, PD_TIMER_HARD_RESET_COMPLETE);
+	}
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 	pd_send_hard_reset(pd_port);
 }
 

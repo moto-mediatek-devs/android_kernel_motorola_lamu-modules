@@ -182,6 +182,11 @@ enum pd_pe_state {
 #if CONFIG_USB_PD_REV30_SRC_CAP_EXT_LOCAL
 	PE_SRC_GIVE_SOURCE_CAP_EXT,
 #endif	/* CONFIG_USB_PD_REV30_SRC_CAP_EXT_LOCAL */
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	PE_SRC_GIVE_SINK_CAP_EXT,
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 #if CONFIG_USB_PD_REV30_STATUS_LOCAL
 	PE_SRC_GIVE_SOURCE_STATUS,
 #endif	/* CONFIG_USB_PD_REV30_STATUS_LOCAL */
@@ -524,6 +529,12 @@ void pe_src_sink_alert_received_entry(
 void pe_src_give_source_cap_ext_entry(
 	struct pd_port *pd_port);
 #endif	/* CONFIG_USB_PD_REV30_SRC_CAP_EXT_LOCAL */
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+void pe_src_give_sink_cap_ext_entry(
+	struct pd_port *pd_port);
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 #if CONFIG_USB_PD_REV30_STATUS_LOCAL
 void pe_src_give_source_status_entry(
 	struct pd_port *pd_port);

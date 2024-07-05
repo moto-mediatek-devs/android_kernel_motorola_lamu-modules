@@ -128,6 +128,15 @@ static inline bool pd_vdm_state_transit_rx(struct pd_port *pd_port,
 		return false;
 	}
 
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	if (state_transition->vdm_cmd != CMD_DISCOVER_IDENT) {
+		PE_TRANSIT_STATE(pd_port, PE_UFP_VDM_SEND_NAK);
+		return true;
+	}
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+
 	PE_TRANSIT_STATE(pd_port, state_transition->vdm_init_state);
 	return true;
 }

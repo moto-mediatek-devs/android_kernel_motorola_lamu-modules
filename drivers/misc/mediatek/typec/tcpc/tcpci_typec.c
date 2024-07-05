@@ -288,11 +288,29 @@ static inline int typec_handle_role_swap_stop(struct tcpc_device *tcpc)
 
 static inline void typec_unattached_src_and_drp_entry(struct tcpc_device *tcpc)
 {
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	uint32_t chip_vid;
+	int rv = 0;
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 	TYPEC_NEW_STATE(typec_unattached_src);
-	tcpci_set_cc(tcpc, TYPEC_CC_RP);
-	tcpc_enable_timer(tcpc, TYPEC_TIMER_DRP_SRC_TOGGLE);
-	if (tcpc->typec_vbus_to_cc_en && tcpc->tcpc_flags & TCPC_FLAGS_VBUS_SHORT_CC)
-		tcpci_set_vbus_short_cc_en(tcpc, false, false);
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	rv = tcpci_get_chip_vid(tcpc,&chip_vid);
+	if (!rv && SOUTHCHIP_PD_VID == chip_vid) {
+		tcpci_set_cc(tcpc, TYPEC_CC_DRP);
+		typec_enable_low_power_mode(tcpc);
+	} else
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+	{
+		tcpci_set_cc(tcpc, TYPEC_CC_RP);
+		tcpc_enable_timer(tcpc, TYPEC_TIMER_DRP_SRC_TOGGLE);
+
+		if (tcpc->typec_vbus_to_cc_en && tcpc->tcpc_flags & TCPC_FLAGS_VBUS_SHORT_CC)
+			tcpci_set_vbus_short_cc_en(tcpc, false, false);
+	}
 }
 
 static inline void typec_unattached_snk_and_drp_entry(struct tcpc_device *tcpc)
@@ -484,6 +502,11 @@ static inline int typec_set_plug_orient(struct tcpc_device *tcpc,
 static inline void typec_source_attached_entry(struct tcpc_device *tcpc)
 {
 	TYPEC_NEW_STATE(typec_attached_src);
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	tcpc->typec_is_attached_src = true;
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 	typec_wait_ps_change(tcpc, TYPEC_WAIT_PS_SRC_VSAFE5V);
 
 	typec_set_plug_orient(tcpc,
@@ -649,12 +672,27 @@ static inline void typec_norp_src_attached_entry(struct tcpc_device *tcpc)
 #if CONFIG_TYPEC_CAP_TRY_SOURCE
 static inline void typec_try_src_entry(struct tcpc_device *tcpc)
 {
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	uint32_t vid;
+	int rv = 0;
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 	TYPEC_NEW_STATE(typec_try_src);
 
 	tcpci_set_cc(tcpc, TYPEC_CC_RP);
 	tcpc->typec_drp_try_timeout = false;
 	tcpc_enable_timer(tcpc, TYPEC_TRY_TIMER_DRP_TRY);
 	tcpc_enable_timer(tcpc, TYPEC_TRY_TIMER_TRY_TOUT);
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	/* add once cc_change */
+	rv = tcpci_get_chip_vid(tcpc, &vid);
+	if (!rv && SOUTHCHIP_PD_VID == vid) {
+		tcpc_typec_handle_cc_change(tcpc);
+	}
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 }
 
 static inline void typec_trywait_snk_entry(struct tcpc_device *tcpc)
@@ -691,11 +729,27 @@ static inline void typec_trywait_snk_pe_entry(struct tcpc_device *tcpc)
 
 static inline void typec_try_snk_entry(struct tcpc_device *tcpc)
 {
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	uint32_t vid;
+	int rv = 0;
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+
 	TYPEC_NEW_STATE(typec_try_snk);
 
 	tcpci_set_cc(tcpc, TYPEC_CC_RD);
 	tcpc->typec_drp_try_timeout = false;
 	tcpc_enable_timer(tcpc, TYPEC_TRY_TIMER_DRP_TRY);
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	/* add once cc_change */
+	rv = tcpci_get_chip_vid(tcpc, &vid);
+	if (!rv && SOUTHCHIP_PD_VID == vid) {
+		tcpc_typec_handle_cc_change(tcpc);
+	}
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 }
 
 static inline void typec_trywait_src_entry(struct tcpc_device *tcpc)
@@ -1010,6 +1064,12 @@ static inline bool typec_handle_cc_changed_entry(struct tcpc_device *tcpc)
 
 static inline void typec_attach_wait_entry(struct tcpc_device *tcpc)
 {
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	int rv = 0;
+	uint32_t chip_vid = 0;
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 	bool as_sink = tcpc_typec_is_act_as_sink_role(tcpc);
 #if CONFIG_USB_PD_REV30
 	struct pd_port *pd_port = &tcpc->pd_port;
@@ -1084,9 +1144,17 @@ static inline void typec_attach_wait_entry(struct tcpc_device *tcpc)
 	}
 
 	tcpci_notify_attachwait_state(tcpc, as_sink);
-	if (as_sink)
+	if (as_sink) {
 		TYPEC_NEW_STATE(typec_attachwait_snk);
-	else {
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+		rv = tcpci_get_chip_vid(tcpc, &chip_vid);
+		if (!(rv && chip_vid == SOUTHCHIP_PD_VID)) {
+			tcpci_set_cc(tcpc,TYPEC_CC_RD);
+		}
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+	} else {
 		TYPEC_NEW_STATE(typec_attachwait_src);
 		/* Advertise Rp level before Attached.SRC Ellisys 3.1.6359 */
 		tcpci_set_cc(tcpc,
@@ -1314,6 +1382,11 @@ int tcpc_typec_handle_cc_change(struct tcpc_device *tcpc)
 		typec_attach_wait_entry(tcpc);
 	} else {
 		typec_detach_wait_entry(tcpc);
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+		tcpc->int_invaild_cnt = 0;
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 	}
 
 	return 0;
@@ -1448,6 +1521,14 @@ static inline int typec_handle_src_reach_vsafe0v(struct tcpc_device *tcpc)
 int tcpc_typec_handle_timeout(struct tcpc_device *tcpc, uint32_t timer_id)
 {
 	int ret = 0;
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	uint32_t chip_vid;
+	int rv = 0;
+
+	rv = tcpci_get_chip_vid(tcpc,&chip_vid);
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 
 	if (timer_id >= TYPEC_TIMER_START_ID &&
 	    tcpc_is_timer_active(tcpc, TYPEC_TIMER_START_ID, PD_TIMER_NR)) {
@@ -1483,8 +1564,20 @@ int tcpc_typec_handle_timeout(struct tcpc_device *tcpc, uint32_t timer_id)
 		break;
 
 	case TYPEC_TIMER_DRP_SRC_TOGGLE:
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	if ((tcpc->typec_state != typec_unattached_src) &&
+		!(!rv && SOUTHCHIP_PD_VID == chip_vid)) {
+			TCPC_DBG("Dummy SRC_TOGGLE\n");
+			return 0;
+		}
+
+		typec_unattached_snk_and_drp_entry(tcpc);
+#else
 		if (tcpc->typec_state == typec_unattached_src)
 			typec_unattached_snk_and_drp_entry(tcpc);
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 		break;
 
 	case TYPEC_TRY_TIMER_DRP_TRY:
@@ -1614,6 +1707,12 @@ static inline int typec_attached_snk_vbus_absent(struct tcpc_device *tcpc)
 
 static inline int typec_handle_vbus_absent(struct tcpc_device *tcpc)
 {
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	int ret = 0;
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+
 #if IS_ENABLED(CONFIG_USB_POWER_DELIVERY)
 	if (tcpc->pd_wait_pr_swap_complete) {
 		TYPEC_DBG("[PR.Swap] Ignore vbus_absent\n");
@@ -1633,11 +1732,44 @@ static inline int typec_handle_vbus_absent(struct tcpc_device *tcpc)
 		break;
 	}
 
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	ret = tcpci_get_cc(tcpc);
+	if (ret < 0)
+		return ret;
+
+	if (!typec_is_cc_no_res()) {
+		tcpc_typec_handle_cc_change(tcpc);
+	}
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+
 	return 0;
 }
 
 int tcpc_typec_handle_ps_change(struct tcpc_device *tcpc, int vbus_level)
 {
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	int rv = 0;
+	uint32_t chip_pid = 0, chip_id = 0;
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	rv = tcpci_get_chip_pid(tcpc, &chip_pid);
+	rv |= tcpci_get_chip_id(tcpc, &chip_id);
+
+	if (!rv && chip_pid == SC2150_PID && chip_id == SC2150A_DID) {
+		if (vbus_level >= TCPC_VBUS_VALID)
+			typec_disable_low_power_mode(tcpc);
+		else
+			typec_enable_low_power_mode(tcpc);
+	}
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+
 	tcpci_notify_ps_change(tcpc, vbus_level);
 
 #if CONFIG_TYPEC_CAP_NORP_SRC
@@ -1672,12 +1804,22 @@ int tcpc_typec_handle_pe_pr_swap(struct tcpc_device *tcpc)
 	switch (tcpc->typec_state) {
 	case typec_attached_snk:
 		TYPEC_NEW_STATE(typec_attached_src);
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+		tcpc->typec_is_attached_src = true;
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 		tcpc->typec_attach_new = TYPEC_ATTACHED_SRC;
 		tcpci_set_cc(tcpc,
 			TYPEC_CC_PULL(tcpc->typec_local_rp_level, TYPEC_CC_RP));
 		break;
 	case typec_attached_src:
 		TYPEC_NEW_STATE(typec_attached_snk);
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+		tcpc->typec_is_attached_src = false;
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 		tcpc->typec_attach_new = TYPEC_ATTACHED_SNK;
 		tcpci_set_cc(tcpc, TYPEC_CC_RD);
 		break;
