@@ -64,3 +64,6 @@ config AWINIC_SAR
         default m
         help
           support AW Sar sensor
+
+source "$(KCONFIG_EXT_PREFIX)/oem/sensors/Kconfig"
+
