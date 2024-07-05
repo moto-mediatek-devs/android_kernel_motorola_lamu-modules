@@ -223,7 +223,39 @@ static ssize_t alsval_show(struct device_driver *ddri, char *buf)
 
 	return res;
 }
+/* +20240709 db add mtk sensor 1.0 alsp sensor test cali node start */
+static int alshub_factory_enable_calibration(void);
+static int pshub_factory_enable_calibration(void);
+static ssize_t test_alscali_store(struct device_driver *ddri, const char *buf,
+			       size_t tCount)
+{
+	int enable = 0, ret = 0;
 
+	ret = kstrtoint(buf, 10, &enable);
+	if (ret != 0) {
+		pr_debug("kstrtoint fail\n");
+		return 0;
+	}
+	if (enable == 1)
+		alshub_factory_enable_calibration();
+	return tCount;
+}
+
+static ssize_t test_pscali_store(struct device_driver *ddri, const char *buf,
+			       size_t tCount)
+{
+	int enable = 0, ret = 0;
+
+	ret = kstrtoint(buf, 10, &enable);
+	if (ret != 0) {
+		pr_debug("kstrtoint fail\n");
+		return 0;
+	}
+	if (enable == 1)
+		pshub_factory_enable_calibration();
+	return tCount;
+}
+/* +20240709 db add mtk sensor 1.0 alsp sensor test cali node end */
 /* --------------------------debug sysfs start --------------------------- */
 static ssize_t rearalstrace_show(struct device_driver *ddri, char *buf)
 {
@@ -262,6 +294,9 @@ static DRIVER_ATTR_RO(alsval);
 static DRIVER_ATTR_RW(trace);
 static DRIVER_ATTR_RO(reg);
 static DRIVER_ATTR_RW(rearalstrace);
+/* +20240709 db add mtk sensor 1.0 alsp sensor test cali node start */
+static DRIVER_ATTR_WO(test_alscali);
+static DRIVER_ATTR_WO(test_pscali);
 static struct driver_attribute *alspshub_attr_list[] = {
 	&driver_attr_als,
 	&driver_attr_ps,
@@ -270,7 +305,10 @@ static struct driver_attribute *alspshub_attr_list[] = {
 	&driver_attr_alsval,
 	&driver_attr_reg,
 	&driver_attr_rearalstrace,
+ 	&driver_attr_test_alscali,
+	&driver_attr_test_pscali,
 };
+/* +20240709 db add mtk sensor 1.0 alsp sensor test cali node end */
 
 static int alspshub_create_attr(struct device_driver *driver)
 {
