@@ -33,16 +33,42 @@
 #define PE_EVENT_DBG_ENABLE	1
 #define PE_STATE_INFO_ENABLE	1
 #define TCPC_INFO_ENABLE	1
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+#define TCPC_TIMER_DBG_ENABLE	1
+#else
 #define TCPC_TIMER_DBG_ENABLE	0
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 #define PE_INFO_ENABLE		1
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+#define TCPC_DBG_ENABLE		1
+#define TCPC_DBG2_ENABLE	1
+#else
 #define TCPC_DBG_ENABLE		0
 #define TCPC_DBG2_ENABLE	0
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 #define DPM_INFO_ENABLE		1
 #define DPM_INFO2_ENABLE	1
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+#define DPM_DBG_ENABLE		1
+#else
 #define DPM_DBG_ENABLE		0
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 #define PD_ERR_ENABLE		1
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+#define PE_DBG_ENABLE		1
+#define TYPEC_DBG_ENABLE	1
+#else
 #define PE_DBG_ENABLE		0
 #define TYPEC_DBG_ENABLE	0
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 
 
 #define DP_INFO_ENABLE		1
@@ -153,6 +179,11 @@ struct tcpc_desc {
 /* TCPC Behavior Flags */
 #define TCPC_FLAGS_RETRY_CRC_DISCARD		(1<<0)
 #define TCPC_FLAGS_PD_REV30			(1<<2)
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+#define TCPC_FLAGS_LPM_WAKEUP_WATCHDOG		(1<<3)
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 #define TCPC_FLAGS_WATER_DETECTION		(1<<4)
 #define TCPC_FLAGS_CABLE_TYPE_DETECTION		(1<<5)
 #define TCPC_FLAGS_VCONN_SAFE5V_ONLY		(1<<6)
@@ -162,6 +193,11 @@ struct tcpc_desc {
 #define TCPC_FLAGS_FLOATING_GROUND		(1<<10)
 #define TCPC_FLAGS_WD_DUAL_PORT			(1<<11)
 #define TCPC_FLAGS_VBUS_SHORT_CC		(1<<12)
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+#define TCPC_FLAGS_WATCHDOG_EN			(1<<13)
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 
 #define TYPEC_CC_PULL(rp_lvl, res)	((rp_lvl & 0x03) << 3 | (res & 0x07))
 
@@ -207,6 +243,14 @@ struct tcpc_ops {
 	int (*alert_status_clear)(struct tcpc_device *tcpc, uint32_t mask);
 	int (*fault_status_clear)(struct tcpc_device *tcpc, uint8_t status);
 	int (*set_alert_mask)(struct tcpc_device *tcpc, uint32_t mask);
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	int (*get_chip_id)(struct tcpc_device *tcpc,uint32_t *chip_id);
+	int (*get_chip_pid)(struct tcpc_device *tcpc,uint32_t *chip_pid);
+	int (*get_chip_vid)(struct tcpc_device *tcpc,uint32_t *chip_vid);
+	int (*set_watchdog)(struct tcpc_device *tcpc, bool en);
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 	int (*get_alert_mask)(struct tcpc_device *tcpc, uint32_t *mask);
 	int (*get_alert_status)(struct tcpc_device *tcpc, uint32_t *alert);
 	int (*get_power_status)(struct tcpc_device *tcpc, uint16_t *pwr_status);
@@ -317,6 +361,14 @@ struct tcpc_device {
 	struct srcu_notifier_head evt_nh[TCP_NOTIFY_IDX_NR];
 	struct tcpc_managed_res *mr_head;
 	struct mutex mr_lock;
+
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	int recv_msg_cnt;
+	int int_invaild_cnt;
+	bool typec_is_attached_src;
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 
 	/* For TCPC TypeC */
 	uint8_t typec_state;

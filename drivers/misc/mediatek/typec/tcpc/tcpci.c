@@ -121,6 +121,34 @@ int tcpci_get_vbus_voltage(struct tcpc_device *tcpc, u32 *vbus)
 }
 EXPORT_SYMBOL(tcpci_get_vbus_voltage);
 
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+int tcpci_get_chip_id(struct tcpc_device *tcpc,uint32_t *chip_id)
+{
+	if (tcpc->ops->get_chip_id == NULL) {
+		return -ENOTSUPP;
+	}
+	return tcpc->ops->get_chip_id(tcpc,chip_id);
+}
+
+int tcpci_get_chip_pid(struct tcpc_device *tcpc,uint32_t *chip_pid)
+{
+	if (tcpc->ops->get_chip_pid == NULL) {
+		return -ENOTSUPP;
+	}
+	return tcpc->ops->get_chip_pid(tcpc,chip_pid);
+}
+
+int tcpci_get_chip_vid(struct tcpc_device *tcpc,uint32_t *chip_vid)
+{
+	if (tcpc->ops->get_chip_vid == NULL) {
+		return -ENOTSUPP;
+	}
+	return tcpc->ops->get_chip_vid(tcpc,chip_vid);
+}
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+
 bool tcpci_check_vsafe0v(struct tcpc_device *tcpc)
 {
 	return tcpc->vbus_level == TCPC_VBUS_SAFE0V;
@@ -353,6 +381,27 @@ int tcpci_set_low_power_mode(struct tcpc_device *tcpc, bool en)
 	return ret;
 }
 EXPORT_SYMBOL(tcpci_set_low_power_mode);
+
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+int tcpci_set_watchdog(struct tcpc_device *tcpc, bool en)
+{
+	int rv = 0;
+	uint32_t chip_vid = 0;
+	rv = tcpci_get_chip_vid(tcpc, &chip_vid);
+	if (!rv && (chip_vid == SOUTHCHIP_PD_VID)) {
+		if (tcpc->ops->set_watchdog)
+			rv = tcpc->ops->set_watchdog(tcpc, en);
+	} else {
+	if (tcpc->tcpc_flags & TCPC_FLAGS_WATCHDOG_EN)
+		if (tcpc->ops->set_watchdog)
+			rv = tcpc->ops->set_watchdog(tcpc, en);
+	}
+
+	return rv;
+}
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 
 int tcpci_alert_vendor_defined_handler(struct tcpc_device *tcpc)
 {

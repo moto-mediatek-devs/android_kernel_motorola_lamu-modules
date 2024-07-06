@@ -589,6 +589,12 @@ static inline bool pd_process_timer_msg(
 	struct pd_port *pd_port, struct pd_event *pd_event)
 {
 	uint8_t ready_state = pe_get_curr_ready_state(pd_port);
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	int rv = 0;
+	uint32_t chip_pid = 0;
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 
 	switch (pd_event->msg) {
 	case PD_TIMER_SENDER_RESPONSE:
@@ -656,6 +662,17 @@ static inline bool pd_process_timer_msg(
 			pd_port, TCP_DPM_RET_DROP_PE_BUSY);
 		break;
 #endif	/* CONFIG_USB_PD_REV30 */
+
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	case PD_TIMER_INT_INVAILD:
+		rv = tcpci_get_chip_pid(pd_port->tcpc, &chip_pid);
+		if (!rv &&  SC660X_PID == chip_pid) {
+			pd_enable_timer(pd_port, PD_TIMER_INT_INVAILD);
+		}
+		break;
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 	default:
 		break;
 	}

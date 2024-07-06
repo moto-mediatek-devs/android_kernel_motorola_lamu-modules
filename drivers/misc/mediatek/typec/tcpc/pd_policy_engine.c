@@ -316,6 +316,11 @@ static const char *const pe_state_name[] = {
 #if CONFIG_USB_PD_REV30_SRC_CAP_EXT_LOCAL
 	"SRC_GIVE_CAP_EXT",
 #endif	/* CONFIG_USB_PD_REV30_SRC_CAP_EXT_LOCAL */
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	"SRC_GIVE_SNK_CAP_EXT",
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 #if CONFIG_USB_PD_REV30_STATUS_LOCAL
 	"SRC_GIVE_STATUS",
 #endif	/* CONFIG_USB_PD_REV30_STATUS_LOCAL */
@@ -591,6 +596,11 @@ static const struct pe_state_actions pe_state_actions[] = {
 #if CONFIG_USB_PD_REV30_SRC_CAP_EXT_LOCAL
 	PE_STATE_ACTIONS(pe_src_give_source_cap_ext),
 #endif	/* CONFIG_USB_PD_REV30_SRC_CAP_EXT_LOCAL */
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	PE_STATE_ACTIONS(pe_src_give_sink_cap_ext),
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 #if CONFIG_USB_PD_REV30_STATUS_LOCAL
 	PE_STATE_ACTIONS(pe_src_give_source_status),
 #endif	/* CONFIG_USB_PD_REV30_STATUS_LOCAL */
@@ -1079,9 +1089,27 @@ static inline bool pd_try_get_vdm_event(
 {
 	bool ret = false;
 	struct pd_port *pd_port = &tcpc->pd_port;
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	int rv = 0;
+	uint32_t chip_id, chip_pid;
+	rv = tcpci_get_chip_id(tcpc, &chip_id);
+	rv |= tcpci_get_chip_pid(tcpc, &chip_pid);
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 
 	switch (pd_port->pe_pd_state) {
 #if CONFIG_USB_PD_PE_SINK
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+	case PE_SNK_TRANSITION_SINK:
+		if (!rv && SC2150A_DID == chip_id &&
+				SC2150_PID == chip_pid)  {
+			ret = pd_get_vdm_event(tcpc, pd_event);
+		}
+		break;
+#endif /* CONFIG_OEM_TCPC_PD_SC2150 */
+/*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 	case PE_SNK_READY:
 #endif	/* CONFIG_USB_PD_PE_SINK */
 #if CONFIG_USB_PD_PE_SOURCE
