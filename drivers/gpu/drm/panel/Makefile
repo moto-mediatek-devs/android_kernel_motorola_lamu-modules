@@ -80,6 +80,7 @@ obj-$(CONFIG_DRM_PANEL_TXD_ILI9883C_VDO) += panel-txd-ili9883c-vdo.o
 obj-$(CONFIG_DRM_PANEL_TM_TD4376_VDO) += panel-tm-td4376-vdo.o
 obj-$(CONFIG_DRM_PANEL_DJN_NT36672S_VDO) += panel-djn-nt36672s-vdo.o
 obj-$(CONFIG_DRM_PANEL_TIANMA_NT36528A_VDO) += panel-tianma-nt36528a-vdo.o
+obj-$(CONFIG_DRM_PANEL_DIJIN_TD4160_VDO) += panel-dijin-td4160-vdo.o
 
 obj-$(CONFIG_DRM_PANEL_MAXIAM_MAX96851) += panel-maxiam-max96851.o
 obj-$(CONFIG_DRM_PANEL_SERDES) += panel-serdes-max96789.o bridge-serdes-max96789.o
