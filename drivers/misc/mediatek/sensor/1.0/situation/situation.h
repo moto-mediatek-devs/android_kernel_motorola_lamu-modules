@@ -30,6 +30,8 @@ enum situation_index_table {
 	tilt_detector,
 	flat,
 	sar,
+	rearals,
+	rearflk,
 	max_situation_support,
 };
 

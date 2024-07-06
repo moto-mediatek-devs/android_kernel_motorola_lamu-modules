@@ -16,3 +16,5 @@ situationhub-$(CONFIG_MTK_MOTION_DETECT_HUB) += motion_detect/motion_detect.o
 situationhub-$(CONFIG_MTK_TILTDETECTHUB) += tilt_detector/tiltdetecthub.o
 situationhub-$(CONFIG_MTK_FLAT_HUB) += flat/flat.o
 situationhub-$(CONFIG_MTK_SAR_HUB) += sar/sarhub.o sar/sar_factory.o
+situationhub-$(CONFIG_MTK_REAR_ALS_HUB) += rear_als/rearals_hub.o rear_als/rearals_factory.o
+situationhub-$(CONFIG_MTK_REAR_FLK_HUB) += rear_flk/rearflk_hub.o rear_flk/rearflk_factory.o

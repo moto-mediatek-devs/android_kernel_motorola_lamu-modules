@@ -224,12 +224,44 @@ static ssize_t alsval_show(struct device_driver *ddri, char *buf)
 	return res;
 }
 
+/* --------------------------debug sysfs start --------------------------- */
+static ssize_t rearalstrace_show(struct device_driver *ddri, char *buf)
+{
+	ssize_t res = 0;
+
+	res = snprintf(buf, PAGE_SIZE, "hello wnn\n");
+	return res;
+}
+
+static ssize_t rearalstrace_store(struct device_driver *ddri,
+				const char *buf, size_t count)
+{
+	int trace = 0;
+	int res = 0;
+	int ret = 0;
+
+	ret = sscanf(buf, "0x%x", &trace);
+	if (ret != 1) {
+		pr_err("invalid content: '%s', length = %zu\n", buf, count);
+		return count;
+	}
+	res = sensor_set_cmd_to_hub(ID_REAR_ALS,
+		CUST_ACTION_SET_TRACE, &trace);
+	if (res < 0) {
+		pr_err("sensor_set_cmd_to_hub fail,(ID: %d),(action: %d)\n",
+			ID_REAR_ALS, CUST_ACTION_SET_TRACE);
+		return 0;
+	}
+	return count;
+}
+
 static DRIVER_ATTR_RO(als);
 static DRIVER_ATTR_RO(ps);
 static DRIVER_ATTR_RO(alslv);
 static DRIVER_ATTR_RO(alsval);
 static DRIVER_ATTR_RW(trace);
 static DRIVER_ATTR_RO(reg);
+static DRIVER_ATTR_RW(rearalstrace);
 static struct driver_attribute *alspshub_attr_list[] = {
 	&driver_attr_als,
 	&driver_attr_ps,
@@ -237,6 +269,7 @@ static struct driver_attribute *alspshub_attr_list[] = {
 	&driver_attr_alslv,
 	&driver_attr_alsval,
 	&driver_attr_reg,
+	&driver_attr_rearalstrace,
 };
 
 static int alspshub_create_attr(struct device_driver *driver)
