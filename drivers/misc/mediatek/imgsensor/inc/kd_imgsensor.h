@@ -152,6 +152,8 @@
 #define GC08A3REAR_SENSOR_ID                          0x08a3
 #define SENSOR_DRVNAME_GC08A3REAR_MIPI_RAW            "gc08a3rear_mipi_raw"
 
+#define S5K4H7SUB_SENSOR_ID                     0x487C
+#define SENSOR_DRVNAME_S5K4H7SUB_MIPI_RAW       "s5k4h7sub_mipi_raw"
 /* SENSOR CHIP VERSION */
 /*IMX*/
 #define IMX06A_SENSOR_ID                        0xa18a
@@ -446,6 +448,7 @@
 #define MAX96712A1MIPI_SENSOR_ID  0xA1
 #define MAX96712A2MIPI_SENSOR_ID  0xA2
 #define MAX96712A3MIPI_SENSOR_ID  0xA3
+#define LT7911_SENSOR_ID  0x1605
 /* CAMERA DRIVER NAME */
 #define CAMERA_HW_DEVNAME                       "kd_camera_hw"
 /* SENSOR DEVICE DRIVER NAME */
@@ -710,6 +713,7 @@
 #define SENSOR_DRVNAME_MAX96712A1_MIPI_YUV        "max96712a1_mipi_yuv"
 #define SENSOR_DRVNAME_MAX96712A2_MIPI_YUV        "max96712a2_mipi_yuv"
 #define SENSOR_DRVNAME_MAX96712A3_MIPI_YUV        "max96712a3_mipi_yuv"
+#define SENSOR_DRVNAME_LT7911_MIPI_YUV        "lt7911_mipi_yuv"
 /************************************
  * I3C SENSOR PID (TOTAL 48-BITS)
  ************************************/

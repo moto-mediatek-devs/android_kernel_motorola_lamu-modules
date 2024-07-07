@@ -2480,7 +2480,7 @@ transparent_hugepage=never";
 		mediatek,mailbox-gce = <&gce_mbox>;
 		mboxes = <&gce_mbox_sec 10 0 CMDQ_THR_PRIO_1>,
 			<&gce_mbox 11 0 CMDQ_THR_PRIO_1>,
-			<&gce_mbox 5 0 CMDQ_THR_PRIO_1>;
+			<&gce_mbox 13 0 CMDQ_THR_PRIO_1>;
 		clocks = <&infracfg_ao CLK_IFR_GCE>,
 			<&infracfg_ao CLK_IFR_GCE_26M>;
 		clock-names = "GCE", "GCE_TIMER";
@@ -4259,7 +4259,7 @@ transparent_hugepage=never";
 			<&scpsys MT6768_POWER_DOMAIN_ISP>;
 		clocks = <&imgsys CLK_IMG_DPE>;
 		clock-names = "DPE_CG_IMG_DPE";
-		mboxes = <&gce_mbox 13 0 CMDQ_THR_PRIO_1>;
+		mboxes = <&gce_mbox 5 0 CMDQ_THR_PRIO_1>;
 		iommus =
 			<&iommu M4U_PORT_CAM_DPE_RDMA>,
 			<&iommu M4U_PORT_CAM_DPE_WDMA>;
@@ -4492,12 +4492,12 @@ transparent_hugepage=never";
 		throughput-normal-max = <457000000>;
 		throughput-config-offset = <2>;
 		throughput-table =
-			<875967048 2 1283 1283>, /* H.264 */
-			<875967048 4 962 962>,
-			<1129727304 2 1283 1283>, /* HEVC */
-			<1129727304 4 962 962>,
-			<892744264 2 1283 1283>, /* H265*/
-			<892744264 4 962 962>;
+			<875967048 2 1283 1283 312000000 100>, /* H.264 */
+			<875967048 4 962 962 416000000 134>,
+			<1129727304 2 1283 1283 312000000 100>, /* HEVC */
+			<1129727304 4 962 962 416000000 134>,
+			<892744264 2 1283 1283 312000000 100>, /* H265*/
+			<892744264 4 962 962 416000000 134>;
 		config-table =
 			<875967048 243000 2 2>, /* H.264 1080p 30fps */
 			<875967048 432000 4 4>, /* 720p 120fps */

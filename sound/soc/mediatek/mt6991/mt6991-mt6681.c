@@ -38,14 +38,37 @@ static const char *const mt6991_spk_type_str[] = {MTK_SPK_NOT_SMARTPA_STR,
 						  MTK_SPK_RICHTEK_RT5509_STR,
 						  MTK_SPK_MEDIATEK_MT6660_STR,
 						  MTK_SPK_RICHTEK_RT5512_STR,
-						  MTK_SPK_GOODIX_TFA98XX_STR};
+						  MTK_SPK_GOODIX_TFA98XX_STR,
+						  MTK_SPK_AKM_AK7709_STR};
 static const char *const
 	mt6991_spk_i2s_type_str[] = {MTK_SPK_I2S_0_STR,
 				     MTK_SPK_I2S_1_STR,
 				     MTK_SPK_I2S_2_STR,
 				     MTK_SPK_I2S_3_STR,
 				     MTK_SPK_I2S_5_STR,
-				     MTK_SPK_TINYCONN_I2S_0_STR};
+				     MTK_SPK_I2S_6_STR,
+				     MTK_SPK_I2S_7_STR,
+				     MTK_SPK_I2S_8_STR,
+				     MTK_SPK_I2S_9_STR,
+				     MTK_SPK_TINYCONN_I2S_0_STR,
+				     MTK_SPK_TINYCONN_I2S_1_STR,
+				     MTK_SPK_TINYCONN_I2S_2_STR,
+				     MTK_SPK_TINYCONN_I2S_3_STR,
+				     MTK_SPK_TINYCONN_I2S_5_STR,
+				     MTK_SPK_TINYCONN_I2S_6_STR,
+				     MTK_SPK_TINYCONN_I2S_7_STR,
+				     MTK_SPK_TINYCONN_I2S_8_STR,
+				     MTK_SPK_TINYCONN_I2S_9_STR,
+				     MTK_SPK_ETDM_OUT_STR,
+				     MTK_SPK_ETDM_IN_STR,
+				     MTK_SPK_I2S_IN0_STR,
+				     MTK_SPK_I2S_OUT0_STR,
+				     MTK_SPK_I2S_IN1_STR,
+				     MTK_SPK_I2S_OUT1_STR,
+				     MTK_SPK_I2S_IN4_STR,
+				     MTK_SPK_I2S_OUT4_STR,
+				     MTK_SPK_I2S_IN5_STR,
+				     MTK_SPK_I2S_OUT5_STR};
 
 static const struct soc_enum mt6991_spk_type_enum[] = {
 	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(mt6991_spk_type_str),
@@ -1044,6 +1067,10 @@ SND_SOC_DAILINK_DEFS(dspcallul,
 #if IS_ENABLED(CONFIG_MTK_ADSP_AUTO_HFP_CLIENT_SUPPORT)
 SND_SOC_DAILINK_DEFS(dsphfpclientrx,
 	DAILINK_COMP_ARRAY(COMP_CPU("audio_task_hfp_client_rx_dai")),
+	DAILINK_COMP_ARRAY(COMP_DUMMY()),
+	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-audio-dsp")));
+SND_SOC_DAILINK_DEFS(dsphfpclienttx,
+	DAILINK_COMP_ARRAY(COMP_CPU("audio_task_hfp_client_tx_dai")),
 	DAILINK_COMP_ARRAY(COMP_DUMMY()),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-audio-dsp")));
 #endif
@@ -2217,6 +2244,11 @@ static struct snd_soc_dai_link mt6991_mt6681_dai_links[] = {
 		.name = "DSP_Playback_HFP_CLIENT_RX",
 		.stream_name = "DSP_Playback_HFP_CLIENT_RX",
 		SND_SOC_DAILINK_REG(dsphfpclientrx),
+	},
+	{
+		.name = "DSP_Playback_HFP_CLIENT_TX",
+		.stream_name = "DSP_Playback_HFP_CLIENT_TX",
+		SND_SOC_DAILINK_REG(dsphfpclienttx),
 	},
 #endif
 #if IS_ENABLED(CONFIG_MTK_ADSP_AUTO_ANC_SUPPORT)

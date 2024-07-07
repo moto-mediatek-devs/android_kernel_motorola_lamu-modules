@@ -107,7 +107,39 @@
 &dispsys_config {
 	pinctrl-names = "mode_te_te";
 	pinctrl-0 = <&mtkfb_pins_lcm_dsi_te>;
+	pd-others = <&disp1_mutex0>, <&disp_ovl0_exdma3>, <&disp_ovl1_exdma3>,
+			<&disp_dpc>, <&mipi_tx_config0>, <&mipi_tx_config1>, <&mipi_tx_config2>;
+	pd-names = "side_dispsys", "ovlsys", "side_ovlsys",
+			"mminfra_in_dpc", "dsi_phy0", "dsi_phy1", "dsi_phy2";
 	status = "okay";
+};
+
+&disp_ovl0_exdma5 {
+	interrupts = <GIC_SPI 465 IRQ_TYPE_LEVEL_HIGH 0>;
+};
+
+&disp_ovl0_exdma6 {
+	interrupts = <GIC_SPI 465 IRQ_TYPE_LEVEL_HIGH 0>;
+};
+
+&ovl_wdma0 {
+	interrupts = <GIC_SPI 465 IRQ_TYPE_LEVEL_HIGH 0>;
+};
+
+&ovl_wdma1 {
+	interrupts = <GIC_SPI 465 IRQ_TYPE_LEVEL_HIGH 0>;
+};
+
+&disp_ovl1_exdma5 {
+	interrupts = <GIC_SPI 465 IRQ_TYPE_LEVEL_HIGH 0>;
+};
+
+&disp_ovl1_exdma6 {
+	interrupts = <GIC_SPI 465 IRQ_TYPE_LEVEL_HIGH 0>;
+};
+
+&ovl1_wdma1 {
+	interrupts = <GIC_SPI 465 IRQ_TYPE_LEVEL_HIGH 0>;
 };
 
 &disp_dvo0 {
@@ -131,13 +163,6 @@
 				remote-endpoint = <&dptx_in0>;
 			};
 		};
-
-		port@1 {
-			reg = <1>;
-			dptx_in0_out: endpoint {
-				remote-endpoint = <&serdes_dp_in>;
-			};
-		};
 	};
 };
 
@@ -149,13 +174,6 @@
 			reg = <0>;
 			disp1_dp_intf1_out: endpoint {
 				remote-endpoint = <&dptx_in1>;
-			};
-		};
-
-		port@1 {
-			reg = <1>;
-			dptx_in1_out: endpoint {
-				remote-endpoint = <&serdes_dp_mst_in1>;
 			};
 		};
 	};
@@ -184,8 +202,14 @@
 
 		port@2 {
 			reg = <2>;
+			dptx_out0: endpoint {
+				remote-endpoint = <&serdes_dp_in0>;
+			};
+		};
+		port@3 {
+			reg = <3>;
 			dptx_out1: endpoint {
-				remote-endpoint = <&serdes_dptx_in>;
+				remote-endpoint = <&serdes_dp_mst_in1>;
 			};
 		};
 	};
@@ -289,7 +313,6 @@
 	use-hpd = <1>;
 	use-edid = <0>;
 	external-monitor = <0>;
-	color-depth-10bit = <0>;
 
 	ports {
 		port@0 {
@@ -361,7 +384,7 @@
 		ser-super-frame = <0>;
 		ser-dual-link = <0>;
 		ser-dp-mst = <1>;
-		support-touch = <1>;
+		support-touch = <0>;
 
 		feature{
 			feature-handle-num = <2>;
@@ -950,24 +973,6 @@
 				>;
 				dp-mst-touch-i2c-addr = <>;
 				dp-mst-touch-init-cmd = <
-					2 0x0044 0x42 0	/* remap 0x14 to 0x21 */
-					2 0x0045 0x28 0
-					3 0x0044 0x44 0	/* remap 0x14 to 0x22 */
-					3 0x0045 0x28 0
-					0 0x0258 0x00 0	/*96851 INT linka  GPIO11 */
-					0 0x0259 0xab 0
-					0 0x025b 0x4b 0
-					0 0x025b 0x22 0
-					0 0x0260 0x00 0	/*96851 INT  linkb  GPIO12 */
-					0 0x0261 0xac 0
-					0 0x0262 0x4c 0
-					0 0x0263 0x28 0
-					2 0x020c 0x03 0	/* 96752 INT linka GPIO 4*/
-					2 0x020d 0xab 0
-					2 0x020e 0x4b 0
-					3 0x020c 0x03 0	/* 96752 INT linkb GPIO 4*/
-					3 0x020d 0xac 0
-					3 0x020e 0x4c 0
 				>;
 				bl-i2c-addr = <0x1a>;
 				bl-on-cmd = <
@@ -1271,8 +1276,8 @@
 		ports {
 			port@0 {
 				reg = <0>;
-				serdes_dp_in: endpoint {
-					remote-endpoint = <&dptx_in0_out>;
+				serdes_dp_in0: endpoint {
+					remote-endpoint = <&dptx_out0>;
 				};
 			};
 
@@ -1286,7 +1291,7 @@
 			port@2 {
 				reg = <2>;
 				serdes_dp_mst_in1: endpoint {
-					remote-endpoint = <&dptx_in1_out>;
+					remote-endpoint = <&dptx_out1>;
 				};
 			};
 
@@ -1294,13 +1299,6 @@
 				reg = <3>;
 				serdes_dp_mst_out1: endpoint {
 					remote-endpoint = <&panel_dp_mst_in1>;
-				};
-			};
-
-			port@4 {
-				reg = <4>;
-				serdes_dptx_in: endpoint {
-					remote-endpoint = <&dptx_out1>;
 				};
 			};
 		};
@@ -1321,7 +1319,7 @@
 		ser-super-frame = <0>;
 		ser-dual-link = <0>;
 		ser-dp-mst = <0>;
-		support-touch = <1>;
+		support-touch = <0>;
 
 		feature{
 			feature-handle-num = <2>;
@@ -1570,18 +1568,6 @@
 					1 0x06ff 0x22 0
 				>;
 				touch-init-cmd =<
-					0 0x0258 0x00 0   /*96851 INT linka  GPIO11 */
-					0 0x0259 0xab 0
-					0 0x025b 0x4b 0
-					0 0x025b 0x22 0
-					0 0x0260 0x00 0	  /*96851 INT  linkb  GPIO12 */
-					0 0x0261 0xac 0
-					0 0x0262 0x4c 0
-					0 0x0263 0x28 0
-					1 0x020c 0x03 0   /* 96752 INT linka GPIO 4*/
-					1 0x020d 0xab 0
-					1 0x020e 0x4b 0
-
 				>;
 				bl-i2c-addr = <0x1a>;
 				bl-on-cmd = <

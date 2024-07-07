@@ -906,7 +906,7 @@ signed int rsc_enque_cb(struct frame *frames, void *req)
 	unsigned int f, fcnt;
 	/*TODO: define engine request struct */
 	struct RSC_Request *_req;
-	struct RSC_Config *pRscConfig;
+	struct RSC_Config *pRscConfig __maybe_unused;
 
 	_req = (struct RSC_Request *) req;
 
@@ -960,7 +960,7 @@ signed int rsc_deque_cb(struct frame *frames, void *req)
 {
 	unsigned int f, fcnt;
 	struct RSC_Request *_req;
-	struct RSC_Config *pRscConfig;
+	struct RSC_Config *pRscConfig __maybe_unused;
 
 	_req = (struct RSC_Request *) req;
 
@@ -1939,7 +1939,7 @@ static long RSC_ioctl(struct file *pFile, unsigned int Cmd, unsigned long Param)
 	struct RSC_CLEAR_IRQ_STRUCT ClearIrq;
 	struct RSC_Config rsc_RscConfig;
 	struct RSC_Request rsc_RscReq;
-	signed int enqnum;
+	signed int enqnum __maybe_unused;
 	struct RSC_USER_INFO_STRUCT *pUserInfo;
 	int enqueNum;
 	int dequeNum;
@@ -2830,7 +2830,7 @@ EXIT:
  ******************************************************************************/
 static signed int RSC_release(struct inode *pInode, struct file *pFile)
 {
-	struct RSC_USER_INFO_STRUCT *pUserInfo;
+	struct RSC_USER_INFO_STRUCT *pUserInfo __maybe_unused;
 	/*unsigned int Reg;*/
 
 	LOG_DBG("- E. UserCount: %d.", RSCInfo.UserCount);
@@ -3391,22 +3391,24 @@ static int rsc_suspend_pm_event(struct notifier_block *notifier,
 	case PM_POST_HIBERNATION:
 		return NOTIFY_DONE;
 	case PM_SUSPEND_PREPARE: /*enter suspend*/
-		LOG_DBG("bPass1_On_In_Resume_TG1(%d)\n", bPass1_On_In_Resume_TG1);
+		LOG_INF("%s+:g_u4EnableClockCount(%d) g_SuspendCnt(%d).\n", __func__,
+					g_u4EnableClockCount, g_SuspendCnt);
 		if (g_u4EnableClockCount > 0) {
 			RSC_EnableClock(MFALSE);
 			g_SuspendCnt++;
 		}
 		bPass1_On_In_Resume_TG1 = 0;
-		LOG_INF("%s:g_u4EnableClockCount(%d) g_SuspendCnt(%d).\n", __func__,
+		LOG_INF("%s-:g_u4EnableClockCount(%d) g_SuspendCnt(%d).\n", __func__,
 					g_u4EnableClockCount, g_SuspendCnt);
 		return NOTIFY_DONE;
 	case PM_POST_SUSPEND:    /*after resume*/
-		LOG_DBG("bPass1_On_In_Resume_TG1(%d).\n", bPass1_On_In_Resume_TG1);
+		LOG_INF("%s+:g_u4EnableClockCount(%d) g_SuspendCnt(%d).\n", __func__,
+					g_u4EnableClockCount, g_SuspendCnt);
 		if (g_SuspendCnt > 0) {
 			RSC_EnableClock(MTRUE);
 			g_SuspendCnt--;
 		}
-		LOG_INF("%s:g_u4EnableClockCount(%d) g_SuspendCnt(%d).\n", __func__,
+		LOG_INF("%s-:g_u4EnableClockCount(%d) g_SuspendCnt(%d).\n", __func__,
 					g_u4EnableClockCount, g_SuspendCnt);
 		return NOTIFY_DONE;
 	}
@@ -3599,7 +3601,7 @@ static int proc_rsc_dump_open(struct inode *inode, struct file *file)
 	return single_open(file, rsc_dump_read, NULL);
 }
 
-static const struct file_operations rsc_dump_proc_fops = {
+static const struct file_operations rsc_dump_proc_fops __maybe_unused = {
 	.owner = THIS_MODULE,
 	.open = proc_rsc_dump_open,
 	.read = seq_read,
@@ -3757,7 +3759,7 @@ static int proc_rsc_reg_open(struct inode *inode, struct file *file)
 	return single_open(file, rsc_reg_read, NULL);
 }
 
-static const struct file_operations rsc_reg_proc_fops = {
+static const struct file_operations rsc_reg_proc_fops __maybe_unused = {
 	.owner = THIS_MODULE,
 	.open = proc_rsc_reg_open,
 	.read = seq_read,

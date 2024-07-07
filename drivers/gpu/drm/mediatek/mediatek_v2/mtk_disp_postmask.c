@@ -730,7 +730,9 @@ static int mtk_postmask_io_cmd(struct mtk_ddp_comp *comp,
 		break;
 	}
 #endif
-	case PMQOS_SET_HRT_BW: {
+	case PMQOS_SET_HRT_BW:
+	case PMQOS_SET_HRT_BW_DELAY:
+	{
 		u32 bw_val = *(unsigned int *)params;
 		unsigned int bpp = 1;
 
@@ -794,8 +796,8 @@ static int mtk_postmask_set_partial_update(struct mtk_ddp_comp *comp,
 	DDPINFO("%s, %s set partial update, height:%d, enable:%d\n",
 			__func__, mtk_dump_comp_str(comp), partial_roi.height, enable);
 
-	if (!panel_ext) {
-		DDPPR_ERR("%s:panel_ext not found\n", __func__);
+	if (!panel_ext || !panel_ext->round_corner_en) {
+		DDPDBG("%s:panel_ext not found or round_corner not enable\n", __func__);
 		return 0;
 	}
 
@@ -821,7 +823,7 @@ static int mtk_postmask_set_partial_update(struct mtk_ddp_comp *comp,
 		size = panel_ext->corner_pattern_tp_size;
 	}
 
-	DDPDBG("ori addr = 0x%pa, ori size = %d\n", &addr, size);
+	DDPDBG("%s, ori addr = 0x%pa, ori size = %d\n", __func__, &addr, size);
 
 	if (postmask->set_partial_update == 1) {
 		cmdq_pkt_write(handle, comp->cmdq_base,
@@ -862,7 +864,7 @@ static int mtk_postmask_set_partial_update(struct mtk_ddp_comp *comp,
 			tmp_bot = panel_ext->corner_pattern_height
 						+ panel_ext->corner_pattern_height_bot - 1;
 			size_per_line_bot = sum_corner_pattern_per_line(
-							panel_ext->corner_pattern_height, tmp_top,
+							panel_ext->corner_pattern_height, tmp_bot,
 							panel_ext->corner_pattern_size_per_line);
 			DDPDBG("%s, size_per_line_bot: %d, num_start: %d, num_end: %d\n",
 				__func__, size_per_line_bot,
@@ -1160,6 +1162,11 @@ static const struct mtk_disp_postmask_data mt6989_postmask_driver_data = {
 	.need_bypass_shadow = true,
 };
 
+static const struct mtk_disp_postmask_data mt6899_postmask_driver_data = {
+	.is_support_34bits = true,
+	.need_bypass_shadow = true,
+};
+
 static const struct mtk_disp_postmask_data mt6897_postmask_driver_data = {
 	.is_support_34bits = true,
 	.need_bypass_shadow = true,
@@ -1244,6 +1251,8 @@ static const struct of_device_id mtk_disp_postmask_driver_dt_match[] = {
 	  .data = &mt6985_postmask_driver_data},
 	{ .compatible = "mediatek,mt6989-disp-postmask",
 	  .data = &mt6989_postmask_driver_data},
+	{ .compatible = "mediatek,mt6899-disp-postmask",
+	  .data = &mt6899_postmask_driver_data},
 	{ .compatible = "mediatek,mt6897-disp-postmask",
 	  .data = &mt6897_postmask_driver_data},
 	{ .compatible = "mediatek,mt6835-disp-postmask",

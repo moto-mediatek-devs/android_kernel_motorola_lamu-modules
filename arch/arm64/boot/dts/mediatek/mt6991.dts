@@ -256,8 +256,7 @@
 			    cgroup.memory=nosocket,nokmem \
 			    disable_dma32=on \
 			    transparent_hugepage=never \
-			    androidboot.init_fatal_panic=true \
-			    kvm-arm.protected_modules=pkvm_mgmt,pkvm_tmem,pkvm_smmu";
+			    kvm-arm.protected_modules=pkvm_mgmt,pkvm_tmem,pkvm_smmu,pkvm_mkp";
 			    mkp_panic="on";
 		kaslr-seed = <0 0>;
 	};
@@ -1701,7 +1700,7 @@
 	mcupm: mcupm@c240000 {
 		compatible = "mediatek,mcupm";
 		mbox-extend = <16>;
-		mcdi-fg-node-support = <1>;
+		mpmm-node-support = <1>;
 		reg = <0 0x0c240000 0 0x50000>,
 			<0 0x0c2cf600 0 0xa0>,
 			<0 0x0c242004 0 0x4>,
@@ -3198,11 +3197,15 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 	};
 
 	mtk_leds: mtk-leds {
+		compatible = "mediatek,i2c-leds";
 		backlight {
 			label = "lcd-backlight";
 			max-brightness = <2047>;
 			min-brightness = <4>;
 			max-hw-brightness = <2047>;
+			led-mode = <6>;
+			gate-enable = <1>;
+			pwm-config = <0 1 0 0 0>;
 		};
 	};
 
@@ -6091,14 +6094,12 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 				<0 0x1a37010c 0 0x4>, /* MBOX2 clr */
 				<0 0x1a380000 0 0x100>, /* MBOX3 base */
 				<0 0x1a380100 0 0x4>, /* MBOX3 set */
-				<0 0x1a38010c 0 0x4>, /* MBOX3 clr */
-				<0 0x10001000 0 0x8>; /* INFRACFG_AO ADSP_RSV */
+				<0 0x1a38010c 0 0x4>; /* MBOX3 clr */
 			reg-names = "cfg", "cfg2", "cfg3", "cfg_hrt",
 				"mbox0_base", "mbox0_set", "mbox0_clr",
 				"mbox1_base", "mbox1_set", "mbox1_clr",
 				"mbox2_base", "mbox2_set", "mbox2_clr",
-				"mbox3_base", "mbox3_set", "mbox3_clr",
-				"infracfg_rsv";
+				"mbox3_base", "mbox3_set", "mbox3_clr";
 
 			interrupts = <GIC_SPI 709 IRQ_TYPE_LEVEL_HIGH 0>, /* MBOX0 */
 				<GIC_SPI 710 IRQ_TYPE_LEVEL_HIGH 0>, /* MBOX1 */
@@ -6347,6 +6348,7 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			compatible = "mediatek,mt6991-xsphy", "mediatek,xsphy";
 			#address-cells = <2>;
 			#size-cells = <2>;
+			u2-procfs-disable;
 			ranges;
 			status = "disabled";
 
@@ -6355,7 +6357,15 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 				clocks = <&clk26m>;
 				clock-names = "ref";
 				#phy-cells = <1>;
+				mediatek,lpm-parameter = <0x19 0x1e 0x1e>;
 				mediatek,refclk-sel;
+				mediatek,chp-en-disable;
+				mediatek,hsrx-vref-sel = <0x7>;
+				mediatek,fs-cr = <0x7>;
+				mediatek,u2-sw-efuse;
+				nvmem-cells = <&u2_phy_data1>, <&u2_phy_data2>, <&u2_phy_data2>;
+				nvmem-cell-names = "hsrx_term_cal", "hstx_impn", "hstx_impp";
+				nvmem-cell-masks = <0xf00000 0x7c00 0xf8000>;
 				status = "disabled";
 			};
 		};
@@ -6364,6 +6374,7 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			compatible = "mediatek,mt6991-xsphy", "mediatek,xsphy";
 			#address-cells = <2>;
 			#size-cells = <2>;
+			u2-procfs-disable;
 			ranges;
 			status = "disabled";
 
@@ -6372,7 +6383,15 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 				clocks = <&clk26m>;
 				clock-names = "ref";
 				#phy-cells = <1>;
+				mediatek,lpm-parameter = <0x19 0x1e 0x1e>;
 				mediatek,refclk-sel;
+				mediatek,chp-en-disable;
+				mediatek,hsrx-vref-sel = <0x7>;
+				mediatek,fs-cr = <0x7>;
+				mediatek,u2-sw-efuse;
+				nvmem-cells = <&u2_phy_data1>, <&u2_phy_data2>, <&u2_phy_data2>;
+				nvmem-cell-names = "hsrx_term_cal", "hstx_impn", "hstx_impp";
+				nvmem-cell-masks = <0xf00000 0x7c00 0xf8000>;
 				status = "disabled";
 			};
 
@@ -6381,7 +6400,15 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 				clocks = <&clk26m>;
 				clock-names = "ref";
 				#phy-cells = <1>;
+				mediatek,lpm-parameter = <0x19 0x1e 0x1e>;
 				mediatek,refclk-sel;
+				mediatek,chp-en-disable;
+				mediatek,hsrx-vref-sel = <0x7>;
+				mediatek,fs-cr = <0x7>;
+				mediatek,u2-sw-efuse;
+				nvmem-cells = <&u2_phy_data1>, <&u2_phy_data2>, <&u2_phy_data2>;
+				nvmem-cell-names = "hsrx_term_cal", "hstx_impn", "hstx_impp";
+				nvmem-cell-masks = <0xf00000 0x7c00 0xf8000>;
 				status = "disabled";
 			};
 		};
@@ -7430,6 +7457,7 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			clocks = <&mdpsys1_config_clk CLK_MDP1_MDP_MUTEX0_MML>;
 			clock-names = "mutex0";
 			sof-event = /bits/ 16 <CMDQ_EVENT_MML1_STREAM_SOF0>;
+			event-prete = /bits/ 16 <CMDQ_EVENT_DPC_DT_DONE34_0>;
 		};
 
 		mml1_rdma0: mml1-rdma0@3e450000 {
@@ -7717,7 +7745,6 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			default-glb-pwroff-timeout-us = <10>;
 			autosuspend-delay-ms = <10>;
 			adaptive-power-policy = <2>;
-			exception-mask = <0x5>;
 			reset-exception-mask = <0x0>;
 			iter-trace-enable = <1>;
 			gpu-frame-base-optimize = <1>;
@@ -8843,7 +8870,7 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 				<0>, /*MTK_DRM_OPT_PREFETCH_TE*/
 				<0>, /*MTK_DRM_OPT_VIDLE_APSRC_OFF*/
 				<0>, /*MTK_DRM_OPT_VIDLE_DSI_PLL_OFF*/
-				<1>, /*MTK_DRM_OPT_CHECK_TRIGGER_MERGE*/
+				<0>, /*MTK_DRM_OPT_CHECK_TRIGGER_MERGE*/
 				<0>, /*MTK_DRM_OPT_VIRTUAL_DISP*/
 				<1>, /*MTK_DRM_OPT_OVL_BW_MONITOR*/
 				<0>, /*MTK_DRM_OPT_GPU_CACHE*/
@@ -9892,7 +9919,8 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 				<0 0x31bd0078 0 0x4>,             /* hfrp DISP_GENERAL_CTRL_SET */
 				<0 0x31bd007c 0 0x4>,             /* hfrp DISP_GENERAL_CTRL_CLR */
 				<0 0x31a912b4 0 0x4>,             /* hfrp_dvfsrc_disp_debug_sta_6 */
-				<0 0x31ac03dc 0 0x4>,             /* hfrp sub pm MMINFRA bit1 */
+				<0 0x31a80130 0 0x4>,             /* mminfra voter */
+				<0 0x1c000918 0 0x4>,             /* done bit, or hfrp sub pm MMINFRA 0x31ac03dc bit1 */
 				<0 0x31ac1e50 0 0x4>,             /* hfrp sub pm DISP_VCORE bit29, or 0x31b50100 bit24*/
 				<0 0x3e800100 0 0x10>,            /* VDISP_AO_CG_CON0 */
 				<0 0x3e8f105c 0 0x4>,             /* DIS0 pwr chk */
@@ -9911,6 +9939,7 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 				"vcore_mode_set",
 				"vcore_mode_clr",
 				"vdisp_dvfsrc",
+				"mminfra_voter",
 				"mminfra_pwr_chk",
 				"disp_vcore_pwr_chk",
 				"vdisp_ao_cg_con",
@@ -12992,7 +13021,16 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 		clocks =
 			<&disp_vdisp_ao_config_clk CLK_MM_V_DISP_VDISP_AO_CONFIG_DISP>,
 			<&disp_vdisp_ao_config_clk CLK_MM_V_DISP_DPC_DISP>,
-			<&disp_vdisp_ao_config_clk CLK_MM_V_SMI_SUB_SOMM0_SMI>;
+			<&disp_vdisp_ao_config_clk CLK_MM_V_SMI_SUB_SOMM0_SMI>,
+			<&mmdvfs_mux MMDVFS_USER_DISP>;
+		clock-names = "mm_v_disp_vdisp_ao_config_disp",
+				"mm_v_disp_dpc_disp",
+				"mm_v_smi_sub_somm0_smi",
+				"mmdvfs_clk";
+		vdisp-clock-names = "mm_v_disp_vdisp_ao_config_disp",
+				"mm_v_disp_dpc_disp",
+				"mm_v_smi_sub_somm0_smi";
+		mmdvfs-clock-names = "mmdvfs_clk";
 		#clock-cells = <1>;
 		reg =
 			<0 0x3e800000 0 0x4>,             /* DISP_REG_VDISP_AO_INTEN */
@@ -13000,14 +13038,16 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			<0 0x31b00000 0 0x2000>,          /* HWCCF_BASE_ADDR */
 			<0 0x31b50180 0 0x4>,             /* MMPC_BUS_PROTECT_CG_GP1 */
 			<0 0x31bd0070 0 0x4>,             /* hfrp DISP_SW_VOTE_SET */
-			<0 0x31bd0074 0 0x4>;             /* hfrp DISP_SW_VOTE_CLR */
+			<0 0x31bd0074 0 0x4>,             /* hfrp DISP_SW_VOTE_CLR */
+			<0 0x3ea00000 0 0x114>;           /* AGING_BASE */
 		reg-names =
 			"vdisp_ao_inten",
 			"vdisp_ao_cg_con",
 			"hwccf_base",
 			"mmpc_bus_prot_gp1",
 			"disp_sw_vote_set",
-			"disp_sw_vote_clr";
+			"disp_sw_vote_clr",
+			"aging_base";
 		disp-pd-id = <0>;
 	};
 
@@ -13426,6 +13466,13 @@ connsys_emi_config_hyp: connsys-emi-config-hyp {
 			pd-id = <18>;
 		};
 
+		vmm_vde_vocre: vmm-vde-vcore {
+			compatible = "mediatek,vmm_notifier_mt6991";
+			power-domains = <&hfrpsys MT6991_POWER_DOMAIN_VDE_VCORE0>,
+					<&hfrpsys MT6991_POWER_DOMAIN_VDE_VCORE0>;
+			#power-domain-cells = <1>;
+			pd-id = <19>;
+		};
 
 		imgsys_cmdq: imgsys-cmdq@15002000 {
 			compatible = "mediatek,imgsys-cmdq-8";
@@ -14960,6 +15007,8 @@ connsys_emi_config_hyp: connsys-emi-config-hyp {
 		scp-scpsys-regmap = "enable";
 		scp-bus-tracker-ver = <0x2>;
 		scp-mbrain = "enable";
+		scp-recovery-wfi-detect = "enable";
+		scp-ipi-timeout-bugon = "enable";
 
 		//scp_aovmem_key = "mediatek,scp_aov_reserved";
 		scp-mem-key = "mediatek,reserve-memory-scp_share";
@@ -15505,7 +15554,8 @@ connsys_emi_config_hyp: connsys-emi-config-hyp {
 			<0 0x31ba010c 0 0x4>, /* mbox2 clr */
 			<0 0x31a70028 0 0x4>, /* mbox2 init */
 			<0 0x31bd0000 0 0x1000>, /* cfg ap*/
-			<0 0x31a70040 0 0x10>; /* cfg sec gpr */
+			<0 0x31a70040 0 0x10>, /* cfg sec gpr */
+			<0 0x1c00091c 0 0x4>; /* vcp rdy */
 
 		reg-names = "vcp_sram_base",
 			"vcp_bus_tracker",
@@ -15530,7 +15580,8 @@ connsys_emi_config_hyp: connsys-emi-config-hyp {
 			"mbox2_clr",
 			"mbox2_init",
 			"vcp_cfgreg_ap",
-			"vcp_sec_gpr";
+			"vcp_sec_gpr",
+			"vcp_vlp_ao_rsvd7";
 
 		interrupts = <GIC_SPI 787 IRQ_TYPE_LEVEL_HIGH 0>,
 			<GIC_SPI 788 IRQ_TYPE_LEVEL_HIGH 0>,
@@ -15554,7 +15605,7 @@ connsys_emi_config_hyp: connsys-emi-config-hyp {
 		fmeter-ck = <24>;	/* clk table fmeter f_fmmup_ck */
 		fmeter-type = <5>;	/* fmeter type */
 		mbox-count = <3>;
-		vcp-ee-enable = <0>;
+		vcp-excep-mode = <1>;
 		bus-debug-num-ports = <25>;
 		/*res-req-status = <0x1c00186c>;*/
 		/* id, mbox, send_size*/
@@ -15699,6 +15750,7 @@ connsys_emi_config_hyp: connsys-emi-config-hyp {
 		send-table =
 			<33 0  2>,/* IPI_OUT_MMDVFS_MMUP */
 			<13 0  2>,/* IPI_OUT_MMDEBUG */
+			<35 0  1>,/* IPI_OUT_VDISP */
 			<30 1  6>,/* IPI_OUT_LOGGER_CTRL_1 */
 			<20 1  2>,/* IPI_OUT_C_SLEEP_1 */
 			<21 1  3>,/* IPI_OUT_TEST_1 */
@@ -16166,7 +16218,6 @@ connsys_emi_config_hyp: connsys-emi-config-hyp {
 		interconnect-names = "fpsgo-perf-bw";
 		required-opps = <&dvfsrc_freq_opp1>;
 		cpu-limit = <2>;
-		gcc-enable = <1>;
 		fbt-cpu-mask = <255 128 15 127 240 112>;
 		sbe-resceue-enable = <1>;
 		ux-scroll-general-policy = <0>;
@@ -16753,10 +16804,11 @@ connsys_emi_config_hyp: connsys-emi-config-hyp {
 		bootmode = <&chosen>;
 		gauge = <&mtk_gauge>;
 		reg = <0 0x00117700 0 0x100>,
+			<0 0x13020170 0 0xc>,
 			<0 0x4b840c18 0 0x8>,
 			<0 0x0c220c04 0 0x20>;
 		reg-names = "ppb_sram",
-			"gpu_dbg", "cpu_dbg";
+			"hpt_ctrl", "gpu_dbg", "cpu_dbg";
 
 		ppb-version = <2>;
 		soc-error = <2500>;
@@ -16783,6 +16835,10 @@ connsys_emi_config_hyp: connsys-emi-config-hyp {
 		bat1-aging-multiples = <0 0>;
 		bat2-aging-threshold = <500 1000>;
 		bat2-aging-multiples = <0 0>;
+
+		soc-max-level = <2>;
+		soc-hpt-ctrl-lv1 = <7>;
+		soc-hpt-ctrl-lv2 = <0>;
 
 		bat-ocv-table-num = <0>;
 
@@ -17212,15 +17268,15 @@ connsys_emi_config_hyp: connsys-emi-config-hyp {
 		lvsys-thd-enable = <1>;
 		vbat-thd-enable = <1>;
 		bat0-thd-volts-l = <
-			3400 3100 2900
-			3400 3100 2900
-			4400 3400 3100
-			4900 4800 4400>;
+			3200 3000 2850
+			3300 3000 2850
+			3360 3000 2850
+			3470 3000 2850>;
 		bat0-thd-volts-h = <
-			3500 3400 3100
-			3500 3400 3100
-			4500 4400 3400
-			5000 4900 4800>;
+			3300 3200 3000
+			3400 3300 3000
+			3460 3360 3000
+			3570 3470 3000>;
 		bat1-thd-volts-l = <
 			3400 3100 2900
 			3400 3100 2900
@@ -17231,7 +17287,7 @@ connsys_emi_config_hyp: connsys-emi-config-hyp {
 			3500 3400 3100
 			4500 4400 3400
 			5000 4900 4800>;
-		lvsys-thd-volt-l = <2900>;
+		lvsys-thd-volt-l = <2850>;
 		lvsys-thd-volt-h = <3100>;
 		temperature-stage-threshold = <25 10 0>;
 
@@ -17249,9 +17305,9 @@ connsys_emi_config_hyp: connsys-emi-config-hyp {
 		pt-shutdown-enable = <1>;
 
 		throttle-level = <0 1 2 3>,
-					<0 1 2 3>,
-					<0 1 2 3>,
-					<0 1 2 3>;
+						<0 1 2 3>,
+						<0 1 2 3>,
+						<0 1 2 3>;
 		bootmode = <&chosen>;
 		gauge = <&mtk_gauge>;
 	};
@@ -17259,31 +17315,29 @@ connsys_emi_config_hyp: connsys-emi-config-hyp {
 	cpu_power_throttling: cpu-power-throttling {
 		compatible = "mediatek,cpu-power-throttling";
 
-		lbat-max-level = <5>;
-		lbat-limit-freq-lv1 = < 2147483647  2147483647 2147483647>;
-		lbat-limit-freq-lv2 = < 1200000  1700000 1900000>;
-		lbat-limit-freq-lv3 = < 900000  900000 900000>;
-		lbat-limit-freq-lv4 = < 900000  900000 900000>;
-		lbat-limit-freq-lv5 = < 900000  900000 900000>;
+		lbat-max-level = <3>;
+		lbat-limit-freq-lv1 = < 1800000  900000 670000>;
+		lbat-limit-freq-lv2 = < 1200000  550000 670000>;
+		lbat-limit-freq-lv3 = < 330000  550000 670000>;
 
 		oc-max-level = <2>;
 		oc-limit-freq-lv1 = < 2147483647  2147483647 2147483647>;
 		oc-limit-freq-lv2 = < 1200000  1700000 1900000>;
 
 		soc-max-level = <2>;
-		soc-limit-freq-lv1 = < 2147483647  2147483647 2147483647>;
-		soc-limit-freq-lv2 = < 900000  900000 670000>;
+		soc-core-onoff-lv1 = < 1 1 1 1 1 1 1 1 >;
+		soc-core-onoff-lv2 = < 1 1 1 1 1 1 0 0 >;
+		soc-limit-freq-lv1 = < 2147483647  2147483647 2147483647 >;
+		soc-limit-freq-lv2 = < 1800000 900000 670000>;
 	};
 
 	gpu_power_throttling: gpu-power-throttling {
 		compatible = "mediatek,gpu-power-throttling";
 
-		lbat-max-level = <5>;
-		lbat-limit-freq-lv1 = <988000>;
-		lbat-limit-freq-lv2 = <572000>;
+		lbat-max-level = <3>;
+		lbat-limit-freq-lv1 = <338000>;
+		lbat-limit-freq-lv2 = <338000>;
 		lbat-limit-freq-lv3 = <338000>;
-		lbat-limit-freq-lv4 = <338000>;
-		lbat-limit-freq-lv5 = <338000>;
 
 		oc-max-level = <2>;
 		oc-limit-freq-lv1 = <988000>;
@@ -17297,12 +17351,10 @@ connsys_emi_config_hyp: connsys-emi-config-hyp {
 	md_power_throttling: md-power-throttling {
 		compatible = "mediatek,md-power-throttling";
 
-		lbat-max-level = <5>;
+		lbat-max-level = <3>;
 		lbat-reduce-tx-lv1 = <0>;
 		lbat-reduce-tx-lv2 = <6>;
 		lbat-reduce-tx-lv3 = <6>;
-		lbat-reduce-tx-lv4 = <6>;
-		lbat-reduce-tx-lv5 = <6>;
 
 		oc-max-level = <2>;
 		oc-reduce-tx-lv1 = <0>;
@@ -17315,16 +17367,17 @@ connsys_emi_config_hyp: connsys-emi-config-hyp {
 	bp_thl: bp-thl {
 		compatible = "mediatek,mtk-bp-thl";
 
-		reg = <0 0x13020170 0 0xc>;
-		reg-names = "hpt_ctrl";
-
 		max-throttle-level = <2>;
-		soc-throttle-level = < 0 1 2>;
-		hpt-ctrl-val = <7 7 0>;
+		soc-throttle-level = <0 1 1 2>, //temperature stage 0
+						<0 1 1 2>, //temperature stage 1
+						<0 1 1 2>, //temperature stage 2
+						<0 1 2 2>; //temperature stage 3
 
-		soc-max-stage = <2>;
-		soc-limit-threshold = <15 2>;
-		soc-release-threshold = <16 3>;
+		soc-max-stage = <3>;
+		soc-limit-threshold = <15 7 5>;
+
+		temperature-max-stage = <3>;
+		temperature-stage-threshold = <25 10 0>;
 
 		md-soc-throttle-l = <20>;
 		md-soc-throttle-h = <25>;

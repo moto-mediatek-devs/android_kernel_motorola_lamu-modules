@@ -428,7 +428,7 @@ static s32 hdr_hist_ctrl(struct mml_comp *comp, struct mml_task *task,
 				call_hw_op(task->config->path[0]->mmlsys,
 					mminfra_pw_enable);
 				call_hw_op(task->config->path[0]->mmlsys,
-					pw_enable);
+					pw_enable, task->config->info.mode);
 				mml_msg_dpc("%s dpc exception flow on", __func__);
 				mml_dpc_exc_keep(task->config->mml, comp->sysid);
 				call_hw_op(comp, clk_enable);
@@ -1594,7 +1594,8 @@ static void hdr_histdone_cb(struct cmdq_cb_data data)
 		mml_msg_dpc("%s dpc exception flow off", __func__);
 		mml_dpc_exc_release(hdr->mml, comp->sysid);
 		/* ccf power off */
-		call_hw_op(hdr->mmlsys_comp, pw_disable);
+		call_hw_op(hdr->mmlsys_comp, pw_disable,
+			hdr->pq_task->task->config->info.mode);
 		call_hw_op(hdr->mmlsys_comp, mminfra_pw_disable);
 		mml_clock_unlock(hdr->mml);
 		mml_lock_wake_lock(hdr->mml, false);
@@ -1864,6 +1865,14 @@ const struct of_device_id mml_hdr_driver_dt_match[] = {
 	{
 		.compatible = "mediatek,mt6897-mml_hdr",
 		.data = &mt6985_hdr_data,
+	},
+	{
+		.compatible = "mediatek,mt6899-mml0_hdr",
+		.data = &mt6991_mmlt_hdr_data,
+	},
+	{
+		.compatible = "mediatek,mt6899-mml1_hdr",
+		.data = &mt6991_mmlf_hdr_data,
 	},
 	{
 		.compatible = "mediatek,mt6989-mml_hdr",

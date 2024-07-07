@@ -1006,10 +1006,12 @@ static s32 sys_post(struct mml_comp *comp, struct mml_task *task,
 static s32 sys_done(struct mml_comp *comp, struct mml_task *task,
 		    struct mml_comp_config *ccfg)
 {
+	struct cmdq_pkt *pkt = task->pkts[ccfg->pipe];
+
+	cmdq_pkt_write(pkt, NULL, comp->base_pa + SYS_MISC_REG, 0, GENMASK(21, 12));
+
 	if (task->config->dpc && (mml_dl_dpc & MML_DPC_PKT_VOTE)) {
 #ifndef MML_FPGA
-		struct cmdq_pkt *pkt = task->pkts[ccfg->pipe];
-
 		mml_dpc_power_release_gce(comp->sysid, pkt);
 #endif
 	}
@@ -1139,13 +1141,19 @@ static const struct mml_comp_debug_ops sys_debug_ops_mt6991 = {
 	.reset = &sys_reset_current,
 };
 
-s32 mml_sys_pw_enable(struct mml_comp *comp)
+s32 mml_sys_pw_enable(struct mml_comp *comp, const s8 mode)
 {
 	int ret;
 	struct mml_sys *sys = comp_to_sys(comp);
 	bool pwon = comp->pw_cnt == 0;
 
-	ret = mml_comp_pw_enable(comp);
+	ret = mml_comp_pw_enable(comp, mode);
+
+	if (mode == MML_MODE_DIRECT_LINK ||
+		mode == MML_MODE_RACING ||
+		mode == MML_MODE_DDP_ADDON)
+		mml_dpc_mtcmos_auto(comp->sysid, true, mode);
+
 	if (!ret && pwon) {
 		ret = clk_prepare_enable(sys->clk_sys_26m);
 		if (ret)
@@ -1155,7 +1163,7 @@ s32 mml_sys_pw_enable(struct mml_comp *comp)
 	return ret;
 }
 
-s32 mml_sys_pw_disable(struct mml_comp *comp)
+s32 mml_sys_pw_disable(struct mml_comp *comp, const s8 mode)
 {
 	int ret;
 	struct mml_sys *sys = comp_to_sys(comp);
@@ -1164,7 +1172,12 @@ s32 mml_sys_pw_disable(struct mml_comp *comp)
 	if (pwoff)
 		clk_disable_unprepare(sys->clk_sys_26m);
 
-	ret = mml_comp_pw_disable(comp);
+	if (mode == MML_MODE_DIRECT_LINK ||
+		mode == MML_MODE_RACING ||
+		mode == MML_MODE_DDP_ADDON)
+		mml_dpc_mtcmos_auto(comp->sysid, false, mode);
+
+	ret = mml_comp_pw_disable(comp, mode);
 
 	return ret;
 }
@@ -1560,7 +1573,7 @@ static void sys_ddp_disable_locked(const struct mml_topology_path *path,
 	mml_trace_ex_begin("%s_%s_%u", __func__, "pw", pipe);
 
 	if (path->mmlsys) {
-		call_hw_op(path->mmlsys, pw_disable);
+		call_hw_op(path->mmlsys, pw_disable, task->config->info.mode);
 		call_hw_op(path->mmlsys, mminfra_pw_disable);
 	}
 	mml_trace_ex_end();
@@ -1616,7 +1629,7 @@ static void sys_ddp_enable(struct mml_sys *sys, struct mml_task *task, u32 pipe)
 
 	if (path->mmlsys) {
 		call_hw_op(path->mmlsys, mminfra_pw_enable);
-		call_hw_op(path->mmlsys, pw_enable);
+		call_hw_op(path->mmlsys, pw_enable, task->config->info.mode);
 	}
 
 	mml_trace_ex_end();
@@ -2673,6 +2686,22 @@ static const struct mml_data mt6897_mml_data = {
 	.ddren = 0x22,
 };
 
+static const struct mml_data mt6899_mmlt_data = {
+	.comp_inits = {
+		[MML_CT_SYS] = &sys_comp_init,
+		[MML_CT_DL_IN] = &dli_comp_init,
+		[MML_CT_DL_OUT] = &dl_mml_comp_init,
+	},
+	.aid_sel = sys_config_aid_sel_bits_sys,
+	.hw_ops = &sys_hw_ops_mminfra,
+	.gpr = {CMDQ_GPR_R12, CMDQ_GPR_R14},
+	.px_per_tick = 2,
+	.aidsel_mode = MML_AIDSEL_ENGINEBITS,
+	.sysid = mml_sys_tile,
+	.pw_mminfra = true,
+	.ddren = 0x42,
+};
+
 static const struct mml_data mt6989_mml_data = {
 	.comp_inits = {
 		[MML_CT_SYS] = &sys_comp_init,
@@ -2766,6 +2795,10 @@ const struct of_device_id mtk_mml_of_ids[] = {
 		.data = &mt6897_mml_data,
 	},
 	{
+		.compatible = "mediatek,mt6899-mml1",
+		.data = &mt6989_mml_data ,
+	},
+	{
 		.compatible = "mediatek,mt6989-mml",
 		.data = &mt6989_mml_data,
 	},
@@ -2786,6 +2819,10 @@ static const struct of_device_id mml_sys_of_ids[] = {
 	{
 		.compatible = "mediatek,mt6893-mml_sys",
 		.data = &mt6893_mml_data,
+	},
+	{
+		.compatible = "mediatek,mt6899-mmlsys0",
+		.data = &mt6899_mmlt_data,
 	},
 	{
 		.compatible = "mediatek,mt6991-mmlsys0",

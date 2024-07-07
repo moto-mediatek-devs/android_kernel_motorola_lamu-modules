@@ -183,9 +183,12 @@ enum DISP_VBLANK_REC_JOB_TYPE {
 #define DISP_SLOT_REQUEST_TE_EN (DISP_SLOT_REQUEST_TE_PREPARE + 0x4)
 
 /* PC */
-#define DISP_SLOT_PANEL_SPR_EN (DISP_SLOT_REQUEST_TE_PREPARE + 0x4)
+#define DISP_SLOT_PANEL_SPR_EN (DISP_SLOT_REQUEST_TE_EN + 0x4)
+#define DISP_SLOT_CUR_HRT_VAL_DMRR (DISP_SLOT_PANEL_SPR_EN + 0x4)
+#define DISP_SLOT_CUR_HRT_VAL_DBIR (DISP_SLOT_CUR_HRT_VAL_DMRR + 0x4)
+#define DISP_SLOT_CUR_HRT_VAL_ODRW (DISP_SLOT_CUR_HRT_VAL_DBIR + 0x4)
 
-#define DISP_SLOT_TRIGGER_LOOP_SKIP_MERGE (DISP_SLOT_PANEL_SPR_EN + 0x4)
+#define DISP_SLOT_TRIGGER_LOOP_SKIP_MERGE (DISP_SLOT_CUR_HRT_VAL_ODRW + 0x4)
 
 /* For idlemgr by wb*/
 #define DISP_SLOT_IDLEMGR_BY_WB_STATUS (DISP_SLOT_TRIGGER_LOOP_SKIP_MERGE + 0x4)
@@ -519,6 +522,7 @@ enum MTK_CRTC_PROP {
 	CRTC_PROP_BL_SYNC_GAMMA_GAIN,
 	CRTC_PROP_DYNAMIC_WCG_OFF,
 	CRTC_PROP_WCG_BY_COLOR_MODE,
+	CRTC_PROP_STYLUS,
 	CRTC_PROP_MAX,
 };
 
@@ -717,6 +721,8 @@ enum SET_DIRTY_INDEX {
 	CRTC_ENABLE,
 	FIRST_ENABLE_DDP_CONFIG,
 	TEST_SHOW,
+	CLR_SET_DIRTY = 0xfffffff,
+	CLR_SET_DIRTY_CB = 0x1000,
 	INDEX_MAX,
 };
 
@@ -1200,6 +1206,7 @@ struct mtk_drm_crtc {
 
 	unsigned int total_srt;
 
+	unsigned int aod_scp_spr_switch;
 	unsigned int spr_is_on;
 	wait_queue_head_t spr_switch_wait_queue;
 	atomic_t spr_switching;
@@ -1215,10 +1222,8 @@ struct mtk_drm_crtc {
 
 	struct mtk_ddp_comp *last_blender;
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
 	struct mtk_ddp_comp *first_exdma;
 	struct mtk_ddp_comp *first_blender;
-#endif
 
 	wait_queue_head_t esd_notice_wq;
 	atomic_t esd_notice_status;
@@ -1291,6 +1296,7 @@ struct mtk_cmdq_cb_data {
 	unsigned int pres_fence_idx;
 	struct drm_framebuffer *wb_fb;
 	unsigned int wb_fence_idx;
+	enum addon_scenario wb_scn;
 	unsigned int hrt_idx;
 	struct mtk_lcm_dsi_cmd_packet *ddic_packet;
 	ktime_t signal_ts;
@@ -1487,6 +1493,7 @@ int mtk_drm_crtc_wait_blank(struct mtk_drm_crtc *mtk_crtc);
 void mtk_drm_crtc_init_para(struct drm_crtc *crtc);
 void trigger_without_cmdq(struct drm_crtc *crtc);
 void mtk_crtc_set_dirty(struct mtk_drm_crtc *mtk_crtc);
+void mtk_crtc_clr_set_dirty(struct mtk_drm_crtc *mtk_crtc);
 void mtk_drm_layer_dispatch_to_dual_pipe(
 	struct mtk_drm_crtc *mtk_crtc, unsigned int mmsys_id,
 	struct mtk_plane_state *plane_state,
@@ -1600,7 +1607,7 @@ void mtk_crtc_exec_atf_prebuilt_instr(struct mtk_drm_crtc *mtk_crtc,
 
 unsigned int mtk_get_cur_spr_type(struct drm_crtc *crtc);
 
-int mtk_drm_switch_spr(struct drm_crtc *crtc, unsigned int en);
+int mtk_drm_switch_spr(struct drm_crtc *crtc, unsigned int en, unsigned int need_lock);
 
 int mtk_vblank_config_rec_init(struct drm_crtc *crtc);
 dma_addr_t mtk_vblank_config_rec_get_slot_pa(struct mtk_drm_crtc *mtk_crtc,
@@ -1629,5 +1636,10 @@ void mtk_drm_crtc_exdma_path_setting_reset_without_cmdq(struct mtk_drm_crtc *mtk
 
 void mtk_crtc_gce_event_config(struct drm_crtc *crtc);
 void mtk_crtc_vdisp_ao_config(struct drm_crtc *crtc);
+
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+struct mtk_ddp_comp *mtk_crtc_get_comp_with_index(struct mtk_drm_crtc *mtk_crtc,
+						  struct mtk_plane_state *plane_state);
+#endif
 
 #endif /* MTK_DRM_CRTC_H */

@@ -74,6 +74,21 @@ struct drm_crtc_state;
 #define MMSYS_SODI_REQ_MASK                       0xF4
 #define MMSYS_EMI_REQ_CTL                         0xF8
 
+#define OVLSYS_EXRDMA_ULTRA_SEL0                  0x40
+#define OVLSYS_EXRDMA_ULTRA_SEL1                  0x44
+#define OVLSYS_EXRDMA_PREULTRA_SEL0               0x48
+#define OVLSYS_EXRDMA_PREULTRA_SEL1               0x4C
+	#define OVL_EXDMA0_SEL       REG_FLD_MSB_LSB(2, 0)
+	#define OVL_EXDMA1_SEL       REG_FLD_MSB_LSB(6, 4)
+	#define OVL_EXDMA2_SEL       REG_FLD_MSB_LSB(10, 8)
+	#define OVL_EXDMA3_SEL       REG_FLD_MSB_LSB(14, 12)
+	#define OVL_EXDMA4_SEL       REG_FLD_MSB_LSB(18, 16)
+	#define OVL_EXDMA5_SEL       REG_FLD_MSB_LSB(22, 20)
+	#define OVL_EXDMA6_SEL       REG_FLD_MSB_LSB(26, 24)
+	#define OVL_EXDMA7_SEL       REG_FLD_MSB_LSB(30, 28)
+	#define OVL_EXDMA8_SEL       REG_FLD_MSB_LSB(2, 0)
+	#define OVL_EXDMA9_SEL       REG_FLD_MSB_LSB(6, 4)
+
 #define DISPSYS0_DDREN_ACK_CON                    0x50
 #define DISPSYS1_DDREN_ACK_CON                    0x3F4
 
@@ -935,6 +950,7 @@ enum mtk_ddp_io_cmd {
 	PMQOS_SET_HRT_BW_DELAY,
 	PMQOS_SET_HRT_BW_DELAY_POST,
 	PMQOS_UPDATE_BW,
+	PMQOS_GET_LARB_PORT_HRT_BW,
 	OVL_REPLACE_BOOTUP_MVA,
 	BACKUP_INFO_CMP,
 	LCM_RESET,
@@ -1518,6 +1534,9 @@ bool mtk_dsi_is_cmd_mode(struct mtk_ddp_comp *comp);
 enum mtk_ddp_comp_id mtk_dsi_get_comp_id(struct drm_connector *c);
 bool mtk_ddp_comp_is_output(struct mtk_ddp_comp *comp);
 bool mtk_ddp_comp_is_output_by_id(enum mtk_ddp_comp_id id);
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+bool mtk_ddp_comp_is_rdma(struct mtk_ddp_comp *comp);
+#endif
 void mtk_ddp_comp_get_name(struct mtk_ddp_comp *comp, char *buf, int buf_len);
 int mtk_ovl_layer_num(struct mtk_ddp_comp *comp);
 void mtk_ddp_write(struct mtk_ddp_comp *comp, unsigned int value,

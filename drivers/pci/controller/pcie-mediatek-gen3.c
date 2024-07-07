@@ -102,6 +102,8 @@
 #define PCIE_PCI_IDS_1			0x9c
 #define PCI_CLASS(class)		(class << 8)
 
+#define PCIE_PCI_LPM			0xa4
+
 #define PCIE_CFGNUM_REG			0x140
 #define PCIE_CFG_DEVFN(devfn)		((devfn) & GENMASK(7, 0))
 #define PCIE_CFG_BUS(bus)		(((bus) << 8) & GENMASK(15, 8))
@@ -252,6 +254,8 @@
 #define PCIE_CPL_TIMEOUT_64US		0x1
 #define PCIE_CPL_TIMEOUT_4MS		0x2
 #define PCIE_CPL_TIMEOUT_32MS		0x5
+#define PCIE_CPLTO_SCALE_4MS		4
+#define PCIE_CPLTO_SCALE_10MS		10
 #define PCIE_CPLTO_SCALE_29MS		29
 
 #define PCIE_CONF_EXP_LNKCTL2_REG	0x10b0
@@ -288,11 +292,6 @@
 
 /* pmrc register */
 #define PMRC_BBCK2_STA			0x41c
-
-enum mtk_pcie_suspend_link_state {
-	LINK_STATE_L12 = 0,
-	LINK_STATE_L2,
-};
 
 struct mtk_pcie_port;
 
@@ -382,12 +381,14 @@ struct mtk_pcie_port {
 	struct mtk_pcie_data *data;
 	int port_num;
 	u32 suspend_mode;
+	u32 rpm_suspend_mode;
 	bool cfg_saved;
 	bool dvfs_req_en;
 	bool peri_reset_en;
 	bool soft_off;
 	bool dump_cfg;
 	bool full_debug_dump;
+	bool aer_detect;
 	bool skip_suspend;
 	bool rpm;
 	int eint_irq;
@@ -476,6 +477,13 @@ static int mtk_pcie_config_read(struct pci_bus *bus, unsigned int devfn,
 			mtk_pcie_dump_link_info(port->port_num);
 			mtk_pcie_disable_data_trans(port->port_num);
 			dev_info(port->dev, "PCIe Rxerr detected!\n");
+		}
+
+		reg = readl_relaxed(port->base + PCIE_AER_UNC_STATUS);
+		if ((reg & PCI_ERR_UNC_COMP_TIME) && port->aer_detect) {
+			mtk_pcie_dump_link_info(port->port_num);
+			mtk_pcie_disable_data_trans(port->port_num);
+			dev_info(port->dev, "PCIe CPLTO detected!\n");
 		}
 	}
 
@@ -922,7 +930,7 @@ static int mtk_pcie_startup_port(struct mtk_pcie_port *port)
 	writel_relaxed(val, port->base + PCIE_INT_ENABLE_REG);
 
 	/* PCIe read completion timeout is adjusted to 4ms */
-	mtk_pcie_adjust_cplto_scale(port, PCIE_CPL_TIMEOUT_4MS);
+	mtk_pcie_adjust_cplto_scale(port, PCIE_CPLTO_SCALE_4MS);
 
 	if (port->data && port->data->post_init) {
 		err = port->data->post_init(port);
@@ -1312,8 +1320,12 @@ static void mtk_pcie_irq_handler(struct irq_desc *desc)
 				readl_relaxed(port->base + PCIE_AXI0_ERR_INFO),
 				cor_sta, uncor_sta);
 
-			if ((uncor_sta & PCI_ERR_UNC_COMP_TIME) || (status & PCIE_AXI_POST_ERR_EVT))
+			if ((uncor_sta & PCI_ERR_UNC_COMP_TIME) || (status & PCIE_AXI_POST_ERR_EVT)) {
 				mtk_pcie_disable_data_trans(port->port_num);
+				int_enable = readl_relaxed(port->base + PCIE_INT_ENABLE_REG);
+				int_enable &= ~PCIE_AER_EVT_EN;
+				writel_relaxed(int_enable, port->base + PCIE_INT_ENABLE_REG);
+			}
 		}
 
 		dev_info(port->dev, "PCIe error %#lx detected\n", status);
@@ -1479,7 +1491,7 @@ static int mtk_pcie_parse_port(struct mtk_pcie_port *port)
 	port->suspend_mode = LINK_STATE_L2;
 	ret = of_property_read_bool(dev->of_node, "mediatek,suspend-mode-l12");
 	if (ret)
-		port->suspend_mode = LINK_STATE_L12;
+		port->suspend_mode = LINK_STATE_ASPM_L12;
 
 	port->phy_reset = devm_reset_control_get_optional_exclusive(dev, "phy");
 	if (IS_ERR(port->phy_reset)) {
@@ -1762,6 +1774,8 @@ static int mtk_pcie_probe(struct platform_device *pdev)
 
 	if (port->rpm)
 		mtk_pcie_enable_host_bridge_rpm(port);
+	else if (port->pcidev->bridge_d3)
+		port->pcidev->bridge_d3 = false;
 
 	return 0;
 
@@ -2540,6 +2554,41 @@ int mtk_pcie_hw_control_vote(int port, bool hw_mode_en, u8 who)
 EXPORT_SYMBOL(mtk_pcie_hw_control_vote);
 
 /*
+ * mtk_pcie_ep_set_info() - handshake protocol: EP deliver info to RC
+ * @port: port number
+ * @params: data structure
+ */
+int mtk_pcie_ep_set_info(int port, struct handshake_info *params)
+{
+	struct platform_device *pdev;
+	struct mtk_pcie_port *pcie_port;
+
+	if (!params)
+		return -EINVAL;
+
+	pdev = mtk_pcie_find_pdev_by_port(port);
+	if (!pdev) {
+		pr_info("PCIe platform device not found!\n");
+		return -ENODEV;
+	}
+
+	pcie_port = platform_get_drvdata(pdev);
+	if (!pcie_port) {
+		pr_info("PCIe port not found!\n");
+		return -ENODEV;
+	}
+
+	pcie_port->rpm_suspend_mode = LINK_STATE_L2;
+	if (params->feature_id == PCIE_RPM_CTRL && params->data[0] == LINK_STATE_PCIPM_L12)
+		pcie_port->rpm_suspend_mode = LINK_STATE_PCIPM_L12;
+
+	dev_info(pcie_port->dev, "%s: set rpm mode=%d\n", __func__, pcie_port->rpm_suspend_mode);
+
+	return 0;
+}
+EXPORT_SYMBOL(mtk_pcie_ep_set_info);
+
+/*
  * mtk_pcie_in_use() - whether pcie is used
  */
 bool mtk_pcie_in_use(int port)
@@ -2572,16 +2621,130 @@ bool mtk_pcie_in_use(int port)
 }
 EXPORT_SYMBOL(mtk_pcie_in_use);
 
-static int __maybe_unused mtk_pcie_suspend_noirq(struct device *dev)
+static int mtk_pcie_suspend_l2(struct mtk_pcie_port *port)
+{
+	int err = 0;
+
+	if (mtk_pcie_in_use(port->port_num)) {
+		port->skip_suspend = true;
+		dev_info(port->dev, "port%d in use, keep active\n", port->port_num);
+		return 0;
+	}
+
+	mtk_pcie_save_restore_cfg(port, true);
+
+	/* Trigger link to L2 state */
+	err = mtk_pcie_turn_off_link(port);
+	if (err)
+		return err;
+
+	/* change pinmux before power off to avoid glitch */
+	pinctrl_pm_select_idle_state(port->dev);
+	mtk_pcie_irq_save(port);
+	mtk_pcie_power_down(port);
+
+	return 0;
+}
+
+static int mtk_pcie_resume_l2(struct mtk_pcie_port *port)
+{
+	int err = 0;
+
+	if (port->port_num == 1 && port->skip_suspend) {
+		port->skip_suspend = false;
+		dev_info(port->dev, "port%d resume done\n", port->port_num);
+		return 0;
+	}
+
+	err = mtk_pcie_power_up(port);
+	if (err)
+		return err;
+
+	/* change pinmux after power on to avoid glitch */
+	pinctrl_pm_select_default_state(port->dev);
+
+	err = mtk_pcie_startup_port(port);
+	if (err) {
+		mtk_pcie_power_down(port);
+		return err;
+	}
+
+	mtk_pcie_irq_restore(port);
+	mtk_pcie_save_restore_cfg(port, false);
+
+	return 0;
+}
+
+static int __maybe_unused mtk_pcie_runtime_suspend(struct device *dev)
 {
 	struct mtk_pcie_port *port = dev_get_drvdata(dev);
 	struct pci_dev *pdev = port->pcidev;
-	int err;
+	int err = 0;
 
 	if (!device_find_child(dev, NULL, match_any))
 		return 0;
 
-	if (port->suspend_mode == LINK_STATE_L12) {
+	dev_info(port->dev, "rpm suspend mode=%d\n", port->rpm_suspend_mode);
+
+	if (port->rpm_suspend_mode == LINK_STATE_L2) {
+		err = mtk_pcie_suspend_l2(port);
+		if (err)
+			return err;
+	}
+
+	if (port->dev->power.runtime_status != RPM_ACTIVE && port->rpm) {
+		pdev->current_state = PCI_D3cold;
+		if (port->rpm_suspend_mode == LINK_STATE_PCIPM_L12) {
+			dev_info(port->dev, "rpm suspend PCIe LTSSM=%#x, PCIe L1SS_pm=%#x\n",
+				 readl_relaxed(port->base + PCIE_LTSSM_STATUS_REG),
+				 readl_relaxed(port->base + PCIE_ISTATUS_PM));
+		} else {
+			err = mtk_pcie_request_eint_irq(port);
+			if (err)
+				return err;
+		}
+	}
+
+	return 0;
+}
+
+static int __maybe_unused mtk_pcie_runtime_resume(struct device *dev)
+{
+	struct mtk_pcie_port *port = dev_get_drvdata(dev);
+	struct pci_dev *pdev = port->pcidev;
+	int err = 0;
+
+	if (!device_find_child(dev, NULL, match_any))
+		return 0;
+
+	dev_info(port->dev, "rpm resume mode=%d\n", port->rpm_suspend_mode);
+
+	if (port->dev->power.runtime_status != RPM_ACTIVE && port->rpm) {
+		pdev->current_state = PCI_D0;
+		if (port->rpm_suspend_mode == LINK_STATE_PCIPM_L12) {
+			dev_info(port->dev, "rpm resume PCIe LTSSM=%#x, PCIe L1SS_pm=%#x\n",
+				 readl_relaxed(port->base + PCIE_LTSSM_STATUS_REG),
+				 readl_relaxed(port->base + PCIE_ISTATUS_PM));
+		} else {
+			mtk_pcie_free_eint_irq(port);
+		}
+	}
+
+	if (port->rpm_suspend_mode == LINK_STATE_L2) {
+		err = mtk_pcie_resume_l2(port);
+		if (err)
+			return err;
+	}
+
+	return 0;
+}
+
+static int __maybe_unused mtk_pcie_suspend_noirq(struct device *dev)
+{
+	struct mtk_pcie_port *port = dev_get_drvdata(dev);
+	int err;
+
+	if (port->suspend_mode == LINK_STATE_ASPM_L12) {
 		dev_info(port->dev, "Suspend PCIe LTSSM=%#x, PCIe L1SS_pm=%#x\n",
 			 readl_relaxed(port->base + PCIE_LTSSM_STATUS_REG),
 			 readl_relaxed(port->base + PCIE_ISTATUS_PM));
@@ -2603,30 +2766,9 @@ static int __maybe_unused mtk_pcie_suspend_noirq(struct device *dev)
 
 		mtk_pcie_dump_pextp_info(port);
 	} else {
-		if (mtk_pcie_in_use(port->port_num)) {
-			port->skip_suspend = true;
-			dev_info(port->dev, "port%d in use, keep active\n", port->port_num);
-			return 0;
-		}
-
-		mtk_pcie_save_restore_cfg(port, true);
-
-		/* Trigger link to L2 state */
-		err = mtk_pcie_turn_off_link(port);
+		err = mtk_pcie_suspend_l2(port);
 		if (err)
 			return err;
-
-		/* change pinmux before power off to avoid glitch */
-		pinctrl_pm_select_idle_state(port->dev);
-		mtk_pcie_irq_save(port);
-		mtk_pcie_power_down(port);
-
-		if ((port->dev->power.runtime_status != RPM_ACTIVE) && port->rpm) {
-			pdev->current_state = PCI_D3cold;
-			err = mtk_pcie_request_eint_irq(port);
-			if (err)
-				return err;
-		}
 	}
 
 	return 0;
@@ -2635,13 +2777,9 @@ static int __maybe_unused mtk_pcie_suspend_noirq(struct device *dev)
 static int __maybe_unused mtk_pcie_resume_noirq(struct device *dev)
 {
 	struct mtk_pcie_port *port = dev_get_drvdata(dev);
-	struct pci_dev *pdev = port->pcidev;
 	int err;
 
-	if (!device_find_child(dev, NULL, match_any))
-		return 0;
-
-	if (port->suspend_mode == LINK_STATE_L12) {
+	if (port->suspend_mode == LINK_STATE_ASPM_L12) {
 		port->data->clkbuf_control(port, true);
 
 		/* Wait 450us for BBCK2 switch SW Mode ready */
@@ -2672,26 +2810,9 @@ static int __maybe_unused mtk_pcie_resume_noirq(struct device *dev)
 			return 0;
 		}
 
-		if ((port->dev->power.runtime_status != RPM_ACTIVE) && port->rpm) {
-			pdev->current_state = PCI_D0;
-			mtk_pcie_free_eint_irq(port);
-		}
-
-		err = mtk_pcie_power_up(port);
+		err = mtk_pcie_resume_l2(port);
 		if (err)
 			return err;
-
-		/* change pinmux after power on to avoid glitch */
-		pinctrl_pm_select_default_state(port->dev);
-
-		err = mtk_pcie_startup_port(port);
-		if (err) {
-			mtk_pcie_power_down(port);
-			return err;
-		}
-
-		mtk_pcie_irq_restore(port);
-		mtk_pcie_save_restore_cfg(port, false);
 	}
 
 	return 0;
@@ -2700,7 +2821,7 @@ static int __maybe_unused mtk_pcie_resume_noirq(struct device *dev)
 static const struct dev_pm_ops mtk_pcie_pm_ops = {
 	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_pcie_suspend_noirq,
 				      mtk_pcie_resume_noirq)
-	SET_RUNTIME_PM_OPS(mtk_pcie_suspend_noirq, mtk_pcie_resume_noirq, NULL)
+	SET_RUNTIME_PM_OPS(mtk_pcie_runtime_suspend, mtk_pcie_runtime_resume, NULL)
 };
 
 int mtk_pcie_disable_refclk(int port)
@@ -2829,6 +2950,10 @@ int mtk_pcie_soft_on(struct pci_bus *bus)
 	port->soft_off = false;
 	mtk_pcie_irq_restore(port);
 	mtk_pcie_save_restore_cfg(port, false);
+
+	/* The detection range is AER enable to soft on done */
+	if (port->port_num == 0)
+		port->aer_detect = false;
 
 	dev_info(port->dev, "mtk pcie soft on done\n");
 
@@ -3050,11 +3175,13 @@ static int mtk_pcie_pre_init_6991(struct mtk_pcie_port *port)
 
 	writel_relaxed(val, port->pextpcfg + PEXTP_CLOCK_CON);
 
-	/* wifi request response data is all zero when completion timeout */
 	if (port->port_num == 0) {
+		/* wifi request response data is all zero when completion timeout */
 		val = readl_relaxed(port->base + PCIE_AXI_IF_CTRL);
 		val |= SW_CPLTO_DATA_SEL;
 		writel_relaxed(val, port->base + PCIE_AXI_IF_CTRL);
+		/* Detect Completion timeout before wifi on */
+		port->aer_detect = true;
 	}
 
 	/* bypass PMRC signal */
@@ -3083,8 +3210,14 @@ static int mtk_pcie_post_init_6991(struct mtk_pcie_port *port)
 		val |= PCIE_AER_EVT_EN;
 		writel_relaxed(val, port->base + PCIE_INT_ENABLE_REG);
 
-		/* Adujst port1 completion timeout to 29ms */
-		mtk_pcie_adjust_cplto_scale(port, PCIE_CPLTO_SCALE_29MS);
+		/* PCIe1 read completion timeout is adjusted to 10ms */
+		mtk_pcie_adjust_cplto_scale(port, PCIE_CPLTO_SCALE_10MS);
+
+		/* Mofify the PM capability to not support generating PME from D3hot state */
+		val = readw_relaxed(port->base + PCIE_PCI_LPM + PCI_PM_PMC);
+		val &= ~PCI_PM_CAP_PME_MASK;
+		val |= PCI_PM_CAP_PME_D0;
+		writew_relaxed(val, port->base + PCIE_PCI_LPM + PCI_PM_PMC);
 	}
 
 	return 0;

@@ -1203,7 +1203,7 @@ signed int dpe_enque_cb(struct frame *frames, void *req)
 	unsigned int Dpe_OutBuf_CONF = 0;
 	/*TODO: define engine request struct */
 	struct DPE_Request *_req;
-	struct DPE_Config *pDpeConfig;
+	struct DPE_Config *pDpeConfig __maybe_unused;
 	_req = (struct DPE_Request *) req;
 	if (frames == NULL || _req == NULL)
 		return -1;
@@ -1368,7 +1368,7 @@ signed int dpe_deque_cb(struct frame *frames, void *req)
 	_req->m_ReqNum = ucnt;
 	return 0;
 }
-void DPE_Config_DVS(struct DPE_Config *pDpeConfig,
+int DPE_Config_DVS(struct DPE_Config *pDpeConfig,
 	struct DPE_Kernel_Config *pConfigToKernel)
 {
 	unsigned int frmWidth = pDpeConfig->Dpe_DVSSettings.frmWidth;
@@ -1398,15 +1398,22 @@ void DPE_Config_DVS(struct DPE_Config *pDpeConfig,
 	pDpeConfig->Dpe_InBuf_SrcImg_Y_L, pDpeConfig->Dpe_InBuf_SrcImg_Y_R,
 	pDpeConfig->Dpe_InBuf_ValidMap_L, pDpeConfig->Dpe_InBuf_ValidMap_R,
 	pDpeConfig->Dpe_OutBuf_CONF, pDpeConfig->Dpe_OutBuf_OCC);
-	if ((frmWidth % 16 != 0))
+	if ((frmWidth % 16 != 0)) {
 		LOG_ERR("frame width is not 16 byte align w(%d)\n", frmWidth);
-	if ((frmHeight % 2 != 0))
+		return -1;
+	}
+	if ((frmHeight % 2 != 0)) {
 		LOG_ERR("frame height is not 2 byte align h(%d)\n", frmHeight);
-	if ((occWidth % 16 != 0))
+		return -1;
+	}
+	if ((occWidth % 16 != 0)) {
 		LOG_ERR("occ width is not 16 byte align w(%d)\n", occWidth);
+		return -1;
+	}
 	if (L_engStartX < R_engStartX) {
 		LOG_ERR("L_engStartX(%d) < R_engStartX(%d)\n",
 		L_engStartX, R_engStartX);
+		return -1;
 	}
 if (pDpeConfig->Dpe_engineSelect == MODE_DVS_DVP_BOTH) {
 	pConfigToKernel->DVS_CTRL00 =
@@ -1487,23 +1494,31 @@ if (pDpeConfig->Dpe_engineSelect == MODE_DVS_DVP_BOTH) {
 	if (pDpeConfig->Dpe_InBuf_SrcImg_Y_L != 0x0) {
 		pConfigToKernel->DVS_SRC_05_L_FRM0 =
 		pDpeConfig->Dpe_InBuf_SrcImg_Y_L;
-	} else
+	} else {
 		LOG_ERR("No Left Src Image Y!\n");
+		return -1;
+	}
 	if (pDpeConfig->Dpe_InBuf_SrcImg_Y_R != 0x0) {
 		pConfigToKernel->DVS_SRC_09_R_FRM0 =
 		pDpeConfig->Dpe_InBuf_SrcImg_Y_R;
-	} else
+	} else {
 		LOG_ERR("No Right Src Image Y!\n");
+		return -1;
+	}
 	if (pDpeConfig->Dpe_InBuf_ValidMap_L != 0x0) {
 		pConfigToKernel->DVS_SRC_13_L_VMAP0 =
 		pDpeConfig->Dpe_InBuf_ValidMap_L;
-	} else
+	} else {
 		LOG_ERR("No Left Valid Map!\n");
+		return -1;
+	}
 	if (pDpeConfig->Dpe_InBuf_ValidMap_R != 0x0) {
 		pConfigToKernel->DVS_SRC_17_R_VMAP0 =
 		pDpeConfig->Dpe_InBuf_ValidMap_R;
-	} else
+	} else {
 		LOG_ERR("No Right Valid Map!\n");
+		return -1;
+	}
 #ifdef KERNEL_DMA_BUFFER
 pConfigToKernel->DVS_SRC_21_INTER_MEDV =
 ((uintptr_t)g_dpewb_dvme_int_Buffer_pa & 0xffffffff);
@@ -1511,19 +1526,25 @@ pConfigToKernel->DVS_SRC_21_INTER_MEDV =
 	if (pDpeConfig->DVS_SRC_21_INTER_MEDV != 0x0) {
 		pConfigToKernel->DVS_SRC_21_INTER_MEDV =
 		pDpeConfig->DVS_SRC_21_INTER_MEDV;
-	} else
+	} else {
 		LOG_ERR("No DVS DVS_SRC_21_INTER_MEDV Buffer!\n");
+		return -1;
+	}
 #endif
 	if (pDpeConfig->Dpe_OutBuf_OCC != 0x0) {
 		pConfigToKernel->DVS_SRC_26_OCCDV0 =
 		pDpeConfig->Dpe_OutBuf_OCC;
-	} else
+	} else {
 		LOG_ERR("No DVS OCC Output Buffer!\n");
+		return -1;
+	}
 	if (pDpeConfig->Dpe_OutBuf_CONF != 0x0) {
 		pConfigToKernel->DVS_SRC_30_DCV_CONF0 =
 		pDpeConfig->Dpe_OutBuf_CONF;
-	} else
+	} else {
 		LOG_ERR("No DVS CONF Output Buffer!\n");
+		return -1;
+	}
 #ifdef KERNEL_DMA_BUFFER
 pConfigToKernel->DVS_SRC_34_DCV_L_FRM0 =
 ((uintptr_t)g_dpewb_cost_int_Buffer_pa & 0xffffffff);
@@ -1531,15 +1552,19 @@ pConfigToKernel->DVS_SRC_34_DCV_L_FRM0 =
 	if (pDpeConfig->DVS_SRC_34_DCV_L_FRM0 != 0x0) {
 		pConfigToKernel->DVS_SRC_34_DCV_L_FRM0 =
 		pDpeConfig->DVS_SRC_34_DCV_L_FRM0;
-	} else
+	} else {
 		LOG_ERR("No DVS DVS_SRC_34_DCV_L_FRM0 Buffer!\n");
+		return -1;
+	}
 #endif
 	if (pDpeConfig->Dpe_is16BitMode != 0) {
 		if (pDpeConfig->Dpe_OutBuf_OCC_Ext != 0x0) {
 			pConfigToKernel->DVS_SRC_42_OCCDV_EXT0 =
 			pDpeConfig->Dpe_OutBuf_OCC_Ext;
-		} else
+		} else {
 			LOG_ERR("No DVS Ext Output Buffer!\n");
+			return -1;
+		}
 	}
 	if (pDpeConfig->Dpe_DVSSettings.is_pd_mode) {
 		pConfigToKernel->DVS_PD_SRC_00_L_FRM0 =
@@ -1562,13 +1587,14 @@ pConfigToKernel->DVS_SRC_34_DCV_L_FRM0 =
 	memcpy(&pConfigToKernel->TuningBuf_OCC,
 	&pDpeConfig->Dpe_DVSSettings.TuningBuf_OCC,
 	sizeof(pDpeConfig->Dpe_DVSSettings.TuningBuf_OCC));
+	return 0;
 }
-void DPE_Config_DVP(struct DPE_Config *pDpeConfig,
+int DPE_Config_DVP(struct DPE_Config *pDpeConfig,
 	struct DPE_Kernel_Config *pConfigToKernel)
 {
 	unsigned int frmWidth, frmHeight, engWidth, engHeight;
 	unsigned int occWidth, occHeight;
-	unsigned int engStartX, engStartY, occStartX, occStartY, pitch;
+	unsigned int engStartX, engStartY, occStartX, occStartY __maybe_unused, pitch;
 	unsigned int engStart_offset_Y, engStart_offset_C;
 	engStartX = pDpeConfig->Dpe_DVPSettings.engStart_x;
 	engStartY = pDpeConfig->Dpe_DVPSettings.engStart_y;
@@ -1584,11 +1610,15 @@ void DPE_Config_DVP(struct DPE_Config *pDpeConfig,
 	pitch = ALIGN16(pDpeConfig->Dpe_DVPSettings.frmWidth) >> 4;
 	engStart_offset_Y = engStartY * (pitch << 4);
 	engStart_offset_C = engStart_offset_Y >> 1;
-	if ((occWidth % 16 != 0))
+	if ((occWidth % 16 != 0)) {
 		LOG_ERR("occ width is not 16 byte align w (%d)\n", occWidth);
+		return -1;
+	}
 	if (pDpeConfig->Dpe_is16BitMode &&
-	pDpeConfig->Dpe_DVPSettings.SubModule_EN.wmf_hf_en)
+	pDpeConfig->Dpe_DVPSettings.SubModule_EN.wmf_hf_en) {
 		LOG_ERR("WMF should not enable in 16 bit mode\n");
+		return -1;
+	}
 // If hf rounds is odd, nb_rounds can't use.
 if (pDpeConfig->Dpe_DVPSettings.SubModule_EN.asf_hf_rounds % 2)
 	pDpeConfig->Dpe_DVPSettings.SubModule_EN.asf_nb_rounds = 0;
@@ -1626,32 +1656,42 @@ pConfigToKernel->DVP_CTRL04 =
 			pConfigToKernel->DVP_SRC_05_Y_FRM0 =
 			(unsigned int)pDpeConfig->Dpe_InBuf_SrcImg_Y +
 			(engStart_offset_Y);
-		} else
+		} else {
 			LOG_ERR("No DVP Right Src Image Y!\n");
+			return -1;
+		}
 	} else if (pDpeConfig->Dpe_DVPSettings.mainEyeSel == LEFT) {
 		if (pDpeConfig->Dpe_InBuf_SrcImg_Y != 0x0) {
 			pConfigToKernel->DVP_SRC_05_Y_FRM0 =
 			(unsigned int)pDpeConfig->Dpe_InBuf_SrcImg_Y +
 			(engStart_offset_Y);
-		} else
+		} else {
 			LOG_ERR("No DVP Left Src Image Y!\n");
+			return -1;
+		}
 	}
 	if (pDpeConfig->Dpe_InBuf_SrcImg_C != 0x0) {
 		pConfigToKernel->DVP_SRC_09_C_FRM0 =
 		(unsigned int)pDpeConfig->Dpe_InBuf_SrcImg_C +
 		(engStart_offset_C);
-	} else
+	} else {
 		LOG_ERR("No Src Image C!\n");
+		return -1;
+	}
 	if (pDpeConfig->Dpe_InBuf_OCC != 0x0) {
 		pConfigToKernel->DVP_SRC_13_OCCDV0 =
 		(unsigned int)pDpeConfig->Dpe_InBuf_OCC;
-	} else
+	} else {
 		LOG_ERR("No DVP OCC In!\n");
+		return -1;
+	}
 	if (pDpeConfig->Dpe_OutBuf_CRM != 0x0) {
 		pConfigToKernel->DVP_SRC_17_CRM =
 		(unsigned int)pDpeConfig->Dpe_OutBuf_CRM;
-	} else
+	} else {
 		LOG_ERR("No CRM Output Buffer!\n");
+		return -1;
+	}
 #ifdef KERNEL_DMA_BUFFER
 pConfigToKernel->DVP_SRC_18_ASF_RMDV =
 ((uintptr_t)g_dpewb_asfrm_Buffer_pa & 0xffffffff);
@@ -1659,19 +1699,25 @@ pConfigToKernel->DVP_SRC_18_ASF_RMDV =
 	if (pDpeConfig->DVP_SRC_18_ASF_RMDV != 0x0) {
 		pConfigToKernel->DVP_SRC_18_ASF_RMDV =
 		pDpeConfig->DVP_SRC_18_ASF_RMDV;
-	} else
+	} else {
 		LOG_ERR("No DVS DVP_SRC_18_ASF_RMDV Buffer!\n");
+		return -1;
+	}
 #endif
 	if (pDpeConfig->Dpe_OutBuf_ASF_RD != 0x0) {
 		pConfigToKernel->DVP_SRC_19_ASF_RDDV =
 		(unsigned int)pDpeConfig->Dpe_OutBuf_ASF_RD;
-	} else
+	} else {
 		LOG_ERR("No ASF_RD Output Buffer!\n");
+		return -1;
+	}
 	if (pDpeConfig->Dpe_OutBuf_ASF_HF != 0x0) {
 		pConfigToKernel->DVP_SRC_20_ASF_DV0 =
 		(unsigned int)pDpeConfig->Dpe_OutBuf_ASF_HF;
-	} else
+	} else {
 		LOG_ERR("No ASF Output Buffer!\n");
+		return -1;
+	}
 if (pDpeConfig->Dpe_is16BitMode == 0) {
 	#ifdef KERNEL_DMA_BUFFER
 	pConfigToKernel->DVP_SRC_24_WMF_HFDV =
@@ -1680,22 +1726,27 @@ if (pDpeConfig->Dpe_is16BitMode == 0) {
 	if (pDpeConfig->DVP_SRC_24_WMF_HFDV != 0x0) {
 		pConfigToKernel->DVP_SRC_24_WMF_HFDV =
 		pDpeConfig->DVP_SRC_24_WMF_HFDV;
-	} else
+	} else {
 		LOG_ERR("No DVS DVP_SRC_24_WMF_HFDV Buffer!\n");
+		return -1;
+	}
 	#endif
 	if (pDpeConfig->Dpe_OutBuf_WMF_FILT != 0x0) {
 		pConfigToKernel->DVP_SRC_25_WMF_DV0 =
 		(unsigned int)pDpeConfig->Dpe_OutBuf_WMF_FILT;
 	} else {
 		LOG_ERR("No WMF Output Buffer!\n");
+		return -1;
 	}
 }
 	if (pDpeConfig->Dpe_is16BitMode != 0) {
 		if (pDpeConfig->Dpe_InBuf_OCC_Ext != 0x0) {
 			pConfigToKernel->DVP_EXT_SRC_13_OCCDV0 =
 			(unsigned int)pDpeConfig->Dpe_InBuf_OCC_Ext;
-		} else
+		} else {
 			LOG_ERR("No DVP Ext OCC Input Buffer!\n");
+			return -1;
+		}
 #ifdef KERNEL_DMA_BUFFER
 pConfigToKernel->DVP_EXT_SRC_18_ASF_RMDV =
 ((uintptr_t)g_dpewb_asfrmext_Buffer_pa & 0xffffffff);
@@ -1703,23 +1754,30 @@ pConfigToKernel->DVP_EXT_SRC_18_ASF_RMDV =
 		if (pDpeConfig->DVP_EXT_SRC_18_ASF_RMDV != 0x0) {
 			pConfigToKernel->DVP_EXT_SRC_18_ASF_RMDV =
 			pDpeConfig->DVP_EXT_SRC_18_ASF_RMDV;
-		} else
+		} else {
 			LOG_ERR("No DVS DVP_EXT_SRC_18_ASF_RMDV Buffer!\n");
+			return -1;
+		}
 #endif
 		if (pDpeConfig->Dpe_OutBuf_ASF_RD_Ext != 0x0) {
 			pConfigToKernel->DVP_EXT_SRC_19_ASF_RDDV =
 			(unsigned int)pDpeConfig->Dpe_OutBuf_ASF_RD_Ext;
-		} else
+		} else {
 			LOG_ERR("No ASF_RD_EXT Output Buffer!\n");
+			return -1;
+		}
 		if (pDpeConfig->Dpe_OutBuf_ASF_HF_Ext != 0x0) {
 			pConfigToKernel->DVP_EXT_SRC_20_ASF_DV0 =
 			(unsigned int)pDpeConfig->Dpe_OutBuf_ASF_HF_Ext;
-		} else
+		} else {
 			LOG_ERR("No DVP Ext ASF Output Buffer!\n");
+			return -1;
+		}
 	}
 	memcpy(&pConfigToKernel->TuningBuf_CORE,
 	&pDpeConfig->Dpe_DVPSettings.TuningBuf_CORE,
 	sizeof(pDpeConfig->Dpe_DVPSettings.TuningBuf_CORE));
+	return 0;
 }
 void DPE_DumpUserSpaceReg(struct DPE_Kernel_Config *pDpeConfig)
 {
@@ -1983,6 +2041,7 @@ signed int CmdqDPEHW(struct frame *frame)
 	struct DPE_Kernel_Config *pDpeConfig;
 	struct DPE_Kernel_Config DpeConfig;
 	struct DPE_Config *pDpeUserConfig;
+	int result = 0;
 	struct tee_mmu mmu;
 	struct tee_mmu *records = NULL;
 	unsigned int success = 0;
@@ -2189,16 +2248,28 @@ signed int CmdqDPEHW(struct frame *frame)
 	}
 
 	if (pDpeUserConfig->Dpe_engineSelect == MODE_DVS_DVP_BOTH) {
-		DPE_Config_DVS(pDpeUserConfig, pDpeConfig);
-		DPE_Config_DVP(pDpeUserConfig, pDpeConfig);
+		result = DPE_Config_DVS(pDpeUserConfig, pDpeConfig);
+		if (result != 0)
+			return -1;
+		result = DPE_Config_DVP(pDpeUserConfig, pDpeConfig);
+		if (result != 0)
+			return -1;
 		pDpeConfig->DPE_MODE = 0;
 	} else if (pDpeUserConfig->Dpe_engineSelect == MODE_DVS_ONLY) {
-		DPE_Config_DVS(pDpeUserConfig, pDpeConfig);
+		result = DPE_Config_DVS(pDpeUserConfig, pDpeConfig);
+		if (result != 0)
+			return -1;
 		pDpeConfig->DPE_MODE = 1;
 	} else if (pDpeUserConfig->Dpe_engineSelect == MODE_DVP_ONLY) {
-		DPE_Config_DVP(pDpeUserConfig, pDpeConfig);
+		result = DPE_Config_DVP(pDpeUserConfig, pDpeConfig);
+		if (result != 0)
+			return -1;
 		pDpeConfig->DPE_MODE = 2;
+	} else {
+		LOG_ERR("Dpe_engineSelect fail(%d)\n", pDpeUserConfig->Dpe_engineSelect);
+		return -1;
 	}
+
 	if (g_isDPELogEnable)
 		DPE_DumpUserSpaceReg(pDpeConfig);
 	//cmdqRecCreate(CMDQ_SCENARIO_ISP_DPE, &handle);
@@ -2474,7 +2545,7 @@ cmdq_pkt_write(handle, dpe_clt_base, DVS_CTRL00_HW, 0x00000000, 0x20000000);
 }
 signed int dpe_feedback(struct frame *frame)
 {
-	struct DPE_Config *pDpeConfig;
+	struct DPE_Config *pDpeConfig __maybe_unused;
 	pDpeConfig = (struct DPE_Config *) frame->data;
 	/* TODO: read statistics and write to the frame data */
 	// pDpeConfig->DVS_IRQ_STATUS = DPE_RD32(DVS_IRQ_STATUS_REG);
@@ -2526,7 +2597,7 @@ void Get_Tile_Info(struct DPE_Config *pDpeConfig)
 	unsigned int w_width[TILE_WITH_NUM] = {0};
 	unsigned int tile_num[TILE_WITH_NUM] = {0};
 	unsigned int idx = 0, i = 0;
-	unsigned int max_width = 0, interval = 0, st_x = 0;
+	unsigned int max_width = 0, interval = 0, st_x __maybe_unused = 0;
 	unsigned int engStart_x_L, engStart_x_R, frmHeight;
 	engStart_x_L = pDpeConfig->Dpe_DVSSettings.L_engStart_x;
 	engStart_x_R = pDpeConfig->Dpe_DVSSettings.R_engStart_x;
@@ -3427,7 +3498,7 @@ static long DPE_ioctl(struct file *pFile, unsigned int Cmd, unsigned long Param)
 	struct DPE_CLEAR_IRQ_STRUCT ClearIrq;
 	struct DPE_Config dpe_DpeConfig;
 	struct DPE_Request dpe_DpeReq;
-	signed int enqnum;
+	signed int enqnum __maybe_unused;
 	struct DPE_USER_INFO_STRUCT *pUserInfo;
 	int enqueNum;
 	int dequeNum;
@@ -4241,9 +4312,9 @@ EXIT:
  ******************************************************************************/
 static signed int DPE_release(struct inode *pInode, struct file *pFile)
 {
-	struct DPE_USER_INFO_STRUCT *pUserInfo;
+	struct DPE_USER_INFO_STRUCT *pUserInfo __maybe_unused;
 	/*unsigned int Reg;*/
-	LOG_INF("- E. UserCount: %d.", DPEInfo.UserCount);
+	LOG_INF("- E. release UserCount: %d.", DPEInfo.UserCount);
 	/*  */
 	if (pFile->private_data != NULL) {
 		pUserInfo =
@@ -4500,7 +4571,7 @@ EXIT:
 static int vidioc_dqbuf(struct file *file, void *priv, struct v4l2_buffer *p)
 {
 	/*struct video_device *vdev = video_devdata(file);*/
-	signed int Ret = 0;
+	signed int Ret __maybe_unused = 0;
 	struct DPE_Request ureq;
 	struct DPE_Request kreq;
 	/* size of cfgs = 3 owing to call stact limitation*/
@@ -5254,7 +5325,7 @@ static int proc_dpe_dump_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, dpe_dump_read, NULL);
 }
-static const struct file_operations dpe_dump_proc_fops = {
+static const struct file_operations dpe_dump_proc_fops __maybe_unused = {
 	.owner = THIS_MODULE,
 	.open = proc_dpe_dump_open,
 	.read = seq_read,
@@ -5390,7 +5461,7 @@ static int proc_dpe_reg_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, dpe_reg_read, NULL);
 }
-static const struct file_operations dpe_reg_proc_fops = {
+static const struct file_operations dpe_reg_proc_fops __maybe_unused = {
 	.owner = THIS_MODULE,
 	.open = proc_dpe_reg_open,
 	.read = seq_read,

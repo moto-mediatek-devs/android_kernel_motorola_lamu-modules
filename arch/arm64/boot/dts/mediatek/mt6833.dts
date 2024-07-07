@@ -1103,6 +1103,24 @@
 			token_gpr_set4 = /bits/ 16 <CMDQ_SYNC_TOKEN_GPR_SET_4>;
 		};
 
+		gce_mbox_bdg: gce_mbox_bdg {
+			compatible = "mediatek,mailbox-gce-bdg";
+			#mbox-cells = <3>;
+			#gce-event-cells = <1>;
+			#gce-subsys-cells = <2>;
+			mboxes = <&gce_mbox_bdg 20 0 CMDQ_THR_PRIO_2>,
+				<&gce_mbox_bdg 21 0 CMDQ_THR_PRIO_1>;
+		};
+
+		cmdq-bdg-test {
+			compatible = "mediatek,cmdq-bdg-test";
+			mediatek,gce = <&gce_mbox_bdg>;
+			mboxes = <&gce_mbox_bdg 22 0 CMDQ_THR_PRIO_2>,
+				<&gce_mbox_bdg 23 0 CMDQ_THR_PRIO_1>;
+			token_user0 = /bits/ 16 <CMDQ_SYNC_TOKEN_USER_0>;
+			token_gpr_set4 = /bits/ 16 <CMDQ_SYNC_TOKEN_GPR_SET_4>;
+		};
+
 		msf@15810000 {
 			compatible = "mediatek,msf";
 			reg = <0 0x15810000 0 0x1000>;
@@ -2074,12 +2092,6 @@
 			"DPE_CLK_IPE_LARB19","DPE_CLK_IPE_LARB20";
 		};
 
-		vcp: vcp@1ec00000 {
-			compatible = "mediatek,vcp";
-			vcp-support = <0>;
-			status = "okay";
-		};
-
 		vcu: vcu@16000000 {
 			compatible = "mediatek-vcu";
 			mediatek,vcuid = <0>;
@@ -2087,8 +2099,7 @@
 			mediatek,vcu-off  = <0>;
 			mediatek,iommu-padding;
 			reg = <0 0x16000000 0 0x40000>,	/* VDEC_BASE */
-				 <0 0x17020000 0 0x10000>,	/* VENC_BASE */
-				 <0 0x17820000 0 0x10000>;	/* VENC_C1_BASE */
+				 <0 0x17020000 0 0x10000>;	/* VENC_BASE */
 			iommus = <&iommu0 M4U_PORT_L4_VDEC_MC_EXT>,
 				<&iommu0 M4U_PORT_L4_VDEC_UFO_EXT>,
 				<&iommu0 M4U_PORT_L4_VDEC_PP_EXT>,
@@ -2103,8 +2114,8 @@
 				<&iommu0 M4U_PORT_L4_VDEC_UFO_ENC_EXT>;
 			dma-ranges = <0x1 0x0 0x1 0x0 0x1 0x0>;
 			mediatek,mailbox-gce = <&gce>;
-			mediatek,dec_gce_th_num = <1>; /* VDEC GCE HW THREAD NUM*/
-			mediatek,enc_gce_th_num = <2>; /* VDEC GCE HW THREAD NUM*/
+			mediatek,dec-gce-th-num = <1>; /* VDEC GCE HW THREAD NUM*/
+			mediatek,enc-gce-th-num = <2>; /* VDEC GCE HW THREAD NUM*/
 
 			mboxes = <&gce 7 0 CMDQ_THR_PRIO_1>,
 				<&gce 12 0 CMDQ_THR_PRIO_1>,
@@ -2238,7 +2249,7 @@
 			clock-names =
 				"CORE_MT_CG_VDEC0";
 			operating-points-v2 = <&opp_table_vdec>;
-			dvfsrc-vcore-supply = <&dvfsrc_vcore>;
+			mmdvfs-dvfsrc-vcore-supply = <&dvfsrc_vcore>;
 			interconnects = <&mmqos MASTER_LARB_PORT(M4U_PORT_L4_VDEC_MC_EXT)
 						&mmqos SLAVE_COMMON(0)>,
 					<&mmqos MASTER_LARB_PORT(M4U_PORT_L4_VDEC_UFO_EXT)
@@ -2301,18 +2312,18 @@
 				<808996950 0 218 218>, /* VP8 */
 				<809062486 0 218 218>; /* VP9 */
 			bandwidth-table =
-				<3 232>,
-				<3 0>,
-				<2 178>,
-				<5 1>,
-				<5 1>,
-				<5 0>,
-				<5 0>,
-				<0 8>,
-				<0 0>,
-				<5 16>,
-				<5 0>,
-				<6 0>;
+				<4 2 232>,
+				<4 0 0>,
+				<4 1 178>,
+				<4 2 1>,
+				<4 2 1>,
+				<4 2 0>,
+				<4 2 0>,
+				<4 0 8>,
+				<4 0 0>,
+				<4 0 16>,
+				<4 2 0>,
+				<4 0 0>;
 			svp-mtee = <1>;
 		};
 
@@ -2320,11 +2331,10 @@
 			compatible = "mediatek,mt6833-vcodec-enc";
 			mediatek,platform = "platform:mt6833";
 			mediatek,ipm = <1>;
-			reg = <0 0x17020000 0 0x2000>,
-				  <0 0x17820000 0 0x20000>;
+			venc-core-count = <1>;
+			reg = <0 0x17020000 0 0x2000>;
 			reg-names =
-				"VENC_SYS",
-				"VENC_C1_SYS";
+				"VENC_SYS";
 			iommus = <&iommu0 M4U_PORT_L7_VENC_RCPU>,
 				<&iommu0 M4U_PORT_L7_VENC_REC>,
 				<&iommu0 M4U_PORT_L7_VENC_BSDMA>,
@@ -2347,7 +2357,22 @@
 			clock-names =
 				"MT_CG_VENC0";
 			operating-points-v2 = <&opp_table_venc>;
-			dvfsrc-vcore-supply = <&dvfsrc_vcore>;
+			mmdvfs-dvfsrc-vcore-supply = <&dvfsrc_vcore>;
+			venc-disable-hw-break = <1>;
+			port-arg-num = <3>;
+			port-def = <0 M4U_PORT_L7_VENC_RCPU 0>,
+				<0 M4U_PORT_L7_VENC_REC 0>,
+				<0 M4U_PORT_L7_VENC_BSDMA 0>,
+				<0 M4U_PORT_L7_VENC_SV_COMV 0>,
+				<0 M4U_PORT_L7_VENC_RD_COMV 0>,
+				<0 M4U_PORT_L7_VENC_CUR_LUMA 0>,
+				<0 M4U_PORT_L7_VENC_CUR_CHROMA 0>,
+				<0 M4U_PORT_L7_VENC_REF_LUMA 0>,
+				<0 M4U_PORT_L7_VENC_REF_CHROMA 0>,
+				<0 M4U_PORT_L7_JPGENC_Y_RDMA 0>,
+				<0 M4U_PORT_L7_JPGENC_C_RDMA 0>,
+				<0 M4U_PORT_L7_JPGENC_Q_TABLE 0>,
+				<0 M4U_PORT_L7_JPGENC_BSDMA>;
 			interconnects = <&mmqos MASTER_LARB_PORT(M4U_PORT_L7_VENC_RCPU)
 						&mmqos SLAVE_COMMON(0)>,
 					<&mmqos MASTER_LARB_PORT(M4U_PORT_L7_VENC_REC)
@@ -2375,18 +2400,18 @@
 						"path_venc_ref_chroma", "path_larb7";
 			interconnect-num = <10>;
 			throughput-op-rate-thresh = <120>;
-			throughput-min = <250000000>;
+			throughput-min = <249000000>;
 			throughput-normal-max = <458000000>;
 			throughput-config-offset = <2>;
 			throughput-table =
-					<875967048 4 860 1415>, /* H.264 */
-					<875967048 5 766 1151>,
-					<1129727304 2 2484 3703>, /* HEVC low power*/
-					<1129727304 4 1780 2889>,
-					<892744264 2 2484 3703>, /* H265*/
-					<892744264 4 1780 2889>,
-					<1179206984 2 2484 3703>, /* HEIF */
-					<1179206984 4 1780 2889>;
+					<875967048 4 860 1415 249000000 270>, /* H.264 */
+					<875967048 5 766 1151 458000000 334>,
+					<1129727304 2 2484 3703 249000000 100>, /* HEVC LP*/
+					<1129727304 4 1780 2889 458000000 83>,
+					<892744264 2 2484 3703 249000000 100>, /* H265*/
+					<892744264 4 1780 2889 458000000 83>,
+					<1179206984 2 2484 3703 249000000 100>, /* HEIF */
+					<1179206984 4 1780 2889 458000000 83>;
 			config-table =
 					<875967048 243000 4 4>, /* H.264 */
 					<875967048 486000 5 5>,
@@ -2398,20 +2423,20 @@
 					<1179206984 486000 4 4>,
 					<1179206984 4294967295 9 7>;
 			bandwidth-table =
-					<4 10>,
-					<3 160>, /* FHD60 worst case * 0.7: 256*458/766 * 1.5 * 0.7 */
-					<0 20>,
-					<5 4>,
-					<5 16>,
-					<1 194>,
-					<2 97>,
-					<1 0>,
-					<2 642>, /* FHD60 worst case * 0.7: 256*458/766 * 1.5 * 4 * 0.7*/
-					<6 7>;
+					<7 2 10>,
+					<7 1 160>, /* FHD60 worst case * 0.7: 256*458/766 * 1.5 * 0.7 */
+					<7 1 20>,
+					<7 2 4>,
+					<7 1 16>,
+					<7 0 194>,
+					<7 0 97>,
+					<7 0 0>,
+					<7 0 642>, /* FHD60 worst case * 0.7: 256*458/766 * 1.5 * 4 * 0.7*/
+					<7 0 7>;
 		};
 
 		jpgenc@17030000 {
-			compatible = "mediatek,mtk-jpgenc-32bit";
+			compatible = "mediatek,mtk-jpgenc";
 			reg = <0 0x17030000 0 0x10000>;
 			interrupts = <GIC_SPI 311 IRQ_TYPE_LEVEL_HIGH 0>;
 			clocks = <&venc_gcon_clk CLK_VEN1_CKE2_JPGENC>;
@@ -2424,7 +2449,7 @@
 				 <&iommu0  M4U_PORT_L7_JPGENC_Q_TABLE>,
 				 <&iommu0  M4U_PORT_L7_JPGENC_BSDMA>;
 			operating-points-v2 = <&opp_table_venc>;
-			dvfsrc-vcore-supply = <&dvfsrc_vcore>;
+			mmdvfs-dvfsrc-vcore-supply = <&dvfsrc_vcore>;
 			interconnects = <&mmqos MASTER_LARB_PORT(M4U_PORT_L7_JPGENC_Y_RDMA)
 						&mmqos SLAVE_COMMON(0)>,
 					<&mmqos MASTER_LARB_PORT(M4U_PORT_L7_JPGENC_C_RDMA)
@@ -2438,6 +2463,7 @@
 						"path_jpegenc_q_table",
 						"path_jpegenc_bsdma";
 			interconnect-num = <4>;
+			support-34bits = <0>;
 		};
 
 	};
@@ -5119,31 +5145,46 @@
 		compatible = "mediatek,srclken-rc";
 		reg = <0 0x1000f800 0 0x100>,
 			<0 0x1000f900 0 0x1f0>;
-		mediatek,subsys-ctl = "suspend", "rf", "deep_idle",
-			"rsv", "gps", "bt",
-			"wifi", "conn_mcu", "co-ant",
-			"nfc", "ufs", "scp",
-			"rsv";
-		suspend-ctl = "XO_SOC";
-		rf-ctl = "XO_WCN";
-		deep_idle-ctl = "XO_SOC";
-		gps-ctl = "XO_CEL";
-		bt-ctl = "XO_WCN";
-		wifi-ctl = "XO_WCN";
-		conn_mcu-ctl = "XO_WCN";
-		nfc-ctl = "XO_NFC";
-
-		mediatek,enable;
+			suspend {
+					xo-buf = "XO_SOC";
+					sub-id = <1>;
+			};
+			rf {
+					xo-buf = "XO_WCN";
+					sub-id = <2>;
+			};
+			dpidle {
+					xo-buf = "XO_SOC";
+					sub-id = <3>;
+			};
+			gps {
+					xo-buf = "XO_CEL";
+					sub-id = <5>;
+			};
+			bt {
+					xo-buf = "XO_WCN";
+					sub-id = <6>;
+			};
+			wifi {
+					xo-buf = "XO_WCN";
+					sub-id = <7>;
+			};
+			coant {
+					xo-buf = "XO_WCN";
+					sub-id = <9>;
+			};
+			nfc {
+					xo-buf = "XO_NFC";
+					sub-id = <10>;
+			};
 	};
 
 	clock_buffer_ctrl: clock_buffer_ctrl {
-		compatible = "mediatek,clock_buffer_ctrl";
-		mediatek,xo-buf-hwbblpm-mask = <1 0 0 0 0 0 0>;
-		mediatek,xo-buf-hwbblpm-bypass = <0 0 0 0 0 0 0>;
-
+		pmic-supply = <&mt6359p_clkbuf>;
+		compatible = "mediatek,mt6833-clkbuf";
+		pmic = <&mt6359p_clkbuf>;
 		pmif = <&pwrap 0>;
-		srclken_rc = <&srclken_rc>;
-		mediatek,enable;
+		srclken-rc = <&srclken_rc>;
 	};
 
 	pwraph: pwraphal@10026000 {
@@ -5218,14 +5259,24 @@
 			<&gce 2 0 CMDQ_THR_PRIO_4>,
 			<&gce 3 CMDQ_NO_TIMEOUT CMDQ_THR_PRIO_2>,
 			<&gce 4 0 CMDQ_THR_PRIO_4>,
-			<&gce 6 0 CMDQ_THR_PRIO_3>;
+			<&gce 6 0 CMDQ_THR_PRIO_3>,
+			<&gce_mbox_bdg 0 0 CMDQ_THR_PRIO_4>,
+			<&gce_mbox_bdg 1 0 CMDQ_THR_PRIO_4>,
+			<&gce_mbox_bdg 2 0 CMDQ_THR_PRIO_4>,
+			<&gce_mbox_bdg 3 CMDQ_NO_TIMEOUT CMDQ_THR_PRIO_2>,
+			<&gce_mbox_bdg 5 CMDQ_NO_TIMEOUT CMDQ_THR_PRIO_2>;
 
 		gce-client-names = "CLIENT_CFG0",
 			"CLIENT_CFG1",
 			"CLIENT_CFG2",
 			"CLIENT_TRIG_LOOP0",
 			"CLIENT_SUB_CFG0",
-			"CLIENT_DSI_CFG0";
+			"CLIENT_DSI_CFG0",
+			"BDG_CLIENT_CFG0",
+			"BDG_CLIENT_CFG1",
+			"BDG_CLIENT_CFG2",
+			"BDG_CLIENT_TRIG_LOOP0",
+			"BDG_CLIENT_TRIG_LOOP1";
 
 		gce-subsys = <&gce 0x14000000 SUBSYS_1400XXXX>,
 			<&gce 0x14010000 SUBSYS_1401XXXX>,
@@ -5246,7 +5297,15 @@
 			"disp_token_disp_va_start0",
 			"disp_token_disp_va_end0",
 			"disp_token_disp_va_start2",
-			"disp_token_disp_va_end2";
+			"disp_token_disp_va_end2",
+			"bdg_dsi0_sof",
+			"bdg_dsi0_eof",
+			"bdg_rdma0_sof",
+			"bdg_rdma0_eof",
+			"bdg_dsi0_te",
+			"bdg_dsi0_irq",
+			"bdg_dsi0_done",
+			"bdg_dsi0_target_line";
 
 		gce-events =
 			<&gce CMDQ_EVENT_DISP_STREAM_DONE_ENG_EVENT_0>,
@@ -5264,7 +5323,15 @@
 			<&gce CMDQ_SYNC_TOKEN_DISP_VA_START>,
 			<&gce CMDQ_SYNC_TOKEN_DISP_VA_END>,
 			<&gce CMDQ_SYNC_TOKEN_DISP_VA_START>,
-			<&gce CMDQ_SYNC_TOKEN_DISP_VA_END>;
+			<&gce CMDQ_SYNC_TOKEN_DISP_VA_END>,
+			<&gce_mbox_bdg CMDQ_BRIDGE_EVENT_DISP_DSI0_SOF>,
+			<&gce_mbox_bdg CMDQ_BRIDGE_EVENT_DSI_FRAME_DONE>,
+			<&gce_mbox_bdg CMDQ_BRIDGE_EVENT_DISP_RDMA0_SOF>,
+			<&gce_mbox_bdg CMDQ_BRIDGE_EVENT_DISP_RDMA0_FRAME_DONE>,
+			<&gce_mbox_bdg CMDQ_BRIDGE_EVENT_DSI0_TE_ENG_EVENT>,
+			<&gce_mbox_bdg CMDQ_BRIDGE_EVENT_DSI0_IRQ_ENG_EVENT>,
+			<&gce_mbox_bdg CMDQ_BRIDGE_EVENT_DSI0_DONE_ENG_EVENT>,
+			<&gce_mbox_bdg CMDQ_BRIDGE_EVENT_DSI0_TARGET_LINE_EVENT>;
 
 		helper-name = "MTK_DRM_OPT_STAGE",
 			"MTK_DRM_OPT_USE_CMDQ",
@@ -5581,6 +5648,25 @@
 	dsi_te: dsi_te {
 		compatible = "mediatek, dsi_te-eint";
 		status = "disabled";
+	};
+
+	mt6382_nfc: mt6382_nfc {
+		compatible = "mediatek, mt6382_nfc-eint";
+		interrupt-parent = <&pio>;
+		interrupts = <25 IRQ_TYPE_EDGE_BOTH 25 0>;
+		mt6382_nfc_srclk = <&pio 25 0x0>;
+		status = "okay";
+	};
+
+	mt6382_eint: mt6382_eint {
+		compatible = "mediatek, mt6382_eint";
+		interrupt-parent = <&pio>;
+		interrupts = <5 IRQ_TYPE_LEVEL_HIGH 5 0>;
+		status = "okay";
+	};
+
+	bdg_support: bdg_support {
+		compatible = "mediatek,disp,6382,bdg";
 	};
 
 	disp_wdma0: disp_wdma0@14014000 {
@@ -6505,7 +6591,7 @@
 		wakeup-source;
 		interrupt-controller;
 		interrupt-parent = <&pio>;
-		interrupts = <10 IRQ_TYPE_EDGE_FALLING>;
+		interrupts = <10 IRQ_TYPE_LEVEL_LOW>;
 		interrupt-names = "IRQB";
 		mt6360_chg: chg {
 			compatible = "mediatek,mt6360-chg";

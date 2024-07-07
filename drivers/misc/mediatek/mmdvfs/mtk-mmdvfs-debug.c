@@ -215,15 +215,16 @@ void mmdvfs_debug_status_dump(struct seq_file *file)
 	unsigned long flags;
 	u32 i, j, k, val;
 
+	if (!g_mmdvfs)
+		return;
 
+	spin_lock_irqsave(&g_mmdvfs->lock, flags);
 	for (i = 0; i < g_mmdvfs->clk_count; i++)
 		mmdvfs_debug_dump_line(file, "[%#010x] = %#010x", g_mmdvfs->clk_base_pa + g_mmdvfs->clk_ofs[i],
 			readl(g_mmdvfs->clk_base + g_mmdvfs->clk_ofs[i]));
 
 	/* MMDVFS_DBG_VER1 */
 	mmdvfs_debug_dump_line(file, "VER1: mux controlled by vcore regulator:");
-
-	spin_lock_irqsave(&g_mmdvfs->lock, flags);
 
 	if (g_mmdvfs->rec[g_mmdvfs->rec_cnt].sec)
 		for (i = g_mmdvfs->rec_cnt; i < ARRAY_SIZE(g_mmdvfs->rec); i++)
@@ -405,6 +406,13 @@ void mmdvfs_debug_status_dump(struct seq_file *file)
 
 sram_dump:
 	mtk_mmdvfs_enable_vcp(true, VCP_PWR_USR_MMDVFS_RST);
+	mmdvfs_vcp_cb_mutex_lock();
+	if (!mmdvfs_vcp_cb_ready_get()) {
+		mmdvfs_vcp_cb_mutex_unlock();
+		MMDVFS_DBG("cb_ready:%d", mmdvfs_vcp_cb_ready_get());
+		return;
+	}
+
 	mmdvfs_debug_dump_line(file, "VER3.5: mux controlled by vcp sram:%#lx", (unsigned long)(void *)SRAM_BASE);
 	// usr
 	for (k = 0; k < SRAM_USR_NUM; k++) {
@@ -483,11 +491,14 @@ sram_dump:
 	// vmm
 	i = readl(SRAM_REC_CNT_VMM);
 	for (j = i; j < SRAM_REC_CNT; j++)
-		mmdvfs_debug_dump_line(file, "[%5u.%3u] vmm:%u",
-			readl(SRAM_VMM_SEC(j)), readl(SRAM_VMM_USEC(j)),readl(SRAM_VMM_VAL(j)));
+		mmdvfs_debug_dump_line(file, "[%5u.%3u] vmm val:%u hw:%u volt:%u",
+			readl(SRAM_VMM_SEC(j)), readl(SRAM_VMM_USEC(j)),
+			readl(SRAM_VMM_VAL(j)), readl(SRAM_VMM_HW_VAL(j)), readl(SRAM_VMM_VOLT(j)));
 	for (j = 0; j < i; j++)
-		mmdvfs_debug_dump_line(file, "[%5u.%3u] vmm:%u",
-			readl(SRAM_VMM_SEC(j)), readl(SRAM_VMM_USEC(j)),readl(SRAM_VMM_VAL(j)));
+		mmdvfs_debug_dump_line(file, "[%5u.%3u] vmm val:%u hw:%u volt:%u",
+			readl(SRAM_VMM_SEC(j)), readl(SRAM_VMM_USEC(j)),
+			readl(SRAM_VMM_VAL(j)), readl(SRAM_VMM_HW_VAL(j)), readl(SRAM_VMM_VOLT(j)));
+	mmdvfs_debug_dump_line(file, "vmm efuse high:%u low:%u", readl(SRAM_VMM_EFUSE_HIGH), readl(SRAM_VMM_EFUSE_LOW));
 
 	// vdisp
 	i = readl(SRAM_REC_CNT_VDISP);
@@ -504,6 +515,8 @@ sram_dump:
 	for (i = 0; i < SRAM_PWR_CNT - 1; i++)
 		mmdvfs_debug_dump_line(file, "pwr:%d gear:%u", i, readl(SRAM_PWR_GEAR(i)));
 	mmdvfs_debug_dump_line(file, "pwr:%d ceil:%u", i, readl(SRAM_VMM_CEIL));
+
+	mmdvfs_vcp_cb_mutex_unlock();
 	mtk_mmdvfs_enable_vcp(false, VCP_PWR_USR_MMDVFS_RST);
 }
 EXPORT_SYMBOL_GPL(mmdvfs_debug_status_dump);
@@ -1080,7 +1093,7 @@ static int mmdvfs_debug_probe(struct platform_device *pdev)
 	if (IS_ERR_OR_NULL(dir))
 		MMDVFS_DBG("proc_mkdir failed:%ld", PTR_ERR(dir));
 
-	proc = proc_create("mmdvfs_opp", 0444, dir, &mmdvfs_debug_opp_fops);
+	proc = proc_create("mmdvfs_opp", 0440, dir, &mmdvfs_debug_opp_fops);
 	if (IS_ERR_OR_NULL(proc))
 		MMDVFS_DBG("proc_create failed:%ld", PTR_ERR(proc));
 	else

@@ -187,7 +187,7 @@ void cmdq_thrd_irq_history_record(u8 hwid ,u8 thread_idx)
 void cmdq_dump_thrd_irq_history(u8 hwid)
 {
 #define txt_sz 128
-	u16 arr_idx, thrd_irq_cnt[CMDQ_THR_MAX_COUNT], offset;
+	u16 arr_idx, thrd_irq_cnt[CMDQ_THR_MAX_COUNT] = {0}, offset;
 	u8 thrd_idx, i;
 	s16 len;
 	char text[txt_sz];
@@ -807,6 +807,17 @@ void cmdq_util_disp_smc_cmd(u32 crtc_idx, u32 cmd)
 }
 EXPORT_SYMBOL(cmdq_util_disp_smc_cmd);
 
+void cmdq_util_pkvm_disable(void)
+{
+	struct arm_smccc_res res;
+
+	cmdq_mbox_mtcmos_by_fast(util.cmdq_mbox[1], true);
+	arm_smccc_smc(MTK_SIP_CMDQ_CONTROL, CMD_CMDQ_TL_PKVM_DISABLE,
+		0, 0, 0, 0, 0, 0, &res);
+	cmdq_mbox_mtcmos_by_fast(util.cmdq_mbox[1], false);
+}
+EXPORT_SYMBOL(cmdq_util_pkvm_disable);
+
 void cmdq_util_prebuilt_init(const u16 mod)
 {
 	struct arm_smccc_res res;
@@ -1352,14 +1363,14 @@ int cmdq_proc_create(void)
 	}
 
 	if (!cmdq_proc_debug_off) {
-		entry = proc_create("cmdq-status", 0444, debugDirEntry,
+		entry = proc_create("cmdq-status", 0440, debugDirEntry,
 			&cmdq_util_status_fops);
 		if (!entry) {
 			cmdq_err("proc_create_file cmdq-status failed");
 			return -ENOMEM;
 		}
 
-		entry = proc_create("cmdq-record", 0444, debugDirEntry,
+		entry = proc_create("cmdq-record", 0440, debugDirEntry,
 			&cmdq_util_record_fops);
 		if (!entry) {
 			cmdq_err("proc_create_file cmdq-record failed");
@@ -1368,7 +1379,7 @@ int cmdq_proc_create(void)
 	}
 
 	if (cmdq_dump_buf_size) {
-		entry = proc_create("cmdq_buffer_record", 0444, debugDirEntry,
+		entry = proc_create("cmdq_buffer_record", 0440, debugDirEntry,
 			&cmdq_proc_util_buf_record_fops);
 		if (!entry) {
 			cmdq_err("proc_create_file cmdq_buffer_record failed");

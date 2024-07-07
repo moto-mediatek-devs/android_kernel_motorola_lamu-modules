@@ -7,6 +7,7 @@
 #include <linux/fs.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/io.h>
 
 #include "mcupm_plt.h"
 #include "mcupm_driver.h"
@@ -14,7 +15,6 @@
 
 /* import from mcupm_driver */
 extern int mcupm_plt_ackdata;
-//extern int mcupm_mcdi_ackdata;
 
 #if MCUPM_PLT_SERV_SUPPORT
 struct plt_ctrl_s {
@@ -27,6 +27,11 @@ struct plt_ctrl_s {
 };
 #endif
 
+#define AP_TCM_MPMM_CTRL_ADDR           (0x0C2CF5F8)    /* MPMM control */
+#define AP_TCM_MPMM_DISABLE_MAGICNUM    (0xF1F2F3F4)    /* MPMM disable magic number */
+#define AP_TCM_MPMM_ENABLE_MAGICNUM     (0xE1E2E3E4)    /* MPMM enable magic number */
+
+static void __iomem *mpmm_en_reg;
 
 #if MCUPM_PLT_SERV_SUPPORT
 static ssize_t mcupm_alive_show(struct device *kobj,
@@ -49,50 +54,43 @@ static ssize_t mcupm_alive_show(struct device *kobj,
 }
 DEVICE_ATTR_RO(mcupm_alive);
 
-static ssize_t mcdi_dynamic_finegrain_show(struct device *kobj,
+static ssize_t mpmm_show(struct device *kobj,
 				 struct device_attribute *attr, char *buf)
 {
+	unsigned int mpmm_en_val;
 
-	struct mcupm_ipi_data_s mcdi_ipi_data;
-	int ret = 0;
+	if (!mpmm_en_reg)
+		mpmm_en_reg = ioremap(AP_TCM_MPMM_CTRL_ADDR, 0x4);
 
-	mcdi_ipi_data.cmd = 0xA1;
-	mcupm_plt_ackdata = 0;
+	mpmm_en_val = ioread32(mpmm_en_reg);
 
-	ret = mtk_ipi_send_compl(&mcupm_ipidev, CH_S_PLATFORM, IPI_SEND_WAIT,
-		&mcdi_ipi_data,
-		sizeof(struct mcupm_ipi_data_s) / MCUPM_MBOX_SLOT_SIZE,
-		2000);
-
-	return snprintf(buf, PAGE_SIZE, "%s / MBOX%d.\n",
-			mcupm_plt_ackdata ? "Finegrain status: disable" : "Finegrain status: enable", CH_S_FG);
+	return snprintf(buf, PAGE_SIZE, "%X\n", mpmm_en_val);
 }
 
-static ssize_t mcdi_dynamic_finegrain_store(struct device *kobj,
+static ssize_t mpmm_store(struct device *kobj,
 	struct device_attribute *attr, const char *buf, size_t n)
 {
-
-	struct mcupm_ipi_data_s mcdi_ipi_data;
 	int ret = 0;
+	unsigned int mpmm_en_val;
 
-	mcdi_ipi_data.cmd = 0xB1;
+	if (!mpmm_en_reg)
+		mpmm_en_reg = ioremap(AP_TCM_MPMM_CTRL_ADDR, 0x4);
 
-	ret = kstrtou32(buf, 0, &mcdi_ipi_data.u.logger.enable);
+	ret = kstrtou32(buf, 0, &mpmm_en_val);
 	if (ret != 0) {
 		free_page((unsigned long)buf);
 		return -EINVAL;
 	}
-
-	ret = mtk_ipi_send_compl(&mcupm_ipidev, CH_S_PLATFORM, IPI_SEND_WAIT,
-		&mcdi_ipi_data,
-		sizeof(struct mcupm_ipi_data_s) / MCUPM_MBOX_SLOT_SIZE,
-		2000);
-
+	if (mpmm_en_val == AP_TCM_MPMM_ENABLE_MAGICNUM || mpmm_en_val == AP_TCM_MPMM_DISABLE_MAGICNUM) {
+		iowrite32(mpmm_en_val, mpmm_en_reg);
+		pr_info("MPMM Status: 0x%X\n", mpmm_en_val);
+	} else {
+		pr_info("Invalid MPMM control value\n");
+	}
 	return n;
 }
 
-DEVICE_ATTR_RW(mcdi_dynamic_finegrain);
-
+DEVICE_ATTR_RW(mpmm);
 
 int mcupm_plt_module_init(void)
 {
@@ -101,7 +99,7 @@ int mcupm_plt_module_init(void)
 	struct plt_ctrl_s *plt_ctl;
 	int ret = 0;
 	unsigned int last_ofs;
-	unsigned int mcdi_fg_support;
+	unsigned int mpmm_support = 0;
 #if MCUPM_LOGGER_SUPPORT
 	unsigned int last_sz;
 #endif
@@ -116,16 +114,18 @@ int mcupm_plt_module_init(void)
 		return -1;
 	}
 
-
 	node = of_find_compatible_node(NULL, NULL, mcupm_desc);
 	if (!node)
 		pr_notice("of_find_compatible_node unable to find mcupm device node\n");
 
-	if (!of_property_read_u32(node, "mcdi-fg-node-support", &mcdi_fg_support)) {
-		if (mcdi_fg_support)
-			ret = mcupm_sysfs_create_file(&dev_attr_mcdi_dynamic_finegrain);
+	if (!of_property_read_u32(node, "mpmm-node-support", &mpmm_support)) {
+		if (mpmm_support) {
+			ret = mcupm_sysfs_create_file(&dev_attr_mpmm);
+			mpmm_en_reg = ioremap(AP_TCM_MPMM_CTRL_ADDR, 0x4);
+			iowrite32(0x0, mpmm_en_reg);
+		}
 	} else {
-		pr_info("Failed to get finegrain support index from dts.\n");
+		pr_info("Failed to get mpmm support index from dts.\n");
 	}
 
 	ret = mcupm_sysfs_create_file(&dev_attr_mcupm_alive);

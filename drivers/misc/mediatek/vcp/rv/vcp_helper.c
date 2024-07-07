@@ -98,6 +98,7 @@ unsigned int vcp_enable[VCP_CORE_TOTAL];
 unsigned int vcp_expected_freq;
 unsigned int vcp_current_freq;
 unsigned int vcp_support;
+unsigned int infra_vcp_support;
 unsigned int vcp_dbg_log;
 
 /* set flag after driver initial done */
@@ -908,7 +909,7 @@ void trigger_vcp_dump(enum vcp_core_id id, char *user, bool vote_mminfra)
 		pr_notice("[VCP] %s call vcp dump clk %d\n",
 			user, mt_get_fmeter_freq(vcpreg.fmeter_ck, vcpreg.fmeter_type));
 
-		if (vote_mminfra) {
+		if (vote_mminfra && !infra_vcp_support) {
 			ret = vcp_turn_mminfra_on();
 			if (ret < 0) {
 				mutex_unlock(&vcp_pw_clk_mutex);
@@ -921,15 +922,20 @@ void trigger_vcp_dump(enum vcp_core_id id, char *user, bool vote_mminfra)
 		/* trigger vcp dump */
 		pr_notice("[VCP] %s %s trigger VCP dump...\n", __func__, user);
 		pr_notice("[VCP] Module:%s\n", get_module_by_taskname(user));
-		writel(B_GIPC3_SETCLR_3, R_GIPC_IN_SET);
+
+		if (!infra_vcp_support)
+			writel(B_GIPC3_SETCLR_3, R_GIPC_IN_SET);
+		else
+			writel(B_GIPC3_SETCLR_3, VCP_INFRA_GIPC_IN_SET);
+
 		for (j = 0; j < NUM_FEATURE_ID; j++)
 			if (feature_table[j].enable)
 				pr_info("[VCP] Active feature id %d cnt %d\n",
-					j, feature_table[j].enable);
+					feature_table[j].feature, feature_table[j].enable);
 
 		mtk_smi_dbg_hang_detect("VCP dump");
 
-		if (vote_mminfra)
+		if (vote_mminfra && !infra_vcp_support)
 			vcp_turn_mminfra_off();
 	}
 	mutex_unlock(&vcp_pw_clk_mutex);
@@ -961,7 +967,7 @@ void trigger_vcp_halt(enum vcp_core_id id, char *user, bool vote_mminfra)
 			pr_notice("[VCP] Module:%s\n", get_module_by_taskname(user));
 		}
 
-		if (vote_mminfra) {
+		if (vote_mminfra && !infra_vcp_support) {
 			ret = vcp_turn_mminfra_on();
 			if (ret < 0) {
 				mutex_unlock(&vcp_pw_clk_mutex);
@@ -973,14 +979,18 @@ void trigger_vcp_halt(enum vcp_core_id id, char *user, bool vote_mminfra)
 
 		/* trigger halt isr, force vcp enter wfi */
 		pr_notice("[VCP] %s %s trigger VCP EE coredump...\n", __func__, user);
-		writel(B_GIPC3_SETCLR_0, R_GIPC_IN_SET);
+		if (!infra_vcp_support)
+			writel(B_GIPC3_SETCLR_0, R_GIPC_IN_SET);
+		else
+			writel(B_GIPC3_SETCLR_0, VCP_INFRA_GIPC_IN_SET);
+
 		for (j = 0; j < NUM_FEATURE_ID; j++)
 			if (feature_table[j].enable)
 				pr_info("[VCP] Active feature id %d cnt %d\n",
-					j, feature_table[j].enable);
+					feature_table[j].feature, feature_table[j].enable);
 		mtk_smi_dbg_hang_detect("VCP EE");
 
-		if (vote_mminfra)
+		if (vote_mminfra && !infra_vcp_support)
 			vcp_turn_mminfra_off();
 	} else
 		pr_notice("[VCP] %s %s tigger but VCP not ready\n", __func__, user);
@@ -1093,7 +1103,7 @@ uint32_t vcp_wait_ready_sync(enum feature_id id)
 			for (j = 0; j < NUM_FEATURE_ID; j++)
 				if (feature_table[j].enable)
 					pr_info("[VCP] Active feature id %d cnt %d\n",
-						j, feature_table[j].enable);
+						feature_table[j].feature, feature_table[j].enable);
 				pr_info("wait ready timeout id %d\n", id);
 			break;
 		}
@@ -1704,35 +1714,35 @@ static inline ssize_t vcp_A_db_test_store(struct device *kobj
 
 DEVICE_ATTR_WO(vcp_A_db_test);
 
-static ssize_t vcp_ee_enable_show(struct device *kobj
+static ssize_t vcp_excep_mode_show(struct device *kobj
 	, struct device_attribute *attr, char *buf)
 {
-	return scnprintf(buf, PAGE_SIZE, "%d\n", vcp_ee_enable);
+	return scnprintf(buf, PAGE_SIZE, "%d\n", vcp_excep_mode);
 }
 
-static ssize_t vcp_ee_enable_store(struct device *kobj
+static ssize_t vcp_excep_mode_store(struct device *kobj
 	, struct device_attribute *attr, const char *buf, size_t n)
 {
 	unsigned int value = 0;
 
 	if (kstrtouint(buf, 10, &value) == 0) {
-		if (value == 0)
-			vcp_ee_enable = 0;
-		else if (value == 1)
-			vcp_ee_enable = 1;
-		else if (value == 2)
+		if (value == VCP_NO_EXCEP)
+			vcp_excep_mode = VCP_NO_EXCEP;
+		else if (value == VCP_KE_ENABLE)
+			vcp_excep_mode = VCP_KE_ENABLE;
+		else if (value == VCP_EE_ENABLE)
+			vcp_excep_mode = VCP_EE_ENABLE;
+		else if (value == 100)
 			vcp_dbg_log = 0;
-		else if (value == 3)
+		else if (value == 101)
 			vcp_dbg_log = 1;
-		else
-			vcp_ee_enable = value;
 
-		pr_debug("[VCP] vcp_ee_enable = %d, vcp_dbg_log = %d (1:enable, 0:disable)\n"
-				, vcp_ee_enable, vcp_dbg_log);
+		pr_debug("[VCP] vcp_excep_mode = %d, vcp_dbg_log = %d (1:enable, 0:disable)\n"
+				, vcp_excep_mode, vcp_dbg_log);
 	}
 	return n;
 }
-DEVICE_ATTR_RW(vcp_ee_enable);
+DEVICE_ATTR_RW(vcp_excep_mode);
 
 static inline ssize_t vcp_A_awake_lock_show(struct device *kobj
 			, struct device_attribute *attr, char *buf)
@@ -1898,6 +1908,10 @@ static ssize_t wdt_reset_store(struct device *dev
 			vcp_wdt_reset(0);
 		else if (value == 667)
 			vcp_wdt_reset(1);
+		else if (value == 668)
+			trigger_vcp_halt(VCP_A_ID, "ADB_CMD", true);
+		else if (value == 669)
+			trigger_vcp_dump(VCP_A_ID, "ADB_CMD", true);
 	}
 	return count;
 }
@@ -2007,7 +2021,7 @@ static int create_files(void)
 		return ret;
 
 	ret = device_create_file(vcp_device.this_device
-					, &dev_attr_vcp_ee_enable);
+					, &dev_attr_vcp_excep_mode);
 	if (unlikely(ret != 0))
 		return ret;
 
@@ -2604,7 +2618,7 @@ void vcp_sys_reset_ws(struct work_struct *ws)
 	__pm_stay_awake(vcp_reset_lock);
 
 	/*workqueue for vcp ee, vcp reset by cmd will not trigger vcp ee*/
-	if (vcp_reset_by_cmd == 0 && vcp_ee_enable) {
+	if (vcp_reset_by_cmd == 0 && vcp_excep_mode != VCP_NO_EXCEP) {
 		vcp_aed(vcp_reset_type, VCP_A_ID);
 		/* vcp_aee_print("[VCP] %s(): vcp_reset_type %d remain %x times, encnt %d\n",
 		 *	__func__, vcp_reset_type, vcp_reset_counts, mmup_enable_count());
@@ -2996,6 +3010,115 @@ void mbox_setup_pin_table(unsigned int mbox)
 	}
 }
 
+static int vcp_infra_vcp_probe(struct platform_device *pdev)
+{
+	struct resource *res;
+	struct device *dev = &pdev->dev;
+
+	pr_debug("[VCP] %s", __func__);
+
+	of_property_read_u32(pdev->dev.of_node, "infra2vcp-support",
+		 &infra_vcp_support);
+	if (infra_vcp_support == 0) {
+		pr_info("Bypass INFRA VCP driver probe\n");
+		return 0;
+	}
+
+	pr_notice("[VCP] INFRA VCP driver support\n");
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "vcp_sram_base");
+	if (res == NULL) {
+		pr_notice("[VCP] platform resource was queryed fail by name.\n");
+		return -1;
+	}
+	vcpreg.infra_sram = devm_ioremap_resource(dev, res);
+	if (IS_ERR((void const *) vcpreg.infra_sram)) {
+		pr_notice("[VCP] vcpreg.infra_sram error\n");
+		return -1;
+	}
+	if (res == NULL) {
+		pr_notice("[VCP] platform_get_resource_byname error\n");
+		return -1;
+	}
+	pr_debug("[VCP] sram base = 0x%p\n", vcpreg.infra_sram);
+
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "vcp_cfgreg");
+	vcpreg.infra_cfg = devm_ioremap_resource(dev, res);
+	if (IS_ERR((void const *) vcpreg.infra_cfg)) {
+		pr_notice("[VCP] vcpreg.infra_cfg error\n");
+		return -1;
+	}
+	pr_debug("[VCP] cfg base = 0x%p\n", vcpreg.infra_cfg);
+
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "vcp_cfgreg_core0");
+	vcpreg.infra_cfg_core0 = devm_ioremap_resource(dev, res);
+	if (IS_ERR((void const *) vcpreg.infra_cfg_core0)) {
+		pr_debug("[VCP] vcpreg.infra_cfg_core0 error\n");
+		return -1;
+	}
+	pr_debug("[VCP] cfg_core0 base = 0x%p\n", vcpreg.infra_cfg_core0);
+
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "vcp_intc_core0");
+	vcpreg.infra_cfg_intc = devm_ioremap_resource(dev, res);
+	if (IS_ERR((void const *) vcpreg.infra_cfg_intc)) {
+		pr_debug("[VCP] vcpreg.infra_cfg_intc error\n");
+		return -1;
+	}
+	pr_debug("[VCP] cfg_intc base = 0x%p\n", vcpreg.infra_cfg_intc);
+
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "vcp_pwr_ctl");
+	vcpreg.infra_cfg_pwr = devm_ioremap_resource(dev, res);
+	if (IS_ERR((void const *) vcpreg.infra_cfg_pwr))
+		pr_debug("[VCP] vcpreg.infra_cfg_pwr not support\n");
+	pr_debug("[VCP] per_ctl base = 0x%p\n", vcpreg.infra_cfg_pwr);
+
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "vcp_cfgreg_core1");
+	vcpreg.infra_cfg_core1 = devm_ioremap_resource(dev, res);
+	if (IS_ERR((void const *) vcpreg.infra_cfg_core1)) {
+		pr_debug("[VCP] vcpreg.infra_cfg_core1 error\n");
+		return -1;
+	}
+	pr_debug("[VCP] cfg_core1 base = 0x%p\n", vcpreg.infra_cfg_core1);
+
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "vcp_bus_debug");
+	vcpreg.infra_bus_debug = devm_ioremap_resource(dev, res);
+	if (IS_ERR((void const *) vcpreg.infra_bus_debug)) {
+		pr_debug("[VCP] vcpreg.infra_bus_debug error\n");
+		return -1;
+	}
+	pr_debug("[VCP] bus_debug base = 0x%p\n", vcpreg.infra_bus_debug);
+
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "vcp_bus_tracker");
+	vcpreg.infra_bus_tracker = devm_ioremap_resource(dev, res);
+	if (IS_ERR((void const *) vcpreg.infra_bus_tracker)) {
+		pr_debug("[VCP] vcpreg.infra_bus_tracker error\n");
+		return -1;
+	}
+	pr_debug("[VCP] bus_tracker base = 0x%p\n", vcpreg.infra_bus_tracker);
+
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "vcp_cfgreg_sec");
+	vcpreg.infra_cfg_sec = devm_ioremap_resource(dev, res);
+	if (IS_ERR((void const *) vcpreg.infra_cfg_sec)) {
+		pr_debug("[VCP] vcpreg.infra_cfg_sec error\n");
+		return -1;
+	}
+	pr_debug("[VCP] cfg_sec base = 0x%p\n", vcpreg.infra_cfg_sec);
+
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "vcp_bus_prot");
+	vcpreg.infra_bus_prot = devm_ioremap_resource(dev, res);
+	if (IS_ERR((void const *) vcpreg.infra_bus_prot)) {
+		pr_notice("[VCP] vcpreg.infra_bus_prot error\n");
+		vcpreg.infra_bus_prot = NULL;
+	}
+	pr_debug("[VCP] bus_prot base = 0x%p\n", vcpreg.infra_bus_prot);
+
+	return 0;
+}
+
+static int vcp_infra_vcp_remove(struct platform_device *dev)
+{
+	return 0;
+}
+
 static int vcp_device_probe(struct platform_device *pdev)
 {
 	int ret = 0, i = 0;
@@ -3195,15 +3318,15 @@ static int vcp_device_probe(struct platform_device *pdev)
 						, &vcpreg.twohart);
 	pr_notice("[VCP] vcpreg.twohart = %d\n", vcpreg.twohart);
 
-	vcp_ee_enable = 0;
+	vcp_excep_mode = VCP_NO_EXCEP;
 	vcpreg.secure_dump = 0;
 	of_property_read_u32(pdev->dev.of_node, "vcp-secure-dump"
 						, &vcpreg.secure_dump);
-	of_property_read_u32(pdev->dev.of_node, "vcp-ee-enable"
-						, &vcp_ee_enable);
+	of_property_read_u32(pdev->dev.of_node, "vcp-excep-mode"
+						, &vcp_excep_mode);
 
-	pr_notice("[VCP] vcpreg.secure_dump = %d, vcp_ee_enable = %d\n",
-			vcpreg.secure_dump, vcp_ee_enable);
+	pr_notice("[VCP] vcpreg.secure_dump = %d, vcp_excep_mode = %d\n",
+			vcpreg.secure_dump, vcp_excep_mode);
 
 	vcpreg.bus_debug_num_ports = 0;
 	of_property_read_u32(pdev->dev.of_node, "bus-debug-num-ports"
@@ -3476,6 +3599,21 @@ static struct platform_driver mtk_vcp_device = {
 	},
 };
 
+static const struct of_device_id infra_vcp_of_ids[] = {
+	{ .compatible = "mediatek,infra2vcp", },
+	{}
+};
+
+static struct platform_driver mtk_infra_vcp_device = {
+	.probe = vcp_infra_vcp_probe,
+	.remove = vcp_infra_vcp_remove,
+	.driver = {
+		.name = "infra2vcp",
+		.owner = THIS_MODULE,
+		.of_match_table = infra_vcp_of_ids,
+	},
+};
+
 static const struct of_device_id vcp_vdec_of_ids[] = {
 	{ .compatible = "mediatek,vcp-io-vdec", },
 	{}
@@ -3625,6 +3763,7 @@ static int __init vcp_init(void)
 		vcp_ready[i] = 0;
 	}
 	vcp_support = 0;
+	infra_vcp_support = 0;
 	vcp_dbg_log = 0;
 	halt_user = NULL;
 
@@ -3636,6 +3775,11 @@ static int __init vcp_init(void)
 	if (platform_driver_register(&mtk_vcp_device)) {
 		pr_info("[VCP] vcp probe fail\n");
 		goto err_vcp;
+	}
+
+	if (platform_driver_register(&mtk_infra_vcp_device)) {
+		pr_info("[VCP] mtk_infra_vcp_device fail\n");
+		goto err_infra_vcp;
 	}
 
 	if (platform_driver_register(&mtk_vcp_io_ube_lat)) {
@@ -3793,6 +3937,8 @@ err_io_vdec:
 err_io_ube_core:
 	platform_driver_unregister(&mtk_vcp_io_ube_lat);
 err_io_ube_lat:
+	platform_driver_unregister(&mtk_infra_vcp_device);
+err_infra_vcp:
 	platform_driver_unregister(&mtk_vcp_device);
 err_vcp:
 	return -1;
@@ -3841,6 +3987,7 @@ static void __exit vcp_exit(void)
 	platform_driver_unregister(&mtk_vcp_io_vdec);
 	platform_driver_unregister(&mtk_vcp_io_ube_core);
 	platform_driver_unregister(&mtk_vcp_io_ube_lat);
+	platform_driver_unregister(&mtk_infra_vcp_device);
 	platform_driver_unregister(&mtk_vcp_device);
 }
 

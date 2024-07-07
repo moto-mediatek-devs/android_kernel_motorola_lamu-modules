@@ -71,7 +71,8 @@ enum POWER_DOMAIN_ID {
 	PD_CAM_MAIN,
 	PD_CAM_VCORE,
 	PD_CAM_CCU,
-	PD_NUM			/*19*/
+	PD_VDE_VCORE0,
+	PD_NUM			/*20*/
 };
 
 struct vmm_notifier_data {
@@ -215,7 +216,10 @@ static int vmm_pm_runtime_enable(struct device *dev, u32 pd_id)
 	if (ret < 0)
 		ISP_LOGE("vmm get sync fail pd_id=%d, ret=%d!!\n", pd_id, ret);
 
+	mutex_lock(&ctrl_mutex);
 	vmm_locked_buck_ctrl(true);
+	mutex_unlock(&ctrl_mutex);
+
 	data->notifier.notifier_call = mtk_camera_pd_callback;
 	data->pd_id = pd_id;
 	ret = dev_pm_genpd_add_notifier(dev, &data->notifier);
@@ -277,7 +281,9 @@ static int __init mtk_vmm_notifier_init(void)
 		pr_notice("Failed to ioremap reg(0x%x)\n", MM_HW_CCF_BASE);
 		return -ENODEV;
 	}
+	mutex_lock(&ctrl_mutex);
 	vmm_locked_buck_ctrl(true);
+	mutex_unlock(&ctrl_mutex);
 	status = platform_driver_register(&drv_vmm_notifier);
 	if (status) {
 		pr_notice("Failed to register VMM dbg driver(%d)\n", status);
@@ -293,8 +299,8 @@ static int __init mtk_vmm_notifier_init(void)
 		if (ret < 0)
 			ISP_LOGI("fail to put_sync id=%d, ret=%d!!!\n", id, ret);
 	}
-	vmm_locked_buck_ctrl(false);
 	mutex_lock(&ctrl_mutex);
+	vmm_locked_buck_ctrl(false);
 	ISP_LOGI("[%s][%d] end, vmm_user_counter=%d\n", __func__, __LINE__, vmm_user_counter);
 	mutex_unlock(&ctrl_mutex);
 

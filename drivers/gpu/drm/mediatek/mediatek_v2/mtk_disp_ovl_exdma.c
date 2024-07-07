@@ -1001,7 +1001,7 @@ static void mtk_ovl_exdma_config(struct mtk_ddp_comp *comp,
 		else
 			fps = drm_mode_vrefresh(&crtc->state->adjusted_mode);
 
-		if (cfg->w <= 1080) {
+		if (crtc->state->adjusted_mode.hdisplay <= 1080) {
 			if (fps == 30) {
 				bw_monitor_config |= REG_FLD_VAL(FLD_OVL_BURST_ACC_WIN_SIZE, 4);
 				ovl_win_size = 5;
@@ -2483,6 +2483,10 @@ static void mtk_ovl_exdma_layer_config(struct mtk_ddp_comp *comp, unsigned int i
 			       comp->regs_pa + DISP_REG_OVL_SMI_2ND_CFG,
 			       (val << (id + 4)), (1 << (id + 4)));
 		}
+		if (fmt == DRM_FORMAT_C8)
+			cmdq_pkt_write(handle, comp->cmdq_base,
+			comp->regs_pa + DISP_REG_OVL_L_EN(ext_lye_idx), 0,
+			DISP_OVL_L_EN);
 	} else {
 		cmdq_pkt_write(handle, comp->cmdq_base,
 			comp->regs_pa + OVL_L0_CLRFMT(0), Ln_CLRFMT,
@@ -2527,6 +2531,10 @@ static void mtk_ovl_exdma_layer_config(struct mtk_ddp_comp *comp, unsigned int i
 			       comp->regs_pa + DISP_REG_OVL_SMI_2ND_CFG,
 			       (val << lye_idx), (1 << lye_idx));
 		}
+		if (fmt == DRM_FORMAT_C8)
+			cmdq_pkt_write(handle, comp->cmdq_base,
+			comp->regs_pa + DISP_REG_OVL_L_EN(0), 0,
+			DISP_OVL_L_EN);
 	}
 
 	if (priv->data->mmsys_id == MMSYS_MT6991) {
@@ -3247,7 +3255,7 @@ static void mtk_ovl_exdma_addon_config(struct mtk_ddp_comp *comp,
 			else
 				fps = drm_mode_vrefresh(&crtc->state->adjusted_mode);
 
-			if (config->rsz_src_roi.width <= 1080) {
+			if (crtc->state->adjusted_mode.hdisplay <= 1080) {
 				if (fps == 30) {
 					bw_monitor_config |=
 						REG_FLD_VAL(FLD_OVL_BURST_ACC_WIN_SIZE, 4);
@@ -3787,7 +3795,7 @@ static int mtk_ovl_exdma_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *hand
 			bw_val = debug_module_bw[phy_id];
 
 		if (bw_val != comp->last_hrt_bw) {
-			DDPDBG("%s/%d bw_val %u -> %u\n",
+			DDPDBG("%s bw_val %u -> %u\n",
 				mtk_dump_comp_str_id(comp->id), comp->last_hrt_bw, bw_val);
 			__mtk_disp_set_module_hrt(comp->hrt_qos_req, comp->id, bw_val,
 				priv->data->respective_ostdl);

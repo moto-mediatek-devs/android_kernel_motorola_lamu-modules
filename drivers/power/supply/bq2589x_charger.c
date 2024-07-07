@@ -74,7 +74,7 @@ enum {
 	PN_SC89890H,
 };
 
-static const u32 bq2589x_otg_oc_threshold[] = {
+static const u32 bq2589x_otg_oc_threshold[] __maybe_unused = {
 	500000, 700000, 1100000, 1300000, 1800000, 2100000, 2400000, 3000000,
 }; /* uA */
 
@@ -1946,6 +1946,11 @@ static int bq2589x_chg_get_property(struct power_supply *psy,
 			val->strval = "Silergy";
 		break;
 	case POWER_SUPPLY_PROP_ONLINE:
+		bq2589x_update_bits(bq, BQ2589X_REG_02, BQ2589X_CONV_RATE_MASK,
+					0 << BQ2589X_CONV_RATE_SHIFT);
+
+		bq2589x_update_bits(bq, BQ2589X_REG_02, BQ2589X_CONV_START_MASK,
+					1 << BQ2589X_CONV_START_SHIFT);
 		if ((bq->part_no != pn_data[PN_SC89890H])) {
 			bq2589x_get_vbus(bq->chg_dev, &vbus);
 			if (!bq->power_good && vbus < BQ2589X_VBUS_UVLO)
@@ -1954,7 +1959,6 @@ static int bq2589x_chg_get_property(struct power_supply *psy,
 				val->intval = 0;
 			else
 				val->intval = 1;
-			val->intval = 1;
 			pr_info("%s usb online(%d),pd(%d), vbus(%d)\n",
 				__func__, val->intval, bq->power_good, vbus);
 		} else

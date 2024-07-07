@@ -343,6 +343,7 @@ aliases {
 			ccorr-num-per-pipe = <1>;
 			ccorr-linear-per-pipe = <0x01>;
 			ccorr-prim-force-linear = <0x0>;
+			ccorr-linear = <1>;
 		};
 
 		disp_aal0: disp_aal0@14011000 {
@@ -4059,11 +4060,9 @@ firmware_class.path=/vendor/firmware kvm-arm.mode=none";
 	};
 
 	pmic_clock_buffer_ctrl: pmic_clock_buffer_ctrl {
-		compatible = "mediatek,clock_buffer_ctrl";
-		mediatek,xo-buf-hwbblpm-mask = <1 0 0 0 0 0 0>;
-		mediatek,xo-buf-hwbblpm-bypass = <0 0 0 0 0 0 0>;
+		compatible = "mediatek,mt6761-clkbuf";
+		pmic = <&mt6357_clkbuf>;
 		pmif = <&pwrap 0>;
-		mediatek,enable;
 	};
 
 	low-battery-throttling {
@@ -4181,16 +4180,21 @@ firmware_class.path=/vendor/firmware kvm-arm.mode=none";
 		dvfs = <&dvfsrc>;
 	};
 
+	eas_info: eas-info {
+		compatible = "mediatek,eas-info";
+		legacy-api-support = <1>;
+	};
+
 	fpsgo: fpsgo {
 		compatible = "mediatek,fpsgo";
 		interconnects = <&dvfsrc MT6873_MASTER_MCU_1 &dvfsrc MT6873_SLAVE_DDR_EMI>;
 		interconnect-names = "fpsgo-perf-bw";
 		required-opps = <&dvfsrc_freq_opp0>;
 
-		adj_count = <30>;
-		gcc_enable = <0>;
-		fbt_cpu_mask = <15 15 15 15>;
-		sbe_resceue_enable = <1>;
+		gcc-enable = <0>;
+		fbt-cpu-mask = <15 15 15 15>;
+		sbe-resceue-enable = <1>;
+		boost-dram = <2>;
 	};
 
 	dram_ctrl {

@@ -2557,15 +2557,16 @@ static long mtk_vcu_free(
 	long ret = -1;
 	unsigned char *user_data_addr = NULL;
 	struct mem_obj mem_buff_data;
+	memset(&mem_buff_data, 0, sizeof(struct mem_obj));
 
 	user_data_addr = (unsigned char *)arg;
 	ret = (long)copy_from_user(&mem_buff_data, user_data_addr,
 		(unsigned long)sizeof(struct mem_obj));
 	if ((ret != 0L) ||
 		(mem_buff_data.iova == 0UL &&
-		mem_buff_data.va == 0UL)) {
-		pr_info("[VCU] %s(%d) Free buf failed on cmd %d!\n",
-			__func__, __LINE__, cmd);
+		mem_buff_data.va == 0UL && cmd != VCU_SECURE_HANDLE_FREE)) { //secure handle iova and va always is 0
+		pr_info("[VCU] %s(%d) Free buf failed on cmd %d! ret: %ld, iova: %llu, va: %llu\n",
+			__func__, __LINE__, cmd, ret, mem_buff_data.iova, mem_buff_data.va);
 		return -EINVAL;
 	}
 

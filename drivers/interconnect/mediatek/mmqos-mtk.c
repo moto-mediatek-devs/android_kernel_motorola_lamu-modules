@@ -1827,6 +1827,11 @@ void mmqos_hrt_dump(void)
 {
 	u32 larb_id = 0;
 
+	if (mmqos_state == MMQOS_DISABLE) {
+		MMQOS_DBG("mmqos not enable");
+		return;
+	}
+
 	//mmpc dvfsrc dump
 	if (mmqos_state & MMPC_ENABLE)
 		mmpc_dvfsrc_full_dump_line();
@@ -2212,13 +2217,13 @@ int mtk_mmqos_probe(struct platform_device *pdev)
 	if (IS_ERR_OR_NULL(dir))
 		pr_notice("proc_mkdir failed:%ld\n", PTR_ERR(dir));
 
-	proc = proc_create("mmqos_bw", 0444, dir, &mmqos_debug_fops);
+	proc = proc_create("mmqos_bw", 0440, dir, &mmqos_debug_fops);
 	if (IS_ERR_OR_NULL(proc))
 		pr_notice("proc_create failed:%ld\n", PTR_ERR(proc));
 	else
 		mmqos->proc = proc;
 
-	last_proc = proc_create("last_mmqos", 0444, dir, &mmqos_last_debug_fops);
+	last_proc = proc_create("last_mmqos", 0440, dir, &mmqos_last_debug_fops);
 	if (IS_ERR_OR_NULL(last_proc))
 		pr_notice("last proc_create failed:%ld\n", PTR_ERR(last_proc));
 	else

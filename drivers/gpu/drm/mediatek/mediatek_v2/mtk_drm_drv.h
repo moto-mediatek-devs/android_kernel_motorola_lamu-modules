@@ -99,6 +99,11 @@ struct mtk_mmsys_driver_data {
 	void (*update_channel_hrt)(struct mtk_drm_crtc *mtk_crtc,
 			unsigned int bw_base, unsigned int channel_bw[]);
 	unsigned int (*get_channel_idx)(enum CHANNEL_TYPE type, unsigned int i);
+	void (*update_channel_bw_by_layer)(unsigned int layer, unsigned int bpp,
+			unsigned int *subcomm_bw_sum, unsigned int size,
+			unsigned int bw_base, enum CHANNEL_TYPE type);
+	void (*update_channel_bw_by_larb)(struct mtk_larb_port_bw *port_bw,
+			unsigned int *subcomm_bw_sum, unsigned int size, enum CHANNEL_TYPE type);
 };
 
 struct mtk_drm_lyeblob_ids {
@@ -181,6 +186,9 @@ struct mtk_drm_private {
 	struct device *dpc_dev;
 	struct device *dsi_phy0_dev;
 	struct device *dsi_phy1_dev;
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+	struct device *dsi_phy2_dev;
+#endif
 
 	struct drm_crtc *crtc[MAX_CRTC];
 	unsigned int pre_defined_bw[MAX_CRTC];
@@ -189,6 +197,7 @@ struct mtk_drm_private {
 	unsigned int ovlsys_usage[MAX_CRTC]; //describe each CRTC OVLSYS connect state
 	unsigned int req_hrt[MAX_CRTC];
 	unsigned int req_hrt_channel_bw[MAX_CRTC][BW_CHANNEL_NR];
+	unsigned int last_max_channel_req;
 	unsigned int num_pipes;
 
 	unsigned int sw_ver;

@@ -53,6 +53,8 @@ static char *dec_port_name[NUM_MAX_VDEC_M4U_PORT+1] = {
 	[VDEC_M4U_PORT_LAT0_MC]             = "LAT_MC",
 	[VDEC_M4U_PORT_LAT0_UFO]            = "LAT_UFO",
 	[VDEC_M4U_PORT_LAT0_UFO_C]          = "LAT_UFO_C",
+	[VDEC_M4U_PORT_LAT0_UNIWRAP]        = "LAT_UNIWRAP",
+	[VDEC_M4U_PORT_UNIWRAP]             = "UNIWRAP",
 	[VDEC_M4U_PORT_VIDEO_UP_SEC]        = "VIDEO_UP_SEC",
 	[VDEC_M4U_PORT_VIDEO_UP_NOR]        = "VIDEO_UP_NOR",
 	[VDEC_M4U_PORT_UP_1]                = "UP_1",
@@ -202,7 +204,9 @@ void mtk_vcodec_release_dec_pm(struct mtk_vcodec_dev *dev)
 	mutex_lock(&dev->dec_dvfs_mutex);
 	mutex_unlock(&dev->dec_dvfs_mutex);
 #endif
+#ifndef FPGA_PWRCLK_API_DISABLE
 	pm_runtime_disable(dev->pm.dev);
+#endif
 }
 
 void mtk_vcodec_dec_pw_on(struct mtk_vcodec_pm *pm)
@@ -1256,6 +1260,10 @@ int mtk_vdec_m4u_port_name_to_index(const char *name)
 		return VDEC_M4U_PORT_LAT0_UFO;
 	else if (!strcmp(MTK_VDEC_M4U_PORT_NAME_LAT0_UFO_ENC_C, name))
 		return VDEC_M4U_PORT_LAT0_UFO_C;
+	else if (!strcmp(MTK_VDEC_M4U_PORT_NAME_LAT0_UNIWRAP, name))
+		return VDEC_M4U_PORT_LAT0_UNIWRAP;
+	else if (!strcmp(MTK_VDEC_M4U_PORT_NAME_UNIWRAP, name))
+		return VDEC_M4U_PORT_UNIWRAP;
 	else if (!strcmp(MTK_VDEC_M4U_PORT_NAME_VIDEO_UP_SEC, name))
 		return VDEC_M4U_PORT_VIDEO_UP_SEC;
 	else if (!strcmp(MTK_VDEC_M4U_PORT_NAME_VIDEO_UP_NOR, name))

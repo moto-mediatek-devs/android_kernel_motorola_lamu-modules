@@ -543,7 +543,7 @@ cpus {
 				local-timer-stop;
 				entry-latency-us = <300>;
 				exit-latency-us = <1200>;
-				min-residency-us = <2600>;
+				min-residency-us = <4000>;
 			};
 			s2idle: s2idle {
 				compatible = "arm,idle-state";
@@ -1321,11 +1321,11 @@ cpus {
 		};
 		sleep: sleep@10006000 {
 			compatible = "mediatek,sleep", "syscon";
-			reg = <0 0x10006000 0 0x100>;
+			reg = <0 0x10006000 0 0x1000>;
 		};
 
 		srclken_rc: srclken-rc@10006500 {
-			compatible = "mediatek,srclken-rc";
+			compatible = "mediatek,srclken-rc-v3";
 			reg = <0 0x10006500 0 0x100>,
 				<0 0x10006E00 0 0x100>;
 			susepnd {
@@ -1803,7 +1803,7 @@ cpus {
 		emiisu: emiisu {
 			compatible = "mediatek,mt6885-emiisu",
 				     "mediatek,common-emiisu";
-			ctrl-intf = <0>;
+			ctrl-intf = <1>;
 		};
 
 		device_mpu_low@1021a000 {
@@ -1875,6 +1875,7 @@ cpus {
 			clear-md = <0x1fc 0x80000000 1>;
 			ctrl-intf = <1>;
 			slverr = <0>;
+			bypass = <1>;
 		};
 
 		gce: mailbox@10228000 {
@@ -2543,7 +2544,7 @@ cpus {
 			#clock-cells = <1>;
 		};
 
-		spi0: spi@1100a000 {
+		spi0: spi0@1100a000 {
 			compatible = "mediatek,mt6765-spi";
 			mediatek,pad-select = <0>;
 			reg = <0 0x1100a000 0 0x100>;
@@ -2614,7 +2615,7 @@ cpus {
 			clock-names = "main", "mm", "pwm_src";
 		};
 
-		spi1: spi@11010000 {
+		spi1: spi1@11010000 {
 			compatible = "mediatek,mt6765-spi";
 			mediatek,pad-select = <0>;
 			reg = <0 0x11010000 0 0x100>;
@@ -2625,7 +2626,7 @@ cpus {
 			clock-names = "parent-clk", "sel-clk", "spi-clk";
 		};
 
-		spi2: spi@11012000 {
+		spi2: spi2@11012000 {
 			compatible = "mediatek,mt6765-spi";
 			mediatek,pad-select = <0>;
 			reg = <0 0x11012000 0 0x100>;
@@ -2636,7 +2637,7 @@ cpus {
 			clock-names = "parent-clk", "sel-clk", "spi-clk";
 		};
 
-		spi3: spi@11013000 {
+		spi3: spi3@11013000 {
 			compatible = "mediatek,mt6765-spi";
 			mediatek,pad-select = <0>;
 			reg = <0 0x11013000 0 0x100>;
@@ -2702,7 +2703,7 @@ cpus {
 			mediatek,control-rs-stop;
 		};
 
-		spi4: spi@11018000 {
+		spi4: spi4@11018000 {
 			compatible = "mediatek,mt6765-spi";
 			mediatek,pad-select = <2>;
 			reg = <0 0x11018000 0 0x100>;
@@ -2713,7 +2714,7 @@ cpus {
 			clock-names = "parent-clk", "sel-clk", "spi-clk";
 		};
 
-		spi5: spi@11019000 {
+		spi5: spi5@11019000 {
 			compatible = "mediatek,mt6765-spi";
 			mediatek,pad-select = <0>;
 			reg = <0 0x11019000 0 0x100>;
@@ -2724,7 +2725,7 @@ cpus {
 			clock-names = "parent-clk", "sel-clk", "spi-clk";
 		};
 
-		spi6: spi@1101d000 {
+		spi6: spi6@1101d000 {
 			compatible = "mediatek,mt6765-spi";
 			mediatek,pad-select = <0>;
 			reg = <0 0x1101d000 0 0x100>;
@@ -2735,7 +2736,7 @@ cpus {
 			clock-names = "parent-clk", "sel-clk", "spi-clk";
 		};
 
-		spi7: spi@1101e000 {
+		spi7: spi7@1101e000 {
 			compatible = "mediatek,mt6765-spi";
 			mediatek,pad-select = <0>;
 			reg = <0 0x1101e000 0 0x100>;
@@ -5256,7 +5257,7 @@ cpus {
 		};
 
 		jpgdec0@17040000 {
-			compatible = "mediatek,jpgdec0";
+			compatible = "mediatek,jpgdec";
 			reg = <0 0x17040000 0 0x10000>,
 				<0 0x17050000 0 0x10000>;
 			interrupts = <GIC_SPI 310 IRQ_TYPE_LEVEL_HIGH 0>,
@@ -5278,7 +5279,7 @@ cpus {
 		};
 
 		jpgdec1@17840000 {
-			compatible = "mediatek,jpgdec1";
+			compatible = "mediatek,jpgdec_c1";
 			reg = <0 0x17840000 0 0x10000>;
 			interrupts = <GIC_SPI 315 IRQ_TYPE_LEVEL_HIGH 0>;
 			mediatek,larbs = <&smi_larb8>;
@@ -6493,13 +6494,19 @@ cpus {
  				 <&ipesys_clk CLK_IPE_LARB20>;
 			clock-names = "aie",
 				 "FDVT_CLK_IPE_LARB20";
-			mboxes = <&gce_m 17 0 CMDQ_THR_PRIO_1>;
+			mboxes = <&gce_m 17 0 CMDQ_THR_PRIO_1>,
+					<&gce_m_sec 11 0 CMDQ_THR_PRIO_1>;
 			iommus = <&iommu0 M4U_PORT_L20_IPE_FDVT_RDA_DISP>,
 				 <&iommu0 M4U_PORT_L20_IPE_FDVT_RDB_DISP>,
 				 <&iommu0 M4U_PORT_L20_IPE_FDVT_WRA_DISP>,
 				 <&iommu0 M4U_PORT_L20_IPE_FDVT_WRB_DISP>;
 		        fdvt_frame_done = <CMDQ_EVENT_IPE_EVENT_TX_FRAME_DONE_0>;
 			mediatek,larb = <&smi_larb20>;
+		};
+
+		mtk_iommu_fake_aie@0 {
+			compatible = "mediatek,mtk_iommu_fake_aie";
+			iommus = <&iommu0 M4U_PORT_L1_DISP_FAKE1>;
 		};
 
 		rsc@1b003000 {
@@ -7043,6 +7050,9 @@ cpus {
 			mdp-dvfsrc-vcore-supply = <&dvfsrc_vcore>;
 			isp-dvfsrc-vcore-supply = <&dvfsrc_vcore>;
 			dre30-hist-sram-start = /bits/ 16 <1536>;
+			pq-rb-thread-id = /bits/ 16 <22>;
+			pq-rb-event-lock = /bits/ 16 <CMDQ_SYNC_TOKEN_HISTOGRAM_MDP_WAIT>;
+			pq-rb-event-unlock = /bits/ 16 <CMDQ_SYNC_TOKEN_HISTOGRAM_MDP_SET>;
 		};
 
 		mdp_mutex: mdp-mutex@1f001000 {
@@ -8174,10 +8184,10 @@ cpus {
 		};
 
 		clock_buffer_ctrl: clkbuf-ctrl {
+			pmic-supply = <&mt6359p_clkbuf>;
 			compatible = "mediatek,mt6885-clkbuf";
 			pmic = <&mt6359p_clkbuf>;
-			pmif = <&pwrap 0>,
-			       <&spmi_bus 0>;
+			pmif = <&pwrap 0>;
 			srclken-rc = <&srclken_rc>;
 		};
 

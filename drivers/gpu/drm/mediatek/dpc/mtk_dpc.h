@@ -3,8 +3,8 @@
  * Copyright (c) 2023 MediaTek Inc.
  */
 
-#ifndef __MTK_DPC_COMMON_H__
-#define __MTK_DPC_COMMON_H__
+#ifndef __MTK_DPC_H__
+#define __MTK_DPC_H__
 
 #ifndef DRM_CMDQ_DISABLE
 #include <linux/soc/mediatek/mtk-cmdq-ext.h>
@@ -22,8 +22,9 @@ enum mtk_vidle_voter_user {
 	DISP_VIDLE_USER_MDP,
 	DISP_VIDLE_USER_MML0 = DISP_VIDLE_USER_MDP,
 	DISP_VIDLE_USER_DISP_CMDQ,
-	DISP_VIDLE_USER_DDIC_CMDQ,
+	DISP_VIDLE_USER_DDIC_CMDQ, //21
 	DISP_VIDLE_USER_PQ_CMDQ,
+	DISP_VIDLE_USER_HSIDLE,
 	DISP_VIDLE_USER_MML_CMDQ = 24,
 	DISP_VIDLE_USER_MML1_CMDQ = DISP_VIDLE_USER_MML_CMDQ,
 	DISP_VIDLE_USER_MML0_CMDQ = 25,
@@ -43,6 +44,11 @@ enum mtk_vidle_voter_status {
 	VOTER_ONLY = 0x1000,
 };
 
+enum mtk_dpc_mtcmos_mode {
+	DPC_MTCMOS_MANUAL,
+	DPC_MTCMOS_AUTO,
+};
+
 enum mtk_panel_type {
 	PANEL_TYPE_CMD,
 	PANEL_TYPE_VDO,
@@ -50,7 +56,8 @@ enum mtk_panel_type {
 };
 
 enum mtk_dpc_version {
-	DPC_VER1 = 1,
+	DPC_VER_UNKNOWN,
+	DPC_VER1,
 	DPC_VER2,
 	DPC_VER_CNT,
 };
@@ -106,7 +113,7 @@ struct dpc_funcs {
 	void (*dpc_group_enable)(const u16 group, bool en);
 
 	/* mtcmos auto mode control */
-	void (*dpc_mtcmos_auto)(const enum mtk_dpc_subsys subsys, const bool en);
+	void (*dpc_mtcmos_auto)(const enum mtk_dpc_subsys subsys, const enum mtk_dpc_mtcmos_mode mode);
 
 	/* mtcmos and resource auto mode control */
 	void (*dpc_pause)(const enum mtk_dpc_subsys subsys, bool en);

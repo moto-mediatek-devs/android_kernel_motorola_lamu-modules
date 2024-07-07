@@ -10,6 +10,9 @@
 int mml_dl_dpc = MML_DPC_PKT_VOTE;
 module_param(mml_dl_dpc, int, 0644);
 
+static struct dpc_funcs mml_dpc_funcs;
+static enum mtk_dpc_version mml_dpc_version;
+
 #define mml_sysid_to_dpc_subsys(sysid)	\
 	(sysid == mml_sys_frame ? DPC_SUBSYS_MML1 : DPC_SUBSYS_MML0)
 #define mml_sysid_to_dpc_user(sysid)	\
@@ -21,9 +24,10 @@ module_param(mml_dl_dpc, int, 0644);
 #define mml_sysid_to_dpc_hrt_read_idx(sysid)	\
 	(sysid == mml_sys_frame ? 10 : 2)
 
-void mml_dpc_register(const struct dpc_funcs *funcs)
+void mml_dpc_register(const struct dpc_funcs *funcs, enum mtk_dpc_version version)
 {
 	mml_dpc_funcs = *funcs;
+	mml_dpc_version = version;
 }
 EXPORT_SYMBOL_GPL(mml_dpc_register);
 
@@ -47,24 +51,29 @@ void mml_dpc_dc_force_enable(bool en)
 	mml_dpc_funcs.dpc_dc_force_enable(en);
 }
 
-void mml_dpc_group_enable(bool en)
+void mml_dpc_group_enable(u32 sysid, bool en)
 {
 	if (mml_dpc_funcs.dpc_group_enable == NULL) {
 		mml_msg_dpc("%s dpc_group_enable not exist", __func__);
 		return;
 	}
 
-	mml_dpc_funcs.dpc_group_enable(DPC_SUBSYS_MML, en);
+	mml_dpc_funcs.dpc_group_enable(mml_sysid_to_dpc_subsys(sysid), en);
 }
 
-void mml_dpc_mtcmos_auto(u32 sysid, const bool en)
+void mml_dpc_mtcmos_auto(u32 sysid, const bool en, const s8 mode)
 {
+	enum mtk_dpc_mtcmos_mode mtcmos_mode = en ? DPC_MTCMOS_AUTO : DPC_MTCMOS_MANUAL;
+
+	if (mml_dpc_version == DPC_VER2)
+		return;
+
 	if (mml_dpc_funcs.dpc_mtcmos_auto == NULL) {
 		mml_msg_dpc("%s dpc_mtcmos_auto not exist", __func__);
 		return;
 	}
 
-	mml_dpc_funcs.dpc_mtcmos_auto(mml_sysid_to_dpc_subsys(sysid), en);
+	mml_dpc_funcs.dpc_mtcmos_auto(mml_sysid_to_dpc_subsys(sysid), mtcmos_mode);
 }
 
 void mml_dpc_config(const enum mtk_dpc_subsys subsys, bool en)

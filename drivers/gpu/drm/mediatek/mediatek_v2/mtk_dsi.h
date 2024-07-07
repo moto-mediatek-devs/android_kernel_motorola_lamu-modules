@@ -62,6 +62,7 @@ struct mtk_dsi_driver_data {
 	bool dsi_buffer;
 	bool smi_dbg_disable;
 	bool require_phy_reset; /* reset phy before trigger DSI */
+	bool support_pre_urgent;
 	u32 max_vfp;
 	void (*mmclk_by_datarate)(struct mtk_dsi *dsi,
 		struct mtk_drm_crtc *mtk_crtc, unsigned int en);
@@ -113,7 +114,7 @@ struct mtk_dsi {
 	struct mtk_dsi *master_dsi;
 	struct mtk_drm_connector_caps connector_caps;
 	uint32_t connector_caps_blob_id;
-#if IS_ENABLED(CONFIG_ENABLE_SERDES_HOTPLUG)
+#if IS_ENABLED(CONFIG_ENABLE_DSI_HOTPLUG)
 	struct task_struct *hotplug_task;
 #endif
 

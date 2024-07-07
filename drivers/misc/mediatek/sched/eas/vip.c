@@ -1068,6 +1068,9 @@ static void account_vip_runtime(struct rq *rq, struct task_struct *curr)
 		return;
 
 	/* slice expired. re-queue the task */
+	if (vts->vip_list.next == NULL || !link_with_others(&vts->vip_list))
+		return;
+
 	list_del_init(&vts->vip_list);
 	insert_vip_task(rq, vts, false, true, NOT_VIP);
 }
@@ -1377,10 +1380,6 @@ void register_vip_hooks(void)
 {
 	int ret = 0;
 
-	ret = register_trace_android_rvh_wake_up_new_task(vip_new_tasks, NULL);
-	if (ret)
-		pr_info("register wake_up_new_task hooks failed, returned %d\n", ret);
-
 	ret = register_trace_android_rvh_cpu_cgroup_online(vip_rvh_cpu_cgroup_online,
 		NULL);
 	if (ret)
@@ -1406,13 +1405,17 @@ void register_vip_hooks(void)
 void vip_init(void)
 {
 	struct task_struct *g, *p;
-	int cpu, slot_id;
+	int cpu, slot_id, ret = 0;
 
 	balance_vvip_overutilied = false;
 	balance_vip_overutilized = false;
 
 	/* init vip related value to group*/
 	init_vip_group();
+
+	ret = register_trace_android_rvh_wake_up_new_task(vip_new_tasks, NULL);
+	if (ret)
+		pr_info("register wake_up_new_task hooks failed, returned %d\n", ret);
 
 	/* init vip related value to exist tasks */
 	read_lock(&tasklist_lock);

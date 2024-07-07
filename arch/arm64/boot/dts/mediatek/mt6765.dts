@@ -122,6 +122,7 @@ aliases {
 			dvfsrc-required-opps = <&dvfsrc_freq_opp0>,
 					<&dvfsrc_freq_opp1>,
 					 <&dvfsrc_freq_opp2>;
+			pre-define-bw = <0xffffffff>, <0>, <0>, <0>;
 
 			/* define threads, see mt6765-gce.h */
 			mediatek,mailbox-gce = <&gce_mbox>;
@@ -219,7 +220,8 @@ aliases {
 				"MTK_DRM_OPT_DUAL_TE",
 				"MTK_DRM_OPT_VIRTUAL_DISP",
 				"MTK_DRM_OPT_RES_SWITCH",
-				"MTK_DRM_OPT_SHARE_SRAM";
+				"MTK_DRM_OPT_SHARE_SRAM",
+				"MTK_DRM_OPT_SPHRT";
 
 			helper-value = <0>, /*MTK_DRM_OPT_STAGE*/
 				<1>, /*MTK_DRM_OPT_USE_CMDQ*/
@@ -270,7 +272,8 @@ aliases {
 				<0>, /*MTK_DRM_OPT_DUAL_TE*/
 				<0>, /*MTK_DRM_OPT_VIRTUAL_DISP*/
 				<0>, /*MTK_DRM_OPT_RES_SWITCH*/
-				<1>; /*MTK_DRM_OPT_SHARE_SRAM*/
+				<1>, /*MTK_DRM_OPT_SHARE_SRAM*/
+				<1>; /*MTK_DRM_OPT_SPHRT*/
 		};
 		disp_mtee_sec: disp_mtee_sec {
 			compatible = "mediatek,disp_mtee";
@@ -378,10 +381,11 @@ aliases {
 			reg = <0 0x14010000 0 0x1000>;
 			interrupts = <GIC_SPI 221 IRQ_TYPE_LEVEL_HIGH 0>;
 			clocks = <&mmsys_config CLK_MM_DISP_CCORR0>;
-			ccorr_bit = <12>;
-			ccorr_num_per_pipe = <1>;
-			ccorr_linear_per_pipe = <0x01>;
-			ccorr_prim_force_linear = <0x0>;
+			ccorr-bit = <12>;
+			ccorr-num-per-pipe = <1>;
+			ccorr-linear-per-pipe = <0x01>;
+			ccorr-prim-force-linear = <0x0>;
+			ccorr-linear = <1>;
 		};
 
 		disp_aal0: disp_aal0@14011000 {
@@ -390,8 +394,8 @@ aliases {
 			reg = <0 0x14011000 0 0x1000>;
 			interrupts = <GIC_SPI 222 IRQ_TYPE_LEVEL_HIGH 0>;
 			clocks = <&mmsys_config CLK_MM_DISP_AAL0>;
-			mtk_aal_support = <1>;
-			mtk_dre30_support = <0>;
+			mtk-aal-support = <1>;
+			mtk-dre30-support = <0>;
 		};
 
 		disp_gamma0: disp_gamma0@14012000 {
@@ -400,13 +404,13 @@ aliases {
 			reg = <0 0x14012000 0 0x1000>;
 			interrupts = <GIC_SPI 223 IRQ_TYPE_LEVEL_HIGH 0>;
 			clocks = <&mmsys_config CLK_MM_DISP_GAMMA0>;
-			gamma_data_mode = <0>;
-			color_protect_red = <0>;
-			color_protect_green = <0>;
-			color_protect_blue = <0>;
-			color_protect_white = <0>;
-			color_protect_black = <0>;
-			color_protect_lsb = <0>;
+			gamma-data-mode = <0>;
+			color-protect-red = <0>;
+			color-protect-green = <0>;
+			color-protect-blue = <0>;
+			color-protect-white = <0>;
+			color-protect-black = <0>;
+			color-protect-lsb = <0>;
 		};
 
 		disp_dither0: disp_dither0@14013000 {
@@ -415,9 +419,9 @@ aliases {
 			reg = <0 0x14013000 0 0x1000>;
 			interrupts = <GIC_SPI 224 IRQ_TYPE_LEVEL_HIGH 0>;
 			clocks = <&mmsys_config CLK_MM_DISP_DITHER0>;
-			pure_clr_det = <0>;
-			pure_clr_num = <7>;
-			pure_clr_rgb = <255 0 0
+			pure-clr-det = <0>;
+			pure-clr-num = <7>;
+			pure-clr-rgb = <255 0 0
 				0 255 0
 				0 0 255
 				255 255 0
@@ -1025,7 +1029,7 @@ initcall_debug=1";
 	/* Microtrust SW IRQ number 249(281) ~ 254(286) */
 	utos: utos {
 		compatible = "microtrust,utos";
-		interrupts = <GIC_SPI 271 IRQ_TYPE_EDGE_RISING 0>,
+		interrupts = <GIC_SPI 249 IRQ_TYPE_EDGE_RISING 0>,
 			<GIC_SPI 250 IRQ_TYPE_EDGE_RISING 0>;
 	};
 	utos_tester {
