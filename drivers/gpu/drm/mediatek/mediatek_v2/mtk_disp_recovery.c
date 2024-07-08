@@ -42,6 +42,10 @@
 
 static DEFINE_MUTEX(pinctrl_lock);
 
+// TN modified by kexin.wang/860557 20240705 CR/EKLAMU-838
+static int need_setbacklight = 0;
+extern int mtkfb_esd_rec_set_backlight_level(void);
+
 /* pinctrl implementation */
 long _set_state(struct drm_crtc *crtc, const char *name)
 {
@@ -619,6 +623,8 @@ int mtk_drm_esd_testing_process(struct mtk_drm_esd_ctx *esd_ctx, bool need_lock)
 			DDPPR_ERR("[ESD%u]esd check fail, will do esd recovery. try=%d\n",
 				crtc_idx, i);
 			mtk_drm_esd_recover(crtc);
+			// TN modified by kexin.wang/860557 20240705 CR/EKLAMU-838
+			need_setbacklight = 1;
 			recovery_flg = 1;
 			mtk_drm_trace_end();
 		} while (++i < ESD_TRY_CNT);
@@ -728,6 +734,13 @@ static int mtk_drm_esd_check_worker_kthread(void *data)
 		}
 
 		/* 2. other check & recovery */
+		/* TN Begin modified by kexin.wang/860557 20240705 CR/EKLAMU-838*/
+		if (need_setbacklight) {
+			DDPPR_ERR("%s: need_setbacklight\n", __func__);
+			mtkfb_esd_rec_set_backlight_level();
+			need_setbacklight = 0;
+		}
+		/* TN end modified by kexin.wang/860557 20240705 CR/EKLAMU-838*/
 		if (kthread_should_stop())
 			break;
 	}
