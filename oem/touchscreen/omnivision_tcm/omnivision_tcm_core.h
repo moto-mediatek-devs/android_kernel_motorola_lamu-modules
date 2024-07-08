@@ -88,7 +88,7 @@ struct ovt_tcm_board_data {
 #define TOUCH_INPUT_NAME "omnivision_tcm_touch"
 #define TOUCH_INPUT_PHYS_PATH "omnivision_tcm/touch_input"
 
-#define WAKEUP_GESTURE (1)
+#define WAKEUP_GESTURE (0)
 
 #define SPEED_UP_RESUME 0
 
