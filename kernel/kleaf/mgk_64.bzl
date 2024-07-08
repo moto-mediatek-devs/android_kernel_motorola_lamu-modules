@@ -1895,6 +1895,7 @@ def get_overlay_modules_list():
         mgk_64_device_modules.append("drivers/gpu/drm/panel/panel-txd-ili9883c-vdo.ko")
         mgk_64_device_modules.append("drivers/gpu/drm/panel/panel-tm-td4376-vdo.ko")
         mgk_64_device_modules.append("drivers/gpu/drm/panel/panel-djn-nt36672s-vdo.ko")
+        mgk_64_device_modules.append("drivers/gpu/drm/panel/panel-tianma-nt36528a-vdo.ko")
         mgk_64_device_modules.append("oem/tinno_charger/oem_tinno_charger.ko")
         mgk_64_device_modules.append("oem/tinno_charger/switch_charger/sgm41542/sgm41542.ko")
         mgk_64_device_modules.append("oem/tinno_charger/switch_charger/cx2589x/cx2589x.ko")

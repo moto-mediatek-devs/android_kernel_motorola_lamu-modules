@@ -734,3 +734,14 @@ config DRM_PANEL_DJN_NT36672S_VDO
 	  nt36672s djn fhdplus vdo panel. The panel has a 1080x2400
 	  resolution and uses 24-bits RGB per pixel. It provides a
 	  MIPI DSI interface to host.
+
+config DRM_PANEL_TIANMA_NT36528A_VDO
+	tristate "mt6769 nt36528a tianma hdplus1604 vdo panel"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here if you want to enable support for mt6769
+	  nt36528a timma hdplus vdo panel. The panel has a 720x1604
+	  resolution and uses 24-bits RGB per pixel. It provides a
+	  MIPI DSI interface to host.

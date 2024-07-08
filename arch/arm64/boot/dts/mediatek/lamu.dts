@@ -387,6 +387,23 @@
 		};
 	};
 
+	panel5@0 {
+		compatible = "tianma,nt36528a,vdo";
+		reg = <4>;
+
+		vddio-gpios = <&pio 12 0>;
+		reset-gpios = <&pio 45 0>;
+		bias-gpios = <&pio 20 0>,
+		<&pio 151 0>;
+		//gate-ic = <4831>;
+		pinctrl-names = "default";
+		port {
+			panel_in5: endpoint {
+				remote-endpoint = <&dsi_out>;
+			};
+		};
+	};
+
 	ports {
 		port {
 			dsi_out: endpoint {
