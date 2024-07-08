@@ -30,4 +30,11 @@
 		status = "okay";
     };
 };
+&odm {
+    ant_det: ant_det {
+		status = "okay";
+		compatible = "tinno,ant_det";
+		tinno,ant-det-gpio = <&pio 65 0>;
+	};
+};
 /*[TN.NJDC] sensor overlay file.end*/

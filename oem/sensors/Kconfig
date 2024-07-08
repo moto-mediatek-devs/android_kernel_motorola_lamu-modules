@@ -12,3 +12,11 @@ config HX9031_SAR
         help
           support HX Sar sensor
 
+config OEM_ANT_DET
+	    tristate "oem antdet"
+	    depends on OEM_PROJECT
+	    default n
+	    help
+	      support oem_antdet
+
+

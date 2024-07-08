@@ -12,6 +12,7 @@
 #include <linux/of_irq.h>
 #include <linux/of_address.h>
 #include <linux/of_gpio.h>
+#include <linux/input.h>
 
 #include "ccci_debug.h"
 #include "ccci_config.h"
@@ -42,6 +43,7 @@ static const char irq_name[][16] = {
 struct swtp_t swtp_data;
 static const char rf_name[] = "RF_cable";
 #define MAX_RETRY_CNT 30
+struct input_dev *input_dev;
 
 static int swtp_send_tx_power(struct swtp_t *swtp)
 {
@@ -136,12 +138,26 @@ static void swtp_send_tx_power_state(struct swtp_t *swtp)
 	}
 }
 
+/* +20240711 db Add air interface detection function start */
+static int ant_det_irq(int status)
+{
+	int ret = 0;
+	input_report_key(input_dev, 1, 1);
+	input_report_key(input_dev, 1, 0);
+	input_sync(input_dev);
+	CCCI_LEGACY_ERR_LOG(-1, SYS,"swtp ant_det_irq input_report_key = %d\n", status+1);
+	return ret;
+}
+/* +20240711 db Add air interface detection function end */
 static irqreturn_t swtp_irq_handler(int irq, void *data)
 {
 	struct swtp_t *swtp = (struct swtp_t *)data;
 	int ret = 0;
 
 	ret = swtp_switch_state(irq, swtp);
+	/* +20240711 db Add air interface detection function start */
+	ant_det_irq(ret);
+	/* +20240711 db Add air interface detection function end */
 	if (ret < 0) {
 		CCCI_LEGACY_ERR_LOG(0, SYS,
 			"%s swtp_switch_state failed in irq, ret=%d\n",
@@ -271,6 +287,18 @@ SWTP_INIT_END:
 
 int swtp_init(void)
 {
+	/* +20240711 db Add air interface detection function start */
+	int ret = 0;
+	input_dev = input_allocate_device();
+	input_dev->name = "ant_det";
+	input_dev->id.vendor = 6;
+	input_set_capability(input_dev, EV_KEY, 1);
+	ret =input_register_device(input_dev);
+	if (ret) {
+		CCCI_LEGACY_ERR_LOG(-1, SYS, "%s:input_register_device is fail\n", __func__);
+		return -1;
+	}
+	/* +20240711 db Add air interface detection function end */
 	/* init woke setting */
 	INIT_DELAYED_WORK(&swtp_data.init_delayed_work,
 		swtp_init_delayed_work);
