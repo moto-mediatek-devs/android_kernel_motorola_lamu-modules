@@ -42,9 +42,47 @@
 #define GC05A2_MIRROR	        0x00
 #endif
 
+#define MODULE_GROUP_FLAG 0x2000
+
+#define MODULE_GROUP1_INFO_FLAG 0x2008
+#define MODULE_GROUP1_CHECKSUM 0x2050
+#define MODULE_GROUP2_INFO_FLAG 0x5CE0
+#define MODULE_GROUP2_CHECKSUM 0x5D28
+#define MODULE_GROUP3_INFO_FLAG 0x99B8
+#define MODULE_GROUP3_CHECKSUM 0x9A00
+#define MODULE_INFO_LENGTH 9
+
+#define AWB_GROUP1_INFO_FLAG 0x2058
+#define AWB_GROUP1_CHECKSUM 0x2138
+#define AWB_GROUP2_INFO_FLAG 0x5D30
+#define AWB_GROUP2_CHECKSUM 0x5E10
+#define AWB_GROUP3_INFO_FLAG 0x9A08
+#define AWB_GROUP3_CHECKSUM 0x9AE0
+#define AWB_INFO_LENGTH 28
+
+#define LSC_GROUP1_INFO_FLAG 0x2140
+#define LSC_GROUP1_CHECKSUM 0x5BA0
+#define LSC_GROUP2_INFO_FLAG 0x5E18
+#define LSC_GROUP2_CHECKSUM 0x9878
+#define LSC_GROUP3_INFO_FLAG 0x9AF0
+#define LSC_GROUP3_CHECKSUM 0xD548
+#define LSC_INFO_LENGTH 1868
+
+// #define GROUP_LENGTH 1900
+// #define MODULE_LENGTH 19
 
 #define SENSOR_BASE_GAIN           0x400
 #define SENSOR_MAX_GAIN            (16 * SENSOR_BASE_GAIN)
+
+struct gc05a2_otp_t {
+	kal_uint8  module_flag;
+	kal_uint8  module_param[9];
+    kal_uint8  module_checksum;
+	kal_uint8  awb_param[28];
+    kal_uint8  awb_checksum;
+	kal_uint8  lsc_param[1868];
+	kal_uint8  lsc_checksum;
+};
 
 enum{
 	IMGSENSOR_MODE_INIT,

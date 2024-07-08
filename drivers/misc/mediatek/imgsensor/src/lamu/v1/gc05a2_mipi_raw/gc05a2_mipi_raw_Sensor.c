@@ -152,7 +152,7 @@ static struct imgsensor_info_struct imgsensor_info = {
 //#endif
 	.mclk = 24,
 	.mipi_lane_num = SENSOR_MIPI_2_LANE,
-	.i2c_addr_table = {0x6e, 0x7e, 0xff},
+	.i2c_addr_table = {0x7e, 0xff},
 	.i2c_speed = 400,
 };
 
@@ -1096,6 +1096,275 @@ static kal_uint32 set_test_pattern_mode(kal_bool enable)
 	return ERROR_NONE;
 }
 
+struct gc05a2_otp_t gc05a2_otp_info = {0};
+EXPORT_SYMBOL(gc05a2_otp_info);
+
+static void gc05a2_otp_init(void)
+{
+    kal_uint16 temp = 0;
+	write_cmos_sensor_8bit(0x0af6, 0x00);
+	write_cmos_sensor_8bit(0x0b90, 0x10);
+	write_cmos_sensor_8bit(0x0b91, 0x00);
+	write_cmos_sensor_8bit(0x0b92, 0x00);
+	write_cmos_sensor_8bit(0x0ba0, 0x17);
+
+	write_cmos_sensor_8bit(0x0ba1, 0x00);
+	write_cmos_sensor_8bit(0x0ba2, 0x00);
+	write_cmos_sensor_8bit(0x0ba4, 0x03);
+	write_cmos_sensor_8bit(0x0ba5, 0x00);
+	write_cmos_sensor_8bit(0x0ba6, 0x00);
+	write_cmos_sensor_8bit(0x0ba8, 0x40);
+	write_cmos_sensor_8bit(0x0ba9, 0x00);
+	write_cmos_sensor_8bit(0x0baa, 0x00);
+	write_cmos_sensor_8bit(0x0bac, 0x40);
+	write_cmos_sensor_8bit(0x0bad, 0x00);
+	write_cmos_sensor_8bit(0x0bae, 0x00);
+	write_cmos_sensor_8bit(0x0bb0, 0x02);
+	write_cmos_sensor_8bit(0x0bb1, 0x00);
+	write_cmos_sensor_8bit(0x0bb2, 0x00);
+	write_cmos_sensor_8bit(0x0bb8, 0x02);
+	write_cmos_sensor_8bit(0x0bb9, 0x00);
+	write_cmos_sensor_8bit(0x0bba, 0x00);
+	write_cmos_sensor_8bit(0x0a70, 0x80);
+	write_cmos_sensor_8bit(0x0a71, 0x00);
+	write_cmos_sensor_8bit(0x0a72, 0x00);
+	/* write_cmos_sensor_8bit(0x0a66, 0x00); */
+	temp = read_cmos_sensor(0x0a66);
+    write_cmos_sensor_8bit(0x0a66, temp & 0xfe);
+	write_cmos_sensor_8bit(0x0a67, 0x80);
+	write_cmos_sensor_8bit(0x0a4d, 0x0e);
+	write_cmos_sensor_8bit(0x0a45, 0x02);
+	write_cmos_sensor_8bit(0x0a47, 0x02);
+	write_cmos_sensor_8bit(0x0a50, 0x00);
+	write_cmos_sensor_8bit(0x0a4f, 0x0c);
+	mdelay(10);
+}
+
+static void gc05a2_otp_group_init(void)
+{
+    kal_uint16 temp = 0;
+	write_cmos_sensor_8bit(0x0af6, 0x00);
+	write_cmos_sensor_8bit(0x0b90, 0x10);
+	write_cmos_sensor_8bit(0x0b91, 0x00);
+	write_cmos_sensor_8bit(0x0b92, 0x00);
+	write_cmos_sensor_8bit(0x0ba0, 0x17);
+
+	write_cmos_sensor_8bit(0x0ba1, 0x00);
+	write_cmos_sensor_8bit(0x0ba2, 0x00);
+	write_cmos_sensor_8bit(0x0ba4, 0x03);
+	write_cmos_sensor_8bit(0x0ba5, 0x00);
+	write_cmos_sensor_8bit(0x0ba6, 0x00);
+	write_cmos_sensor_8bit(0x0ba8, 0x40);
+	write_cmos_sensor_8bit(0x0ba9, 0x00);
+	write_cmos_sensor_8bit(0x0baa, 0x00);
+	write_cmos_sensor_8bit(0x0bac, 0x40);
+	write_cmos_sensor_8bit(0x0bad, 0x00);
+	write_cmos_sensor_8bit(0x0bae, 0x00);
+	write_cmos_sensor_8bit(0x0bb0, 0x02);
+	write_cmos_sensor_8bit(0x0bb1, 0x00);
+	write_cmos_sensor_8bit(0x0bb2, 0x00);
+	write_cmos_sensor_8bit(0x0bb8, 0x02);
+	write_cmos_sensor_8bit(0x0bb9, 0x00);
+	write_cmos_sensor_8bit(0x0bba, 0x00);
+	write_cmos_sensor_8bit(0x0a70, 0x80);
+	write_cmos_sensor_8bit(0x0a71, 0x00);
+	write_cmos_sensor_8bit(0x0a72, 0x00);
+	/* write_cmos_sensor_8bit(0x0a66, 0x00); */
+	temp = read_cmos_sensor(0x0a66);
+    write_cmos_sensor_8bit(0x0a66, temp & 0xfe);
+	write_cmos_sensor_8bit(0x0a67, 0x84);
+	write_cmos_sensor_8bit(0x0a4d, 0x0e);
+	write_cmos_sensor_8bit(0x0a45, 0x02);
+	write_cmos_sensor_8bit(0x0a47, 0x02);
+	write_cmos_sensor_8bit(0x0a50, 0x00);
+	write_cmos_sensor_8bit(0x0a4f, 0x0c);
+	mdelay(10);
+}
+
+static kal_uint16 gc05a2_otp_read_byte(kal_uint16 addr)
+{
+	kal_uint16 val = 0;
+	kal_uint16 temp = 0;
+	write_cmos_sensor_8bit(0x0a69, (addr >> 8) & 0xff);
+	write_cmos_sensor_8bit(0x0a6a, addr & 0xff);
+	temp = read_cmos_sensor(0x0a66);
+	write_cmos_sensor_8bit(0x0a66, temp|0x20);
+	val = read_cmos_sensor(0x0a6c);
+	CAM_DBG(PFX,"addr = 0x%x, data = 0x%x\n", addr , val);
+	return val;
+}
+
+static kal_uint16 gc05a2_otp_read_group(kal_uint16 addr, kal_uint8 *data, kal_uint16 length)
+{
+	kal_uint16 i = 0;
+	kal_uint16 val = 0;
+	kal_uint16 temp = 0;
+
+	write_cmos_sensor_8bit(0x0a69, (addr >> 8) & 0xff);
+	write_cmos_sensor_8bit(0x0a6a, addr & 0xff);
+	temp = read_cmos_sensor(0x0a66);
+	write_cmos_sensor_8bit(0x0a66, temp|0x20);
+	val = read_cmos_sensor(0x0a6c);
+	write_cmos_sensor_8bit(0x0a66, 0x12);
+
+	for (i = 0; i < length; i++) {
+		data[i] = read_cmos_sensor(0x0a6c);
+	    CAM_DBG(PFX,"addr = 0x%x, data = 0x%x\n", addr + i * 8, data[i]);
+	}
+	return 0;
+}
+
+static int gc05a2_iReadData(unsigned int ui4_offset, unsigned int ui4_length, unsigned char *pinputdata)
+{
+	int i4RetValue = 0;
+	int i4ResidueDataLength;
+	u32 u4CurrentOffset;
+	kal_uint8 *pBuff;
+
+	CAM_DBG(PFX,"ui4_offset = 0x%x, ui4_length = %d \n", ui4_offset, ui4_length);
+
+	i4ResidueDataLength = (int)ui4_length;
+	u4CurrentOffset = ui4_offset;
+	pBuff = pinputdata;
+
+	i4RetValue =gc05a2_otp_read_group((kal_uint16) u4CurrentOffset, pBuff, i4ResidueDataLength);
+	if (i4RetValue != 0) {
+		CAM_DBG(PFX,"I2C iReadData failed!!\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+static bool gc05a2_param_checksum(kal_uint8 *buf, unsigned int size, kal_uint8 checksum)
+{
+    int i, sum = 0;
+
+    for (i = 0; i < size; i++)
+    {
+        sum += buf[i];
+        //CAM_DBG(PFX,"buf[%d] = 0x%x %d", i, buf[i], buf[i]);
+    }
+
+    if ((sum % 256) != checksum)
+    {
+        CAM_DBG(PFX,"checksum fail size = %d sum=%d sum-in-eeprom=%d", size, sum % 256, checksum);
+        return false;
+    }
+    CAM_DBG(PFX,"checksum success size = %d sum=%d sum-in-eeprom=%d", size, sum % 256, checksum);
+    return true;
+}
+
+static bool gc05a2_read_module_info(kal_uint8 moduleflag)
+{
+	bool ret = false;
+	CAM_DBG(PFX,"--------------gc05a2 module info read begin------------\n");
+	if ((moduleflag & 0xc0) == 0x40) {
+        gc05a2_iReadData(MODULE_GROUP1_INFO_FLAG, MODULE_INFO_LENGTH, &gc05a2_otp_info.module_param[0]);
+        /* gc05a2_otp_read_byte(MODULE_GROUP1_CHECKSUM, 1, &gc05a2_otp_info.module_checksum); */
+		gc05a2_otp_info.module_checksum = gc05a2_otp_read_byte(MODULE_GROUP1_CHECKSUM);
+	} else if ((moduleflag & 0x30) == 0x10) {
+		gc05a2_iReadData(MODULE_GROUP2_INFO_FLAG, MODULE_INFO_LENGTH, &gc05a2_otp_info.module_param[0]);
+        /* gc05a2_otp_read_byte(MODULE_GROUP2_CHECKSUM, 1, &gc05a2_otp_info.module_checksum); */
+		gc05a2_otp_info.module_checksum = gc05a2_otp_read_byte(MODULE_GROUP2_CHECKSUM);
+	} else if ((moduleflag & 0x0c) == 0x04) {
+		gc05a2_iReadData(MODULE_GROUP3_INFO_FLAG, MODULE_INFO_LENGTH, &gc05a2_otp_info.module_param[0]);
+        /* gc05a2_otp_read_byte(MODULE_GROUP3_CHECKSUM, 1, &gc05a2_otp_info.module_checksum); */
+		gc05a2_otp_info.module_checksum = gc05a2_otp_read_byte(MODULE_GROUP3_CHECKSUM);
+	} else {
+		CAM_DBG(PFX,"--------------gc05a2 module info read failed------------\n");
+	}
+	CAM_DBG(PFX,"--------------gc05a2 module info read end------------\n");
+	ret = gc05a2_param_checksum(&gc05a2_otp_info.module_param[0], MODULE_INFO_LENGTH, gc05a2_otp_info.module_checksum);
+	if (ret) {
+        CAM_DBG(PFX,"--------------gc05a2 module info checksum success------------\n");
+	}
+	return ret;
+}
+
+static bool gc05a2_read_awb_info(kal_uint8 moduleflag)
+{
+	bool ret = false;
+	CAM_DBG(PFX,"--------------gc05a2 awb info read begin------------\n");
+	if ((moduleflag & 0xc0) == 0x40) {
+        gc05a2_iReadData(AWB_GROUP1_INFO_FLAG, AWB_INFO_LENGTH, &gc05a2_otp_info.awb_param[0]);
+        /* gc05a2_otp_read_byte(AWB_GROUP1_CHECKSUM, 1, &gc05a2_otp_info.awb_checksum); */
+		gc05a2_otp_info.awb_checksum = gc05a2_otp_read_byte(AWB_GROUP1_CHECKSUM);
+	} else if ((moduleflag & 0x30) == 0x10) {
+		gc05a2_iReadData(AWB_GROUP2_INFO_FLAG, AWB_INFO_LENGTH, &gc05a2_otp_info.awb_param[0]);
+        /* gc05a2_otp_read_byte(AWB_GROUP1_CHECKSUM, 1, &gc05a2_otp_info.awb_checksum); */
+		gc05a2_otp_info.awb_checksum = gc05a2_otp_read_byte(AWB_GROUP2_CHECKSUM);
+	} else if ((moduleflag & 0x0c) == 0x04) {
+		gc05a2_iReadData(AWB_GROUP3_INFO_FLAG, AWB_INFO_LENGTH, &gc05a2_otp_info.awb_param[0]);
+        /* gc05a2_otp_read_byte(AWB_GROUP1_CHECKSUM, 1, &gc05a2_otp_info.awb_checksum); */
+		gc05a2_otp_info.awb_checksum = gc05a2_otp_read_byte(AWB_GROUP3_CHECKSUM);
+	} else {
+		CAM_DBG(PFX,"--------------gc05a2 awb info read failed------------\n");
+	}
+	CAM_DBG(PFX,"--------------gc05a2 awb info read end------------\n");
+	ret = gc05a2_param_checksum(&gc05a2_otp_info.awb_param[0], AWB_INFO_LENGTH, gc05a2_otp_info.awb_checksum);
+	if (ret) {
+        CAM_DBG(PFX,"--------------gc05a2 awb info checksum success------------\n");
+	}
+	return ret;
+}
+
+static bool gc05a2_read_lsc_info(kal_uint8 moduleflag)
+{
+	bool ret = false;
+	CAM_DBG(PFX,"--------------gc05a2 lsc info read begin------------\n");
+	if ((moduleflag & 0xc0) == 0x40) {
+        gc05a2_iReadData(LSC_GROUP1_INFO_FLAG, LSC_INFO_LENGTH, &gc05a2_otp_info.lsc_param[0]);
+        /* gc05a2_otp_read_byte(LSC_GROUP1_CHECKSUM, 1, &gc05a2_otp_info.lsc_checksum); */
+		gc05a2_otp_info.lsc_checksum = gc05a2_otp_read_byte(LSC_GROUP1_CHECKSUM);
+	} else if ((moduleflag & 0x30) == 0x10) {
+		gc05a2_iReadData(LSC_GROUP2_INFO_FLAG, LSC_INFO_LENGTH, &gc05a2_otp_info.lsc_param[0]);
+        /* gc05a2_otp_read_byte(LSC_GROUP1_CHECKSUM, 1, &gc05a2_otp_info.lsc_checksum); */
+		gc05a2_otp_info.lsc_checksum = gc05a2_otp_read_byte(LSC_GROUP2_CHECKSUM);
+	} else if ((moduleflag & 0x0c) == 0x04) {
+		gc05a2_iReadData(LSC_GROUP3_INFO_FLAG, LSC_INFO_LENGTH, &gc05a2_otp_info.lsc_param[0]);
+        /* gc05a2_otp_read_byte(LSC_GROUP1_CHECKSUM, 1, &gc05a2_otp_info.lsc_checksum); */
+		gc05a2_otp_info.lsc_checksum = gc05a2_otp_read_byte(LSC_GROUP3_CHECKSUM);
+	} else {
+		CAM_DBG(PFX,"--------------gc05a2 lsc info read failed------------\n");
+	}
+	CAM_DBG(PFX,"--------------gc05a2 lsc info read end------------\n");
+	ret = gc05a2_param_checksum(&gc05a2_otp_info.lsc_param[0], LSC_INFO_LENGTH, gc05a2_otp_info.lsc_checksum);
+	if (ret) {
+        CAM_DBG(PFX,"--------------gc05a2 lsc info checksum success------------\n");
+	}
+	return ret;
+}
+
+static void read_gc05a2_otp_data(void)
+{
+	kal_uint8 moduleflag =0;
+	bool checksum_module = false;
+	bool checksum_awb = false;
+	bool checksum_lsc = false;
+
+	sensor_init();
+    gc05a2_otp_init();
+
+	moduleflag = gc05a2_otp_read_byte(MODULE_GROUP_FLAG);
+	CAM_DBG(PFX,"gc05a2 moduleflag = 0x%x", moduleflag);
+
+    gc05a2_otp_group_init();
+
+	checksum_module = gc05a2_read_module_info(moduleflag);
+	checksum_awb = gc05a2_read_awb_info(moduleflag);
+	checksum_lsc = gc05a2_read_lsc_info(moduleflag);
+
+	if (true == (checksum_module & checksum_awb & checksum_lsc))
+	{
+		CAM_DBG(PFX,"----------------gc05a2 otp info check success----------------");
+	}
+	else
+	{
+		CAM_DBG(PFX,"----------------gc05a2 otp info check fail-------------------");
+	}
+}
+
 static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 {
 	kal_uint8 i = 0;
@@ -1108,11 +1377,12 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 		do {
 			*sensor_id = return_sensor_id();
 			if (*sensor_id == imgsensor_info.sensor_id) {
-				pr_debug("[gc05a2_camera_sensor]get_imgsensor_id:i2c write id: 0x%x, sensor id: 0x%x\n",
+				pr_err("[gc05a2_camera_sensor]get_imgsensor_id:i2c write id: 0x%x, sensor id: 0x%x\n",
 					imgsensor.i2c_write_id, *sensor_id);
+				read_gc05a2_otp_data();
 				return ERROR_NONE;
 			}
-			pr_debug("[gc05a2_camera_sensor]get_imgsensor_id:Read sensor id fail, write id: 0x%x, id: 0x%x\n",
+			pr_err("[gc05a2_camera_sensor]get_imgsensor_id:Read sensor id fail, write id: 0x%x, id: 0x%x\n",
 				imgsensor.i2c_write_id, *sensor_id);
 			retry--;
 		} while (retry > 0);

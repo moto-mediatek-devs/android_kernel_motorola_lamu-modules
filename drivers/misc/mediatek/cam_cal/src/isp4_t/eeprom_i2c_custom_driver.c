@@ -33,6 +33,8 @@ static DEFINE_SPINLOCK(g_spinLock);
 static struct i2c_client *g_pstI2CclientG;
 
 extern struct gc08a8_otp_t gc08a8_otp_info;
+extern struct gc05a2_otp_t gc05a2_otp_info;
+
 struct gc08a8_otp_t {
 	u8  module_flag;
 	u8  module_param[18];
@@ -43,6 +45,16 @@ struct gc08a8_otp_t {
 	u8  lsc_flag;
 	u8  lsc_param[1868];
 	u8  lscChksum;
+};
+
+struct gc05a2_otp_t{
+	u8  module_flag;
+	u8  module_param[9];
+	u8  module_checksum;
+	u8  awb_param[28];
+	u8  awb_checksum;
+	u8  lsc_param[1868];
+	u8  lsc_checksum;
 };
 /************************************************************
  * I2C read function (Custom)
@@ -169,6 +181,76 @@ unsigned int gc08a8_dd_p329_read_region(struct i2c_client *client, unsigned int 
     }
 
     return size;
+}
+
+unsigned int gc05a2sub_read_region(struct i2c_client *client, unsigned int addr,
+                                unsigned char *data, unsigned int size)
+{
+    unsigned char *dataTmp = data;
+
+    pr_err("gc05a2 otp region addr = 0x%x, size = %d\n", addr, size);
+	if (addr == 0x2 && size == 1) {//0xff
+		*(u32 *)data = 0x00000006;
+	} else if (addr == 0x0 && size == 1909) {
+       unsigned int totalSize = sizeof(gc05a2_otp_info.module_flag) +
+                                 sizeof(gc05a2_otp_info.module_param) +
+                                 sizeof(gc05a2_otp_info.module_checksum) +
+                                 sizeof(gc05a2_otp_info.awb_param) +
+                                 sizeof(gc05a2_otp_info.awb_checksum) +
+                                 sizeof(gc05a2_otp_info.lsc_param) +
+								 sizeof(gc05a2_otp_info.lsc_checksum);
+        pr_err("gc05a2 otp region addr = 0x%x, size = %d  totalSize=%d \n", addr, size, totalSize);
+        if (size == totalSize) {
+            data[0] = gc05a2_otp_info.module_flag;
+
+            /* dataTmp += sizeof(gc05a2_otp_info.page_flag); */
+            /* memcpy(dataTmp, gc05a2_otp_info.module_flag, sizeof(gc05a2_otp_info.module_flag)); */
+            dataTmp += sizeof(gc05a2_otp_info.module_flag);
+
+            memcpy(dataTmp, gc05a2_otp_info.module_param, sizeof(gc05a2_otp_info.module_param));
+            dataTmp += sizeof(gc05a2_otp_info.module_param);
+
+            /* memcpy(dataTmp, gc05a2_otp_info.module_checksum, sizeof(gc05a2_otp_info.module_checksum)); */
+			data[10] = gc05a2_otp_info.module_checksum;
+            dataTmp += sizeof(gc05a2_otp_info.module_checksum);
+
+            memcpy(dataTmp, gc05a2_otp_info.awb_param, sizeof(gc05a2_otp_info.awb_param));
+            dataTmp += sizeof(gc05a2_otp_info.awb_param);
+
+            /* memcpy(dataTmp, gc05a2_otp_info.awb_checksum, sizeof(gc05a2_otp_info.awb_checksum)); */
+			data[39] = gc05a2_otp_info.awb_checksum;
+            dataTmp += sizeof(gc05a2_otp_info.awb_checksum);
+
+            memcpy(dataTmp, gc05a2_otp_info.lsc_param, sizeof(gc05a2_otp_info.lsc_param));
+            dataTmp += sizeof(gc05a2_otp_info.lsc_param);
+
+            /* memcpy(dataTmp, gc05a2_otp_info.lsc_checksum, sizeof(gc05a2_otp_info.lsc_checksum)); */
+			data[totalSize - 1] = gc05a2_otp_info.lsc_checksum;
+        } else {
+			pr_err("gc05a2 otp size != totalSize");
+            size = totalSize;
+        }
+    } else if (size == 8) { //read single awb data
+        if (addr == 25) {
+            memcpy(data, (gc05a2_otp_info.awb_param + 14), size);
+            pr_err("add = 0x%x, read golden\n",addr);
+        } else if (addr == 11){
+            memcpy(data,(gc05a2_otp_info.awb_param), size);
+            pr_err("add = 0x%x, read awb_unint\n",addr);
+        }
+    } else if (size >=1868 && size < 2048 && addr == 40) {
+		memcpy(data, gc05a2_otp_info.lsc_param, size);
+		pr_err("add = 0x%x, read lsc\n",addr);
+	} else if (addr == 1908 && size == 1) {
+		*(u32 *)data = gc05a2_otp_info.lsc_checksum;
+		pr_err("add = 0x%x, read lsc_checksum = %x\n",addr, *(u32 *)data);
+	} else if (addr == 39 && size == 1) {
+		*(u32 *)data = gc05a2_otp_info.awb_checksum;
+		pr_err("add = 0x%x, read awb_checksum = %x\n",addr, *(u32 *)data);
+	} else{
+        pr_err("gc05a2 otp add = 0x%x, size = %d ,read error !!!\n",addr,size);
+    }
+	return size;
 }
 
 /*end 20240702 add for otp check*/
