@@ -635,8 +635,8 @@ static int boe_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 
 static struct mtk_panel_params ext_params = {
 	.pll_clk = 534,
-	.cust_esd_check = 0,
-	.esd_check_enable = 0,
+	.cust_esd_check = 1,
+	.esd_check_enable = 1,
 	.lcm_esd_check_table[0] = {
 		.cmd = 0x0a,
 		.count = 1,

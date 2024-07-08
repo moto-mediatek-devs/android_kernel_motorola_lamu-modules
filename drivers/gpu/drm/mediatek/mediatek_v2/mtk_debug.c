@@ -122,6 +122,9 @@ unsigned int lfr_params;
 unsigned int disp_spr_bypass;
 unsigned int disp_cm_bypass;
 unsigned int g_mml_mode;
+// TN modified by kexin.wang/860557 20240705 CR/EKLAMU-838
+unsigned int esd_rec_level;
+
 bool g_y2r_en;
 #if IS_ENABLED(CONFIG_MTK_DISP_DEBUG)
 struct wr_online_dbg g_wr_reg;
@@ -671,6 +674,9 @@ int __mtkfb_set_backlight_level(unsigned int level, unsigned int panel_ext_param
 		return -EINVAL;
 	}
 
+	// TN modified by kexin.wang/860557 20240705 CR/EKLAMU-838
+	esd_rec_level = level;
+
 	/* this debug cmd only for crtc0 */
 	crtc = list_first_entry(&(drm_dev)->mode_config.crtc_list,
 				typeof(*crtc), head);
@@ -692,6 +698,15 @@ int mtkfb_set_backlight_level(unsigned int level, unsigned int panel_ext_param,
 	return __mtkfb_set_backlight_level(level, panel_ext_param, cfg_flag, false);
 }
 EXPORT_SYMBOL(mtkfb_set_backlight_level);
+
+/* TN Begin modified by kexin.wang/860557 20240705 CR/EKLAMU-838*/
+int mtkfb_esd_rec_set_backlight_level(void)
+{
+	DDPPR_ERR("%s: esd_rec_level %d\n", __func__, esd_rec_level);
+	return mtkfb_set_backlight_level(esd_rec_level, 0, 0x1<<SET_BACKLIGHT_LEVEL);
+}
+EXPORT_SYMBOL(mtkfb_esd_rec_set_backlight_level);
+/* TN end modified by kexin.wang/860557 20240705 CR/EKLAMU-838*/
 
 int mtk_drm_set_conn_backlight_level(unsigned int conn_id, unsigned int level,
 				unsigned int panel_ext_param, unsigned int cfg_flag)
