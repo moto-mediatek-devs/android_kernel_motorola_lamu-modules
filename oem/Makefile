@@ -4,3 +4,4 @@ obj-y += fingerprint/
 obj-y += sensors/
 #obj-y += panel/
 obj-y += audiopa/
+obj-y += nfc/
