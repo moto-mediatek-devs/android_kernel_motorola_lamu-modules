@@ -58,5 +58,12 @@ config SND_SOC_FS1815
 	help
 	  support oem aduiopa
 
+config NXP_NFC_I2C
+    tristate "oem nxp pn560uk"
+    depends on PROJECT_LAMU
+    default m
+    help
+      support oem_nxp_pn560uk
+
 source "$(KCONFIG_EXT_PREFIX)/oem/sensors/Kconfig"
 

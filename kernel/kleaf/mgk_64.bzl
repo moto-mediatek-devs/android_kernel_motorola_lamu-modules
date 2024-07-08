@@ -1909,6 +1909,7 @@ def get_overlay_modules_list():
         mgk_64_device_modules.append("oem/tinno_charger/turbo_charger/oem_turbo_charger.ko")
         mgk_64_device_modules.append("oem/sensors/aw_sar/awinic_sar.ko")
         mgk_64_device_modules.append("oem/sensors/hx9031/hx9031_sar.ko")
+        mgk_64_device_modules.append("oem/nfc/nxppn560/pn553_i2c.ko")
 
     if "p325a_overlay.config" in DEFCONFIG_OVERLAYS:
         mgk_64_device_modules.append("oem/devinfo/oem_devinfo.ko")
