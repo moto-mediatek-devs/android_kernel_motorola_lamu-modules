@@ -31,18 +31,15 @@
 #define LOG_INF(format, args...)		pr_err(PFX "[%s] " format, __func__, ##args)
 unsigned char fusion_id_main_dd[96];
 unsigned char sn_main_dd[96];
-#define SC520CS_MODULE_ID  0x43 
+#define SC520CS_MODULE_ID  0x47 
 #define MULTI_WRITE 0
 
-#define MODULE_INFO_SIZE 5
-#define AWB_DATA_SIZE 8
-#define PD_DATA_SIZE 13
+
 
 #define MODULE_GROUP1_ADDR 0x80E6
 #define MODULE_GROUP2_ADDR 0x8106
 
-#define AWB_GROUP1_FLAG 0x80ed
-#define AWB_GROUP2_FLAG 0x810d
+
 
 #define PD_GROUP1_FLAG 0x80f7
 #define PD_GROUP2_FLAG 0x8117
@@ -51,7 +48,7 @@ unsigned char sn_main_dd[96];
 int wb_rgain = 0x80, wb_ggain = 0x80, wb_bgain = 0x80;
 //static unsigned char sc520cs_data_pd[PD_DATA_SIZE + 1] = { 0 };/*Add check sum*/
 //static unsigned char sc520cs_data_awb[AWB_DATA_SIZE + 1] = { 0 };/*Add check sum*/
-static unsigned char sc520cs_data_info[MODULE_INFO_SIZE + 1] = { 0 };/*Add check sum*/
+//static unsigned char sc520cs_data_info[MODULE_INFO_SIZE + 1] = { 0 };/*Add check sum*/
 
 
 static DEFINE_SPINLOCK(imgsensor_drv_lock);
@@ -141,7 +138,7 @@ static struct imgsensor_info_struct imgsensor_info = {
 	.ihdr_support = 0,		// //1, support; 0,not support
 	.ihdr_le_firstline = 0, // //1,le first ; 0, se first
 	.sensor_mode_num = 5,	// support sensor mode num
-    .frame_time_delay_frame = 2,
+	.frame_time_delay_frame = 2,
 	.cap_delay_frame = 3,
 	.pre_delay_frame = 3,
 	.video_delay_frame = 3,
@@ -355,8 +352,8 @@ static void set_shutter_frame_length(kal_uint32 shutter,kal_uint16 frame_length)
 	imgsensor.shutter = shutter;
 	spin_unlock_irqrestore(&imgsensor_drv_lock, flags);
 	spin_lock(&imgsensor_drv_lock);
-    if(frame_length > 1)
-	        dummy_line = frame_length - imgsensor.frame_length;
+	if(frame_length > 1)
+			dummy_line = frame_length - imgsensor.frame_length;
 	imgsensor.frame_length = imgsensor.frame_length + dummy_line;
 	if (shutter > imgsensor.frame_length - imgsensor_info.margin)
 		imgsensor.frame_length = shutter + imgsensor_info.margin;
@@ -377,7 +374,7 @@ static void set_shutter_frame_length(kal_uint32 shutter,kal_uint16 frame_length)
 		else
 		{
 			write_cmos_sensor8(0x320e, (imgsensor.frame_length >> 8) & 0xff);
-		    write_cmos_sensor8(0x320f, imgsensor.frame_length & 0xFF);
+			write_cmos_sensor8(0x320f, imgsensor.frame_length & 0xFF);
 		}
 	}
 	else
@@ -959,48 +956,88 @@ static void slim_video_setting(void)
 #endif
 }
 
-/*static kal_uint16 read_cmos_sensor_sc520cs(kal_uint32 addr)
-{
-	kal_uint16 get_byte = 0;
-	char pu_send_cmd[2] = {(char)(addr >> 8), (char)(addr & 0xFF)};
-	iReadRegI2C(pu_send_cmd, 2, (u8 *)&get_byte, 1, 0xA2);
-	return get_byte;
+
+
+/*begin sc520cs-otp otp check*/
+struct sc520cs_otp_t sc520cs_otp_info;
+EXPORT_SYMBOL(sc520cs_otp_info);
+
+static int sc520cs_sensor_otp_init1(kal_uint32 threshold,kal_uint32 threshold1) {
+	int delay = 0;
+
+	write_cmos_sensor8(0x36b0, 0x4c);
+	write_cmos_sensor8(0x36b1, threshold);//1st: 2st:
+	write_cmos_sensor8(0x36b2, threshold1);//threshold 1st: 2st:
+	write_cmos_sensor8(0x4408, 0x00);
+	write_cmos_sensor8(0x4409, 0x00);
+	write_cmos_sensor8(0x440a, 0x07);
+	write_cmos_sensor8(0x440b, 0xff);
+	write_cmos_sensor8(0x4401, 0x13);
+	write_cmos_sensor8(0x4412, 0x03);//group 1st:01 2st:03
+	write_cmos_sensor8(0x4407, 0x00);//group 1st:0c 2st:00
+	write_cmos_sensor8(0x4400, 0x11);
+
+	msleep(15);
+	while ((read_cmos_sensor(0x4420) & 0x01) == 0x01) {
+		delay++;
+		if (delay == 1000) {
+			CAM_DBG(PFX,"sc520cs-otp1st section OTP is still busy for reading. R0x4420[0]!=0 \n");
+			return 0;
+		}
+	}
+	CAM_DBG(PFX,"sc520cs-otpthreshold=0x%x ,threshold1=0x%x\n", threshold,threshold1);
+	return 1;
 }
-static void sc520cs_fusion_id_read(void)
+static int read_sc520cs_lsc_info(kal_uint32 addr,kal_uint32 threshold,kal_uint32 threshold1)
 {
+
+	int check_sum = 0, check_sum_cal = 0, check_sum_cal1 = 0;
 	int i;
-	for (i = 0; i < 9; i++)
-	{
-		fusion_id_main[i] = read_cmos_sensor_sc520cs(0x10 + i);
-		pr_err("%s %d wpc fusion_id_front[%d]=0x%2x\n",__func__, __LINE__, i, fusion_id_main[i]);
+    int ret1 = 0;
+    CAM_DBG(PFX,"sc520cs-otp addr= 0x%x\n", addr);
+    if(addr == 0x80F9){
+        for (i = 0; i < 1799 ; i++) {
+            sc520cs_otp_info.lsc_param[i] = read_cmos_sensor(addr + i);
+            check_sum_cal += sc520cs_otp_info.lsc_param[i];
+        }
+        CAM_DBG(PFX,"sc520cs-otp check_sum_cal(0x%x) i=%d\n", check_sum_cal,i);
+        if(i == 1799){
+            ret1 = sc520cs_sensor_otp_init1(threshold,threshold1);
+            if (ret1 != 1) {
+                CAM_DBG(PFX,"sc520cs-otp=== sc520cs_sensor_otp_init1(1) failed ===\n");
+                return 0;
+            }
+            for (i = 0; i < 69 ; i++) {
+                check_sum = read_cmos_sensor(0x88ab);
+                sc520cs_otp_info.lsc_param[i+1799] = read_cmos_sensor(addr + i + 1901);
+                check_sum_cal1 += sc520cs_otp_info.lsc_param[i+1799];
+            }
+        }
+    } else if(addr == 0x88AC){
+        ret1 = sc520cs_sensor_otp_init1(threshold,threshold1);
+	    if (ret1 != 1) {
+            CAM_DBG(PFX,"sc520cs-otp=== sc520cs_sensor_otp_init1(1) failed ===\n");
+            return 0;
+	    }
+        for (i = 0; i < LSC_LENGTH ; i++) {
+            sc520cs_otp_info.lsc_param[i] = read_cmos_sensor(addr + i);
+            check_sum_cal += sc520cs_otp_info.lsc_param[i];
+        }
+        check_sum = read_cmos_sensor(0x8ff8);
+    }
+
+	check_sum_cal = check_sum_cal1 + check_sum_cal;
+    check_sum_cal = (check_sum_cal % 255) + 1;
+	if (check_sum == check_sum_cal) {
+        CAM_DBG(PFX,"sc520cs-otp lsc checksum ok\n");
+		return 1;
+	}
+	else {
+        CAM_DBG(PFX,"sc520cs-otp lsc checksum not ok\n");
+		return 0;
 	}
 }
-static void sc520cs_sn_id_read(void)
-{
-	int i;
-	for (i = 0; i < 14; i++)
-	{
-		sn_main[i] = read_cmos_sensor_sc520cs(0x1F92 + i);
-		pr_err("%s %d wpc fusion_id_front[%d]=0x%2x\n",__func__, __LINE__, i, sn_main[i]);
-	}
-}
-static void get_sensor_module_info(void)
-{
-	int i;
-	u8 calmoduleversion[16] = {0};
-	for (i = 0; i < 15; i++)
-	{
-		calmoduleversion[i] = read_cmos_sensor_sc520cs(0x80E7 + i);
-		pr_err("%s %d sc520cs module_id[%d]=0x%2x\n",__func__, __LINE__, i, calmoduleversion[i]);
-	}
-	pr_err("======================module version==================\n");
-	pr_err("[vendor id] = 0x%x\n", calmoduleversion[0]);
-	pr_err("[yy/mm/dd] = %d/%d/%d \n", calmoduleversion[1], calmoduleversion[2], calmoduleversion[3]);
-	pr_err("[hh/mm/sec] = %d:%d:%d \n", calmoduleversion[4], calmoduleversion[5], calmoduleversion[6]);
-	pr_err("[lens_id/vcmid/drive id] = 0x%x/0x%x/0x%x \n", calmoduleversion[7], calmoduleversion[8], calmoduleversion[9]);
-	pr_err("======================module version==================\n");
-}*/
-/*
+
 static int read_sc520cs_module_info(kal_uint32 addr)
 {
 	int year = 0, month = 0, day = 0;
@@ -1008,31 +1045,32 @@ static int read_sc520cs_module_info(kal_uint32 addr)
 	int check_sum = 0, check_sum_cal = 0;
 	int i;
 
-	for (i = 0; i < MODULE_INFO_SIZE + 1; i++) {
-		sc520cs_data_info[i] = read_cmos_sensor(addr + i);
-		check_sum_cal += sc520cs_data_info[i];
+	for (i = 0; i < MODULE_LENGTH ; i++) {
+		sc520cs_otp_info.module_param[i] = read_cmos_sensor(addr + i);
+		check_sum_cal += sc520cs_otp_info.module_param[i];
 	}
-	check_sum_cal = check_sum_cal - sc520cs_data_info[MODULE_INFO_SIZE];
+	check_sum = read_cmos_sensor(addr + 18);
 	check_sum_cal = (check_sum_cal % 255) + 1;
-	mid = sc520cs_data_info[0];
-	lens_id = sc520cs_data_info[1];
-	year = sc520cs_data_info[2];
-	month = sc520cs_data_info[3];
-	day = sc520cs_data_info[4];
-	check_sum = sc520cs_data_info[MODULE_INFO_SIZE];
+	mid = sc520cs_otp_info.module_param[0];
+	lens_id = sc520cs_otp_info.module_param[1];
+	year = sc520cs_otp_info.module_param[2];
+	month = sc520cs_otp_info.module_param[3];
+	day = sc520cs_otp_info.module_param[4];
 
-
-	CAM_DBG(PFX,"=== SC520CS INFO module_id=0x%x  ===\n", mid);
-	CAM_DBG(PFX,"=== SC520CS INFO lens_id=0x%x ===\n", lens_id);
-	CAM_DBG(PFX,"=== SC520CS INFO date is %d-%d-%d ===\n", year, month, day);
-	CAM_DBG(PFX,"=== SC520CS INFO check_sum=0x%x,check_sum_cal=0x%x ===\n", check_sum, check_sum_cal);
+	CAM_DBG(PFX,"sc520cs-otp=== SC520CS INFO module_id=0x%x  ===\n", mid);
+	CAM_DBG(PFX,"sc520cs-otp=== SC520CS INFO lens_id=0x%x ===\n", lens_id);
+	CAM_DBG(PFX,"sc520cs-otp=== SC520CS INFO date is %d-%d-%d ===\n", year, month, day);
+	CAM_DBG(PFX,"sc520cs-otp=== SC520CS INFO check_sum=0x%x,check_sum_cal=0x%x ===\n", check_sum, check_sum_cal);
 	if (check_sum == check_sum_cal) {
+        CAM_DBG(PFX,"sc520cs-otp module checksum ok\n");
 		return 1;
 	}
 	else {
+        CAM_DBG(PFX,"sc520cs-otp module checksum not ok\n");
 		return 0;
 	}
 }
+
 static int read_sc520cs_awb_info(kal_uint32 addr)
 {
 	int check_sum_awb = 0, check_sum_awb_cal = 0;
@@ -1042,32 +1080,31 @@ static int read_sc520cs_awb_info(kal_uint32 addr)
 	int GAIN_DEFAULT = 128;
 	int i;
 
-	for (i = 0; i < AWB_DATA_SIZE + 1; i++) {
-		sc520cs_data_awb[i] = read_cmos_sensor(addr + i);
-		check_sum_awb_cal += sc520cs_data_awb[i];
+	for (i = 0; i < AWB_LENGTH ; i++) {
+		sc520cs_otp_info.awb_param[i] = read_cmos_sensor(addr + i);
+		check_sum_awb_cal += sc520cs_otp_info.awb_param[i];
 	}
 
-	check_sum_awb_cal = check_sum_awb_cal - sc520cs_data_awb[AWB_DATA_SIZE];
+	check_sum_awb_cal = check_sum_awb_cal - sc520cs_otp_info.awb_param[AWB_LENGTH-1];
+	rg = ((sc520cs_otp_info.awb_param[0] << 8) & 0xff00) | (sc520cs_otp_info.awb_param[1] & 0xff);
+	bg = ((sc520cs_otp_info.awb_param[2] << 8) & 0xff00) | (sc520cs_otp_info.awb_param[3] & 0xff);
 
-	CAM_DBG(PFX,"check_sum_awb_cal =0x%x \n", check_sum_awb_cal);
-	rg = ((sc520cs_data_awb[0] << 8) & 0xff00) | (sc520cs_data_awb[1] & 0xff);
-	bg = ((sc520cs_data_awb[2] << 8) & 0xff00) | (sc520cs_data_awb[3] & 0xff);
-
-	golden_rg = ((sc520cs_data_awb[4] << 8) & 0xff00) | (sc520cs_data_awb[5] & 0xff);
-	golden_bg = ((sc520cs_data_awb[6] << 8) & 0xff00) | (sc520cs_data_awb[7] & 0xff);
-	check_sum_awb = sc520cs_data_awb[AWB_DATA_SIZE];
+	golden_rg = 0x26A; //((sc520cs_otp_info.awb_param[4] << 8) & 0xff00) | (sc520cs_otp_info.awb_param[5] & 0xff);
+	golden_bg = 0x29A; //((sc520cs_otp_info.awb_param[6] << 8) & 0xff00) | (sc520cs_otp_info.awb_param[7] & 0xff);
+	check_sum_awb = read_cmos_sensor(addr + 12);
 	check_sum_awb_cal = (check_sum_awb_cal % 255) + 1;
 
-	CAM_DBG(PFX,"=== SC520CS AWB rg=0x%x, bg=0x%x ===\n", rg, bg);
-	CAM_DBG(PFX,"=== SC520CS AWB golden_rg=0x%x,golden_bg=0x%x ===\n", golden_rg, golden_bg);
-	CAM_DBG(PFX,"=== SC520CS AWB check_sum_awb=0x%x,check_sum_awb_cal=0x%x ===\n", check_sum_awb, check_sum_awb_cal);
+	CAM_DBG(PFX,"sc520cs-otp=== SC520CS AWB rg=0x%x, bg=0x%x ===\n", rg, bg);
+	CAM_DBG(PFX,"sc520cs-otp=== SC520CS AWB golden_rg=0x%x,golden_bg=0x%x ===\n", golden_rg, golden_bg);
+	CAM_DBG(PFX,"sc520cs-otp=== SC520CS AWB check_sum_awb=0x%x,check_sum_awb_cal=0x%x ===\n", check_sum_awb, check_sum_awb_cal);
 	if (check_sum_awb == check_sum_awb_cal) {
+
 
 		r_ratio = 512 *golden_rg/ rg;
 		b_ratio = 512 * golden_bg / bg;
 		g_ratio = 512;
 
-		base_gain = (r_ratio < b_ratio) ? r_ratio : b_ratio;   //������Сgain��Ϊbasegain
+		base_gain = (r_ratio < b_ratio) ? r_ratio : b_ratio;   
 		base_gain = (base_gain < g_ratio) ? base_gain : g_ratio;
 		wb_rgain = GAIN_DEFAULT * r_ratio / base_gain;
 		wb_ggain = GAIN_DEFAULT * g_ratio / base_gain;
@@ -1078,152 +1115,121 @@ static int read_sc520cs_awb_info(kal_uint32 addr)
 		wb_bgain = (wb_bgain>256)?128:wb_bgain;
 
 
-		CAM_DBG(PFX,"R_GAIN=0x%x,G_GAIN=0x%x,B_GAIN=0x%x\n,", wb_rgain, wb_ggain, wb_bgain);
+		CAM_DBG(PFX,"sc520cs-otp R_GAIN=0x%x,G_GAIN=0x%x,B_GAIN=0x%x\n,", wb_rgain, wb_ggain, wb_bgain);
+        CAM_DBG(PFX,"sc520cs-otp awb checksum ok\n");
 
 		return 1;
 	}
 	else {
-		return 0;
-	}
-}
-
-static int read_sc520cs_pd_info(kal_uint32 addr)
-{
-
-	int check_sum_pd = 0, check_sum_pd_cal = 0;
-	int i;
-
-	for (i = 0; i < PD_DATA_SIZE + 1; i++) {
-		sc520cs_data_pd[i] = read_cmos_sensor(addr + i);
-		check_sum_pd_cal += sc520cs_data_pd[i];
-	}
-	check_sum_pd_cal = check_sum_pd_cal - sc520cs_data_pd[PD_DATA_SIZE];
-	check_sum_pd_cal = (check_sum_pd_cal % 255) + 1;
-
-	check_sum_pd = sc520cs_data_pd[PD_DATA_SIZE];
-	CAM_DBG(PFX,"=== SC520CS pd check_sum_pd=0x%x,check_sum_pd_cal=0x%x ===\n", check_sum_pd, check_sum_pd_cal);
-	if (check_sum_pd == check_sum_pd_cal) {
-		return 1;
-	}
-	else {
+        CAM_DBG(PFX,"sc520cs-otp awb checksum not ok\n");
 		return 0;
 	}
 }
 
 
-
-
-static int sc520cs_sensor_otp_init(kal_uint32 threshold) {
+static int sc520cs_sensor_otp_init(kal_uint32 threshold,kal_uint32 threshold1) {
 	int delay = 0;
 
 	write_cmos_sensor8(0x36b0, 0x4c);
-	write_cmos_sensor8(0x36b1, threshold);
-	write_cmos_sensor8(0x36b2, 0xc1);
+	write_cmos_sensor8(0x36b1, threshold);//1st: 2st:
+	write_cmos_sensor8(0x36b2, threshold1);//threshold 1st: 2st:
 	write_cmos_sensor8(0x4408, 0x00);
 	write_cmos_sensor8(0x4409, 0x00);
-	write_cmos_sensor8(0x440a, 0x01);
-	write_cmos_sensor8(0x440b, 0x25);
+	write_cmos_sensor8(0x440a, 0x07);
+	write_cmos_sensor8(0x440b, 0xff);
 	write_cmos_sensor8(0x4401, 0x13);
-	write_cmos_sensor8(0x4412, 0x01);
-	write_cmos_sensor8(0x4407, 0x0c);
+	write_cmos_sensor8(0x4412, 0x01);//group 1st:01 2st:03
+	write_cmos_sensor8(0x4407, 0x0c);//group 1st:0c 2st:00
 	write_cmos_sensor8(0x4400, 0x11);
 
-	msleep(50);
+	msleep(15);
 	while ((read_cmos_sensor(0x4420) & 0x01) == 0x01) {
 		delay++;
 		if (delay == 1000) {
-			CAM_DBG(PFX,"1st section OTP is still busy for reading. R0x4420[0]!=0 \n");
+			CAM_DBG(PFX,"sc520cs-otp 1st section OTP is still busy for reading. R0x4420[0]!=0 \n");
 			return 0;
 		}
 	}
-	CAM_DBG(PFX,"threshold=0x%x \n", threshold);
+	CAM_DBG(PFX,"sc520cs-otp threshold=0x%x ,threshold1=0x%x\n", threshold,threshold1);
 	return 1;
 }
 
-static int sc520cs_sensor_otp_info(kal_uint32 threshold)
+static int sc520cs_sensor_otp_info(kal_uint32 threshold,kal_uint32 threshold1)
 {
 	int ret = 0;
-	kal_uint16 total_ret = 0x0f;  //bit0:module info, bit1:AWB data, bit2:PD data, bit3:otp init;
-	CAM_DBG(PFX,"come to %s:%d E!\n", __func__, __LINE__);
+	kal_uint16 total_ret = 0x0f;
+	//CAM_DBG(PFX,"sc520cs-otp come to %s:%d E!\n", __func__, __LINE__);
 
-	ret = sc520cs_sensor_otp_init(threshold); //otp int
-
-	if (ret != 1) {
-		CAM_DBG(PFX,"=== sc520cs_sensor_otp_init(1) failed ===\n");
+		 //otp int
+	 ret = sc520cs_sensor_otp_init(threshold,threshold1);
+	 if (ret != 1) {
+		CAM_DBG(PFX,"sc520cs-otp=== sc520cs_sensor_otp_init(1) failed ===\n");
 		total_ret = total_ret & 0xf7;
-	}
-	//Get Module Info
-	if (VALID_OTP_FLAG == read_cmos_sensor(MODULE_GROUP1_ADDR)) {
-		ret = read_sc520cs_module_info(MODULE_GROUP1_ADDR+1);
-		if (ret != 1) {
-			CAM_DBG(PFX,"=== read_sc520cs_module_info(MODULE_GROUP1_ADDR) checksum error ===\n");
-			total_ret = total_ret & 0xfe;
-		}
-	}
-	else {
-		CAM_DBG(PFX,"=== sc520cs_data_info group1 invalid ===\n");
-	}
-	//Get AWB data
-	if (VALID_OTP_FLAG == read_cmos_sensor(AWB_GROUP1_FLAG)) {
-		ret = read_sc520cs_awb_info(AWB_GROUP1_FLAG+1);
-		if (ret != 1) {
-			CAM_DBG(PFX,"=== read_sc520cs_awb_info(AWB_GROUP1_FLAG) checksum error ===\n");
-			total_ret = total_ret & 0xfd;
-		}
-	}
-	else {
-		CAM_DBG(PFX,"=== sc520cs_data_awb group1 invalid ===\n");
-	}
-	//Get PD data
-	if (VALID_OTP_FLAG == read_cmos_sensor(PD_GROUP1_FLAG)) {
-		ret = read_sc520cs_pd_info(PD_GROUP1_FLAG+1);
-		if (ret != 1) {
-			CAM_DBG(PFX,"=== read_sc520cs_pd_info(PD_GROUP1_FLAG) checksum error ===\n");
-			total_ret = total_ret & 0xfb;
-		}
-	}
-	else {
-		CAM_DBG(PFX,"=== sc520cs_data_pd group1 invalid ===\n");
-	}
+	 }
 
-	//Get Module Info
-	if (VALID_OTP_FLAG == read_cmos_sensor(MODULE_GROUP2_ADDR)) {
-		ret = read_sc520cs_module_info(MODULE_GROUP2_ADDR+1);
-		if (ret != 1) {
-			CAM_DBG(PFX,"=== read_sc520cs_module_info(MODULE_GROUP2_ADDR) checksum error ===\n");
-			total_ret = total_ret & 0xfe;
+		//Get Module Info
+		ret = read_cmos_sensor(MODULE_GROUP_FLAG);
+        CAM_DBG(PFX,"sc520cs-otp=== sc520cs_sensor_otp_info Module ret = 0x%2x read_cmos_sensor(0x%x) ===\n", ret , MODULE_GROUP_FLAG);
+		if (GROUP1_VALID_FLAG == ret) {
+			ret = read_sc520cs_module_info(MODULE_INFO_GROUP1);
+			if (ret != 1) {
+				CAM_DBG(PFX,"sc520cs-otp=== read_sc520cs_module_info(MODULE_INFO_GROUP1) checksum error ===\n");
+				total_ret = total_ret & 0xfe;
+			}
+		} else if (GROUP2_VALID_FLAG == ret) {
+			ret = read_sc520cs_module_info(MODULE_INFO_GROUP2);
+			if (ret != 1) {
+				CAM_DBG(PFX,"sc520cs-otp=== read_sc520cs_module_info(MODULE_INFO_GROUP2) checksum error ===\n");
+				total_ret = total_ret & 0xfe;
+			}
+		}else {
+			CAM_DBG(PFX,"sc520cs-otp=== sc520cs_otp_info.module_param module info group invalid ===\n");
 		}
-	}
-	else {
-		CAM_DBG(PFX,"=== sc520cs_data_info group2 invalid ===\n");
-	}
-	//Get AWB data
-	if (VALID_OTP_FLAG == read_cmos_sensor(AWB_GROUP2_FLAG)) {
-		ret = read_sc520cs_awb_info(AWB_GROUP2_FLAG+1);
-		if (ret != 1) {
-			CAM_DBG(PFX,"=== read_sc520cs_awb_info(AWB_GROUP2_FLAG) checksum error ===\n");
-			total_ret = total_ret & 0xfd;
-		}
-	}
-	else {
-		CAM_DBG(PFX,"=== sc520cs_data_awb group2 invalid ===\n");
-	}
-	//Get PD data
-	if (VALID_OTP_FLAG == read_cmos_sensor(PD_GROUP2_FLAG)) {
-		ret = read_sc520cs_pd_info(PD_GROUP2_FLAG+1);
-		if (ret != 1) {
-			CAM_DBG(PFX,"=== read_sc520cs_pd_info(PD_GROUP2_FLAG) checksum error ===\n");
-			total_ret = total_ret & 0xfb;
-		}
-	}
-	else {
-		CAM_DBG(PFX,"=== sc520cs_data_pd group2 invalid ===\n");
-	}
 
-	CAM_DBG(PFX,"=== sc520cs_sensor_otp_info option done, total_ret = 0x%2x ===\n", total_ret);
+
+	 //Get AWB data
+	 ret = read_cmos_sensor(AWB_GROUP_FLAG);
+     CAM_DBG(PFX,"sc520cs-otp=== sc520cs_sensor_otp_info AWB ret = 0x%2x read_cmos_sensor(0x%x) ===\n", ret , AWB_GROUP_FLAG);
+		if (GROUP1_VALID_FLAG == ret) {
+			ret = read_sc520cs_awb_info(AWB_INFO_GROUP1);
+			if (ret != 1) {
+				CAM_DBG(PFX,"sc520cs-otp=== read_sc520cs_awb_info(AWB_INFO_GROUP1) checksum error ===\n");
+				total_ret = total_ret & 0xfd;
+			}
+		} else if (GROUP2_VALID_FLAG == ret) {
+			ret = read_sc520cs_awb_info(AWB_INFO_GROUP2);
+			if (ret != 1) {
+				CAM_DBG(PFX,"sc520cs-otp=== read_sc520cs_awb_info(AWB_INFO_GROUP2) checksum error ===\n");
+				total_ret = total_ret & 0xfd;
+			}
+		} else {
+			CAM_DBG(PFX,"sc520cs-otp=== sc520cs_otp_info.module_param awb info invalid ===\n");
+		}
+    //Get lsc data
+	 ret = read_cmos_sensor(LSC_GROUP_FLAG);
+     sc520cs_otp_info.lsc_flag = ret;
+     CAM_DBG(PFX,"sc520cs-otp=== sc520cs_sensor_otp_info lsc ret = 0x%2x read_cmos_sensor(0x%x) ===\n", ret , LSC_GROUP_FLAG);
+		if (GROUP1_VALID_FLAG == ret) {
+			ret = read_sc520cs_lsc_info(LSC_INFO_GROUP1,threshold,threshold1);
+			if (ret != 1) {
+				CAM_DBG(PFX,"sc520cs-otp=== read_sc520cs_lsc_info(LSC_INFO_GROUP1) checksum error ===\n");
+				total_ret = total_ret & 0xfb;
+			}
+		} else if (GROUP2_VALID_FLAG == ret) {
+			ret = read_sc520cs_lsc_info(LSC_INFO_GROUP2,threshold,threshold1);
+			if (ret != 1) {
+				CAM_DBG(PFX,"sc520cs-otp=== read_sc520cs_lsc_info(LSC_INFO_GROUP2) checksum error ===\n");
+				total_ret = total_ret & 0xfb;
+			}
+		} else {
+			CAM_DBG(PFX,"sc520cs-otp=== sc520cs_otp_info.lsc_param lsc info invalid ===\n");
+		}
+
+	CAM_DBG(PFX,"sc520cs-otp=== sc520cs_sensor_otp_info option done, total_ret = 0x%2x ===\n", total_ret);
 	return total_ret;
 }
-*/
+
+/*end sc520cs-otp otp check*/
 
 #ifdef CONFIG_TINNO_DEVINFO
 int main_5m_cam_get_info(char *buf, void *arg0)
@@ -1240,9 +1246,10 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 {
 	kal_uint8 i = 0;
 	kal_uint8 retry = 2;
-	//kal_uint8 j = 0;
-	//kal_uint8 rc = 0;
-	//kal_uint16 threshold[3] = {0x38,0x28,0x48};
+	kal_uint8 j = 0;
+	kal_uint8 rc = 0;
+	kal_uint16 threshold[2] = {0x78,0x18};
+    kal_uint16 threshold1[2] = {0xc0,0xc1};
 	CAM_DBG(PFX,"[get_imgsensor_id] ");
 	while (imgsensor_info.i2c_addr_table[i] != 0xff)
 	{
@@ -1254,22 +1261,40 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 			*sensor_id = return_sensor_id();
 			if (*sensor_id == imgsensor_info.sensor_id) {
 				CAM_DBG(PFX,"i2c write id  : 0x%x, sensor id: 0x%x\n", imgsensor.i2c_write_id, *sensor_id);
-#ifdef CONFIG_TINNO_DEVINFO
-                            FULL_PRODUCT_DEVICE_CB(ID_MAIN_CAM, main_5m_cam_get_info, NULL);
-#endif
-                            return ERROR_NONE;
-                            /* for(j=0;j<3;j++){
-                                rc = sc520cs_sensor_otp_info(threshold[j]);
+				CAM_DBG(PFX,"[sc520cs-otp]sc520cs,check OTP \n");
+                for(j=0;j<2;j++){
+                                rc = 0;
+                                rc = sc520cs_sensor_otp_info(threshold[j],threshold1[j]);
                                 if (rc == 0x0f) {
+                                    CAM_DBG(PFX,"sc520cs-otp %d st read otp success", j);
                                     break;
+                                } else {
+                                    CAM_DBG(PFX,"sc520cs-otp %d st read otp failed", j);
+                                    continue;
                                 }
                             }
-                            if (sc520cs_data_info[0]==SC520CS_MODULE_ID) {
+                            if (sc520cs_otp_info.module_param[0]==SC520CS_MODULE_ID) {
+                                CAM_DBG(PFX,"sc520cs-otp %d st read module id success", j);
+                                return ERROR_NONE;
+                            }
+#ifdef CONFIG_TINNO_DEVINFO
+							FULL_PRODUCT_DEVICE_CB(ID_MAIN_CAM, main_5m_cam_get_info, NULL);
+#endif
+							return ERROR_NONE;
 
-                            return ERROR_NONE;
-                            }*/
+							
+							/* for(j=0;j<3;j++){
+								rc = sc520cs_sensor_otp_info(threshold[j]);
+								if (rc == 0x0f) {
+									break;
+								}
+							}
+							if (sc520cs_otp_info.module_param[0]==SC520CS_MODULE_ID) {
+
+							return ERROR_NONE;
+							}*/
 			}
-			CAM_DBG(PFX,"get_imgsensor_id Read sensor id fail, i2c write id: 0x%x,sensor id: 0x%x\n,module id: 0x%x",imgsensor.i2c_write_id, *sensor_id,sc520cs_data_info[0]);
+			CAM_DBG(PFX,"get_imgsensor_id Read sensor id fail, i2c write id: 0x%x,sensor id: 0x%x\n,module id: 0x%x",imgsensor.i2c_write_id, *sensor_id,sc520cs_otp_info.module_param[0]);
 
 			retry--;
 		} while (retry > 0);
@@ -2085,7 +2110,7 @@ static kal_uint32 feature_control(
 				(UINT16)*feature_data, (UINT16) * (feature_data + 1),
 				(UINT16) * (feature_data + 2));
 #if 0
-	    ihdr_write_shutter_gain((UINT16)*feature_data,
+		ihdr_write_shutter_gain((UINT16)*feature_data,
 			(UINT16)*(feature_data+1), (UINT16)*(feature_data+2));
 #endif
 		break;

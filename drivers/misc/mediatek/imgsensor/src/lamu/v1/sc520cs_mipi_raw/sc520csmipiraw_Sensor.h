@@ -26,6 +26,46 @@
 #include "kd_imgsensor_define.h"
 #include "kd_imgsensor_errcode.h"
 
+/*otp sc520cs-otp*/
+
+#define MODULE_GROUP_FLAG 0x80B6
+#define AWB_GROUP_FLAG 0x80DD
+#define LSC_GROUP_FLAG 0x80F8
+
+#define MODULE_INFO_GROUP1 0x80B7
+#define MODULE_INFO_CHKSUM1 0x80C9
+#define MODULE_INFO_GROUP2 0x80CA
+#define MODULE_INFO_CHKSUM2 0x80DC
+#define AWB_INFO_GROUP1 0x80DE
+#define AWB_INFO_CHKSUM1 0x80EA
+#define AWB_INFO_GROUP2 0x80EB
+#define AWB_INFO_CHKSUM2 0x80F7
+#define LSC_INFO_GROUP1 0x80F9
+#define LSC_INFO_GROUP12 0x8866
+#define LSC_INFO_CHKSUM1 0x88AB
+#define LSC_INFO_GROUP2 0x88AC
+#define LSC_INFO_CHKSUM2 0x8FF8
+
+#define GROUP1_VALID_FLAG 0X01
+#define GROUP2_VALID_FLAG 0X07
+
+//#define GROUP_LENGTH 1899
+#define MODULE_LENGTH 18
+#define AWB_LENGTH 12
+#define LSC_LENGTH 1868
+
+struct sc520cs_otp_t {
+	kal_uint8  module_flag;
+	kal_uint8  module_param[18];
+	kal_uint8  moduleChksum;
+	kal_uint8  awb_flag;
+	kal_uint8  awb_param[12];
+	kal_uint8  awbChksum;
+	kal_uint8  lsc_flag;
+	kal_uint8  lsc_param[1868];
+	kal_uint8  lscChksum;
+};
+
 enum IMGSENSOR_MODE
 {
 	IMGSENSOR_MODE_INIT,

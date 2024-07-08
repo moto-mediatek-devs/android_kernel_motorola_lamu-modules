@@ -27,4 +27,13 @@ unsigned int gc05a2sub_read_region(struct i2c_client *client,
 				unsigned char *data,
 				unsigned int size);
 
+/*zyy otp*/
+unsigned int sc520cs_read_region(struct i2c_client *client,
+				unsigned int addr,
+				unsigned char *data,
+				unsigned int size);
+
+/*zyy otp*/
+
+
 #endif				/* __CAM_CAL_LIST_H */

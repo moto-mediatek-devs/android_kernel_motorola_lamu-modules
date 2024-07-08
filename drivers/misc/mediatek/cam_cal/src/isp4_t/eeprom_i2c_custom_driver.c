@@ -56,6 +56,19 @@ struct gc05a2_otp_t{
 	u8  lsc_param[1868];
 	u8  lsc_checksum;
 };
+
+struct sc520cs_otp_t {
+    u8  module_flag;
+    u8  module_param[18];
+    u8  moduleChksum;
+    u8  awb_flag;
+    u8  awb_param[12];
+    u8  awbChksum;
+    u8  lsc_flag;
+    u8  lsc_param[1868];
+    u8  lscChksum;
+};
+extern struct sc520cs_otp_t sc520cs_otp_info;
 /************************************************************
  * I2C read function (Custom)
  * Customer's driver can put on here
@@ -254,3 +267,54 @@ unsigned int gc05a2sub_read_region(struct i2c_client *client, unsigned int addr,
 }
 
 /*end 20240702 add for otp check*/
+
+/*zyy otp*/
+unsigned int sc520cs_read_region(struct i2c_client *client, unsigned int addr,
+                                unsigned char *data, unsigned int size)
+{
+    int i=0;
+
+    pr_err("[zyy]addr =%x size %d\n", addr, size);
+	pr_err("module id = 0x%x", sc520cs_otp_info.module_param[0]);
+	pr_err("Year = 0x%x", sc520cs_otp_info.module_param[1]);
+
+	if (addr == 0x8)
+    {
+        *(u32 *)data = 0x00000099;
+		pr_err("sc520cs_read_region [zyy]addr =%x data = %x  size = %x\n", addr, *(u32 *)data, size);
+    }
+
+    else if (addr == 0x1)
+    {
+        pr_err("[zyy]lsc_flag sc520cs_otp_info.lsc_flag =0x%x\n" ,sc520cs_otp_info.lsc_flag);
+        if ((sc520cs_otp_info.lsc_flag == 0x01) || (sc520cs_otp_info.lsc_flag == 0x07))
+        {
+            pr_err("[zyy]lsc_flag valid\n");
+            for(i=0; i<size; i++){
+                data[i] = sc520cs_otp_info.lsc_param[i];
+            }
+        }
+    }
+    else if (addr == 0x3)
+    {
+        for(i=0; i<size; i++){
+            data[i] = sc520cs_otp_info.awb_param[i];
+            pr_err("[zyy]sc520cs_read_region awb data[%d] =%x \n", i, data[i]);
+        }
+    }
+    else if (addr == 0x2)
+    {
+        for(i=0; i<size; i++){
+            data[i] = sc520cs_otp_info.module_param[i];
+            pr_err("[zyy]sc520cs_read_region module_param [%d] =%x \n", i, data[i]);
+        }
+    }
+    else
+    {
+        pr_err("[zyy]error addr =%x,size = %d\n", addr, size);
+    }
+
+    return size;
+}
+
+/*zyy otp*/
