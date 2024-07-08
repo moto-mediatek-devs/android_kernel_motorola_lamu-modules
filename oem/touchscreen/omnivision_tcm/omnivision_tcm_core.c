@@ -34,6 +34,9 @@
 #include <linux/regulator/consumer.h>
 #include "omnivision_tcm_core.h"
 
+#include "../../../drivers/gpu/drm/mediatek/mediatek_v2/mtk_disp_notify.h"
+#include "../../../drivers/gpu/drm/mediatek/mediatek_v2/mtk_panel_ext.h"
+
 /* #define RESET_ON_RESUME */
 
 /* #define RESUME_EARLY_UNBLANK */
@@ -3562,6 +3565,206 @@ static void ovt_tcm_helper_work(struct work_struct *work)
 	return;
 }
 
+
+static int ovt_tcm_disp_resume(struct device *dev)
+{
+#if SPEED_UP_RESUME
+	struct ovt_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
+	mutex_lock(&tcm_hcd->suspend_resume_mutex);
+	queue_work(tcm_hcd->speed_up_resume_workqueue, &tcm_hcd->speed_up_work);
+	mutex_unlock(&tcm_hcd->suspend_resume_mutex);
+	return 0;
+#else
+	int retval;
+	struct ovt_tcm_module_handler *mod_handler;
+	struct ovt_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
+
+	if (!tcm_hcd->in_suspend  || tcm_hcd->ovt_tcm_driver_removing)
+		return 0;
+
+#ifdef CONFIG_OVT_CHARGER_DETECT
+	ovt_start_charger_detect(tcm_hcd);
+#endif
+	mutex_lock(&tcm_hcd->suspend_resume_mutex);
+	if (tcm_hcd->in_hdl_mode) {
+		tcm_hcd->enable_irq(tcm_hcd, true, NULL);
+		retval = ovt_tcm_wait_hdl(tcm_hcd);
+		if (retval < 0) {
+			LOGE(tcm_hcd->pdev->dev.parent,
+					"Failed to wait for completion of host download\n");
+			goto exit;
+		}
+		goto mod_resume;
+	} else {
+		if (!tcm_hcd->wakeup_gesture_enabled)
+			tcm_hcd->enable_irq(tcm_hcd, true, NULL);
+
+#ifdef RESET_ON_RESUME
+		msleep(RESET_ON_RESUME_DELAY_MS);
+		goto do_reset;
+#endif
+	}
+
+	if (IS_NOT_FW_MODE(tcm_hcd->id_info.mode) ||
+			tcm_hcd->app_status != APP_STATUS_OK) {
+		LOGN(tcm_hcd->pdev->dev.parent,
+				"Identifying mode = 0x%02x\n",
+				tcm_hcd->id_info.mode);
+		goto do_reset;
+	}
+
+	retval = tcm_hcd->sleep(tcm_hcd, false);
+	if (retval < 0) {
+		LOGE(tcm_hcd->pdev->dev.parent,
+				"Failed to exit deep sleep\n");
+		goto exit;
+	}
+
+	retval = ovt_tcm_rezero(tcm_hcd);
+	if (retval < 0) {
+		LOGE(tcm_hcd->pdev->dev.parent,
+				"Failed to rezero\n");
+		goto exit;
+	}
+
+	goto mod_resume;
+
+do_reset:
+	retval = tcm_hcd->reset_n_reinit(tcm_hcd, false, true);
+	if (retval < 0) {
+		LOGE(tcm_hcd->pdev->dev.parent,
+				"Failed to do reset and reinit\n");
+		goto exit;
+	}
+
+	if (IS_NOT_FW_MODE(tcm_hcd->id_info.mode) ||
+			tcm_hcd->app_status != APP_STATUS_OK) {
+		LOGN(tcm_hcd->pdev->dev.parent,
+				"Identifying mode = 0x%02x\n",
+				tcm_hcd->id_info.mode);
+		retval = 0;
+		goto exit;
+	}
+
+mod_resume:
+	touch_resume(tcm_hcd);
+
+#ifdef WATCHDOG_SW
+	tcm_hcd->update_watchdog(tcm_hcd, true);
+#endif
+
+	mutex_lock(&mod_pool.mutex);
+
+	if (!list_empty(&mod_pool.list)) {
+		list_for_each_entry(mod_handler, &mod_pool.list, link) {
+			if (!mod_handler->insert &&
+					!mod_handler->detach &&
+					(mod_handler->mod_cb->resume))
+				mod_handler->mod_cb->resume(tcm_hcd);
+		}
+	}
+
+	mutex_unlock(&mod_pool.mutex);
+
+	retval = 0;
+
+exit:
+	tcm_hcd->in_suspend = false;
+	mutex_unlock(&tcm_hcd->suspend_resume_mutex);
+	return retval;
+#endif
+}
+
+static int ovt_tcm_disp_suspend(struct device *dev)
+{
+	struct ovt_tcm_module_handler *mod_handler;
+	struct ovt_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
+
+	if (tcm_hcd->in_suspend || tcm_hcd->ovt_tcm_driver_removing)
+		return 0;
+#ifdef CONFIG_OVT_CHARGER_DETECT
+	ovt_stop_charger_detect(tcm_hcd);
+#endif
+	mutex_lock(&tcm_hcd->suspend_resume_mutex);
+	touch_suspend(tcm_hcd);
+
+	mutex_lock(&mod_pool.mutex);
+
+	if (!list_empty(&mod_pool.list)) {
+		list_for_each_entry(mod_handler, &mod_pool.list, link) {
+			if (!mod_handler->insert &&
+					!mod_handler->detach &&
+					(mod_handler->mod_cb->suspend)) {
+				mod_handler->mod_cb->suspend(tcm_hcd);
+				}
+		}
+	}
+
+	mutex_unlock(&mod_pool.mutex);
+
+	if (!tcm_hcd->wakeup_gesture_enabled) {
+		tcm_hcd->enable_irq(tcm_hcd, false, true);
+		if (atomic_read(&tcm_hcd->command_status) != CMD_IDLE) {
+			atomic_set(&tcm_hcd->command_status, CMD_ERROR);
+			complete(&response_complete);
+		}
+	}
+
+	tcm_hcd->in_suspend = true;
+	mutex_unlock(&tcm_hcd->suspend_resume_mutex);
+	return 0;
+}
+
+static int ovt_tcm_disp_notifier_cb(struct notifier_block *nb,
+		unsigned long action, void *data)
+{
+	int retval;
+	//int *transition;
+	//struct drm_panel_notifier *evdata = data;
+	struct ovt_tcm_hcd *tcm_hcd =
+			container_of(nb, struct ovt_tcm_hcd, fb_notifier);
+	int *tcm_disp_status = (int *)data;
+
+	//if (!evdata)
+		//return 0;
+	//retval = 0;
+
+	if (tcm_disp_status && tcm_hcd) {
+		//transition = (int *)evdata->data;
+
+		if (atomic_read(&tcm_hcd->firmware_flashing) &&
+				*tcm_disp_status == MTK_DISP_BLANK_POWERDOWN) {
+
+			retval = wait_event_interruptible_timeout(
+				tcm_hcd->reflash_wq,
+				!atomic_read(&tcm_hcd->firmware_flashing),
+				msecs_to_jiffies(RESPONSE_TIMEOUT_MS)
+				);
+			if (retval == 0) {
+				LOGE(tcm_hcd->pdev->dev.parent,
+						"Timed out waiting for completion of flashing firmware\n");
+				atomic_set(&tcm_hcd->firmware_flashing, 0);
+				return -EIO;
+			} else {
+				retval = 0;
+			}
+		}
+
+		if (action == MTK_DISP_EARLY_EVENT_BLANK &&
+				*tcm_disp_status == MTK_DISP_BLANK_POWERDOWN) {
+				retval = ovt_tcm_disp_suspend(&tcm_hcd->pdev->dev);
+				tcm_hcd->fb_ready = 0;
+		} else if (action == MTK_DISP_EVENT_BLANK &&
+				*tcm_disp_status == MTK_DISP_BLANK_UNBLANK) {
+				retval = ovt_tcm_disp_resume(&tcm_hcd->pdev->dev);
+				tcm_hcd->fb_ready++;
+		}
+	}
+
+	return 0;
+}
+
+
 #if defined(CONFIG_PM) || defined(CONFIG_DRMV) || defined(CONFIG_FBV)
 static int ovt_tcm_resume(struct device *dev)
 {
@@ -4403,6 +4606,16 @@ static int ovt_tcm_probe(struct platform_device *pdev)
 			goto err_sysfs_create_dynamic_config_file;
 		}
 	}
+
+
+	tcm_hcd->fb_notifier.notifier_call = ovt_tcm_disp_notifier_cb;
+	retval = mtk_disp_notifier_register("tcm_ts", &tcm_hcd->fb_notifier);
+	if (retval < 0) {
+			LOGE(tcm_hcd->pdev->dev.parent,
+					"%s: Failed to register disp  notifier client\n",
+					__func__);
+	}
+
 
 #ifndef USE_SYS_SUSPEND_METHOD
 #ifdef CONFIG_DRMV
