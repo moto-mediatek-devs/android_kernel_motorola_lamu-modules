@@ -72,6 +72,12 @@ static int handle_to_index(int handle)
 	case ID_SAR:
 		index = sar;
 		break;
+	case ID_REAR_ALS:
+		index = rearals;
+		break;
+	case ID_REAR_FLICKER:
+		index = rearflk;
+		break;
 	default:
 		index = -1;
 		pr_err("%s invalid handle:%d,index:%d\n", __func__,
@@ -97,6 +103,7 @@ int situation_data_report_t(int handle, uint32_t one_sample_data,
 	}
 
 	pr_debug("situation_notify handle:%d, index:%d\n", handle, index);
+	printk("situation_notify handle:%d, index:%d\n", handle, index);
 	event.time_stamp = time_stamp;
 	event.handle = handle;
 	event.flush_action = DATA_ACTION;
@@ -142,6 +149,7 @@ int sar_data_report(int32_t value[3])
 {
 	return sar_data_report_t(value, 0);
 }
+
 int situation_notify_t(int handle, int64_t time_stamp)
 {
 	return situation_data_report_t(handle, 1, time_stamp);
@@ -599,6 +607,7 @@ int situation_probe(void)
 	int err;
 
 	pr_debug("%s+++!!\n", __func__);
+	printk("%s\n", __func__);
 
 	situation_context_obj = situation_context_alloc_object();
 	if (!situation_context_obj) {

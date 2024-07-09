@@ -9,3 +9,13 @@ source "$(KCONFIG_EXT_PREFIX)drivers/misc/mediatek/sensor/1.0/situation/situatio
 source "$(KCONFIG_EXT_PREFIX)drivers/misc/mediatek/sensor/1.0/situation/situation_hub/tilt_detector/Kconfig"
 source "$(KCONFIG_EXT_PREFIX)drivers/misc/mediatek/sensor/1.0/situation/situation_hub/flat/Kconfig"
 source "$(KCONFIG_EXT_PREFIX)drivers/misc/mediatek/sensor/1.0/situation/situation_hub/sar/Kconfig"
+source "$(KCONFIG_EXT_PREFIX)drivers/misc/mediatek/sensor/1.0/situation/situation_hub/rear_als/Kconfig"
+source "$(KCONFIG_EXT_PREFIX)drivers/misc/mediatek/sensor/1.0/situation/situation_hub/rear_flk/Kconfig"
+
+config MTK_REAR_ALS_HUB
+	bool "rearalshub for MediaTek package"
+	help
+	  A sar is a device,
+	  usually portable and electronic
+	  or electromechanical,
+	  that detect distance between the body and device .

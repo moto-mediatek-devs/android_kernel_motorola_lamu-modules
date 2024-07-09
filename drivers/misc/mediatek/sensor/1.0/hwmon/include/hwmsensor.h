@@ -68,9 +68,14 @@
 #define SENSOR_TYPE_RGBW                               70
 #define SENSOR_TYPE_GYRO_TEMPERATURE                   71
 #define SENSOR_TYPE_SAR                                72
+// +20240617 wnn add mtk sensor 1.0 flicker support start
+#define SENSOR_TYPE_REAR_ALS                           73
+#define SENSOR_TYPE_REAR_FLICKER                       74
+
 /* end sensor type */
-#define SENSOR_TYPE_MAX_NUM                            SENSOR_TYPE_SAR
+#define SENSOR_TYPE_MAX_NUM                            SENSOR_TYPE_REAR_FLICKER
 #define SENSOR_TYPE_MAX_NUM_PLUS_ONE                   (SENSOR_TYPE_MAX_NUM + 1)
+// +20240617 wnn add mtk sensor 1.0 flicker support end
 
 /*---------------------------------------------------------------------------*/
 #define ID_BASE                 (0)
@@ -141,8 +146,13 @@
 #define ID_RGBW                 (ID_BASE + SENSOR_TYPE_RGBW - 1)
 #define ID_GYRO_TEMPERATURE     (ID_BASE + SENSOR_TYPE_GYRO_TEMPERATURE - 1)
 #define ID_SAR                  (ID_BASE + SENSOR_TYPE_SAR - 1)
+// +20240617 wnn add mtk sensor 1.0 flicker support start
+#define ID_REAR_ALS             (ID_BASE + SENSOR_TYPE_REAR_ALS -1)
+#define ID_REAR_FLICKER         (ID_BASE + SENSOR_TYPE_REAR_FLICKER - 1)
+
 /* end sensor ID */
-#define ID_SENSOR_MAX_HANDLE    (ID_SAR)
+#define ID_SENSOR_MAX_HANDLE    (ID_REAR_FLICKER)
+// -20240617 wnn add mtk sensor 1.0 flicker support end
 #define ID_SENSOR_MAX_HANDLE_PLUS_ONE    (ID_SENSOR_MAX_HANDLE + 1)
 
 #if (ID_SENSOR_MAX_HANDLE_PLUS_ONE != SENSOR_TYPE_MAX_NUM)

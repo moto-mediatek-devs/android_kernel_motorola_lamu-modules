@@ -31,6 +31,8 @@ enum {
 	ps,
 	baro,
 	sar,
+	rearals,
+	rearflk,
 	maxhandle,
 };
 
@@ -68,6 +70,12 @@ inline int sensor_to_handle(int sensor)
 	case ID_SAR:
 		handle = sar;
 		break;
+	case ID_REAR_ALS:
+		handle = rearals;
+		break;
+	case ID_REAR_FLICKER:
+		handle = rearflk;
+		break;
 	}
 	return handle;
 }
@@ -97,6 +105,12 @@ static inline int handle_to_sensor(int handle)
 		break;
 	case sar:
 		sensor = ID_SAR;
+		break;
+	case rearals:
+		sensor = ID_REAR_ALS;
+		break;
+	case rearflk:
+		sensor = ID_REAR_FLICKER;
 		break;
 	}
 	return sensor;
@@ -129,6 +143,7 @@ static void sensorlist_get_deviceinfo(struct work_struct *work)
 			pr_err("sensor(%d) not register\n", sensor);
 			continue;
 		}
+		pr_err("sensor(%d) register: %s\n", sensor, devinfo.name);
 		spin_lock(&sensorlist_info_lock);
 		strlcpy(sensorlist_info[handle].name,
 			devinfo.name,

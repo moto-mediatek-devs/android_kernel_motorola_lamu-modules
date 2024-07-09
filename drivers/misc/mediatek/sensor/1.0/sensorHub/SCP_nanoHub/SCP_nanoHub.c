@@ -698,9 +698,9 @@ static void SCP_sensorHub_IPI_handler(int id,
 		pr_err("%s len=%d error\n", __func__, len);
 		return;
 	}
-	/*pr_err("sensorType:%d, action=%d event:%d len:%d\n",
-	 * rsp->rsp.sensorType, rsp->rsp.action, rsp->notify_rsp.event, len);
-	 */
+	pr_err("sensorType:%d, action=%d event:%d len:%d\n",
+	rsp->rsp.sensorType, rsp->rsp.action, rsp->notify_rsp.event, len);
+
 	cmd = SCP_sensorHub_find_cmd(rsp->rsp.action);
 	if (cmd != NULL)
 		cmd->handler(rsp, len);
@@ -865,6 +865,14 @@ static void SCP_sensorHub_init_sensor_state(void)
 
 	mSensorState[SENSOR_TYPE_SAR].sensorType = SENSOR_TYPE_SAR;
 	mSensorState[SENSOR_TYPE_SAR].timestamp_filter = false;
+
+// +20240617 wnn add mtk sensor 1.0 flicker support start
+       mSensorState[SENSOR_TYPE_REAR_ALS].sensorType = SENSOR_TYPE_REAR_ALS;
+       mSensorState[SENSOR_TYPE_REAR_ALS].timestamp_filter = false;
+
+       mSensorState[SENSOR_TYPE_REAR_FLICKER].sensorType = SENSOR_TYPE_REAR_FLICKER;
+       mSensorState[SENSOR_TYPE_REAR_FLICKER].timestamp_filter = false;
+// -20240617 wnn add mtk sensor 1.0 flicker support end
 }
 
 static void init_sensor_config_cmd(struct ConfigCmd *cmd,
@@ -1699,6 +1707,14 @@ int sensor_get_data_from_hub(uint8_t sensorType,
 		data->sar_event.data[1] = data_t->sar_event.data[1];
 		data->sar_event.data[2] = data_t->sar_event.data[2];
 		break;
+	case ID_REAR_ALS:
+		data->time_stamp = data_t->time_stamp;
+		data->rearals = data_t->rearals;
+		break;
+	case ID_REAR_FLICKER:
+		data->time_stamp = data_t->time_stamp;
+		data->rearflk = data_t->rearflk;
+		break;
 	default:
 		err = -1;
 		break;
@@ -2049,6 +2065,34 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
 		break;
 	case ID_SAR:
 		req.set_cust_req.sensorType = ID_SAR;
+		req.set_cust_req.action = SENSOR_HUB_SET_CUST;
+		switch (action) {
+		case CUST_ACTION_GET_SENSOR_INFO:
+			req.set_cust_req.getInfo.action =
+				CUST_ACTION_GET_SENSOR_INFO;
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.getInfo);
+			break;
+		default:
+			return -1;
+		}
+		break;
+	case ID_REAR_ALS:
+		req.set_cust_req.sensorType = ID_REAR_ALS;
+		req.set_cust_req.action = SENSOR_HUB_SET_CUST;
+		switch (action) {
+		case CUST_ACTION_GET_SENSOR_INFO:
+			req.set_cust_req.getInfo.action =
+				CUST_ACTION_GET_SENSOR_INFO;
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.getInfo);
+			break;
+		default:
+			return -1;
+		}
+		break;
+	case ID_REAR_FLICKER:
+		req.set_cust_req.sensorType = ID_REAR_FLICKER;
 		req.set_cust_req.action = SENSOR_HUB_SET_CUST;
 		switch (action) {
 		case CUST_ACTION_GET_SENSOR_INFO:

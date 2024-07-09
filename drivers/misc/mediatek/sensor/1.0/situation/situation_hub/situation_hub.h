@@ -52,4 +52,12 @@
 #include "sar/sarhub.h"
 #endif
 
+#if IS_ENABLED(CONFIG_MTK_REAR_ALS_HUB)
+#include "rear_als/rearals_hub.h"
+#endif
+
+#if IS_ENABLED(CONFIG_MTK_REAR_FLK_HUB)
+#include "rear_flk/rearflk_hub.h"
+#endif
+
 #endif
