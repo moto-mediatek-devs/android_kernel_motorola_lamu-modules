@@ -1013,6 +1013,7 @@ static int read_sc520cs_lsc_info(kal_uint32 addr,kal_uint32 threshold,kal_uint32
                 check_sum_cal1 += sc520cs_otp_info.lsc_param[i+1799];
             }
         }
+		sc520cs_otp_info.lscChksum = read_cmos_sensor(0x88ab);
     } else if(addr == 0x88AC){
         ret1 = sc520cs_sensor_otp_init1(threshold,threshold1);
 	    if (ret1 != 1) {
@@ -1024,6 +1025,7 @@ static int read_sc520cs_lsc_info(kal_uint32 addr,kal_uint32 threshold,kal_uint32
             check_sum_cal += sc520cs_otp_info.lsc_param[i];
         }
         check_sum = read_cmos_sensor(0x8ff8);
+		sc520cs_otp_info.lscChksum = read_cmos_sensor(0x8ff8);
     }
 
 	check_sum_cal = check_sum_cal1 + check_sum_cal;
@@ -1093,6 +1095,7 @@ static int read_sc520cs_awb_info(kal_uint32 addr)
 	golden_bg = 0x29A; //((sc520cs_otp_info.awb_param[6] << 8) & 0xff00) | (sc520cs_otp_info.awb_param[7] & 0xff);
 	check_sum_awb = read_cmos_sensor(addr + 12);
 	check_sum_awb_cal = (check_sum_awb_cal % 255) + 1;
+    sc520cs_otp_info.awbChksum = check_sum_awb;
 
 	CAM_DBG(PFX,"sc520cs-otp=== SC520CS AWB rg=0x%x, bg=0x%x ===\n", rg, bg);
 	CAM_DBG(PFX,"sc520cs-otp=== SC520CS AWB golden_rg=0x%x,golden_bg=0x%x ===\n", golden_rg, golden_bg);

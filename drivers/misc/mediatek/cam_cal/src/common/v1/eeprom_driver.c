@@ -157,7 +157,8 @@ static struct stCAM_CAL_CMD_INFO_STRUCT *EEPROM_get_cmd_info_ex
 
 	/* To check device ID */
 	for (i = 0; i < IMGSENSOR_SENSOR_IDX_MAX_NUM; i++) {
-		if (g_camCalDrvInfo[i].deviceID == deviceID)
+		if (g_camCalDrvInfo[i].deviceID == deviceID &&
+            g_camCalDrvInfo[i].sensorID == sensorID)
 			break;
 	}
 	/* To check cmd from Sensor ID */

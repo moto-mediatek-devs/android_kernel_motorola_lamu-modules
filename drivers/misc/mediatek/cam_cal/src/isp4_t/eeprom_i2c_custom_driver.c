@@ -146,53 +146,71 @@ unsigned int Custom_read_region(struct i2c_client *client, unsigned int addr,
 		return 0;
 }
 
-/*begin 20240702 add for otp check*/
-unsigned int gc08a8_dd_p329_read_region(struct i2c_client *client, unsigned int addr,
+unsigned int gc08a8_read_region(struct i2c_client *client, unsigned int addr,
                                 unsigned char *data, unsigned int size)
 {
-    int i=0;
+    unsigned char *dataTmp = data;
 
-    pr_err("[yy]addr =%x size %d\n", addr, size);
-	pr_err("module id = 0x%x", gc08a8_otp_info.module_param[0]);
-	pr_err("Year = 0x%x", gc08a8_otp_info.module_param[1]);
+    pr_err("gc08a8 otp region addr = 0x%x, size = %d\n", addr, size);
+    if (addr == 0x1 && size == 1) {//0xff
+        *(u32 *)data = 0x00000047;
+    } else if (addr == 0x0 && size == 1904) {
+       unsigned int totalSize = sizeof(gc08a8_otp_info.module_flag) +
+                                 sizeof(gc08a8_otp_info.module_param) +
+                                 sizeof(gc08a8_otp_info.moduleChksum) +
+                                 sizeof(gc08a8_otp_info.awb_flag) +
+                                 sizeof(gc08a8_otp_info.awb_param) +
+                                 sizeof(gc08a8_otp_info.awbChksum) +
+                                 sizeof(gc08a8_otp_info.lsc_flag) +
+                                 sizeof(gc08a8_otp_info.lsc_param) +
+                                 sizeof(gc08a8_otp_info.lscChksum);
+        pr_err("gc08a8 otp region addr = 0x%x, size = %d  totalSize=%d \n", addr, size, totalSize);
+        if (size == totalSize) {
+            data[0] = gc08a8_otp_info.module_flag;
 
-	if (addr == 0x6)
-    {
-        *(u32 *)data = 0x00000088;
-		pr_err("gc08a8_read_region [yy]addr =%x data = %x  size = %x\n", addr, *(u32 *)data, size);
-    }
+            dataTmp += sizeof(gc08a8_otp_info.module_flag);
 
-    else if (addr == 0x1)
-    {
-        if ((gc08a8_otp_info.lsc_flag == 0x01) || (gc08a8_otp_info.lsc_flag == 0x04))
-        {
-            pr_err("[yy]lsc_flag valid\n");
-            for(i=0; i<size; i++){
-                data[i] = gc08a8_otp_info.lsc_param[i];
-            }
+            memcpy(dataTmp, gc08a8_otp_info.module_param, sizeof(gc08a8_otp_info.module_param));
+            dataTmp += sizeof(gc08a8_otp_info.module_param);
+
+            data[19] = gc08a8_otp_info.moduleChksum;
+            dataTmp += sizeof(gc08a8_otp_info.moduleChksum);
+
+            data[20] = gc08a8_otp_info.awb_flag;
+            dataTmp += sizeof(gc08a8_otp_info.awb_flag);
+
+            memcpy(dataTmp, gc08a8_otp_info.awb_param, sizeof(gc08a8_otp_info.awb_param));
+            dataTmp += sizeof(gc08a8_otp_info.awb_param);
+
+            data[33] = gc08a8_otp_info.awbChksum;
+            dataTmp += sizeof(gc08a8_otp_info.awbChksum);
+
+            data[34] = gc08a8_otp_info.lsc_flag;
+            dataTmp += sizeof(gc08a8_otp_info.lsc_flag);
+
+            memcpy(dataTmp, gc08a8_otp_info.lsc_param, sizeof(gc08a8_otp_info.lsc_param));
+            dataTmp += sizeof(gc08a8_otp_info.lsc_param);
+
+            data[totalSize - 1] = gc08a8_otp_info.lscChksum;
+        } else {
+            pr_err("gc08a8 otp size != totalSize");
+            size = totalSize;
         }
+    } else if (size == 12 && addr == 21) { //read single awb data
+        memcpy(data, (gc08a8_otp_info.awb_param), size);
+        pr_err("add = 0x%x, read awb\n",addr);
+    } else if (size >=1868 && size < 2048 && addr == 35) {
+        memcpy(data, gc08a8_otp_info.lsc_param, size);
+        pr_err("add = 0x%x, read lsc\n",addr);
+    } else if (addr == 1903 && size == 1) {
+        *(u32 *)data = gc08a8_otp_info.lscChksum;
+        pr_err("add = 0x%x, read lscChksum = %x\n",addr, *(u32 *)data);
+    } else if (addr == 33 && size == 1) {
+        *(u32 *)data = gc08a8_otp_info.awbChksum;
+        pr_err("add = 0x%x, read awbChksum = %x\n",addr, *(u32 *)data);
+    } else{
+        pr_err("gc08a8 otp add = 0x%x, size = %d ,read error !!!\n",addr,size);
     }
-	/*
-    else if (addr == 0x2)
-    {
-        if ((gc08a8_otp_info.awb_flag == 0x01) || (gc08a8_otp_info.awb_flag == 0x04))
-        {
-            *data = 1;
-        }
-    }
-	*/
-    else if (addr == 0x3)
-    {
-        for(i=0; i<size; i++){
-            data[i] = gc08a8_otp_info.awb_param[i];
-            pr_err("[yy]gc08a8_read_region awb data[%d] =%x \n", i, data[i]);
-        }
-    }
-    else
-    {
-        pr_err("add = 0x%x, size = %d ,read error !!!\n",addr,size);
-    }
-
     return size;
 }
 
@@ -202,7 +220,7 @@ unsigned int gc05a2sub_read_region(struct i2c_client *client, unsigned int addr,
     unsigned char *dataTmp = data;
 
     pr_err("gc05a2 otp region addr = 0x%x, size = %d\n", addr, size);
-	if (addr == 0x2 && size == 1) {//0xff
+	if (addr == 0x1 && size == 1) {//0xff
 		*(u32 *)data = 0x00000006;
 	} else if (addr == 0x0 && size == 1909) {
        unsigned int totalSize = sizeof(gc05a2_otp_info.module_flag) +
@@ -216,28 +234,23 @@ unsigned int gc05a2sub_read_region(struct i2c_client *client, unsigned int addr,
         if (size == totalSize) {
             data[0] = gc05a2_otp_info.module_flag;
 
-            /* dataTmp += sizeof(gc05a2_otp_info.page_flag); */
-            /* memcpy(dataTmp, gc05a2_otp_info.module_flag, sizeof(gc05a2_otp_info.module_flag)); */
             dataTmp += sizeof(gc05a2_otp_info.module_flag);
 
             memcpy(dataTmp, gc05a2_otp_info.module_param, sizeof(gc05a2_otp_info.module_param));
             dataTmp += sizeof(gc05a2_otp_info.module_param);
 
-            /* memcpy(dataTmp, gc05a2_otp_info.module_checksum, sizeof(gc05a2_otp_info.module_checksum)); */
 			data[10] = gc05a2_otp_info.module_checksum;
             dataTmp += sizeof(gc05a2_otp_info.module_checksum);
 
             memcpy(dataTmp, gc05a2_otp_info.awb_param, sizeof(gc05a2_otp_info.awb_param));
             dataTmp += sizeof(gc05a2_otp_info.awb_param);
 
-            /* memcpy(dataTmp, gc05a2_otp_info.awb_checksum, sizeof(gc05a2_otp_info.awb_checksum)); */
 			data[39] = gc05a2_otp_info.awb_checksum;
             dataTmp += sizeof(gc05a2_otp_info.awb_checksum);
 
             memcpy(dataTmp, gc05a2_otp_info.lsc_param, sizeof(gc05a2_otp_info.lsc_param));
             dataTmp += sizeof(gc05a2_otp_info.lsc_param);
 
-            /* memcpy(dataTmp, gc05a2_otp_info.lsc_checksum, sizeof(gc05a2_otp_info.lsc_checksum)); */
 			data[totalSize - 1] = gc05a2_otp_info.lsc_checksum;
         } else {
 			pr_err("gc05a2 otp size != totalSize");
@@ -251,6 +264,9 @@ unsigned int gc05a2sub_read_region(struct i2c_client *client, unsigned int addr,
             memcpy(data,(gc05a2_otp_info.awb_param), size);
             pr_err("add = 0x%x, read awb_unint\n",addr);
         }
+    } else if (size == 28 && addr == 11) {
+		memcpy(data, gc05a2_otp_info.awb_param, size);
+		pr_err("add = 0x%x, read awb param\n",addr);
     } else if (size >=1868 && size < 2048 && addr == 40) {
 		memcpy(data, gc05a2_otp_info.lsc_param, size);
 		pr_err("add = 0x%x, read lsc\n",addr);
@@ -266,55 +282,70 @@ unsigned int gc05a2sub_read_region(struct i2c_client *client, unsigned int addr,
 	return size;
 }
 
-/*end 20240702 add for otp check*/
-
-/*zyy otp*/
 unsigned int sc520cs_read_region(struct i2c_client *client, unsigned int addr,
                                 unsigned char *data, unsigned int size)
 {
-    int i=0;
+    unsigned char *dataTmp = data;
 
-    pr_err("[zyy]addr =%x size %d\n", addr, size);
-	pr_err("module id = 0x%x", sc520cs_otp_info.module_param[0]);
-	pr_err("Year = 0x%x", sc520cs_otp_info.module_param[1]);
+    pr_err("sc520cs otp region addr = 0x%x, size = %d\n", addr, size);
+    if (addr == 0x1 && size == 1) {//0xff
+        *(u32 *)data = 0x00000047;
+    } else if (addr == 0x0 && size == 1904) {
+       unsigned int totalSize = sizeof(sc520cs_otp_info.module_flag) +
+                                 sizeof(sc520cs_otp_info.module_param) +
+                                 sizeof(sc520cs_otp_info.moduleChksum) +
+                                 sizeof(sc520cs_otp_info.awb_flag) +
+                                 sizeof(sc520cs_otp_info.awb_param) +
+                                 sizeof(sc520cs_otp_info.awbChksum) +
+                                 sizeof(sc520cs_otp_info.lsc_flag) +
+                                 sizeof(sc520cs_otp_info.lsc_param) +
+                                 sizeof(sc520cs_otp_info.lscChksum);
+        pr_err("sc520cs otp region addr = 0x%x, size = %d  totalSize=%d \n", addr, size, totalSize);
+        if (size == totalSize) {
+            data[0] = sc520cs_otp_info.module_flag;
 
-	if (addr == 0x8)
-    {
-        *(u32 *)data = 0x00000099;
-		pr_err("sc520cs_read_region [zyy]addr =%x data = %x  size = %x\n", addr, *(u32 *)data, size);
-    }
+            dataTmp += sizeof(sc520cs_otp_info.module_flag);
 
-    else if (addr == 0x1)
-    {
-        pr_err("[zyy]lsc_flag sc520cs_otp_info.lsc_flag =0x%x\n" ,sc520cs_otp_info.lsc_flag);
-        if ((sc520cs_otp_info.lsc_flag == 0x01) || (sc520cs_otp_info.lsc_flag == 0x07))
-        {
-            pr_err("[zyy]lsc_flag valid\n");
-            for(i=0; i<size; i++){
-                data[i] = sc520cs_otp_info.lsc_param[i];
-            }
+            memcpy(dataTmp, sc520cs_otp_info.module_param, sizeof(sc520cs_otp_info.module_param));
+            dataTmp += sizeof(sc520cs_otp_info.module_param);
+
+            data[19] = sc520cs_otp_info.moduleChksum;
+            dataTmp += sizeof(sc520cs_otp_info.moduleChksum);
+
+            data[20] = sc520cs_otp_info.awb_flag;
+            dataTmp += sizeof(sc520cs_otp_info.awb_flag);
+
+            memcpy(dataTmp, sc520cs_otp_info.awb_param, sizeof(sc520cs_otp_info.awb_param));
+            dataTmp += sizeof(sc520cs_otp_info.awb_param);
+
+            data[33] = sc520cs_otp_info.awbChksum;
+            dataTmp += sizeof(sc520cs_otp_info.awbChksum);
+
+            data[34] = sc520cs_otp_info.lsc_flag;
+            dataTmp += sizeof(sc520cs_otp_info.lsc_flag);
+
+            memcpy(dataTmp, sc520cs_otp_info.lsc_param, sizeof(sc520cs_otp_info.lsc_param));
+            dataTmp += sizeof(sc520cs_otp_info.lsc_param);
+
+            data[totalSize - 1] = sc520cs_otp_info.lscChksum;
+        } else {
+            pr_err("sc520cs otp size != totalSize");
+            size = totalSize;
         }
+    } else if (size == 12 && addr == 21) { //read single awb data
+        memcpy(data, (sc520cs_otp_info.awb_param), size);
+        pr_err("add = 0x%x, read awb\n",addr);
+    } else if (size >=1868 && size < 2048 && addr == 35) {
+        memcpy(data, sc520cs_otp_info.lsc_param, size);
+        pr_err("add = 0x%x, read lsc\n",addr);
+    } else if (addr == 1903 && size == 1) {
+        *(u32 *)data = sc520cs_otp_info.lscChksum;
+        pr_err("add = 0x%x, read lscChksum = %x\n",addr, *(u32 *)data);
+    } else if (addr == 33 && size == 1) {
+        *(u32 *)data = sc520cs_otp_info.awbChksum;
+        pr_err("add = 0x%x, read awbChksum = %x\n",addr, *(u32 *)data);
+    } else{
+        pr_err("sc520cs otp add = 0x%x, size = %d ,read error !!!\n",addr,size);
     }
-    else if (addr == 0x3)
-    {
-        for(i=0; i<size; i++){
-            data[i] = sc520cs_otp_info.awb_param[i];
-            pr_err("[zyy]sc520cs_read_region awb data[%d] =%x \n", i, data[i]);
-        }
-    }
-    else if (addr == 0x2)
-    {
-        for(i=0; i<size; i++){
-            data[i] = sc520cs_otp_info.module_param[i];
-            pr_err("[zyy]sc520cs_read_region module_param [%d] =%x \n", i, data[i]);
-        }
-    }
-    else
-    {
-        pr_err("[zyy]error addr =%x,size = %d\n", addr, size);
-    }
-
     return size;
 }
-
-/*zyy otp*/
