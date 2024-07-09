@@ -76,5 +76,6 @@ extern unsigned int oem_pcba_nfc_exist(void);
 extern unsigned int oem_pcba_chg_power(void);
 extern char *oem_battery_sn(void);
 extern unsigned int oem_boot_mode(void);
+extern unsigned int oem_lcd_res(void);
 
 #endif

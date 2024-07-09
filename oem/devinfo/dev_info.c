@@ -28,11 +28,13 @@
 static unsigned int charge_power = 0;
 static unsigned int nfc_exist = 0;
 static unsigned int boot_mode = 0;
+static unsigned int lcd_res = 0;
 static char batterysn_buff[OEM_BUFF_SIZE_16] = {0};
 
 module_param_named(chgpower, charge_power, int, 0644);
 module_param_named(nfcexist, nfc_exist, int, 0644);
 module_param_named(bootmode, boot_mode, int, 0644);
+module_param_named(lcdres, lcd_res, int, 0644);
 module_param_string(batterysn, batterysn_buff, OEM_BUFF_SIZE_16, 0644);
 
 unsigned int oem_pcba_charge_power(void)
@@ -52,6 +54,12 @@ unsigned int oem_boot_mode(void)
 	return boot_mode;
 }
 EXPORT_SYMBOL(oem_boot_mode);
+
+unsigned int oem_lcd_res(void)
+{
+	return lcd_res;
+}
+EXPORT_SYMBOL(oem_lcd_res);
 
 char *oem_battery_sn(void)
 {
