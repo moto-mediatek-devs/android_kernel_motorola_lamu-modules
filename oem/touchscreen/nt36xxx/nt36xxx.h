@@ -83,8 +83,8 @@
 #define NVT_PEN_NAME "NVTCapacitivePen"
 
 //---Touch info.---
-#define TOUCH_MAX_WIDTH 1080
-#define TOUCH_MAX_HEIGHT 2400
+#define TOUCH_MAX_WIDTH 720
+#define TOUCH_MAX_HEIGHT 1604
 #define PEN_MAX_WIDTH 2160
 #define PEN_MAX_HEIGHT 4800
 #define TOUCH_MAX_FINGER_NUM 10
