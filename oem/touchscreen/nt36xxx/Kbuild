@@ -5,6 +5,6 @@ ifdef CONFIG_OEM_LAMU_TOUCHSCREEN
 		nt36xxx_mp_ctrlram.o
 endif
 
-obj-$(CONFIG_OEM_LAMU_TOUCHSCREEN) += nt36672s.o
-nt36672s-y := $(NVT_OBJS)
+obj-$(CONFIG_OEM_LAMU_TOUCHSCREEN) += nt36xxx_tp.o
+nt36xxx_tp-y := $(NVT_OBJS)
 

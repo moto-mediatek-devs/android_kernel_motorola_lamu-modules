@@ -1889,7 +1889,7 @@ def get_overlay_modules_list():
         mgk_64_device_modules.append("drivers/gpu/drm/panel/panel-boe-icnl9922c-vdo.ko")
         mgk_64_device_modules.append("oem/touchscreen/chipone_tddi/chipone_tddi.ko")
         mgk_64_device_modules.append("oem/touchscreen/omnivision_tcm/omnivision_tcm.ko")
-        mgk_64_device_modules.append("oem/touchscreen/nt36672s/nt36672s.ko")
+        mgk_64_device_modules.append("oem/touchscreen/nt36xxx/nt36xxx_tp.ko")
         mgk_64_device_modules.append("oem/touchscreen/ILITEK9883C/tp_ilitek.ko")
         mgk_64_device_modules.append("oem/fingerprint/fpc1560/fpc_fingerprint.ko")
         mgk_64_device_modules.append("drivers/gpu/drm/panel/panel-txd-ili9883c-vdo.ko")
