@@ -234,7 +234,7 @@ static void boe_panel_init(struct boe *ctx)
 	gpiod_set_value(ctx->reset_gpio, 1);
 	udelay(5 * 1000);
 	gpiod_set_value(ctx->reset_gpio, 0);
-	udelay(2 * 1000);
+	udelay(10 * 1000);
 	gpiod_set_value(ctx->reset_gpio, 1);
 	udelay(15 * 1000);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
