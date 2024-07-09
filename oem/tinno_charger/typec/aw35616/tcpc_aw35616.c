@@ -544,7 +544,21 @@ int aw35616_get_alert_mask(struct tcpc_device *tcpc, uint32_t *mask)
 	return 0;
 }
 
-int aw35616_get_alert_status(struct tcpc_device *tcpc, uint32_t *alert)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
+int aw35616_get_alert_status_and_mask(struct tcpc_device *tcpc, uint32_t *alert, uint32_t *mask)
+{
+	AW_LOG("enter\n");
+	return 0;
+}
+
+static int aw35616_get_power_status(struct tcpc_device *tcpc)
+{
+	AW_LOG("enter\n");
+	return 0;
+}
+#else
+int aw35616_get_alert_status(struct tcpc_device *tcpc,
+		uint32_t *alert)
 {
 	AW_LOG("enter\n");
 	return 0;
@@ -556,6 +570,7 @@ static int aw35616_get_power_status(
 	AW_LOG("enter\n");
 	return 0;
 }
+#endif /* LINUX_VERSION_CODE */
 
 int aw35616_get_fault_status(struct tcpc_device *tcpc, uint8_t *status)
 {
@@ -686,7 +701,11 @@ static struct tcpc_ops aw35616_tcpc_ops = {
 	.alert_status_clear = aw35616_alert_status_clear,
 	.fault_status_clear = aw35616_fault_status_clear,
 	.get_alert_mask = aw35616_get_alert_mask,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
+	.get_alert_status_and_mask = aw35616_get_alert_status_and_mask,
+#else
 	.get_alert_status = aw35616_get_alert_status,
+#endif
 	.get_power_status = aw35616_get_power_status,
 	.get_fault_status = aw35616_get_fault_status,
 	.get_cc = aw35616_get_cc,

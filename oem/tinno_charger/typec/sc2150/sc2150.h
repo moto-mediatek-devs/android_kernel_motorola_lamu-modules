@@ -56,6 +56,11 @@
 #define SC2150_IICRST_300		(1 << 0)
 #define SC2150_IICRST_EN		(1 << 7)
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
+#define TCPC_REG_POWER_STATUS_EXT_VSAFE0V	(1<<15)	/* extend */
+#define TCPC_REG_POWER_STATUS_VBUS_PRES		(1<<2)
+#endif /* LINUX_VERSION_CODE */
+
 #if ENABLE_SC2150_DBG
 #define SC2150_INFO(format, args...) \
 	pd_dbg_info("%s() line-%d: " format,\

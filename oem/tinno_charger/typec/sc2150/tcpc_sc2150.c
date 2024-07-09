@@ -430,7 +430,11 @@ static irqreturn_t sc2150_intr_handler(int irq, void *data)
 	pm_wakeup_event(sc->dev, SC2150_IRQ_WAKE_TIME);
 
 	tcpci_lock_typec(sc->tcpc);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
+	tcpci_alert(sc->tcpc, true);
+#else
 	tcpci_alert(sc->tcpc);
+#endif
 	tcpci_unlock_typec(sc->tcpc);
 
 	return IRQ_HANDLED;
@@ -592,7 +596,7 @@ static inline int sc2150_fault_status_vconn_ov(struct tcpc_device *tcpc)
 static int sc2150_set_vconn(struct tcpc_device *tcpc, int enable);
 static int sc2150_fault_status_clear(struct tcpc_device *tcpc, uint8_t status)
 {
-	int ret;
+	int ret = 0;
 
 	if (status & TCPC_V10_REG_FAULT_STATUS_VCONN_OV)
 		ret = sc2150_fault_status_vconn_ov(tcpc);
@@ -600,7 +604,7 @@ static int sc2150_fault_status_clear(struct tcpc_device *tcpc, uint8_t status)
 		ret = sc2150_set_vconn(tcpc, false);
 
 	sc2150_i2c_write8(tcpc, TCPC_V10_REG_FAULT_STATUS, status);
-	return 0;
+	return ret;
 }
 
 static int sc2150_get_alert_mask(struct tcpc_device *tcpc, uint32_t *mask)
@@ -624,6 +628,69 @@ static int sc2150_get_alert_mask(struct tcpc_device *tcpc, uint32_t *mask)
 	return 0;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
+int sc2150_get_alert_status_and_mask(struct tcpc_device *tcpc,
+		uint32_t *alert, uint32_t *mask)
+{
+	int ret;
+	uint8_t v2;
+
+	ret = sc2150_i2c_read16(tcpc, TCPC_V10_REG_ALERT);
+	if (ret < 0)
+		return ret;
+
+	*alert = (uint16_t) ret;
+
+	ret = sc2150_i2c_read8(tcpc, SC2150_REG_ANA_INT);
+	if (ret < 0)
+		return ret;
+
+	v2 = (uint8_t) ret;
+	*alert |= v2 << 16;
+
+	/* get alert mask */
+	ret = sc2150_i2c_read16(tcpc, TCPC_V10_REG_ALERT_MASK);
+	if (ret < 0)
+		return ret;
+
+	*mask = (uint16_t) ret;
+
+	ret = sc2150_i2c_read8(tcpc, SC2150_REG_ANA_MASK);
+	if (ret < 0)
+		return ret;
+
+	v2 = (uint8_t) ret;
+	*mask |= v2 << 16;
+
+	return 0;
+}
+
+static int sc2150_get_power_status(struct tcpc_device *tcpc)
+{
+	int ret;
+	uint16_t pwr_status;
+
+	ret = sc2150_i2c_read8(tcpc, TCPC_V10_REG_POWER_STATUS);
+	if (ret < 0)
+		return ret;
+
+	pwr_status = 0;
+
+	if (ret & TCPC_V10_REG_POWER_STATUS_VBUS_PRES)
+		pwr_status |= TCPC_REG_POWER_STATUS_VBUS_PRES;
+
+	ret = sc2150_i2c_read8(tcpc, SC2150_REG_ANA_STATUS);
+	if (ret < 0)
+		return ret;
+
+	if (ret & SC2150_REG_VBUS_80)
+		pwr_status |= TCPC_REG_POWER_STATUS_EXT_VSAFE0V;
+
+	SC2150_INFO("%s pwr_status:0x%x\n", __func__, pwr_status);
+
+	return ret;
+}
+#else
 int sc2150_get_alert_status(struct tcpc_device *tcpc, uint32_t *alert)
 {
 	int ret;
@@ -668,6 +735,7 @@ static int sc2150_get_power_status(
 
 	return 0;
 }
+#endif /* LINUX_VERSION_CODE */
 
 int sc2150_get_fault_status(struct tcpc_device *tcpc, uint8_t *status)
 {
@@ -1012,7 +1080,11 @@ static struct tcpc_ops sc2150_tcpc_ops = {
 	.alert_status_clear = sc2150_alert_status_clear,
 	.fault_status_clear = sc2150_fault_status_clear,
 	.get_alert_mask = sc2150_get_alert_mask,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
+	.get_alert_status_and_mask = sc2150_get_alert_status_and_mask,
+#else
 	.get_alert_status = sc2150_get_alert_status,
+#endif /* LINUX_VERSION_CODE */
 	.get_power_status = sc2150_get_power_status,
 	.get_fault_status = sc2150_get_fault_status,
 	.get_chip_id = sc2150_get_chip_id,

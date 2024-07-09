@@ -1,3 +1,5 @@
+subdir-ccflags-y += -Wno-unused-but-set-variable
+
 obj-y += devinfo/
 obj-y += touchscreen/
 obj-y += fingerprint/

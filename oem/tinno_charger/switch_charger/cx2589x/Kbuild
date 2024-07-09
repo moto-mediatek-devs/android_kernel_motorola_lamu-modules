@@ -1,3 +1,5 @@
+subdir-ccflags-y += -Wno-unused-but-set-variable
+
 ifdef CONFIG_OEM_SWITCH_CHARGER_CX2589X
 	SWITCH_CHARGER_CX2589X_OBJS += cx2589x_charger.o
 endif
