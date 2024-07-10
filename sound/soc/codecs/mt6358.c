@@ -2744,7 +2744,7 @@ static int mt6358_amic_enable(struct mt6358_priv *priv)
 		}
 		/* Enable MICBIAS0, MISBIAS0 = 1P9V */
 		regmap_update_bits(priv->regmap, MT6358_AUDENC_ANA_CON9,
-				   0xff, 0x21);
+				   0xff, 0x51);                                      //chao.zhang1@tinno.com modify 1P9V-->2P5V
 	}
 
 	/* mic bias 1 */
@@ -6417,7 +6417,7 @@ static int mt6358_rcv_mic_set(struct snd_kcontrol *kcontrol,
 	}
 
 	/* Enable MICBIAS0, MISBIAS0 = 1P9V */
-	regmap_write(priv->regmap, MT6358_AUDENC_ANA_CON9, 0x0021);
+	regmap_write(priv->regmap, MT6358_AUDENC_ANA_CON9, 0x0051);      //chao.zhang1@tinno.com modify 1P9V-->2P5V
 
 	if (rcv_mic_type == RCV_MIC_DCC) {
 		/* Audio L preamplifier DCC precharge */
