@@ -999,6 +999,7 @@ static int read_sc520cs_lsc_info(kal_uint32 addr,kal_uint32 threshold,kal_uint32
         for (i = 0; i < 1799 ; i++) {
             sc520cs_otp_info.lsc_param[i] = read_cmos_sensor(addr + i);
             check_sum_cal += sc520cs_otp_info.lsc_param[i];
+            //CAM_DBG(PFX,"sc520cs-otp zyy === SC520CS INFO sc520cs_otp_info.lsc_param[%d]=0x%x  ===\n",i, sc520cs_otp_info.lsc_param[i]);
         }
         CAM_DBG(PFX,"sc520cs-otp check_sum_cal(0x%x) i=%d\n", check_sum_cal,i);
         if(i == 1799){
@@ -1011,6 +1012,7 @@ static int read_sc520cs_lsc_info(kal_uint32 addr,kal_uint32 threshold,kal_uint32
                 check_sum = read_cmos_sensor(0x88ab);
                 sc520cs_otp_info.lsc_param[i+1799] = read_cmos_sensor(addr + i + 1901);
                 check_sum_cal1 += sc520cs_otp_info.lsc_param[i+1799];
+                //CAM_DBG(PFX,"sc520cs-otp zyy === SC520CS INFO sc520cs_otp_info.lsc_param[%d]=0x%x  ===\n",i+1799, sc520cs_otp_info.lsc_param[i]);
             }
         }
 		sc520cs_otp_info.lscChksum = read_cmos_sensor(0x88ab);
@@ -1023,6 +1025,7 @@ static int read_sc520cs_lsc_info(kal_uint32 addr,kal_uint32 threshold,kal_uint32
         for (i = 0; i < LSC_LENGTH ; i++) {
             sc520cs_otp_info.lsc_param[i] = read_cmos_sensor(addr + i);
             check_sum_cal += sc520cs_otp_info.lsc_param[i];
+            //CAM_DBG(PFX,"sc520cs-otp zyy === SC520CS INFO sc520cs_otp_info.lsc_param[%d]=0x%x  ===\n",i, sc520cs_otp_info.lsc_param[i]);
         }
         check_sum = read_cmos_sensor(0x8ff8);
 		sc520cs_otp_info.lscChksum = read_cmos_sensor(0x8ff8);
@@ -1050,18 +1053,19 @@ static int read_sc520cs_module_info(kal_uint32 addr)
 	for (i = 0; i < MODULE_LENGTH ; i++) {
 		sc520cs_otp_info.module_param[i] = read_cmos_sensor(addr + i);
 		check_sum_cal += sc520cs_otp_info.module_param[i];
+        //CAM_DBG(PFX,"sc520cs-otp zyy === SC520CS INFO sc520cs_otp_info.module_param[%d]=0x%x  ===\n",i, sc520cs_otp_info.module_param[i]);
 	}
 	check_sum = read_cmos_sensor(addr + 18);
 	check_sum_cal = (check_sum_cal % 255) + 1;
 	mid = sc520cs_otp_info.module_param[0];
-	lens_id = sc520cs_otp_info.module_param[1];
-	year = sc520cs_otp_info.module_param[2];
-	month = sc520cs_otp_info.module_param[3];
-	day = sc520cs_otp_info.module_param[4];
+	lens_id = sc520cs_otp_info.module_param[4];
+	year = sc520cs_otp_info.module_param[1];
+	month = sc520cs_otp_info.module_param[2];
+	day = sc520cs_otp_info.module_param[3];
 
 	CAM_DBG(PFX,"sc520cs-otp=== SC520CS INFO module_id=0x%x  ===\n", mid);
 	CAM_DBG(PFX,"sc520cs-otp=== SC520CS INFO lens_id=0x%x ===\n", lens_id);
-	CAM_DBG(PFX,"sc520cs-otp=== SC520CS INFO date is %d-%d-%d ===\n", year, month, day);
+	CAM_DBG(PFX,"sc520cs-otp=== SC520CS INFO date is 20%d-%d-%d ===\n", year, month, day);
 	CAM_DBG(PFX,"sc520cs-otp=== SC520CS INFO check_sum=0x%x,check_sum_cal=0x%x ===\n", check_sum, check_sum_cal);
 	if (check_sum == check_sum_cal) {
         CAM_DBG(PFX,"sc520cs-otp module checksum ok\n");
@@ -1085,14 +1089,15 @@ static int read_sc520cs_awb_info(kal_uint32 addr)
 	for (i = 0; i < AWB_LENGTH ; i++) {
 		sc520cs_otp_info.awb_param[i] = read_cmos_sensor(addr + i);
 		check_sum_awb_cal += sc520cs_otp_info.awb_param[i];
+        //CAM_DBG(PFX,"sc520cs-otp zyy === SC520CS INFO sc520cs_otp_info.awb_param[%d]=0x%x  ===\n",i, sc520cs_otp_info.awb_param[i]);
 	}
 
 	check_sum_awb_cal = check_sum_awb_cal - sc520cs_otp_info.awb_param[AWB_LENGTH-1];
 	rg = ((sc520cs_otp_info.awb_param[0] << 8) & 0xff00) | (sc520cs_otp_info.awb_param[1] & 0xff);
 	bg = ((sc520cs_otp_info.awb_param[2] << 8) & 0xff00) | (sc520cs_otp_info.awb_param[3] & 0xff);
 
-	golden_rg = 0x26A; //((sc520cs_otp_info.awb_param[4] << 8) & 0xff00) | (sc520cs_otp_info.awb_param[5] & 0xff);
-	golden_bg = 0x29A; //((sc520cs_otp_info.awb_param[6] << 8) & 0xff00) | (sc520cs_otp_info.awb_param[7] & 0xff);
+	golden_rg = 0x26A;
+	golden_bg = 0x29A;
 	check_sum_awb = read_cmos_sensor(addr + 12);
 	check_sum_awb_cal = (check_sum_awb_cal % 255) + 1;
     sc520cs_otp_info.awbChksum = check_sum_awb;
@@ -1270,7 +1275,6 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
                                 rc = sc520cs_sensor_otp_info(threshold[j],threshold1[j]);
                                 if (rc == 0x0f) {
                                     CAM_DBG(PFX,"sc520cs-otp %d st read otp success", j);
-                                    break;
                                 } else {
                                     CAM_DBG(PFX,"sc520cs-otp %d st read otp failed", j);
                                     continue;
@@ -1284,18 +1288,6 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 							FULL_PRODUCT_DEVICE_CB(ID_MAIN_CAM, main_5m_cam_get_info, NULL);
 #endif
 							return ERROR_NONE;
-
-							
-							/* for(j=0;j<3;j++){
-								rc = sc520cs_sensor_otp_info(threshold[j]);
-								if (rc == 0x0f) {
-									break;
-								}
-							}
-							if (sc520cs_otp_info.module_param[0]==SC520CS_MODULE_ID) {
-
-							return ERROR_NONE;
-							}*/
 			}
 			CAM_DBG(PFX,"get_imgsensor_id Read sensor id fail, i2c write id: 0x%x,sensor id: 0x%x\n,module id: 0x%x",imgsensor.i2c_write_id, *sensor_id,sc520cs_otp_info.module_param[0]);
 
