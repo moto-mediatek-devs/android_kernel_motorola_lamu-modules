@@ -67,6 +67,13 @@ struct charger_data;
 #define NON_STD_AC_CHARGER_CURRENT		500000
 #define CHARGING_HOST_CHARGER_CURRENT		650000
 
+/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
+#define HVDCP_CHARGER_CURRENT			3500000
+#define HVDCP_CHARGER_INPUT_CURRENT		3200000
+#endif
+/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+
 /* dynamic mivr */
 #define V_CHARGER_MIN_1 4400000 /* 4.4 V */
 #define V_CHARGER_MIN_2 4200000 /* 4.2 V */
@@ -263,6 +270,19 @@ struct charger_custom_data {
 	int temp_t0_thres_plus_x_degree;
 	int temp_neg_10_thres;
 
+/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
+	int hvdcp_temp_above_t4_icurrent;
+	int hvdcp_temp_t3_to_t4_icurrent;
+	int hvdcp_temp_t2_to_t3_icurrent;
+	int hvdcp_temp_t1_to_t2_icurrent;
+	int hvdcp_temp_t0_to_t1_icurrent;
+	int hvdcp_temp_below_t0_icurrent;
+	int hvdcp_charging_current_limit;
+	int hvdcp_input_current_limit;
+#endif
+/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+
 	/* battery temperature protection */
 	int mtk_temperature_recharge_support;
 	int max_charge_temp;
@@ -289,6 +309,11 @@ struct charger_data {
 	int input_current_limit_by_aicl;
 	int junction_temp_min;
 	int junction_temp_max;
+/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
+	int hvdcp_temp_charging_current_limit;
+#endif
+/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 };
 
 enum chg_data_idx_enum {
@@ -349,6 +374,12 @@ struct mtk_charger {
 	struct power_supply_desc psy_hvdvchg_desc2;
 	struct power_supply_config psy_hvdvchg_cfg2;
 	struct power_supply *psy_hvdvchg2;
+
+/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
+	struct power_supply *hvdcp_logic_psy;
+#endif
+/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 
 	struct power_supply  *chg_psy;
 	struct power_supply  *bc12_psy;
@@ -503,6 +534,14 @@ struct mtk_charger {
 	int protocol_state;
 	int ta_capability;
 	int wait_times;
+
+/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
+	struct delayed_work hvdcp_work;
+	struct notifier_block hvdcp_charger_detect_nb;
+#endif
+/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+
 /* TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
 	struct ffc_bat_zone *ffc_zones;

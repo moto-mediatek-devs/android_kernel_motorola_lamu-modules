@@ -103,11 +103,6 @@ struct charger_ops {
 	int (*set_charging_current)(struct charger_device *dev, u32 uA);
 	int (*get_min_charging_current)(struct charger_device *dev, u32 *uA);
 
-#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
-	int (*set_dp)(struct charger_device *dev, u32 uV);
-	int (*set_dm)(struct charger_device *dev, u32 uV);
-#endif
-
 /* TN Begin modified by hao.jia/809321 20240701 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
 	int (*enable_adc)(struct charger_device *dev, bool enable);
@@ -126,6 +121,13 @@ struct charger_ops {
 	/* set cv */
 	int (*set_constant_voltage)(struct charger_device *dev, u32 uV);
 	int (*get_constant_voltage)(struct charger_device *dev, u32 *uV);
+
+/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
+	int (*set_dp)(struct charger_device *dev, u32 uV);
+	int (*set_dm)(struct charger_device *dev, u32 uV);
+#endif
+/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 
 	int (*check_cs_temp)(struct charger_device *dev);
 	int (*cs_status_control)(struct charger_device *chg_dev, bool enable);
@@ -309,6 +311,14 @@ extern int charger_dev_set_constant_voltage(
 	struct charger_device *charger_dev, u32 uV);
 extern int charger_dev_get_constant_voltage(
 	struct charger_device *charger_dev, u32 *uV);
+/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
+	extern int charger_dev_set_dp_voltage(
+		struct charger_device *charger_dev, u32 uV);
+	extern int charger_dev_set_dm_voltage(
+		struct charger_device *charger_dev, u32 uV);
+#endif
+/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 extern int charger_dev_dump_init_setting(
 	struct charger_device *charger_dev);
 extern int charger_dev_dump_registers(

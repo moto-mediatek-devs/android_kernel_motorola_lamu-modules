@@ -59,6 +59,12 @@
 
 #include "mtk_charger.h"
 
+/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
+extern int hvdcp_charging_mode;
+#endif
+/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+
 /*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
 #define FFC_BAT_VOLT_COMP_MV	100
@@ -261,6 +267,18 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		}
 #endif /* CONFIG_OEM_TURBO_CHARGER */
 /*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+
+/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
+		if (hvdcp_charging_mode) {
+			chr_info("[%s]: for HVDCP mode, set charge current:%d, input current:%d\n",
+						__func__, info->data.hvdcp_charging_current_limit, info->data.hvdcp_input_current_limit);
+			pdata->charging_current_limit = info->data.hvdcp_charging_current_limit;
+			pdata->input_current_limit = info->data.hvdcp_input_current_limit;
+		}
+#endif
+/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+
 	} else if (info->chr_type == POWER_SUPPLY_TYPE_USB &&
 	    info->usb_type == POWER_SUPPLY_USB_TYPE_DCP) {
 		/* NONSTANDARD_CHARGER */
@@ -320,9 +338,23 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 			&& info->chr_type == POWER_SUPPLY_TYPE_USB)
 			chr_debug("USBIF & STAND_HOST skip current check\n");
 		else {
-			if (info->sw_jeita.sm == TEMP_T0_TO_T1) {
-				pdata->input_current_limit = 500000;
-				pdata->charging_current_limit = 350000;
+/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
+			if (hvdcp_charging_mode) {
+				chr_info("[%s] charging_current_limit:%d, hvdcp_temp_charging_current_limit:%d\n",
+						__func__, pdata->charging_current_limit, pdata->hvdcp_temp_charging_current_limit);
+				if (pdata->hvdcp_temp_charging_current_limit < pdata->charging_current_limit) {
+					pdata->charging_current_limit = pdata->hvdcp_temp_charging_current_limit;
+					pdata->input_current_limit = pdata->hvdcp_temp_charging_current_limit;
+				}
+			} else
+#endif
+/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+			{
+				if (info->sw_jeita.sm == TEMP_T0_TO_T1) {
+					pdata->input_current_limit = 500000;
+					pdata->charging_current_limit = 350000;
+				}
 			}
 		}
 	}
