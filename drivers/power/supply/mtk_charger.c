@@ -96,6 +96,17 @@ struct tag_bootmode {
 	u32 boottype;
 };
 
+/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
+#define HVDCP_TARGE_VOLT  6000 //mV
+#define HVDCP_MAX_VOLT    (HVDCP_TARGE_VOLT + 200) //mV
+int hvdcp_charging_mode = 0;
+static bool first_insert = true;
+bool is_hvdcp_charger_ready = false;
+EXPORT_SYMBOL(is_hvdcp_charger_ready);
+#endif
+/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+
 #ifdef MODULE
 static char __chg_cmdline[COMMAND_LINE_SIZE];
 static char *chg_cmdline = __chg_cmdline;
@@ -659,6 +670,72 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 		info->cs_hw_disable = true;
 		info->curr_select_name = "NULL";
 	}
+
+/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
+	if (of_property_read_u32(np, "hvdcp_temp_above_t4_icurrent", &val) >= 0)
+		info->data.hvdcp_temp_above_t4_icurrent = val;
+	else {
+		chr_err("use default hvdcp_temp_above_t4_icurrent:0\n");
+		info->data.hvdcp_temp_above_t4_icurrent = 0;
+	}
+
+	if (of_property_read_u32(np, "hvdcp_temp_t3_to_t4_icurrent", &val) >= 0)
+		info->data.hvdcp_temp_t3_to_t4_icurrent = val;
+	else {
+		chr_err("use default hvdcp_temp_t3_to_t4_icurrent:%d\n",
+			HVDCP_CHARGER_CURRENT);
+		info->data.hvdcp_temp_t3_to_t4_icurrent = HVDCP_CHARGER_CURRENT;
+	}
+
+	if (of_property_read_u32(np, "hvdcp_temp_t2_to_t3_icurrent", &val) >= 0)
+		info->data.hvdcp_temp_t2_to_t3_icurrent = val;
+	else {
+		chr_err("use default hvdcp_temp_t2_to_t3_icurrent:%d\n",
+			HVDCP_CHARGER_CURRENT);
+		info->data.hvdcp_temp_t2_to_t3_icurrent = HVDCP_CHARGER_CURRENT;
+	}
+
+	if (of_property_read_u32(np, "hvdcp_temp_t1_to_t2_icurrent", &val) >= 0)
+		info->data.hvdcp_temp_t1_to_t2_icurrent = val;
+	else {
+		chr_err("use default hvdcp_temp_t1_to_t2_icurrent:%d\n",
+			HVDCP_CHARGER_CURRENT);
+		info->data.hvdcp_temp_t1_to_t2_icurrent = HVDCP_CHARGER_CURRENT;
+	}
+
+	if (of_property_read_u32(np, "hvdcp_temp_t0_to_t1_icurrent", &val) >= 0)
+		info->data.hvdcp_temp_t0_to_t1_icurrent = val;
+	else {
+		chr_err("use default hvdcp_temp_t0_to_t1_icurrent:%d\n",
+			HVDCP_CHARGER_CURRENT);
+		info->data.hvdcp_temp_t0_to_t1_icurrent = HVDCP_CHARGER_CURRENT;
+	}
+
+	if (of_property_read_u32(np, "hvdcp_temp_below_t0_icurrent", &val) >= 0)
+		info->data.hvdcp_temp_below_t0_icurrent = val;
+	else {
+		chr_err("use default hvdcp_temp_below_t0_icurrent:0\n");
+		info->data.hvdcp_temp_below_t0_icurrent = 0;
+	}
+
+	if (of_property_read_u32(np, "hvdcp_input_current_limit", &val) >= 0)
+		info->data.hvdcp_input_current_limit = val;
+	else {
+		chr_err("use default hvdcp_input_current_limit:%d\n",
+			HVDCP_CHARGER_INPUT_CURRENT);
+		info->data.hvdcp_input_current_limit = HVDCP_CHARGER_INPUT_CURRENT;
+	}
+
+	if (of_property_read_u32(np, "hvdcp_charging_current_limit", &val) >= 0)
+		info->data.hvdcp_charging_current_limit = val;
+	else {
+		chr_err("use default hvdcp_charging_current_limit:%d\n",
+			HVDCP_CHARGER_CURRENT);
+		info->data.hvdcp_charging_current_limit = HVDCP_CHARGER_CURRENT;
+	}
+#endif
+/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 }
 
 static void mtk_charger_start_timer(struct mtk_charger *info)
@@ -760,6 +837,13 @@ void do_sw_jeita_state_machine(struct mtk_charger *info)
 	sw_jeita = &info->sw_jeita;
 	sw_jeita->pre_sm = sw_jeita->sm;
 	sw_jeita->charging = true;
+
+/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
+	struct charger_data *pdata;
+	pdata = &info->chg_data[CHG1_SETTING];
+#endif
+/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 
 	/* JEITA battery temp Standard */
 	if (info->battery_temp >= info->data.temp_t4_thres) {
@@ -865,6 +949,26 @@ void do_sw_jeita_state_machine(struct mtk_charger *info)
 	} else {
 		sw_jeita->cv = 0;
 	}
+
+/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
+	if (sw_jeita->sm == TEMP_ABOVE_T4)
+		pdata->hvdcp_temp_charging_current_limit = info->data.hvdcp_temp_above_t4_icurrent;
+	else if (sw_jeita->sm == TEMP_T3_TO_T4)
+		pdata->hvdcp_temp_charging_current_limit = info->data.hvdcp_temp_t3_to_t4_icurrent;
+	else if (sw_jeita->sm == TEMP_T2_TO_T3)
+		pdata->hvdcp_temp_charging_current_limit = info->data.hvdcp_temp_t2_to_t3_icurrent;
+	else if (sw_jeita->sm == TEMP_T1_TO_T2)
+		pdata->hvdcp_temp_charging_current_limit = info->data.hvdcp_temp_t1_to_t2_icurrent;
+	else if (sw_jeita->sm == TEMP_T0_TO_T1)
+		pdata->hvdcp_temp_charging_current_limit = info->data.hvdcp_temp_t0_to_t1_icurrent;
+	else if (sw_jeita->sm == TEMP_BELOW_T0)
+		pdata->hvdcp_temp_charging_current_limit = info->data.hvdcp_temp_below_t0_icurrent;
+	else
+		pdata->hvdcp_temp_charging_current_limit = 0;
+	chr_err("[SW_JEITA] hvdcp_temp_curr:%d\n", pdata->hvdcp_temp_charging_current_limit);
+#endif
+/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 
 	chr_err("[SW_JEITA]preState:%d newState:%d tmp:%d cv:%d\n",
 		sw_jeita->pre_sm, sw_jeita->sm, info->battery_temp,
@@ -2888,6 +2992,196 @@ static bool charger_init_algo(struct mtk_charger *info)
 	return true;
 }
 
+/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
+static int hvdcp_charging(struct mtk_charger *info)
+{
+	int i, ret, vbus_volt_old, vbus_volt_new, time_out = 0;
+	struct charger_data *pdata;
+	pdata = &info->chg_data[CHG1_SETTING];
+
+	chr_err("%s start\n", __func__);
+	ret = get_vbus(info);
+	if (ret < 0) {
+		chr_err("%s get vbus voltage failed before hvdcp check\n", __func__);
+		return ret;
+	} else {
+		vbus_volt_old = ret;
+	}
+
+	if (vbus_volt_old >= HVDCP_TARGE_VOLT) {
+		chr_err("%s vbus_volt_old hvdcp detected, vbus old voltage: %d\n", __func__, vbus_volt_old);
+		return ret;
+	}
+
+	ret = charger_dev_set_dp_voltage(info->chg1_dev, 600000);
+	if (ret < 0) {
+		chr_err("%s ignore hvdcp detect due to set dp voltage failed(%d)\n", __func__, ret);
+		return ret;
+	}
+
+	ret = charger_dev_set_dm_voltage(info->chg1_dev, 3300000);
+	if (ret < 0) {
+		chr_err("%s ignore hvdcp detect due to set dm voltage failed(%d)\n", __func__, ret);
+		return ret;
+	}
+	chr_info("%s enter hvdcp vbus old %d\n", __func__, vbus_volt_old);
+	msleep(100);
+	for (i = 0; i < 15; i++) {
+		ret = charger_dev_set_dp_voltage(info->chg1_dev, 3300000);
+		if (ret < 0) {
+			chr_err("%s ignore hvdcp detect due to set dp voltage failed(%d), Loop: %d\n", __func__, ret, i);
+			return ret;
+		}
+		usleep_range(100, 100);
+		ret = charger_dev_set_dp_voltage(info->chg1_dev, 600000);
+		if (ret < 0) {
+			chr_err("%s ignore hvdcp detect due to set dp voltage failed(%d), Loop: %d\n", __func__, ret, i);
+			return ret;
+		}
+		msleep(500);
+		ret = get_vbus(info);
+		if (ret < 0) {
+			chr_err("%s get vbus voltage failed\n", __func__);
+			return -EINVAL;
+		}
+
+		while (time_out < 100) {
+			msleep(10);
+			ret = get_vbus(info);
+			if (ret < 0) {
+				chr_err("%s check hvdcp vbus failed, try count: %d\n", __func__, i);
+				return ret;
+			}
+			vbus_volt_new = get_vbus(info);
+			if (vbus_volt_new > vbus_volt_old) {
+				vbus_volt_old = vbus_volt_new;
+				chr_info("%s hvdcp detected, vbus new voltage: %d\n",  __func__, vbus_volt_new);
+				break;
+			}
+			time_out++;
+		}
+		if (time_out == 100) {
+			chr_info("%s hvdcp not supported\n", __func__);
+			return -EINVAL;
+		}
+
+		if (vbus_volt_new >= HVDCP_TARGE_VOLT) {
+			chr_err("%s vbus new >= %d, vbus voltage: %d\n", __func__, HVDCP_TARGE_VOLT, vbus_volt_new);
+			hvdcp_charging_mode = 1;
+			break;
+		}
+	}
+
+	if (vbus_volt_new >= HVDCP_MAX_VOLT) {
+		msleep(300);
+		ret = charger_dev_set_dm_voltage(info->chg1_dev, 600000);
+		usleep_range(100, 100);
+		ret = charger_dev_set_dm_voltage(info->chg1_dev, 3300000);
+		msleep(500);
+		ret = get_vbus(info);
+		if (ret < 0) {
+			chr_err("%s get vbus voltage failed\n", __func__);
+			return -EINVAL;
+		}
+		chr_err("%s vbus new > %d , vbus voltage: %d\n", __func__, HVDCP_MAX_VOLT, vbus_volt_new);
+	}
+
+	_wake_up_charger(info);
+
+	return ret;
+}
+
+static int hvdcp_charger_detect_notifier_cb(struct notifier_block *nb,
+			unsigned long event, void *data)
+{
+	struct mtk_charger *info = container_of(nb,
+						struct mtk_charger, hvdcp_charger_detect_nb);
+	union power_supply_propval val = {0};
+	struct power_supply *psy = data;
+	int ret = 0;
+	int chr_type = 0;
+
+	chr_err("%s: enter, power supply name is %s\n", __func__, psy->desc->name);
+
+	if (IS_ERR_OR_NULL(info) || IS_ERR_OR_NULL(info->chg_psy)) {
+		chr_err("%s: failed to get mtk_charger device\n", __func__);
+		return NOTIFY_DONE;
+	}
+
+	#if 0
+	if (!oem_pcba_chg_15w_exist()) {
+		if (IS_ERR_OR_NULL(info->hvdcp_logic_psy)) {
+			info->hvdcp_logic_psy = power_supply_get_by_name("z350-usb");
+			if (IS_ERR_OR_NULL(info->hvdcp_logic_psy)) {
+				chr_err("%s: failed to get z350 device\n", __func__);
+				return NOTIFY_DONE;
+			}
+		}
+	}
+	#endif
+
+	if (psy == info->chg_psy || psy == info->hvdcp_logic_psy) {
+		chr_err("%s: %s first insert cable\n", __func__, first_insert ? "is" : "not");
+		if (first_insert) {
+			ret = power_supply_get_property(info->chg_psy,
+							POWER_SUPPLY_PROP_USB_TYPE, &val);
+			if (ret < 0) {
+				chr_err("%s: failed to get basic charger type\n", __func__);
+			} else {
+				chr_type = val.intval;
+				#if 0
+				if (chr_type == POWER_SUPPLY_USB_TYPE_DCP) {
+					if (!oem_pcba_chg_15w_exist()) {
+						chr_err("%s: found 33W device, is_hvdcp_charger_ready:%d\n", __func__, is_hvdcp_charger_ready);
+						if (is_hvdcp_charger_ready) {
+							chr_err("%s: detect hvdcp charger, try to tuning voltage\n", __func__);
+							charger_dev_set_dp_voltage(info->chg1_dev, 600000);
+							schedule_delayed_work(&info->hvdcp_work, msecs_to_jiffies(1500));
+							first_insert = false;
+						}
+					} else {
+						chr_err("%s: found 15W device, try to detect hvdcp charger\n", __func__);
+						charger_dev_set_dp_voltage(info->chg1_dev, 600000);
+						schedule_delayed_work(&info->hvdcp_work, msecs_to_jiffies(1500));
+						first_insert = false;
+					}
+				}
+				#endif
+				chr_err("%s: found 15W device, try to detect hvdcp charger\n", __func__);
+				charger_dev_set_dp_voltage(info->chg1_dev, 600000);
+				schedule_delayed_work(&info->hvdcp_work, msecs_to_jiffies(1500));
+				first_insert = false;
+			}
+		}
+	}
+
+	return NOTIFY_OK;
+}
+
+static void charger_hvdcp_detect_work(
+		struct work_struct *work)
+{
+	struct mtk_charger *info =
+		container_of(work, struct mtk_charger, hvdcp_work.work);
+	int ret;
+	chr_err("%s enter hvdcp detect work\n", __func__);
+
+	if (info == NULL) {
+		chr_err("%s: get info failed\n", __func__);
+		cancel_delayed_work(&info->hvdcp_work);
+		return;
+	}
+	ret = hvdcp_charging(info);
+	if (ret < 0) {
+		cancel_delayed_work(&info->hvdcp_work);
+		chr_err("cancel charger_delayed_work hvdcp\n");
+		first_insert = true;
+	}
+}
+#endif
+/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+
 static int mtk_charger_force_disable_power_path(struct mtk_charger *info,
 	int idx, bool disable);
 static int mtk_charger_plug_out(struct mtk_charger *info)
@@ -2919,6 +3213,15 @@ static int mtk_charger_plug_out(struct mtk_charger *info)
 	charger_dev_set_input_current(info->chg1_dev, 100000);
 	charger_dev_set_mivr(info->chg1_dev, info->data.min_charger_voltage);
 	charger_dev_plug_out(info->chg1_dev);
+/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
+	first_insert = true;
+	hvdcp_charging_mode = 0;
+	is_hvdcp_charger_ready = false;
+	cancel_delayed_work(&info->hvdcp_work);
+	chr_err("%s: cancel hvdcp work\n", __func__);
+#endif
+/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 	mtk_charger_force_disable_power_path(info, CHG1_SETTING, true);
 
 /*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202*/
@@ -4353,6 +4656,14 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	/* 9 = LOW_POWER_OFF_CHARGING_BOOT */
 	if (info != NULL && info->bootmode != 8 && info->bootmode != 9)
 		mtk_charger_force_disable_power_path(info, CHG1_SETTING, true);
+
+/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
+	INIT_DELAYED_WORK(&info->hvdcp_work, charger_hvdcp_detect_work);
+	info->hvdcp_charger_detect_nb.notifier_call = hvdcp_charger_detect_notifier_cb;
+	power_supply_reg_notifier(&info->hvdcp_charger_detect_nb);
+#endif
+/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 
 	kthread_run(charger_routine_thread, info, "charger_thread");
 

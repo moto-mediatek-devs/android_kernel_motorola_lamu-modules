@@ -170,3 +170,10 @@ config OEM_BATTERY_SWITCH_UPM2388
 	default n
 	help
 	  support oem_battery_switch_upm2388
+
+config OEM_HVDCP_ALGO
+	tristate "oem hvdcp algo"
+	depends on OEM_TINNO_CHARGER
+	default n
+	help
+	  support oem_hvdcp_algo

@@ -404,6 +404,30 @@ int charger_dev_get_constant_voltage(struct charger_device *chg_dev, u32 *uV)
 }
 EXPORT_SYMBOL(charger_dev_get_constant_voltage);
 
+/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
+int charger_dev_set_dp_voltage(struct charger_device *chg_dev, u32 uV)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL &&
+	    chg_dev->ops->set_dp)
+		return chg_dev->ops->set_dp(chg_dev, uV);
+
+	return -EOPNOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_set_dp_voltage);
+
+int charger_dev_set_dm_voltage(struct charger_device *chg_dev, u32 uV)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL &&
+	    chg_dev->ops->set_dm)
+		return chg_dev->ops->set_dm(chg_dev, uV);
+
+	return -EOPNOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_set_dm_voltage);
+#endif
+/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+
 /* for mt6375 solution */
 int cs_dev_check_cs_temp(struct charger_device *chg_dev)
 {
