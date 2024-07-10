@@ -157,6 +157,13 @@ config OEM_QC_LOGIC_Z350
 	help
 	  support oem_qc_logic_z350
 
+config OEM_QC_LOGIC_WT6670F
+	tristate "oem qc logic wt6670f"
+	depends on OEM_QC_LOGIC
+	default n
+	help
+	  support oem_qc_logic_wt6670f
+
 config OEM_FUEL_GAUGE_SM5602
 	tristate "oem fuel gauge sm5602"
 	depends on OEM_FUEL_GAUGE
