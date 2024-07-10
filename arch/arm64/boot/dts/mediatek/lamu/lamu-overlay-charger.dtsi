@@ -1,6 +1,7 @@
 /*[TN.NJDC] charger overlay file.start*/
 #include <dt-bindings/iio/mt635x-auxadc.h>
 #include <dt-bindings/phy/phy.h>
+#include <dt-bindings/pinctrl/mt6768-pinfunc.h>
 
 &charger {
 	battery_cv = <4530000>;
@@ -41,6 +42,70 @@
 	sw-charging-curr-limited = <500000>; /*uA*/
 	charging-curr-min = <2000000>; /*uA*/
 	turbo-volt-comp = <300000>; /*uV*/
+};
+
+&pio {
+	wt6670f_int_isp: wt6670t_int_isp {
+		pin_cmd_dat {
+			pinmux = <PINMUX_GPIO94__FUNC_GPIO94>;
+			slew-rate = <0>;
+			bias-pull-up = <1>;
+			input-enable;
+		};
+	};
+
+	wt6670f_default: wt6670t_default {
+	};
+
+	wt6670f_rst_normal: wt6670t_rst_normal {
+		pin_cmd_dat {
+			pinmux = <PINMUX_GPIO92__FUNC_GPIO92>;
+			slew-rate = <1>;
+			bias-disable;
+			output-high;
+		};
+	};
+
+	wt6670f_rst_isp: wt6670t_rst_isp {
+		pin_cmd_dat {
+			pinmux = <PINMUX_GPIO92__FUNC_GPIO92>;
+			slew-rate = <1>;
+			bias-disable;
+			output-low;
+		};
+	};
+
+	wt6670f_sda_normal: wt6670t_sda_normal {
+		pin_cmd_dat {
+			pinmux = <PINMUX_GPIO90__FUNC_SDA6>;
+			slew-rate = <0>;
+			bias-pull-up = <1>;
+		};
+	};
+
+	wt6670f_sda_isp: wt6670t_sda_isp {
+		pin_cmd_dat {
+			pinmux = <PINMUX_GPIO90__FUNC_GPIO90>;
+			slew-rate = <1>;
+			output-low;
+		};
+	};
+
+	wt6670f_scl_normal: wt6670t_scl_normal {
+		pin_cmd_dat {
+			pinmux = <PINMUX_GPIO89__FUNC_SCL6>;
+			slew-rate = <0>;
+			bias-pull-up = <1>;
+		};
+	};
+
+	wt6670f_scl_isp: wt6670t_scl_isp {
+		pin_cmd_dat {
+			pinmux = <PINMUX_GPIO89__FUNC_GPIO89>;
+			slew-rate = <1>;
+			output-low;
+		};
+	};
 };
 
 &i2c7 {
@@ -115,6 +180,29 @@
 		z350,qc3-vset-mv = <9000>;
 		interrupt-names = "z350_irq";
 		status = "okay";
+	};
+
+	wt6670f@36 {
+		compatible = "wt,wt6670f_charger";
+		reg = <0x36>;
+		status = "okay";
+
+		phys = <&u2port0 PHY_TYPE_USB2>;
+		phy-names = "usb2-phy";
+
+		pinctrl-names = "default",  "rst_normal", "rst_isp", "scl_normal", "scl_isp", "sda_normal", "sda_isp";
+		pinctrl-0 = <&wt6670f_default>;
+		pinctrl-1 = <&wt6670f_rst_normal>;
+		pinctrl-2 = <&wt6670f_rst_isp>;
+		pinctrl-3 = <&wt6670f_scl_normal>;
+		pinctrl-4 = <&wt6670f_scl_isp>;
+		pinctrl-5 = <&wt6670f_sda_normal>;
+		pinctrl-6 = <&wt6670f_sda_isp>;
+
+		wt,wt6670f_scl_gpio = <&pio 89 0x01>;
+		wt,wt6670f_sda_gpio = <&pio 90 0x01>;
+		wt,wt6670f_int_gpio = <&pio 94 IRQ_TYPE_EDGE_RISING>;
+		wt,wt6670f_rst_gpio = <&pio 92 IRQ_TYPE_EDGE_FALLING>;
 	};
 
 	sc2150-pd@4e{

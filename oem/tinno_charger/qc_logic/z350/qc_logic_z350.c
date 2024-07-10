@@ -1212,15 +1212,15 @@ static int z350_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	chip->i2c = client;
 	i2c_set_clientdata(client, chip);
 
-	ret = z350_parse_dts(np, chip);
-	if (ret < 0) {
-		dev_err(cdev, "%s: parse dt failed\n", __func__);
-		goto err_parse_dt;
-	}
-
 	ret = z350_check_vendor_id(chip);
 	if (ret < 0) {
 		dev_err(cdev, "%s: no dev, check vendor id failed\n", __func__);
+		goto err_parse_dt;
+	}
+
+	ret = z350_parse_dts(np, chip);
+	if (ret < 0) {
+		dev_err(cdev, "%s: parse dt failed\n", __func__);
 		goto err_parse_dt;
 	}
 
@@ -1290,6 +1290,8 @@ err_request_irq:
 	mutex_destroy(&chip->qc3p_lock);
 	i2c_set_clientdata(client, NULL);
 err_parse_dt:
+	gpio_free(chip->irq_gpio);
+	gpio_free(chip->reset_gpio);
 	devm_kfree(cdev, chip);
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
 	qc_logic_probe_done = false;
