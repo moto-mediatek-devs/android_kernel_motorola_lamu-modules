@@ -3130,8 +3130,8 @@ static int hvdcp_charger_detect_notifier_cb(struct notifier_block *nb,
 				chr_err("%s: failed to get basic charger type\n", __func__);
 			} else {
 				chr_type = val.intval;
-				#if 0
 				if (chr_type == POWER_SUPPLY_USB_TYPE_DCP) {
+					#if 0
 					if (!oem_pcba_chg_15w_exist()) {
 						chr_err("%s: found 33W device, is_hvdcp_charger_ready:%d\n", __func__, is_hvdcp_charger_ready);
 						if (is_hvdcp_charger_ready) {
@@ -3146,12 +3146,12 @@ static int hvdcp_charger_detect_notifier_cb(struct notifier_block *nb,
 						schedule_delayed_work(&info->hvdcp_work, msecs_to_jiffies(1500));
 						first_insert = false;
 					}
+					#endif
+					chr_err("%s: found 15W device, try to detect hvdcp charger\n", __func__);
+					charger_dev_set_dp_voltage(info->chg1_dev, 600000);
+					schedule_delayed_work(&info->hvdcp_work, msecs_to_jiffies(1500));
+					first_insert = false;
 				}
-				#endif
-				chr_err("%s: found 15W device, try to detect hvdcp charger\n", __func__);
-				charger_dev_set_dp_voltage(info->chg1_dev, 600000);
-				schedule_delayed_work(&info->hvdcp_work, msecs_to_jiffies(1500));
-				first_insert = false;
 			}
 		}
 	}
