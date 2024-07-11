@@ -29,12 +29,14 @@ static unsigned int charge_power = 0;
 static unsigned int nfc_exist = 0;
 static unsigned int boot_mode = 0;
 static unsigned int lcd_res = 0;
+static unsigned int hw_sku = 0;
 static char batterysn_buff[OEM_BUFF_SIZE_16] = {0};
 
 module_param_named(chgpower, charge_power, int, 0644);
 module_param_named(nfcexist, nfc_exist, int, 0644);
 module_param_named(bootmode, boot_mode, int, 0644);
 module_param_named(lcdres, lcd_res, int, 0644);
+module_param_named(hwsku, hw_sku, int, 0644);
 module_param_string(batterysn, batterysn_buff, OEM_BUFF_SIZE_16, 0644);
 
 unsigned int oem_pcba_charge_power(void)
@@ -60,6 +62,12 @@ unsigned int oem_lcd_res(void)
 	return lcd_res;
 }
 EXPORT_SYMBOL(oem_lcd_res);
+
+unsigned int oem_hw_sku(void)
+{
+	return hw_sku;
+}
+EXPORT_SYMBOL(oem_hw_sku);
 
 char *oem_battery_sn(void)
 {
@@ -186,8 +194,8 @@ static int dev_info_probe(struct platform_device *pdev)
 {
 	int i, rc;
 
-	pr_info( "[%s] charge power %d, nfc exist %d, boot mode %d, oem battery sn %s\n",
-		__func__, charge_power, nfc_exist, boot_mode, batterysn_buff);
+	pr_info( "[%s] charge power %d, nfc exist %d, boot mode %d, oem battery sn %s, lcd_res %d, hwsku %d\n",
+		__func__, charge_power, nfc_exist, boot_mode, batterysn_buff, lcd_res, hw_sku);
 
 	for (i = 0; i < ARRAY_SIZE(product_dev_attr_array); i++) {
 		rc = device_create_file(&pdev->dev, &product_dev_attr_array[i]);
