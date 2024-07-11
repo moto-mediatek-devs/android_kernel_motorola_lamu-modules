@@ -173,7 +173,6 @@ struct wt6670f_charger {
 	struct mutex chgdet_lock;
 	struct mutex qc3p_lock;
 	bool hvdcp_dpdm_status;
-	unsigned int connect_therm_gpio;
 	int connector_temp;
 	struct mutex irq_complete;
 
@@ -979,13 +978,6 @@ static int wt6670f_parse_dt(struct wt6670f_charger *chip)
 		return -EINVAL;
 	} else
 		pr_info("wt6670f_scl_gpio: %d\n", chip->wt6670f_scl_gpio);
-
-	chip->connect_therm_gpio = of_get_named_gpio(np, "wt,connect_therm", 0);
-	if (!gpio_is_valid(chip->connect_therm_gpio)) {
-		pr_err("get connect_therm_gpio failed\n");
-		return -EINVAL;
-	} else
-		pr_info("connect_therm_gpio: %d\n", chip->connect_therm_gpio);
 
 	chip->bc12_unsupported = of_property_read_bool(np, "wt,bc12_unsupported");
 	chip->hvdcp_unsupported = of_property_read_bool(np, "wt,hvdcp_unsupported");
