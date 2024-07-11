@@ -31,10 +31,6 @@
 
 #include <linux/fs.h>
 
-static const struct of_device_id ant_det_match_tbl[] = {
-	{ .compatible = "tinno,ant_det" },
-	{},
-};
 
 static struct ant_det_data *ant_pdata;
 static struct platform_device *ant_pdev;
