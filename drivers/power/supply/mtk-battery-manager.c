@@ -1364,6 +1364,17 @@ static void mtk_battery_external_power_changed(struct power_supply *psy)
 		chg_psy = devm_power_supply_get_by_phandle(bm->dev,
 						       "charger");
 		pr_err("%s retry to get chg_psy\n", __func__);
+/* TN Begin modified by xinjun.lu/860715 20240711 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_SWITCH_CHARGER)
+		if (IS_ERR_OR_NULL(chg_psy)) {
+			pr_err("%s failed to get charger psy\n", __func__);
+			chg_psy = power_supply_get_by_name("primary_chg");
+			if (IS_ERR_OR_NULL(chg_psy)) {
+				pr_err("%s failed to get primary_chg psy\n", __func__);
+			}
+		}
+#endif
+/* TN End modified by xinjun.lu/860715 20240711 CR/EKLAMU-202 */
 		bs_data->chg_psy = chg_psy;
 	} else {
 		ret |= power_supply_get_property(chg_psy,
