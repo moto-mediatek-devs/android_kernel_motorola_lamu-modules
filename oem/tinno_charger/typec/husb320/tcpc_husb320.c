@@ -2421,6 +2421,20 @@ int husb320_get_alert_mask(struct tcpc_device *tcpc, uint32_t *mask)
 	return 0;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
+int husb320_get_alert_status_and_mask(struct tcpc_device *tcpc, uint32_t *alert, uint32_t *mask)
+{
+	pr_info("%s: enter \n", __func__);
+	return 0;
+}
+
+static int husb320_get_power_status(struct tcpc_device *tcpc)
+{
+	pr_info("%s: enter \n", __func__);
+	return 0;
+}
+
+#else
 int husb320_get_alert_status(struct tcpc_device *tcpc,
 		uint32_t *alert)
 {
@@ -2434,6 +2448,7 @@ static int husb320_get_power_status(struct tcpc_device *tcpc,
 	pr_info("%s: enter \n", __func__);
 	return 0;
 }
+#endif /* LINUX_VERSION_CODE */
 
 int husb320_get_fault_status(struct tcpc_device *tcpc,
 		uint8_t *status)
@@ -2564,7 +2579,11 @@ static struct tcpc_ops husb320_tcpc_ops = {
 	.alert_status_clear = husb320_alert_status_clear,
 	.fault_status_clear = husb320_fault_status_clear,
 	.get_alert_mask = husb320_get_alert_mask,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
+	.get_alert_status_and_mask = husb320_get_alert_status_and_mask,
+#else
 	.get_alert_status = husb320_get_alert_status,
+#endif
 	.get_power_status = husb320_get_power_status,
 	.get_fault_status = husb320_get_fault_status,
 	.get_cc = husb320_get_cc,

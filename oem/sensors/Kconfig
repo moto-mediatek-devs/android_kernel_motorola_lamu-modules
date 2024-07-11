@@ -1,10 +1,3 @@
-config AWINIC_SAR
-        tristate "AW Sar sensor"
-        depends on OEM_PROJECT
-        default n
-        help
-          support AW Sar sensor
-
 config HX9031_SAR
         tristate "HX9031 Sar sensor"
         depends on OEM_PROJECT

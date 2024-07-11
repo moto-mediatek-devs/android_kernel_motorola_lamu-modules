@@ -19,6 +19,7 @@
 #include <linux/spinlock.h>
 #include <linux/pm_opp.h>
 #include <linux/regulator/consumer.h>
+#include <linux/jiffies.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-mem2mem.h>
 #include <media/v4l2-ioctl.h>
@@ -290,6 +291,9 @@ static int mtk_jpeg_enum_fmt_vid_out(struct file *file, void *priv,
 	struct mtk_jpeg_ctx *ctx = mtk_jpeg_fh_to_ctx(priv);
 	struct mtk_jpeg_dev *jpeg = ctx->jpeg;
 
+	if (strcmp((const char *)jpeg->variant->dev_name, "mtk-jpeg-dec") == 0)
+		f->flags = V4L2_FMT_FLAG_DYN_RESOLUTION;
+
 	return mtk_jpeg_enum_fmt(jpeg->variant->formats,
 				 jpeg->variant->num_formats, f,
 				 MTK_JPEG_FMT_FLAG_OUTPUT);
@@ -544,6 +548,20 @@ static int mtk_jpeg_s_fmt_mplane(struct mtk_jpeg_ctx *ctx,
 			 i, q_data->pix_mp.plane_fmt[i].bytesperline,
 			 q_data->pix_mp.plane_fmt[i].sizeimage);
 	}
+
+	return 0;
+}
+
+static int vidioc_enum_framesizes(struct file *file, void *priv,
+				 struct v4l2_frmsizeenum *fsize)
+{
+	fsize->type = V4L2_FRMSIZE_TYPE_CONTINUOUS;
+	fsize->stepwise.min_width = MTK_JPEG_MIN_WIDTH;
+	fsize->stepwise.max_width = MTK_JPEG_DEFAULT_WIDTH;
+	fsize->stepwise.min_height = MTK_JPEG_MIN_HEIGHT;
+	fsize->stepwise.max_height = MTK_JPEG_DEFAULT_HEIGHT;
+	fsize->stepwise.step_width = 1;
+	fsize->stepwise.step_height = 1;
 
 	return 0;
 }
@@ -1038,6 +1056,7 @@ static const struct v4l2_ioctl_ops mtk_jpeg_dec_ioctl_ops = {
 	.vidioc_querycap                = mtk_jpeg_querycap,
 	.vidioc_enum_fmt_vid_cap	= mtk_jpeg_enum_fmt_vid_cap,
 	.vidioc_enum_fmt_vid_out	= mtk_jpeg_enum_fmt_vid_out,
+	.vidioc_enum_framesizes         = vidioc_enum_framesizes,
 	.vidioc_try_fmt_vid_cap_mplane	= mtk_jpeg_try_fmt_vid_cap_mplane,
 	.vidioc_try_fmt_vid_out_mplane	= mtk_jpeg_try_fmt_vid_out_mplane,
 	.vidioc_g_fmt_vid_cap_mplane    = mtk_jpeg_g_fmt_vid_mplane,
@@ -1126,9 +1145,14 @@ static int mtk_jpeg_buf_prepare(struct vb2_buffer *vb)
 static void mtk_jpeg_buf_finish(struct vb2_buffer *vb)
 {
 	struct mtk_jpeg_ctx *ctx = vb2_get_drv_priv(vb->vb2_queue);
+	struct v4l2_m2m_ctx *m2m_ctx = ctx->fh.m2m_ctx;
 
-	if (vb->vb2_queue->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE &&
-		vb->planes[0].bytesused > 0) {
+	if (vb->vb2_queue->memory == VB2_MEMORY_DMABUF &&
+		vb->vb2_queue->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE &&
+		vb->planes[0].bytesused > 0 && !m2m_ctx->has_stopped) {
+		if (vb->planes[0].dbuf == NULL)
+			return;
+
 		struct dma_buf_attachment *buf_att;
 		struct sg_table *sgt;
 
@@ -1243,7 +1267,8 @@ static void mtk_jpeg_dec_buf_queue(struct vb2_buffer *vb)
 
 	if (V4L2_TYPE_IS_CAPTURE(vb->vb2_queue->type) &&
 		vb2_is_streaming(vb->vb2_queue) &&
-		v4l2_m2m_dst_buf_is_last(ctx->fh.m2m_ctx)) {
+		(v4l2_m2m_dst_buf_is_last(ctx->fh.m2m_ctx)
+		|| (ctx->fh.m2m_ctx->is_draining && ctx->early_eos))) {
 
 		vbuf->field = V4L2_FIELD_NONE;
 		v4l2_m2m_last_buffer_done(ctx->fh.m2m_ctx, vbuf);
@@ -1329,7 +1354,7 @@ static const struct vb2_ops mtk_jpeg_dec_qops = {
 	.buf_queue          = mtk_jpeg_dec_buf_queue,
 	.wait_prepare       = vb2_ops_wait_prepare,
 	.wait_finish        = vb2_ops_wait_finish,
-	//.buf_finish         = mtk_jpeg_buf_finish,
+	.buf_finish         = mtk_jpeg_buf_finish,
 	.stop_streaming     = mtk_jpeg_dec_stop_streaming,
 };
 
@@ -1425,6 +1450,7 @@ static void mtk_jpeg_enc_device_run(void *priv)
 	mtk_jpeg_set_enc_src(ctx, jpeg->reg_base, &src_buf->vb2_buf);
 	mtk_jpeg_set_enc_dst(ctx, jpeg->reg_base, &dst_buf->vb2_buf);
 	mtk_jpeg_set_enc_params(ctx, jpeg->reg_base);
+	ctx->time_start = jiffies_to_nsecs(jiffies);
 	mtk_jpeg_enc_start(jpeg->reg_base);
 	ctx->state = MTK_JPEG_RUNNING;
 	spin_unlock_irqrestore(&jpeg->hw_lock, flags);
@@ -1628,7 +1654,7 @@ static irqreturn_t mtk_jpeg_enc_done(struct mtk_jpeg_dev *jpeg)
 		v4l2_err(&jpeg->v4l2_dev, "Context is NULL\n");
 		return IRQ_HANDLED;
 	}
-
+	ctx->time_end = jiffies_to_nsecs(jiffies);
 
 	src_buf = v4l2_m2m_src_buf_remove(ctx->fh.m2m_ctx);
 	dst_buf = v4l2_m2m_dst_buf_remove(ctx->fh.m2m_ctx);
@@ -1643,6 +1669,7 @@ static irqreturn_t mtk_jpeg_enc_done(struct mtk_jpeg_dev *jpeg)
 
 	dst_buf->vb2_buf.timestamp = src_buf->vb2_buf.timestamp;
 	result_size = mtk_jpeg_enc_get_file_size(jpeg->reg_base, jpeg->support_34bits);
+	ctx->size_output = result_size;
 	vb2_set_plane_payload(&dst_buf->vb2_buf, 0, result_size);
 
 	buf_state = VB2_BUF_STATE_DONE;
@@ -1736,8 +1763,7 @@ dec_end:
 
 	if (v4l2_m2m_is_last_draining_src_buf(ctx->fh.m2m_ctx, src_buf)) {
 		v4l2_dbg(0, debug, &jpeg->v4l2_dev, "mark stopped\n");
-		dst_buf->flags |= V4L2_BUF_FLAG_LAST;
-		v4l2_m2m_mark_stopped(ctx->fh.m2m_ctx);
+		ctx->early_eos = true;
 	}
 
 	v4l2_m2m_buf_done(src_buf, buf_state);
@@ -1851,6 +1877,10 @@ static int mtk_jpeg_release(struct file *file)
 	#endif
 		pm_runtime_put(ctx->jpeg->dev);
 	}
+	if ((ctx->size_output != 0) && (ctx->time_end != 0))
+		pr_info("%s  time(ms) %lld outsize %d\n", __func__,
+			NS_TO_MS(ctx->time_end - ctx->time_start),
+			ctx->size_output);
 	mutex_lock(&jpeg->lock);
 	v4l2_m2m_ctx_release(ctx->fh.m2m_ctx);
 	v4l2_ctrl_handler_free(&ctx->ctrl_hdl);

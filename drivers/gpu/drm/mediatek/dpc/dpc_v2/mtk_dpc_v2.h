@@ -3,8 +3,8 @@
  * Copyright (c) 2023 MediaTek Inc.
  */
 
-#ifndef __MTK_DPC_H__
-#define __MTK_DPC_H__
+#ifndef __MTK_DPC_V2_H__
+#define __MTK_DPC_V2_H__
 
 #include "mtk_dpc.h"
 
@@ -44,7 +44,7 @@
 #define DT_7  (DT_OFF1 + DT_PRE_DISP1_OFF)
 #define DT_13 (DT_OFF1 + DT_PRE_MMINFRA_OFF)
 
-#define DPC2_DT_PRESZ 300
+#define DPC2_DT_PRESZ 600
 #define DPC2_DT_POSTSZ 500
 #define DPC2_DT_MTCMOS 100
 #define DPC2_DT_INFRA 300

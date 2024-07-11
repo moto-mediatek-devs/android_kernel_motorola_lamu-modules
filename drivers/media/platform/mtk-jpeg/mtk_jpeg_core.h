@@ -31,6 +31,10 @@
 
 #define MTK_JPEG_DEFAULT_SIZEIMAGE	(1 * 1024 * 1024)
 
+#define MTK_JPEG_DEFAULT_WIDTH	(8 * 1024)
+
+#define MTK_JPEG_DEFAULT_HEIGHT	(8 * 1024)
+
 #define MTK_JPEG_HW_TIMEOUT_MSEC 1000
 
 #define MTK_JPEG_DVFS_BW_SUPPORT 1
@@ -42,6 +46,8 @@
 #endif
 
 #define MTK_JPEG_MAX_EXIF_SIZE	(64 * 1024)
+#define NS_TO_MS(X) (div_u64(X, 1000000))
+
 
 #define SNPRINTF(args...)							\
 	do {											\
@@ -219,6 +225,10 @@ struct mtk_jpeg_ctx {
 	u8 restart_interval;
 	struct v4l2_ctrl_handler ctrl_hdl;
 	u32 dst_offset;
+	bool early_eos;
+	u64 time_start; // jiffies_to_nsecs
+	u64 time_end;
+	u32 size_output;
 };
 
 #endif /* _MTK_JPEG_CORE_H */

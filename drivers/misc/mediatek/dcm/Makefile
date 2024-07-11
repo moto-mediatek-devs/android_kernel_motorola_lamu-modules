@@ -4,6 +4,11 @@ ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/dcm/include/
 obj-$(CONFIG_MTK_DCM_COMMON)	+= mtk_dcm.o
 
 # SoC Drivers
+ifneq ($(wildcard $(srctree)/$(src)/mt6761_dcm_internal.c),)
+obj-$(CONFIG_MTK_DCM_MT6761) += mt6761_dcm.o
+mt6761_dcm-objs := mt6761_dcm_internal.o mt6761_dcm_autogen.o
+endif
+
 ifneq ($(wildcard $(srctree)/$(src)/mt6765_dcm_internal.c),)
 obj-$(CONFIG_MTK_DCM_MT6765) += mt6765_dcm.o
 mt6765_dcm-objs := mt6765_dcm_internal.o mt6765_dcm_autogen.o
@@ -12,6 +17,11 @@ endif
 ifneq ($(wildcard $(srctree)/$(src)/mt6768_dcm_internal.c),)
 obj-$(CONFIG_MTK_DCM_MT6768) += mt6768_dcm.o
 mt6768_dcm-objs := mt6768_dcm_internal.o mt6768_dcm_autogen.o
+endif
+
+ifneq ($(wildcard $(srctree)/$(src)/mt6833_dcm_internal.c),)
+obj-$(CONFIG_MTK_DCM_MT6833) += mt6833_dcm.o
+mt6833_dcm-objs := mt6833_dcm_internal.o mt6833_dcm_autogen.o
 endif
 
 ifneq ($(wildcard $(srctree)/$(src)/mt6885_dcm_internal.c),)
@@ -37,6 +47,11 @@ endif
 ifneq ($(wildcard $(srctree)/$(src)/mt6897_dcm_internal.c),)
 obj-$(CONFIG_MTK_DCM_MT6897) += mt6897_dcm.o
 mt6897_dcm-objs := mt6897_dcm_internal.o mt6897_dcm_autogen.o
+endif
+
+ifneq ($(wildcard $(srctree)/$(src)/mt6899_dcm_internal.c),)
+obj-$(CONFIG_MTK_DCM_MT6899) += mt6899_dcm.o
+mt6899_dcm-objs := mt6899_dcm_internal.o mt6899_dcm_autogen.o
 endif
 
 ifneq ($(wildcard $(srctree)/$(src)/mt6989_dcm_internal.c),)

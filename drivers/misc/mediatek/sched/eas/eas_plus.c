@@ -559,7 +559,7 @@ inline void update_thermal_pressure_capacity(bool update_all, int this_cpu)
 void mtk_tick_entry(void *data, struct rq *rq)
 {
 	unsigned int this_cpu = cpu_of(rq);
-	bool sbb_trigger, is_cpu_to_update_thermal = false, update_all = true;
+	bool sbb_trigger, is_cpu_to_update_thermal = false, update_all __maybe_unused = true;
 	u64 idle_time, wall_time, cpu_utilize;
 	struct sbb_cpu_data *sbb_data = per_cpu(sbb, rq->cpu);
 	if (!get_eas_hook())
@@ -1108,6 +1108,7 @@ void mtk_update_misfit_status(void *data, struct task_struct *p, struct rq *rq, 
 
 	if (!p || p->nr_cpus_allowed == 1) {
 		rq->misfit_task_load = 0;
+		rq->misfit_reason = -1;
 		return;
 	}
 
@@ -1118,6 +1119,7 @@ void mtk_update_misfit_status(void *data, struct task_struct *p, struct rq *rq, 
 	fits = util_fits_capacity(util, uclamp_min, uclamp_max, capacity, cpu_of(rq));
 	if (fits > 0) {
 		rq->misfit_task_load = 0;
+		rq->misfit_reason = -1;
 		goto out;
 	}
 
@@ -1127,6 +1129,7 @@ void mtk_update_misfit_status(void *data, struct task_struct *p, struct rq *rq, 
 	 */
 	misfit_task_load = task_h_load(p);
 	rq->misfit_task_load = max_t(unsigned long, misfit_task_load, 1);
+	rq->misfit_reason = MISFIT_PERF;
 
 out:
 	if (trace_sched_mtk_update_misfit_status_enabled())
@@ -1141,3 +1144,17 @@ int set_util_est_ctrl(bool enable)
 	sysctl_util_est = enable;
 	return 0;
 }
+
+int set_cpus_allowed_ptr_by_kernel(struct task_struct *p, const struct cpumask *new_mask)
+{
+	struct cpumask *kernel_allowed_mask;
+	int ret;
+
+	if (!p)
+		return -EINVAL;
+	kernel_allowed_mask = &((struct mtk_task *) p->android_vendor_data1)->kernel_allowed_mask;
+	cpumask_copy(kernel_allowed_mask, new_mask);
+	ret = set_cpus_allowed_ptr(p, new_mask);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(set_cpus_allowed_ptr_by_kernel);

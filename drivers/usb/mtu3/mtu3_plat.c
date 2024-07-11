@@ -46,13 +46,11 @@ enum ssusb_smc_request {
 enum ssusb_hwrscs_vers {
 	SSUSB_HWRECS_V1 = 1,
 	SSUSB_HWRECS_V2 = 2,
+	SSUSB_HWRECS_V3 = 3,
 };
 
 struct regmap *usb_mbist;
 struct regmap *usb_cfg_ao;
-
-static struct ssusb_offload *usb_offload;
-static DEFINE_MUTEX(offload_lock);
 
 /* protect vs voter state */
 static DEFINE_MUTEX(vsv_mutex);
@@ -117,14 +115,15 @@ static void ssusb_hwrscs_req(struct ssusb_mtk *ssusb,
 			smc_req, 0, 0, 0, 0, 0, 0, &res);
 }
 
-static void ssusb_hwrscs_req_v2(struct ssusb_mtk *ssusb,
+static void ssusb_hwrscs_req_v2_v3(struct ssusb_mtk *ssusb,
 	enum mtu3_power_state state)
 {
 	struct arm_smccc_res res;
 	void __iomem *ibase = ssusb->ippc_base;
-	u32 spm_ctrl, value;
+	u32 spm_ctrl, value, spm_msk = SSUSB_SPM_REQ_MSK;
 	u32 smc_req = -1;
 	int ret;
+	bool vcore_req_support = (ssusb->hwrscs_vers == SSUSB_HWRECS_V3);
 
 
 	dev_info(ssusb->dev, "%s state = %d\n", __func__, state);
@@ -143,38 +142,44 @@ static void ssusb_hwrscs_req_v2(struct ssusb_mtk *ssusb,
 
 	spm_ctrl = mtu3_readl(ibase, U3D_SSUSB_SPM_CTRL_V2);
 
+	if (vcore_req_support)
+		spm_msk |= SSUSB_SPM_VCORE_EN;
+
+
 	/* Clear FORCE HW Request which is default on since MT6989 */
 	spm_ctrl &= ~SSUSB_SPM_FORCE_HW_REQ_MSK;
 
 	switch (state) {
 	case MTU3_STATE_POWER_OFF:
-		spm_ctrl &= ~SSUSB_SPM_REQ_MSK;
+		spm_ctrl &= ~spm_msk;
 		break;
 	case MTU3_STATE_POWER_ON:
-		spm_ctrl |= SSUSB_SPM_REQ_MSK;
+		spm_ctrl |= spm_msk;
 		break;
 	case MTU3_STATE_OFFLOAD:
-		spm_ctrl &= ~SSUSB_SPM_REQ_MSK;
-		spm_ctrl |= (SSUSB_SPM_SRCCLKENA | SSUSB_SPM_INFRE_REQ
-				| SSUSB_SPM_VRF18_REQ);
+		/* Clear req for offload scenario */
+		spm_ctrl &= SSUSB_SPM_REQ_OFFLOAD_MSK;
 		break;
 	case MTU3_STATE_RESUME:
-		spm_ctrl |= SSUSB_SPM_REQ_MSK;
+		spm_ctrl |= spm_msk;
 		smc_req = SSUSB_SMC_HWRECS_RESUME;
 		break;
 	case MTU3_STATE_SUSPEND:
-		spm_ctrl &= ~SSUSB_SPM_REQ_MSK;
+		/* Clear req for host suspend scenario */
+		spm_ctrl &= SSUSB_SPM_VCORE_EN;
 		smc_req = SSUSB_SMC_HWRECS_SUSPEND;
 		break;
 	default:
 		return;
 	}
 
+	dev_info(ssusb->dev, "%s spm_ctrl=0x%x\n", __func__, spm_ctrl);
 	/* write spm_ctrl */
 	mtu3_writel(ibase, U3D_SSUSB_SPM_CTRL_V2, spm_ctrl);
 
+	/* make sure intended configure bits received ack from SPM */
 	ret = readl_poll_timeout_atomic(ibase + U3D_SSUSB_SPM_CTRL_ACK_V2,
-		value, (spm_ctrl == (value & SSUSB_SPM_REQ_MSK)), 100, 20000);
+		value, ((spm_ctrl & spm_msk) == (value & spm_msk)), 100, 20000);
 	if (ret)
 		dev_info(ssusb->dev, "%s timeout, spm_ctrl=0x%x, value=0x%x\n",
 			__func__, spm_ctrl, value);
@@ -234,7 +239,8 @@ void ssusb_set_power_state(struct ssusb_mtk *ssusb,
 		ssusb_hwrscs_req(ssusb, state);
 		break;
 	case SSUSB_HWRECS_V2:
-		ssusb_hwrscs_req_v2(ssusb, state);
+	case SSUSB_HWRECS_V3:
+		ssusb_hwrscs_req_v2_v3(ssusb, state);
 		break;
 	default:
 		return;
@@ -624,59 +630,71 @@ struct notifier_block ssusb_pd_notifier_block = {
 	.priority = 0,
 };
 
-static int ssusb_offload_get_mode(void)
+static int ssusb_offload_get_mode(struct ssusb_offload *offload)
 {
-	if (usb_offload && usb_offload->get_mode)
-		return usb_offload->get_mode(usb_offload->dev);
+	if (offload && offload->get_mode)
+		return offload->get_mode(offload->dev);
 	else
 		return SSUSB_OFFLOAD_MODE_NONE;
 }
 
 int ssusb_offload_register(struct ssusb_offload *offload)
 {
+	struct device_node *node;
+	struct platform_device *pdev;
+	struct ssusb_mtk *ssusb;
 	int ret = 0;
 
-	mutex_lock(&offload_lock);
+	node = of_find_node_by_name(NULL, "usb0");
+	if (!node) {
+		ret = -ENODEV;
+		goto err;
+	}
 
-	if (IS_ERR_OR_NULL(offload) || IS_ERR_OR_NULL(offload->dev)) {
+		pdev = of_find_device_by_node(node);
+		of_node_put(node);
+	if (!pdev) {
+		ret = -ENODEV;
+		goto err;
+	}
+
+	ssusb = platform_get_drvdata(pdev);
+	if (IS_ERR_OR_NULL(offload) || IS_ERR_OR_NULL(offload->dev) ||
+		IS_ERR_OR_NULL(ssusb)) {
 		ret = -EINVAL;
-		goto out;
+		goto err;
 	}
 
-	if (usb_offload) {
+	if (offload->ssusb) {
 		ret = -EEXIST;
-		goto out;
+		goto err;
 	}
 
-	usb_offload = kzalloc(sizeof(*usb_offload), GFP_KERNEL);
-	if (!usb_offload) {
-		ret = -ENOMEM;
-		goto out;
-	}
+	offload->ssusb = ssusb;
+	ssusb->offload = offload;
 
-	usb_offload->dev = offload->dev;
-	usb_offload->get_mode = offload->get_mode;
-out:
-	mutex_unlock(&offload_lock);
+	if (ssusb->otg_switch.latest_role == USB_ROLE_HOST) {
+		dev_info(ssusb->dev, "usb offload ready, switch to host\n");
+		ssusb_set_mode(&ssusb->otg_switch, USB_ROLE_HOST);
+	}
+err:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(ssusb_offload_register);
 
-int ssusb_offload_unregister(struct device *dev)
+int ssusb_offload_unregister(struct ssusb_offload *offload)
 {
+	struct ssusb_mtk *ssusb = offload->ssusb;
 	int ret = 0;
 
-	mutex_lock(&offload_lock);
-
-	if (usb_offload->dev != dev) {
+	if (IS_ERR_OR_NULL(offload) || IS_ERR_OR_NULL(offload->ssusb)) {
 		ret = -EINVAL;
-		goto out;
+		goto err;
 	}
 
-	kfree(usb_offload);
-	usb_offload = NULL;
-out:
-	mutex_unlock(&offload_lock);
+	offload->ssusb = NULL;
+	ssusb->offload = NULL;
+err:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(ssusb_offload_unregister);
@@ -1016,6 +1034,7 @@ out:
 static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
 {
 	struct device_node *node = pdev->dev.of_node;
+	struct device_node *child;
 	struct otg_switch_mtk *otg_sx = &ssusb->otg_switch;
 	struct clk_bulk_data *clks = ssusb->clks;
 	struct device *dev = &pdev->dev;
@@ -1091,6 +1110,13 @@ get_phy:
 			ssusb->hwrscs_vers = SSUSB_HWRECS_V1;
 	}
 	ssusb->smc_req = of_property_read_bool(node, "mediatek,smc-req");
+
+	/* check offload support for child node */
+	for_each_child_of_node(node, child) {
+		ssusb->offload_support = of_property_read_bool(child, "mediatek,usb-offload");
+		if (ssusb->offload_support)
+			break;
+	}
 
 	ret = ssusb_clkgate_of_property_parse(ssusb, node);
 	if (ret)
@@ -1486,7 +1512,7 @@ static int mtu3_suspend_common(struct device *dev, pm_message_t msg)
 	else
 		ssusb->host_dev = true;
 
-	ssusb->offload_mode = ssusb_offload_get_mode();
+	ssusb->offload_mode = ssusb_offload_get_mode(ssusb->offload);
 
 	dev_info(ssusb->dev, "%s offload_mode %d\n", __func__, ssusb->offload_mode);
 

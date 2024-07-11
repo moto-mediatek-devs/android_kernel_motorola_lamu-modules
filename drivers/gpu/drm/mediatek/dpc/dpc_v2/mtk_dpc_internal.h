@@ -11,6 +11,7 @@
 #endif
 
 #define MMSYS_MT6989  0x6989
+#define MMSYS_MT6899  0x6899
 #define MMSYS_MT6878  0x6878
 #define MMSYS_MT6991  0x6991
 
@@ -309,6 +310,7 @@ struct mtk_dpc_mtcmos_cfg {
 	u16 thread_clr;
 	resource_size_t chk_pa;
 	void __iomem *chk_va;
+	enum mtk_dpc_mtcmos_mode mode;
 };
 
 struct mtk_dpc_channel_bw_cfg {
@@ -332,10 +334,13 @@ struct mtk_dpc {
 	struct device *dev;
 	struct device *pd_dev;
 	struct notifier_block pm_nb;
+	struct notifier_block vcp_nb;
 	int disp_irq;
 	int mml_irq;
 	resource_size_t dpc_pa;
 	void __iomem *mminfra_hangfree;
+	bool enabled;
+	bool vcp_is_alive;
 	bool skip_force_power;
 	spinlock_t skip_force_power_lock;
 	spinlock_t mtcmos_cfg_lock;
@@ -360,6 +365,9 @@ struct mtk_dpc {
 	void __iomem *dispvcore_chk;
 	u32 dispvcore_chk_mask;
 
+	void __iomem *mminfra_chk;
+	u32 mminfra_chk_mask;
+
 	resource_size_t voter_set_pa;
 	resource_size_t voter_clr_pa;
 	void __iomem *voter_set_va;
@@ -369,14 +377,15 @@ struct mtk_dpc {
 
 	void __iomem *rtff_pwr_con;
 	void __iomem *vdisp_ao_cg_con;
-	void __iomem *mminfra_chk;
+	void __iomem *mminfra_voter;
+	void __iomem *mminfra_dummy;
 
 	struct mtk_dpc_mtcmos_cfg *mtcmos_cfg;
 	struct mtk_dpc_dt_usage *disp_dt_usage;
 	struct mtk_dpc_dt_usage *mml_dt_usage;
 	struct mtk_dpc2_dt_usage *dpc2_dt_usage;
 
-	void (*set_mtcmos)(const enum mtk_dpc_subsys subsys, bool en);
+	void (*set_mtcmos)(const enum mtk_dpc_subsys subsys, const enum mtk_dpc_mtcmos_mode mode);
 	irqreturn_t (*disp_irq_handler)(int irq, void *dev_id);
 	irqreturn_t (*mml_irq_handler)(int irq, void *dev_id);
 };

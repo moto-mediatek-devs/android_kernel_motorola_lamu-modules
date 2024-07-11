@@ -1343,6 +1343,9 @@ static int mt6991_adsp_mem_get(struct snd_kcontrol *kcontrol,
 #if (IS_ENABLED(CONFIG_SND_SOC_MTK_AUTO_AUDIO_DSP) && IS_ENABLED(CONFIG_MTK_ADSP_AUTO_MULTI_PLAYBACK_SUPPORT))
 	case AUDIO_TASK_SUB_PLAYBACK_ID:
 #endif
+#if IS_ENABLED(CONFIG_MTK_ADSP_AUTO_HFP_CLIENT_SUPPORT)
+	case AUDIO_TASK_HFP_CLIENT_TX_ADSP_ID:
+#endif
 		memif_num = get_dsp_task_attr(task_id,
 					      ADSP_TASK_ATTR_MEMDL);
 		break;
@@ -1433,6 +1436,7 @@ static int mt6991_adsp_mem_set(struct snd_kcontrol *kcontrol,
 	case AUDIO_TASK_KTV_ID:
 #if IS_ENABLED(CONFIG_MTK_ADSP_AUTO_HFP_CLIENT_SUPPORT)
 	case AUDIO_TASK_HFP_CLIENT_RX_ADSP_ID:
+	case AUDIO_TASK_HFP_CLIENT_TX_ADSP_ID:
 #endif
 #if IS_ENABLED(CONFIG_MTK_ADSP_AUTO_ANC_SUPPORT)
 	case AUDIO_TASK_ANC_ADSP_ID:
@@ -2059,6 +2063,10 @@ static const struct snd_kcontrol_new mt6991_pcm_kcontrols[] = {
 		       SND_SOC_NOPM, 0, 0x1, 0,
 		       mt6991_adsp_mem_get,
 		       mt6991_adsp_mem_set),
+	SOC_SINGLE_EXT("adsp_hfp_client_tx_sharemem_scenario",
+		       SND_SOC_NOPM, 0, 0x1, 0,
+		       mt6991_adsp_mem_get,
+		       mt6991_adsp_mem_set),
 #endif
 #if IS_ENABLED(CONFIG_MTK_ADSP_AUTO_ANC_SUPPORT)
 	SOC_SINGLE_EXT("adsp_anc_sharemem_scenario",
@@ -2374,6 +2382,8 @@ static const struct snd_kcontrol_new memif_ul1_ch1_mix[] = {
 				    I_I2SIN3_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN4_CH1", AFE_CONN020_4,
 				    I_I2SIN4_CH1, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN5_CH1", AFE_CONN020_4,
+				    I_I2SIN5_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN6_CH1", AFE_CONN020_5,
 				    I_I2SIN6_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("HW_SRC_0_OUT_CH1", AFE_CONN020_6,
@@ -2425,6 +2435,8 @@ static const struct snd_kcontrol_new memif_ul1_ch2_mix[] = {
 				    I_I2SIN3_CH2, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN4_CH2", AFE_CONN021_4,
 				    I_I2SIN4_CH2, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN5_CH2", AFE_CONN021_4,
+				    I_I2SIN5_CH2, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN6_CH2", AFE_CONN021_5,
 				    I_I2SIN6_CH2, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("HW_SRC_0_OUT_CH2", AFE_CONN021_6,
@@ -2448,6 +2460,8 @@ static const struct snd_kcontrol_new memif_ul2_ch1_mix[] = {
 				    I_SRC_1_OUT_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN4_CH1", AFE_CONN022_4,
 				    I_I2SIN4_CH1, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN5_CH1", AFE_CONN022_4,
+				    I_I2SIN5_CH1, 1, 0),
 };
 
 static const struct snd_kcontrol_new memif_ul2_ch2_mix[] = {
@@ -2465,6 +2479,8 @@ static const struct snd_kcontrol_new memif_ul2_ch2_mix[] = {
 				    I_SRC_1_OUT_CH2, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN4_CH2", AFE_CONN023_4,
 				    I_I2SIN4_CH2, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN5_CH2", AFE_CONN023_4,
+				    I_I2SIN5_CH2, 1, 0),
 };
 
 static const struct snd_kcontrol_new memif_ul3_ch1_mix[] = {
@@ -2512,6 +2528,8 @@ static const struct snd_kcontrol_new memif_ul4_ch1_mix[] = {
 				    I_PCM_0_CAP_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("PCM_1_CAP_CH1", AFE_CONN026_4,
 				    I_PCM_1_CAP_CH1, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN1_CH1", AFE_CONN026_4,
+				    I_I2SIN1_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN0_CH1", AFE_CONN026_4,
 					I_I2SIN0_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN4_CH1", AFE_CONN026_4,
@@ -2547,6 +2565,8 @@ static const struct snd_kcontrol_new memif_ul4_ch2_mix[] = {
 				    I_PCM_1_CAP_CH2, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN0_CH2", AFE_CONN027_4,
 					I_I2SIN0_CH2, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN1_CH2", AFE_CONN027_4,
+				    I_I2SIN1_CH2, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN4_CH2", AFE_CONN027_4,
 				    I_I2SIN4_CH2, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN5_CH2", AFE_CONN027_4,
@@ -2676,6 +2696,8 @@ static const struct snd_kcontrol_new memif_ul7_ch1_mix[] = {
 					I_I2SIN2_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN4_CH1", AFE_CONN032_4,
 				    I_I2SIN4_CH1, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN4_CH3", AFE_CONN032_4,
+				    I_I2SIN4_CH3, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN5_CH1", AFE_CONN032_4,
 				    I_I2SIN5_CH1, 1, 0),
 };
@@ -2701,6 +2723,8 @@ static const struct snd_kcontrol_new memif_ul7_ch2_mix[] = {
 					I_I2SIN2_CH2, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN4_CH2", AFE_CONN033_4,
 				    I_I2SIN4_CH2, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN4_CH4", AFE_CONN033_4,
+				    I_I2SIN4_CH4, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN5_CH2", AFE_CONN033_4,
 				    I_I2SIN5_CH2, 1, 0),
 };
@@ -2857,7 +2881,8 @@ static const struct snd_kcontrol_new memif_ul_cm0_ch1_mix[] = {
 				    I_I2SIN4_CH3, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN5_CH1", AFE_CONN040_4,
 				    I_I2SIN5_CH1, 1, 0),
-
+	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN6_CH1", AFE_CONN040_5,
+				    I_I2SIN6_CH1, 1, 0),
 };
 static const struct snd_kcontrol_new memif_ul_cm0_ch2_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("ADDA_UL_CH1", AFE_CONN041_0,
@@ -2880,6 +2905,8 @@ static const struct snd_kcontrol_new memif_ul_cm0_ch2_mix[] = {
 				    I_I2SIN4_CH4, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN5_CH2", AFE_CONN041_4,
 				    I_I2SIN5_CH2, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN6_CH2", AFE_CONN041_5,
+				    I_I2SIN6_CH2, 1, 0),
 };
 static const struct snd_kcontrol_new memif_ul_cm0_ch3_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("ADDA_UL_CH1", AFE_CONN042_0,
@@ -2896,6 +2923,8 @@ static const struct snd_kcontrol_new memif_ul_cm0_ch3_mix[] = {
 				    I_I2SIN5_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN5_CH3", AFE_CONN042_4,
 				    I_I2SIN5_CH3, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN6_CH3", AFE_CONN042_5,
+				    I_I2SIN6_CH3, 1, 0),
 };
 static const struct snd_kcontrol_new memif_ul_cm0_ch4_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("ADDA_UL_CH1", AFE_CONN043_0,
@@ -2912,6 +2941,8 @@ static const struct snd_kcontrol_new memif_ul_cm0_ch4_mix[] = {
 				    I_I2SIN5_CH2, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN5_CH4", AFE_CONN043_4,
 				    I_I2SIN5_CH4, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN6_CH4", AFE_CONN043_5,
+				    I_I2SIN6_CH4, 1, 0),
 };
 static const struct snd_kcontrol_new memif_ul_cm0_ch5_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("ADDA_UL_CH1", AFE_CONN044_0,
@@ -2926,6 +2957,8 @@ static const struct snd_kcontrol_new memif_ul_cm0_ch5_mix[] = {
 				    I_I2SIN4_CH5, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN5_CH5", AFE_CONN044_4,
 				    I_I2SIN5_CH5, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN6_CH5", AFE_CONN044_5,
+				    I_I2SIN6_CH5, 1, 0),
 };
 static const struct snd_kcontrol_new memif_ul_cm0_ch6_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("ADDA_UL_CH1", AFE_CONN045_0,
@@ -2940,6 +2973,8 @@ static const struct snd_kcontrol_new memif_ul_cm0_ch6_mix[] = {
 				    I_I2SIN4_CH6, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN5_CH6", AFE_CONN045_4,
 				    I_I2SIN5_CH6, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN6_CH6", AFE_CONN045_5,
+				    I_I2SIN6_CH6, 1, 0),
 };
 static const struct snd_kcontrol_new memif_ul_cm0_ch7_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("ADDA_UL_CH1", AFE_CONN046_0,
@@ -2954,6 +2989,8 @@ static const struct snd_kcontrol_new memif_ul_cm0_ch7_mix[] = {
 				    I_I2SIN4_CH7, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN5_CH7", AFE_CONN046_4,
 				    I_I2SIN5_CH7, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN6_CH7", AFE_CONN046_5,
+				    I_I2SIN6_CH7, 1, 0),
 };
 static const struct snd_kcontrol_new memif_ul_cm0_ch8_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("ADDA_UL_CH1", AFE_CONN047_0,
@@ -2968,6 +3005,8 @@ static const struct snd_kcontrol_new memif_ul_cm0_ch8_mix[] = {
 				    I_I2SIN4_CH8, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN5_CH8", AFE_CONN047_4,
 				    I_I2SIN5_CH8, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN6_CH8", AFE_CONN047_5,
+				    I_I2SIN6_CH8, 1, 0),
 };
 
 static const struct snd_kcontrol_new memif_ul_cm1_ch1_mix[] = {
@@ -3892,6 +3931,8 @@ static const struct snd_soc_dapm_route mt6991_memif_routes[] = {
 	{"UL1_CH2", "I2SIN3_CH2", "I2SIN3"},
 	{"UL1_CH1", "I2SIN4_CH1", "I2SIN4"},
 	{"UL1_CH2", "I2SIN4_CH2", "I2SIN4"},
+	{"UL1_CH1", "I2SIN5_CH1", "I2SIN5"},
+	{"UL1_CH2", "I2SIN5_CH2", "I2SIN5"},
 	{"UL1_CH1", "I2SIN6_CH1", "I2SIN6"},
 	{"UL1_CH2", "I2SIN6_CH2", "I2SIN6"},
 
@@ -3923,6 +3964,8 @@ static const struct snd_soc_dapm_route mt6991_memif_routes[] = {
 	{"UL2_CH2", "HW_SRC_1_OUT_CH2", "HW_SRC_1_Out"},
 	{"UL2_CH1", "I2SIN4_CH1", "I2SIN4"},
 	{"UL2_CH2", "I2SIN4_CH2", "I2SIN4"},
+	{"UL2_CH1", "I2SIN5_CH1", "I2SIN5"},
+	{"UL2_CH2", "I2SIN5_CH2", "I2SIN5"},
 
 	{"UL3", NULL, "UL3_CH1"},
 	{"UL3", NULL, "UL3_CH2"},
@@ -3944,6 +3987,8 @@ static const struct snd_soc_dapm_route mt6991_memif_routes[] = {
 	{"UL4_CH2", "ADDA_UL_CH2", "ADDA_UL_Mux"},
 	{"UL4_CH1", "I2SIN0_CH1", "I2SIN0"},
 	{"UL4_CH2", "I2SIN0_CH2", "I2SIN0"},
+	{"UL4_CH1", "I2SIN1_CH1", "I2SIN1"},
+	{"UL4_CH2", "I2SIN1_CH2", "I2SIN1"},
 	{"UL4_CH1", "I2SIN4_CH1", "I2SIN4"},
 	{"UL4_CH2", "I2SIN4_CH2", "I2SIN4"},
 	{"UL4_CH1", "I2SIN5_CH1", "I2SIN5"},
@@ -4010,16 +4055,24 @@ static const struct snd_soc_dapm_route mt6991_memif_routes[] = {
 	{"UL7_CH1", "ADDA_UL_CH1", "ADDA_UL_Mux"},
 	{"UL7_CH1", "ADDA_UL_CH2", "ADDA_UL_Mux"},
 	{"UL7_CH1", "ADDA_UL_CH3", "ADDA_CH34_UL_Mux"},
+	{"UL7_CH1", "ADDA_UL_CH4", "ADDA_CH34_UL_Mux"},
+	{"UL7_CH1", "ADDA_UL_CH5", "ADDA_CH56_UL_Mux"},
+	{"UL7_CH1", "ADDA_UL_CH6", "ADDA_CH56_UL_Mux"},
 	{"UL7_CH2", "ADDA_UL_CH1", "ADDA_UL_Mux"},
 	{"UL7_CH2", "ADDA_UL_CH2", "ADDA_UL_Mux"},
 	{"UL7_CH2", "ADDA_UL_CH3", "ADDA_CH34_UL_Mux"},
 	{"UL7_CH2", "ADDA_UL_CH4", "ADDA_CH34_UL_Mux"},
+	{"UL7_CH2", "ADDA_UL_CH5", "ADDA_CH56_UL_Mux"},
+	{"UL7_CH2", "ADDA_UL_CH6", "ADDA_CH56_UL_Mux"},
+
 	{"UL7_CH1", "CONNSYS_I2S_CH1", "Connsys I2S"},
 	{"UL7_CH2", "CONNSYS_I2S_CH2", "Connsys I2S"},
 	{"UL7_CH1", "I2SIN2_CH1", "I2SIN2"},
 	{"UL7_CH2", "I2SIN2_CH2", "I2SIN2"},
 	{"UL7_CH1", "I2SIN4_CH1", "I2SIN4"},
 	{"UL7_CH2", "I2SIN4_CH2", "I2SIN4"},
+	{"UL7_CH1", "I2SIN4_CH3", "I2SIN4"},
+	{"UL7_CH2", "I2SIN4_CH4", "I2SIN4"},
 	{"UL7_CH1", "HW_GAIN0_OUT_CH1", "HW Gain 0 Out"},
 	{"UL7_CH2", "HW_GAIN0_OUT_CH2", "HW Gain 0 Out"},
 	{"UL7_CH1", "I2SIN5_CH1", "I2SIN5"},
@@ -4060,6 +4113,14 @@ static const struct snd_soc_dapm_route mt6991_memif_routes[] = {
 	{"UL_CM0_CH7", "I2SIN5_CH7", "I2SIN5"},
 	{"UL_CM0_CH8", "I2SIN5_CH8", "I2SIN5"},
 
+	{"UL_CM0_CH1", "I2SIN6_CH1", "I2SIN6"},
+	{"UL_CM0_CH2", "I2SIN6_CH2", "I2SIN6"},
+	{"UL_CM0_CH3", "I2SIN6_CH3", "I2SIN6"},
+	{"UL_CM0_CH4", "I2SIN6_CH4", "I2SIN6"},
+	{"UL_CM0_CH5", "I2SIN6_CH5", "I2SIN6"},
+	{"UL_CM0_CH6", "I2SIN6_CH6", "I2SIN6"},
+	{"UL_CM0_CH7", "I2SIN6_CH7", "I2SIN6"},
+	{"UL_CM0_CH8", "I2SIN6_CH8", "I2SIN6"},
 
 	{"UL_CM0_CH1", NULL, "CM0_Enable"},
 	{"UL_CM0_CH2", NULL, "CM0_Enable"},
@@ -6154,6 +6215,50 @@ static const struct mtk_base_irq_data irq_data[MT6991_IRQ_NUM] = {
 	},
 };
 
+#if IS_ENABLED(CONFIG_SND_SOC_MTK_AUTO_AUDIO)
+static const int memif_irq_usage[MT6991_MEMIF_NUM] = {
+	/* TODO: verify each memif & irq */
+	[MT6991_MEMIF_DL0] = MT6991_IRQ_4,
+	[MT6991_MEMIF_DL1] = MT6991_IRQ_1,
+	[MT6991_MEMIF_DL2] = MT6991_IRQ_2,
+	[MT6991_MEMIF_DL3] = MT6991_IRQ_3,
+	[MT6991_MEMIF_DL4] = MT6991_IRQ_3,
+	[MT6991_MEMIF_DL5] = MT6991_IRQ_3,
+	[MT6991_MEMIF_DL6] = MT6991_IRQ_3,
+	[MT6991_MEMIF_DL7] = MT6991_IRQ_7,
+	[MT6991_MEMIF_DL8] = MT6991_IRQ_8,
+	[MT6991_MEMIF_DL23] = MT6991_IRQ_9,
+	[MT6991_MEMIF_DL24] = MT6991_IRQ_10,
+	[MT6991_MEMIF_DL25] = MT6991_IRQ_11,
+	[MT6991_MEMIF_DL26] = MT6991_IRQ_0,
+	[MT6991_MEMIF_DL_4CH] = MT6991_IRQ_5,
+	[MT6991_MEMIF_DL_24CH] = MT6991_IRQ_12,
+	[MT6991_MEMIF_VUL0] = MT6991_IRQ_13,
+	[MT6991_MEMIF_VUL1] = MT6991_IRQ_14,
+	[MT6991_MEMIF_VUL2] = MT6991_IRQ_15,
+	[MT6991_MEMIF_VUL3] = MT6991_IRQ_16,
+	[MT6991_MEMIF_VUL4] = MT6991_IRQ_17,
+	[MT6991_MEMIF_VUL5] = MT6991_IRQ_18,
+	[MT6991_MEMIF_VUL6] = MT6991_IRQ_19,
+	[MT6991_MEMIF_VUL7] = MT6991_IRQ_20,
+	[MT6991_MEMIF_VUL8] = MT6991_IRQ_21,
+	[MT6991_MEMIF_VUL9] = MT6991_IRQ_22,
+	[MT6991_MEMIF_VUL10] = MT6991_IRQ_23,
+	[MT6991_MEMIF_VUL24] = MT6991_IRQ_24,
+	[MT6991_MEMIF_VUL25] = MT6991_IRQ_25,
+	[MT6991_MEMIF_VUL26] = MT6991_IRQ_0,
+	[MT6991_MEMIF_VUL_CM0] = MT6991_IRQ_26,
+	[MT6991_MEMIF_VUL_CM1] = MT6991_IRQ_0,
+	[MT6991_MEMIF_VUL_CM2] = MT6991_IRQ_0,
+	[MT6991_MEMIF_ETDM_IN0] = MT6991_IRQ_0,
+	[MT6991_MEMIF_ETDM_IN1] = MT6991_IRQ_0,
+	[MT6991_MEMIF_ETDM_IN2] = MT6991_IRQ_0,
+	[MT6991_MEMIF_ETDM_IN3] = MT6991_IRQ_0,
+	[MT6991_MEMIF_ETDM_IN4] = MT6991_IRQ_0,
+	[MT6991_MEMIF_ETDM_IN6] = MT6991_IRQ_0,
+	[MT6991_MEMIF_HDMI] = MT6991_IRQ_31
+};
+#else
 static const int memif_irq_usage[MT6991_MEMIF_NUM] = {
 	/* TODO: verify each memif & irq */
 	[MT6991_MEMIF_DL0] = MT6991_IRQ_0,
@@ -6196,6 +6301,7 @@ static const int memif_irq_usage[MT6991_MEMIF_NUM] = {
 	[MT6991_MEMIF_ETDM_IN6] = MT6991_IRQ_0,
 	[MT6991_MEMIF_HDMI] = MT6991_IRQ_31
 };
+#endif
 
 static bool mt6991_is_volatile_reg(struct device *dev, unsigned int reg)
 {

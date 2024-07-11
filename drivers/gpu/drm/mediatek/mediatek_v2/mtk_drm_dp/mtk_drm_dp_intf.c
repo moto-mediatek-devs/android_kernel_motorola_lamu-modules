@@ -13,6 +13,7 @@
 #include <linux/pinctrl/consumer.h>
 #include <linux/platform_device.h>
 #include <linux/types.h>
+#include <linux/of_device.h>
 
 #include <video/videomode.h>
 
@@ -29,8 +30,6 @@
 #include "../mtk_drm_drv.h"
 
 #include "mtk_drm_dp_intf_regs.h"
-
-#define ATTACH_SERDES_BRIDGE 1
 
 enum mtk_dpi_out_bit_num {
 	MTK_DPI_OUT_BIT_NUM_8BITS,
@@ -73,9 +72,7 @@ enum TVDPLL_CLK {
 struct mtk_dpi {
 	struct drm_encoder encoder;
 	struct drm_bridge bridge;
-#if ATTACH_SERDES_BRIDGE
 	struct drm_bridge *next_bridge;
-#endif
 	struct drm_connector *connector;
 	struct mtk_ddp_comp ddp_comp;
 	void __iomem *regs;
@@ -101,7 +98,11 @@ struct mtk_dpi {
 	u32 output_fmt;
 	int refcount;
 	unsigned long long dp_intf_bw;
+	bool suspend;
 };
+
+#define MAX_DPI		2
+static struct mtk_dpi *g_mtk_dpi[MAX_DPI];
 
 static inline struct mtk_dpi *bridge_to_dpi(struct drm_bridge *b)
 {
@@ -174,6 +175,7 @@ struct mtk_dpi_conf {
 	u32 csc_enable_bit;
 	u32 pixels_per_iter;
 	bool edge_cfg_in_mmsys;
+	bool no_next_bridge;
 };
 
 static void mtk_dpi_mask(struct mtk_dpi *dpi, u32 offset, u32 val, u32 mask)
@@ -182,6 +184,11 @@ static void mtk_dpi_mask(struct mtk_dpi *dpi, u32 offset, u32 val, u32 mask)
 
 	tmp |= (val & mask);
 	writel(tmp, dpi->regs + offset);
+}
+
+static void mtk_dpi_write(struct mtk_dpi *dpi, u32 offset, u32 val)
+{
+	writel(val, dpi->regs + offset);
 }
 
 static void mtk_dpi_sw_reset(struct mtk_dpi *dpi, bool reset)
@@ -196,6 +203,12 @@ static void mtk_dpi_sw_reset(struct mtk_dpi *dpi, bool reset)
 static void mtk_dpi_enable(struct mtk_dpi *dpi)
 {
 	dev_info(dpi->dev, "enable dpi go");
+
+	mtk_dpi_mask(dpi, DPI_INTSTA, 0, 0xf);
+
+	mtk_dpi_mask(dpi, DPI_INTEN, INT_VSYNC_EN, (INT_UNDERFLOW_EN |
+						   INT_VDE_EN |
+						   INT_VSYNC_EN));
 	mtk_dpi_mask(dpi, DPI_EN, EN, EN);
 	//mtk_dpi_mask(dpi, DP_PATTERN_CTRL0, DP_PATTERN_EN, DP_PATTERN_EN);
 	//mtk_dpi_mask(dpi, DP_PATTERN_CTRL0, DP_PATTERN_COLOR_BAR, DP_PATTERN_COLOR_BAR);
@@ -493,7 +506,6 @@ static void mtk_dpi_power_off(struct mtk_dpi *dpi)
 
 	mtk_dpi_disable(dpi);
 
-	clk_disable_unprepare(dpi->pclk);
 	clk_disable_unprepare(dpi->pclk_src[TVDPLL_PLL]);
 	clk_disable_unprepare(dpi->hf_fdp_ck);
 	clk_disable_unprepare(dpi->hf_fmm_ck);
@@ -524,12 +536,6 @@ static int mtk_dpi_power_on(struct mtk_dpi *dpi)
 		goto err_pixel;
 	}
 
-	ret = clk_prepare_enable(dpi->pclk);
-	if (ret) {
-		dev_info(dpi->dev, "Failed to enable pixel clock: %d\n", ret);
-		goto err_pixel;
-	}
-
 	return 0;
 
 err_pixel:
@@ -539,31 +545,57 @@ err_refcount:
 	return ret;
 }
 
-static void mtk_dpi_set_golden_setting(struct mtk_dpi *dpi, u32 hsize, u32 vsize)
+static void mtk_dpi_set_golden_setting(struct mtk_dpi *dpi)
 {
-	u32 dp_buf_sodi_high = 5255;
-	u32 dp_buf_sodi_low = 3899;
+	unsigned int dp_buf_sodi_high, dp_buf_sodi_low;
+	unsigned int dp_buf_preultra_high, dp_buf_preultra_low;
+	unsigned int dp_buf_ultra_high, dp_buf_ultra_low;
+	unsigned int dp_buf_urgent_high, dp_buf_urgent_low;
+	unsigned int mmsys_clk, dp_clk; //{26000, 37125, 74250, 148500, 297000};
+	unsigned int twait = 12, twake = 5;
+	unsigned int fill_rate, consume_rate;
 
-	unsigned int rw_times = 0;
+	dp_clk = dpi->mode.clock / 4;
+	dp_clk = dp_clk > 0 ? dp_clk : 74250;
+	mmsys_clk = mtk_drm_get_mmclk(&dpi->ddp_comp.mtk_crtc->base, __func__) / 1000;
+	mmsys_clk = mmsys_clk > 0 ? mmsys_clk : 273000;
 
-	DDPMSG("HV:%d x %d, sodi_high:%d, sodi_low:%d\n",
-	       hsize, vsize,
-		dp_buf_sodi_high,
-		dp_buf_sodi_low);
+	fill_rate = mmsys_clk * 4 / 8;
+	consume_rate = dp_clk * 4 / 8;
+	dev_info(dpi->dev, "%s mmsys_clk=%d, dp_clk=%d, fill_rate=%d, consume_rate=%d\n",
+		 __func__, mmsys_clk, dp_clk, fill_rate, consume_rate);
 
-	mtk_dpi_mask(dpi, DPI_BUF_SODI_HIGH, dp_buf_sodi_high, 0xffffffff);
+	dp_buf_sodi_high = (5940000 - twait * 100 * fill_rate / 1000 - consume_rate) * 30 / 32000;
+	dp_buf_sodi_low = (25 + twake) * consume_rate * 30 / 32000;
 
-	mtk_dpi_mask(dpi, DPI_BUF_SODI_LOW, dp_buf_sodi_low, 0xffffffff);
+	dp_buf_preultra_high = 36 * consume_rate * 30 / 32000;
+	dp_buf_preultra_low = 35 * consume_rate * 30 / 32000;
 
-	if (hsize & 0x3)
-		rw_times = ((hsize >> 2) + 1) * vsize;
-	else
-		rw_times = (hsize >> 2) * vsize;
+	dp_buf_ultra_high = 26 * consume_rate * 30 / 32000;
+	dp_buf_ultra_low = 25 * consume_rate * 30 / 32000;
 
-	mtk_dpi_mask(dpi, DPI_BUF_RW_TIMES, rw_times, 0xffffffff);
-	mtk_dpi_mask(dpi, DPI_BUF_CON0, BUF_BUF_EN, BUF_BUF_EN);
-	mtk_dpi_mask(dpi, DPI_BUF_CON0, BUF_BUF_FIFO_UNDERFLOW_DONT_BLOCK,
-		     BUF_BUF_FIFO_UNDERFLOW_DONT_BLOCK);
+	dp_buf_urgent_high = 12 * consume_rate * 30 / 32000;
+	dp_buf_urgent_low = 11 * consume_rate * 30 / 32000;
+
+	dev_info(dpi->dev, "dp_buf_sodi_high=%d, dp_buf_sodi_low=%d, dp_buf_preultra_high=%d, dp_buf_preultra_low=%d\n",
+		 dp_buf_sodi_high, dp_buf_sodi_low, dp_buf_preultra_high, dp_buf_preultra_low);
+
+	dev_info(dpi->dev, "dp_buf_ultra_high=%d, dp_buf_ultra_low=%d dp_buf_urgent_high=%d, dp_buf_urgent_low=%d\n",
+		 dp_buf_ultra_high, dp_buf_ultra_low, dp_buf_urgent_high, dp_buf_urgent_low);
+
+	mtk_dpi_write(dpi, DPI_BUF_SODI_HIGH, dp_buf_sodi_high);
+	mtk_dpi_write(dpi, DPI_BUF_SODI_LOW, dp_buf_sodi_low);
+
+	mtk_dpi_write(dpi, DPI_BUF_PREULTRA_HIGH, dp_buf_preultra_high);
+	mtk_dpi_write(dpi, DPI_BUF_PREULTRA_LOW, dp_buf_preultra_low);
+
+	mtk_dpi_write(dpi, DPI_BUF_ULTRA_HIGH, dp_buf_ultra_high);
+	mtk_dpi_write(dpi, DPI_BUF_ULTRA_LOW, dp_buf_ultra_low);
+
+	mtk_dpi_write(dpi, DPI_BUF_URGENT_HIGH, dp_buf_urgent_high);
+	mtk_dpi_write(dpi, DPI_BUF_URGENT_LOW, dp_buf_urgent_low);
+
+	mtk_dpi_write(dpi, DPI_MUTEX_VSYNC_SETTING, 0x1000F);
 }
 
 static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
@@ -579,6 +611,7 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
 	unsigned long pll_rate;
 	unsigned int factor;
 	unsigned int clksrc = TCK_26M;
+	unsigned int rw_times = 0;
 	int ret = 0;
 
 	/* let pll_rate can fix the valid range of tvdpll (1G~2GHz) */
@@ -609,32 +642,11 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
 			 __func__, ret);
 	}
 
-	ret = clk_prepare_enable(dpi->pclk_src[TVDPLL_PLL]);
-	if (ret) {
-		dev_info(dpi->dev, "%s clk_prepare_enable pclk_src[TVDPLL_PLL]: err=%d\n",
-			 __func__, ret);
-	}
-
-	ret = clk_prepare_enable(dpi->pclk);
-	if (ret) {
-		dev_info(dpi->dev, "%s clk_prepare_enable dp_intf->pclk: err=%d\n",
-			 __func__, ret);
-	}
-
 	ret = clk_set_parent(dpi->pclk, dpi->pclk_src[clksrc]);
 	if (ret) {
 		dev_info(dpi->dev, "%s clk_set_parent dp_intf->pclk: err=%d\n",
 			 __func__, ret);
 	}
-
-	ret = clk_prepare_enable(dpi->hf_fmm_ck);
-	if (ret < 0)
-		dev_info(dpi->dev, "%s Failed to enable hf_fmm_ck clock: %d\n",
-			 __func__, ret);
-	ret = clk_prepare_enable(dpi->hf_fdp_ck);
-	if (ret < 0)
-		dev_info(dpi->dev, "%s Failed to enable hf_fdp_ck clock: %d\n",
-			 __func__, ret);
 
 	dev_info(dpi->dev, "%s dpintf->pclk_src[TVDPLL_PLL] =  %ld\n",
 		 __func__, clk_get_rate(dpi->pclk_src[TVDPLL_PLL]));
@@ -687,7 +699,16 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
 	mtk_dpi_sw_reset(dpi, true);
 	mtk_dpi_config_pol(dpi, &dpi_pol);
 
-	mtk_dpi_set_golden_setting(dpi, vm.hactive, vm.vactive);
+	if (vm.hactive & 0x3)
+		rw_times = ((vm.hactive >> 2) + 1) * vm.vactive;
+	else
+		rw_times = (vm.hactive >> 2) * vm.vactive;
+
+	mtk_dpi_mask(dpi, DPI_BUF_RW_TIMES, rw_times, 0xffffffff);
+	mtk_dpi_mask(dpi, DPI_BUF_CON0, BUF_BUF_EN, BUF_BUF_EN);
+	mtk_dpi_mask(dpi, DPI_BUF_CON0, BUF_BUF_FIFO_UNDERFLOW_DONT_BLOCK,
+		     BUF_BUF_FIFO_UNDERFLOW_DONT_BLOCK);
+	mtk_dpi_set_golden_setting(dpi);
 
 	mtk_dpi_config_hsync(dpi, &hsync);
 	mtk_dpi_config_vsync_lodd(dpi, &vsync_lodd);
@@ -787,7 +808,7 @@ static int mtk_dpi_bridge_atomic_check(struct drm_bridge *bridge,
 		if (dpi->conf->num_output_fmts)
 			out_bus_format = dpi->conf->output_fmts[0];
 
-	dev_dbg(dpi->dev, "input format 0x%04x, output format 0x%04x\n",
+	dev_dbg(dpi->dev, "dpintf, input format 0x%04x, output format 0x%04x\n",
 		bridge_state->input_bus_cfg.format,
 		bridge_state->output_bus_cfg.format);
 
@@ -803,23 +824,17 @@ static int mtk_dpi_bridge_atomic_check(struct drm_bridge *bridge,
 	return 0;
 }
 
-#if ATTACH_SERDES_BRIDGE
 static int mtk_dpi_bridge_attach(struct drm_bridge *bridge,
 				 enum drm_bridge_attach_flags flags)
 {
 	struct mtk_dpi *dpi = bridge_to_dpi(bridge);
-	int ret;
 
-	if (!dpi->next_bridge)
+	if (dpi->conf->no_next_bridge)
 		return 0;
 
-	ret = drm_bridge_attach(bridge->encoder, dpi->next_bridge, &dpi->bridge, flags);
-	if (ret < 0)
-		dev_info(dpi->dev, "Failed to attach next bridge (%d)\n", ret);
-
-	return 0;
+	return drm_bridge_attach(bridge->encoder, dpi->next_bridge,
+				 &dpi->bridge, flags);
 }
-#endif
 
 static void mtk_dpi_bridge_mode_set(struct drm_bridge *bridge,
 				    const struct drm_display_mode *mode,
@@ -828,7 +843,7 @@ static void mtk_dpi_bridge_mode_set(struct drm_bridge *bridge,
 	struct mtk_dpi *dpi = bridge_to_dpi(bridge);
 
 	drm_mode_copy(&dpi->mode, adjusted_mode);
-	dev_info(dpi->dev, "Htt:%d, Vtt:%d, Hact:%d, Vact:%d, fps:%d\n",
+	dev_info(dpi->dev, "dpintf, Htt:%d, Vtt:%d, Hact:%d, Vact:%d, fps:%d\n",
 		 dpi->mode.htotal, dpi->mode.vtotal,
 			dpi->mode.hdisplay, dpi->mode.vdisplay, drm_mode_vrefresh(mode));
 }
@@ -869,9 +884,7 @@ mtk_dpi_bridge_mode_valid(struct drm_bridge *bridge,
 }
 
 static const struct drm_bridge_funcs mtk_dpi_bridge_funcs = {
-#if ATTACH_SERDES_BRIDGE
 	.attach = mtk_dpi_bridge_attach,
-#endif
 	.mode_set = mtk_dpi_bridge_mode_set,
 	.mode_valid = mtk_dpi_bridge_mode_valid,
 	.disable = mtk_dpi_bridge_disable,
@@ -883,20 +896,6 @@ static const struct drm_bridge_funcs mtk_dpi_bridge_funcs = {
 	.atomic_destroy_state = drm_atomic_helper_bridge_destroy_state,
 	.atomic_reset = drm_atomic_helper_bridge_reset,
 };
-
-void mtk_dpi_start(struct device *dev)
-{
-	struct mtk_dpi *dpi = dev_get_drvdata(dev);
-
-	mtk_dpi_power_on(dpi);
-}
-
-void mtk_dpi_stop(struct device *dev)
-{
-	struct mtk_dpi *dpi = dev_get_drvdata(dev);
-
-	mtk_dpi_power_off(dpi);
-}
 
 unsigned int mtk_dpi_encoder_index(struct device *dev)
 {
@@ -933,8 +932,14 @@ static int mtk_dpi_bind(struct device *dev, struct device *master, void *data)
 
 	ret = drm_bridge_attach(&dpi->encoder, &dpi->bridge, NULL,
 				DRM_BRIDGE_ATTACH_NO_CONNECTOR);
+	if (ret)
+		goto err_cleanup;
 
 	return 0;
+
+err_cleanup:
+	drm_encoder_cleanup(&dpi->encoder);
+	return ret;
 }
 
 static void mtk_dpi_unbind(struct device *dev, struct device *master,
@@ -1122,7 +1127,7 @@ static const struct mtk_dpi_conf mt8195_dpintf_conf = {
 	.csc_enable_bit = DPINTF_CSC_ENABLE,
 };
 
-static const struct mtk_dpi_conf mt8678_dpintf_conf = {
+static const struct mtk_dpi_conf mt8678_dpintf_conf0 = {
 	.cal_factor = mt8678_dpintf_calculate_factor,
 	.max_clock_khz = 600000,
 	.output_fmts = mt8678_output_fmts,
@@ -1134,6 +1139,21 @@ static const struct mtk_dpi_conf mt8678_dpintf_conf = {
 	.channel_swap_shift = DPINTF_CH_SWAP,
 	.yuv422_en_bit = DPINTF_YUV422_EN,
 	.csc_enable_bit = DPINTF_CSC_ENABLE,
+};
+
+static const struct mtk_dpi_conf mt8678_dpintf_conf1 = {
+	.cal_factor = mt8678_dpintf_calculate_factor,
+	.max_clock_khz = 600000,
+	.output_fmts = mt8678_output_fmts,
+	.num_output_fmts = ARRAY_SIZE(mt8678_output_fmts),
+	.pixels_per_iter = 4,
+	.input_2pixel = true,
+	.dimension_mask = DPINTF_HPW_MASK,
+	.hvsize_mask = DPINTF_HSIZE_MASK,
+	.channel_swap_shift = DPINTF_CH_SWAP,
+	.yuv422_en_bit = DPINTF_YUV422_EN,
+	.csc_enable_bit = DPINTF_CSC_ENABLE,
+	.no_next_bridge = true,
 };
 
 static void mt8678_get_clk(struct mtk_dpi *dp_intf)
@@ -1300,6 +1320,27 @@ static const struct mtk_ddp_comp_funcs mtk_dp_intf_funcs = {
 	.io_cmd = mtk_dpintf_io_cmd,
 };
 
+static irqreturn_t mtk_dp_intf_irq_status(int irq, void *dev_id)
+{
+	struct mtk_dpi *dpi = dev_id;
+	u32 status = 0;
+	struct mtk_drm_crtc *mtk_crtc = dpi->ddp_comp.mtk_crtc;
+
+	status = readl(dpi->regs + DPI_INTSTA);
+
+	status &= 0xf;
+	if (status) {
+		mtk_dpi_mask(dpi, DPI_INTSTA, 0, status);
+		if (status & INT_VSYNC_STA)
+			mtk_crtc_vblank_irq(&mtk_crtc->base);
+
+		if (status & INT_UNDERFLOW_STA)
+			DDPMSG("[E]%s dpintf underflow!\n", __func__);
+	}
+
+	return IRQ_HANDLED;
+}
+
 /*  dp intf ddp comp functions end */
 
 static int mtk_dpi_probe(struct platform_device *pdev)
@@ -1309,6 +1350,7 @@ static int mtk_dpi_probe(struct platform_device *pdev)
 	enum mtk_ddp_comp_id comp_id;
 	int ret;
 
+	DDPMSG("%s %s +\n", __func__, dev_name(dev));
 	dpi = devm_kzalloc(dev, sizeof(*dpi), GFP_KERNEL);
 	if (!dpi)
 		return -ENOMEM;
@@ -1316,6 +1358,15 @@ static int mtk_dpi_probe(struct platform_device *pdev)
 	dpi->dev = dev;
 	dpi->conf = (struct mtk_dpi_conf *)of_device_get_match_data(dev);
 	dpi->output_fmt = MEDIA_BUS_FMT_RGB888_1X24;
+
+	if (!dpi->conf->no_next_bridge) {
+		dpi->next_bridge = devm_drm_of_get_bridge(dev, dev->of_node, 0, 0);
+		if (IS_ERR(dpi->next_bridge)) {
+			dev_dbg(dev, "Can not find next_bridge");
+			return -EPROBE_DEFER;
+		}
+		dev_info(dev, "Found dp tx bridge node: %pOF\n", dpi->next_bridge->of_node);
+	}
 
 	dpi->pinctrl = devm_pinctrl_get(&pdev->dev);
 	if (IS_ERR(dpi->pinctrl)) {
@@ -1356,6 +1407,18 @@ static int mtk_dpi_probe(struct platform_device *pdev)
 
 	mt8678_get_clk(dpi);
 
+	ret = clk_prepare_enable(dpi->pclk);
+	if (ret < 0)
+		dev_info(dev, "%s Failed to enable pclk:%d\n",
+			 __func__, ret);
+
+	ret = clk_set_parent(dpi->pclk, dpi->pclk_src[TCK_26M]);
+	if (ret < 0)
+		dev_info(dev, "%s Failed to clk_set_parent:%d\n",
+			 __func__, ret);
+	dev_info(dev, "%s dpintf->pclk:%ld\n",
+		 __func__, clk_get_rate(dpi->pclk));
+
 	comp_id = mtk_ddp_comp_get_id(dev->of_node, MTK_DP_INTF);
 	if ((int)comp_id < 0) {
 		dev_info(dev, "Failed to identify by alias: %d\n", comp_id);
@@ -1372,15 +1435,15 @@ static int mtk_dpi_probe(struct platform_device *pdev)
 	if (dpi->irq < 0)
 		return dpi->irq;
 
-#if ATTACH_SERDES_BRIDGE
-	ret = drm_of_find_panel_or_bridge(dev->of_node, 1, 0, NULL, &dpi->next_bridge);
-	if (!dpi->next_bridge) {
-		dev_info(dev, "Can not find next_bridge");
-		return -EPROBE_DEFER;
+	irq_set_status_flags(dpi->irq, IRQ_TYPE_LEVEL_HIGH);
+	ret = devm_request_irq(
+		&pdev->dev, dpi->irq, mtk_dp_intf_irq_status,
+		IRQF_TRIGGER_NONE | IRQF_SHARED, dev_name(&pdev->dev), dpi);
+	if (ret) {
+		dev_info(&pdev->dev, "failed to request mediatek dp intf irq\n");
+		ret = -EPROBE_DEFER;
+		return ret;
 	}
-
-	dev_info(dev, "Found next bridge node: %pOF\n", dpi->next_bridge->of_node);
-#endif
 
 	platform_set_drvdata(pdev, dpi);
 
@@ -1393,21 +1456,17 @@ static int mtk_dpi_probe(struct platform_device *pdev)
 		return ret;
 
 	ret = component_add(dev, &mtk_dpi_component_ops);
-	if (ret)
+	if (ret) {
+		dev_info(dev, "Failed to component add: %d\n", ret);
 		return -EPROBE_DEFER;
+	}
 
-	ret = clk_prepare_enable(dpi->pclk);
-	if (ret < 0)
-		dev_info(dev, "%s Failed to enable pclk:%d\n",
-			 __func__, ret);
+	if (comp_id == DDP_COMPONENT_DP_INTF0)
+		g_mtk_dpi[0] = dpi;
+	else if (comp_id == DDP_COMPONENT_DP_INTF1)
+		g_mtk_dpi[1] = dpi;
 
-	ret = clk_set_parent(dpi->pclk, dpi->pclk_src[TCK_26M]);
-	if (ret < 0)
-		dev_info(dev, "%s Failed to clk_set_parent:%d\n",
-			 __func__, ret);
-
-	dev_info(dev, "%s dpintf->pclk:%ld\n",
-		 __func__, clk_get_rate(dpi->pclk));
+	DDPMSG("%s %s comp %s-\n", __func__, dev_name(dev), mtk_dump_comp_str_id(comp_id));
 
 	return 0;
 }
@@ -1425,10 +1484,112 @@ static const struct of_device_id mtk_dpi_of_ids[] = {
 	{ .compatible = "mediatek,mt8188-dp-intf", .data = &mt8195_dpintf_conf },
 	{ .compatible = "mediatek,mt8192-dpi", .data = &mt8192_conf },
 	{ .compatible = "mediatek,mt8195-dp-intf", .data = &mt8195_dpintf_conf },
-	{ .compatible = "mediatek,mt6991-dp-intf", .data = &mt8678_dpintf_conf },
+	{ .compatible = "mediatek,disp1_dp_intf0", .data = &mt8678_dpintf_conf0 },
+	{ .compatible = "mediatek,disp1_dp_intf1", .data = &mt8678_dpintf_conf1 },
 	{ /* sentinel */ },
 };
 MODULE_DEVICE_TABLE(of, mtk_dpi_of_ids);
+
+#ifdef CONFIG_PM_SLEEP
+static int mtk_dpi_suspend(struct device *dev)
+{
+	struct mtk_dpi *mtk_dpi = dev_get_drvdata(dev);
+
+	if (!mtk_dpi) {
+		pr_info("[DPI] suspend, dpi not initial\n");
+		return 0;
+	}
+
+	if (mtk_dpi->suspend) {
+		pr_info("[DPI] %s already suspend\n", __func__);
+		return 0;
+	}
+
+	dev_info(mtk_dpi->dev, "[DPI] suspend +\n");
+
+	clk_disable_unprepare(mtk_dpi->pclk);
+
+	mtk_dpi->suspend = true;
+
+	dev_info(mtk_dpi->dev, "[DPI] suspend -\n");
+
+	return 0;
+}
+
+static int mtk_dpi_resume(struct device *dev)
+{
+	struct mtk_dpi *mtk_dpi = dev_get_drvdata(dev);
+	int ret;
+
+	if (!mtk_dpi) {
+		pr_info("[DPI] resume, dpi not initial\n");
+		return 0;
+	}
+
+	if (!mtk_dpi->suspend) {
+		pr_info("[DPI] %s already resume\n", __func__);
+		return 0;
+	}
+
+	dev_info(mtk_dpi->dev, "[DPI] resume +\n");
+
+	ret = clk_prepare_enable(mtk_dpi->pclk);
+	if (ret < 0)
+		dev_info(mtk_dpi->dev, "%s Failed to enable pclk:%d\n",
+			 __func__, ret);
+
+	mtk_dpi->suspend = false;
+
+	dev_info(mtk_dpi->dev, "[DPI] resume -\n");
+
+	return 0;
+}
+
+void mtk_drm_dpi_suspend(void)
+{
+	struct mtk_dpi *mtk_dpi = NULL;
+	int i = 0;
+
+	DDPMSG("%s +\n", __func__);
+
+	for (i = 0; i < MAX_DPI; i++) {
+		mtk_dpi = g_mtk_dpi[i];
+
+		if (!mtk_dpi || !mtk_dpi->dev) {
+			DDPMSG("[E][DPI] %s dp-%d not initial\n", __func__, i);
+			continue;
+		}
+
+		mtk_dpi_suspend(mtk_dpi->dev);
+	}
+
+	DDPMSG("%s -\n", __func__);
+}
+
+void mtk_drm_dpi_resume(void)
+{
+	struct mtk_dpi *mtk_dpi = NULL;
+	int i = 0;
+
+	DDPMSG("%s +\n", __func__);
+
+	for (i = 0; i < MAX_DPI; i++) {
+		mtk_dpi = g_mtk_dpi[i];
+
+		if (!mtk_dpi || !mtk_dpi->dev) {
+			DDPMSG("[E][DPI] %s dp-%d not initial\n", __func__, i);
+			continue;
+		}
+
+		mtk_dpi_resume(mtk_dpi->dev);
+	}
+
+	DDPMSG("%s -\n", __func__);
+}
+#endif
+
+//static SIMPLE_DEV_PM_OPS(mtk_dpi_pm_ops,
+//		mtk_dpi_suspend, mtk_dpi_resume);
 
 struct platform_driver mtk_dp_intf_driver = {
 	.probe = mtk_dpi_probe,
@@ -1436,5 +1597,6 @@ struct platform_driver mtk_dp_intf_driver = {
 	.driver = {
 		.name = "mediatek-dpi",
 		.of_match_table = mtk_dpi_of_ids,
+//		.pm = &mtk_dpi_pm_ops,
 	},
 };

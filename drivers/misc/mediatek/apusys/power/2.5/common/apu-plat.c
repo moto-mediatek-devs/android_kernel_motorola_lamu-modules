@@ -344,8 +344,10 @@ static noinline int __get_bin_raise_from_dts(struct apu_dev *ad, char *name, int
 		return -ENODEV;
 
 	count = prop->length / sizeof(u32);
-	if (idx > count)
-		goto out;
+
+	/* if idx is out of bound, change it as no bin/raise */
+	if (idx > (count - 1))
+		idx = 0;
 
 	tmp = kmalloc_array(count, sizeof(*tmp), GFP_KERNEL);
 	if (!tmp)
@@ -360,7 +362,6 @@ static noinline int __get_bin_raise_from_dts(struct apu_dev *ad, char *name, int
 
 free_mem:
 	kfree(tmp);
-out:
 	return ret;
 }
 
@@ -686,19 +687,19 @@ static noinline int _bin_ub_lb(struct apu_dev *ad)
 		tmp_f = dev_pm_opp_get_freq(opp);
 		sign_v = dev_pm_opp_get_voltage(opp);
 		aprobe_info(ad->dev,
-				"%s: \"%s\",r_f/r_v/b_f/b_v/s_v = %lu/%d/%lu/%d/%lu\n",
+				"%s: \"%s\",r_f/r_v/b_f/b_v/s_v/t_f = %lu/%d/%lu/%d/%lu/%lu\n",
 				__func__, VB_MTD_UB_LB,
-				raise_f, raise_v, bin_f, bin_v, sign_v);
+				raise_f, raise_v, bin_f, bin_v, sign_v, tmp_f);
 
 		/* change v if sign_v > bin_v */
 		if (sign_v > bin_v)
-			ret = dev_pm_opp_adjust_voltage(ad->dev, bin_v,
+			ret = dev_pm_opp_adjust_voltage(ad->dev, tmp_f,
 								(ulong)bin_v,
 								(ulong)bin_v,
 								(ulong)bin_v);
 		/* change v if sign_v < raise_v */
 		if (sign_v < raise_v)
-			ret = dev_pm_opp_adjust_voltage(ad->dev, raise_v,
+			ret = dev_pm_opp_adjust_voltage(ad->dev, tmp_f,
 								(ulong)raise_v,
 								(ulong)raise_v,
 								(ulong)raise_v);
@@ -711,6 +712,11 @@ static noinline int _bin_ub_lb(struct apu_dev *ad)
 
 	apu_dump_opp_table(ad, __func__, 1);
 out:
+	if (ret)
+		aprobe_err(ad->dev,
+				"%s: \"%s\",r_f/r_v/b_f/b_v/s_v/t_f = %lu/%d/%lu/%d/%lu/%lu\n",
+				__func__, VB_MTD_UB_LB,
+				raise_f, raise_v, bin_f, bin_v, sign_v, tmp_f);
 	return ret;
 }
 

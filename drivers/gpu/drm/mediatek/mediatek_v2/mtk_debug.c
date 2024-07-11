@@ -802,9 +802,9 @@ int mtkfb_set_spr_status(unsigned int en)
 	}
 
 	if (en)
-		ret = mtk_drm_switch_spr(crtc, 1);
+		ret = mtk_drm_switch_spr(crtc, 1, 1);
 	else
-		ret = mtk_drm_switch_spr(crtc, 0);
+		ret = mtk_drm_switch_spr(crtc, 0, 1);
 
 	return ret;
 }
@@ -2414,6 +2414,7 @@ void mtk_wakeup_pf_wq(unsigned int m_id)
 
 	mtk_crtc->sof_time = ktime_get();
 	drm_priv = mtk_crtc->base.dev->dev_private;
+#ifndef DRM_CMDQ_DISABLE
 
 	if (drm_priv &&
 		mtk_crtc_is_frame_trigger_mode(&mtk_crtc->base)) {
@@ -2424,6 +2425,7 @@ void mtk_wakeup_pf_wq(unsigned int m_id)
 		atomic_set(&mtk_crtc->pf_event, 1);
 		wake_up_interruptible(&mtk_crtc->present_fence_wq);
 	}
+#endif
 }
 
 void mtk_drm_cwb_backup_copy_size(void)
@@ -3500,6 +3502,7 @@ static void process_dbg_opt(const char *opt)
 			DDPINFO("cannot find output component\n");
 			return;
 		}
+		DDP_MUTEX_LOCK(&mtk_crtc->lock, __func__, __LINE__);
 		enable = 1;
 		comp->funcs->io_cmd(comp, NULL, LCM_RESET, &enable);
 		msleep(20);
@@ -3508,6 +3511,7 @@ static void process_dbg_opt(const char *opt)
 		msleep(20);
 		enable = 1;
 		comp->funcs->io_cmd(comp, NULL, LCM_RESET, &enable);
+		DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
 	} else if (strncmp(opt, "lcm1_reset", 10) == 0) {
 		struct mtk_ddp_comp *comp;
 		struct drm_crtc *crtc;
@@ -3538,6 +3542,7 @@ static void process_dbg_opt(const char *opt)
 			DDPINFO("cannot find output component\n");
 			return;
 		}
+		DDP_MUTEX_LOCK(&mtk_crtc->lock, __func__, __LINE__);
 		enable = 1;
 		comp->funcs->io_cmd(comp, NULL, LCM_RESET, &enable);
 		msleep(20);
@@ -3546,6 +3551,7 @@ static void process_dbg_opt(const char *opt)
 		msleep(20);
 		enable = 1;
 		comp->funcs->io_cmd(comp, NULL, LCM_RESET, &enable);
+		DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
 	} else if (strncmp(opt, "backlight:", 10) == 0) {
 		unsigned int level;
 		int ret;

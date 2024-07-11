@@ -22,8 +22,11 @@ obj-$(CONFIG_DRM_PANEL_ALPHA_JDI_NT36672C_CPHY_VDO) += panel-alpha-jdi-nt36672c-
 obj-$(CONFIG_DRM_PANEL_SC_NT36672C_VDO_120HZ) += panel-sc-nt36672c-vdo-120hz.o
 obj-$(CONFIG_DRM_PANEL_TIANMA_R66451_CMD_120HZ) += panel-tianma-r66451-cmd-120hz.o
 obj-$(CONFIG_DRM_PANEL_TIANMA_R66451_CMD_120HZ_WA) += panel-tianma-r66451-cmd-120hz-wa.o
+obj-$(CONFIG_DRM_PANEL_TIANMA_R66451_CMD_120HZ_NO_MIPI_SWITCH) += panel-tianma-r66451-cmd-120hz-no-mipi-switch.o
 obj-$(CONFIG_DRM_PANEL_TIANMA_NT36672C_VDO_144HZ) += panel-tianma-nt36672c-vdo-144hz.o
 obj-$(CONFIG_DRM_PANEL_TIANMA_NT36672E_VDO_120HZ_HFP) += panel-tianma-nt36672e-vdo-120hz-hfp.o
+obj-$(CONFIG_DRM_PANEL_TIANMA_NT36672E_VDO_120HZ_VFP) += panel-tianma-nt36672e-vdo-120hz-vfp.o
+obj-$(CONFIG_DRM_PANEL_TIANMA_NT36672E_VDO_120HZ_VFP_6382) += panel-tianma-nt36672e-vdo-120hz-vfp-6382.o
 obj-$(CONFIG_DRM_PANEL_ALPHA_JDI_NT36672E_CPHY_VDO) += panel-alpha-jdi-nt36672e-cphy-vdo.o
 obj-$(CONFIG_DRM_PANEL_ALPHA_JDI_NT36672E_VDO_120HZ) += panel-alpha-jdi-nt36672e-vdo-120hz.o
 obj-$(CONFIG_DRM_PANEL_ALPHA_JDI_NT36672E_VDO_120HZ_THRESHOLD) += panel-alpha-jdi-nt36672e-vdo-120hz-threshold.o
@@ -36,6 +39,7 @@ obj-$(CONFIG_DRM_PANEL_TRULY_NT35595_CMD) += panel-truly-nt35595-cmd.o
 obj-$(CONFIG_DRM_PANEL_NT37801_MSYNC2_RTE) += panel-nt37801-msync2-rte.o
 obj-$(CONFIG_DRM_PANEL_SAMSUNG_S68FC01_VDO_AOD) += panel-samsung-s68fc01-vdo-aod.o
 obj-$(CONFIG_DRM_PANEL_ALPHA_SAMSUNG_S6E3HAE_CMD_120HZ) += panel-alpha-samsung-s6e3hae-fhd-dphy-cmd-120hz-r4831a.o
+obj-$(CONFIG_DRM_PANEL_TIANMA_NT36672C_CPHY_VDO_90HZ_RT4801) += panel-tianma-nt36672c-cphy-vdo-90hz-rt4801.o
 obj-$(CONFIG_DRM_PANEL_HIMAX_HX83121A_VDO) += panel-himax-hx83121a-vdo.o
 obj-$(CONFIG_DRM_PANEL_BOE_TV106C9MLL0) += ocp2138_i2c.o
 obj-$(CONFIG_DRM_PANEL_BOE_TV106C9MLL0) += panel-boe-tv106c9mll0.o
@@ -58,6 +62,7 @@ obj-$(CONFIG_DRM_PANEL_NT36672C_FHDP_DSI_VDO_DSC_TXD_BOE) += panel-nt36672c-fhdp
 obj-$(CONFIG_DRM_PANEL_BOE_JD9365DA_VDO) += panel-boe-jd9365da-vdo.o
 obj-$(CONFIG_DRM_PANEL_ILI7838E_DV3_ALPHA_CMD) += panel-ili7838e-dv3-alpha-cmd.o
 obj-$(CONFIG_DRM_PANEL_RM692H5_CMD) += panel-rm692h5-cmd.o
+obj-$(CONFIG_DRM_PANEL_NT35695_FHD_VDO_AUO_RT5081_HDP) += panel-nt35695_fhd_dsi_vdo_auo_rt5081_hdp.o
 ifneq ($(wildcard $(srctree)/$(src)/k6985v1_64),)
 obj-$(CONFIG_DRM_TD2204_WQHD_AMB678ZY01_S6E3HC3_CMD) += k6985v1_64/td2204-wqhd-amb678zy01-s6e3hc3-cmd.o
 endif
@@ -72,6 +77,9 @@ endif
 ifneq ($(wildcard $(srctree)/$(src)/k6991v1_64_alpha),)
 obj-$(CONFIG_DRM_PANEL_RM692H5_ALPHA_CMD_SPR) += k6991v1_64_alpha/panel-rm692h5-alpha-cmd-spr.o
 obj-$(CONFIG_DRM_PANEL_NT37707_BOE_FHDPLUS_CMD) += k6991v1_64_alpha/panel-nt37707-boe-fhdplus-cmd.o
+obj-$(CONFIG_DRM_PANEL_RM692K0_VISIONOX_FHDPLUS_CMD) += k6991v1_64_alpha/panel-rm692k0-visionox-fhdplus-cmd.o
+obj-$(CONFIG_DRM_PANEL_NT37707_BOE_FHDPLUS_CMD_LTPS) += k6991v1_64_alpha/panel-nt37707-boe-fhdplus-cmd-ltps.o
+obj-$(CONFIG_DRM_PANEL_RM692K0_VSN_FHDPLUS_CMD_LTPS) += k6991v1_64_alpha/panel-rm692k0-vsn-fhdplus-cmd-ltps.o
 endif
 
 obj-$(CONFIG_DRM_PANEL_DJIN_FT8057S_VDO) += panel-djin-ft8057s-vdo.o

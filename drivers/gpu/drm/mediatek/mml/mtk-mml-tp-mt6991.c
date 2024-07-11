@@ -1391,7 +1391,8 @@ static enum mml_mode tp_query_mode_dl(struct mml_dev *mml, struct mml_frame_info
 		dest->pq_config.en_dre ||
 		dest->pq_config.en_region_pq ||
 		dest->pq_config.en_fg ||
-		dest->pq_config.en_c3d) {
+		dest->pq_config.en_c3d ||
+		dest->pq_config.en_sharp) {
 		*reason = mml_query_pqen;
 		goto decouple;
 	}
@@ -1569,9 +1570,9 @@ static enum mml_mode tp_query_mode(struct mml_dev *mml, struct mml_frame_info *i
 	if (info->alpha) {
 		*reason = mml_query_alpha;
 		if (!MML_FMT_ALPHA(info->src.format) ||
-		    info->src.width <= 9 ||
+		    info->src.width <= 32 ||
 		    info->dest_cnt != 1 ||
-		    info->dest[0].crop.r.width <= 9 ||
+		    info->dest[0].crop.r.width <= 32 ||
 		    info->dest[0].compose.width <= 9)
 			goto not_support;
 		if (mml_isdc(info->mode))

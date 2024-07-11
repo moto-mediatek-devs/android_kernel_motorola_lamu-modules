@@ -803,7 +803,7 @@ static void disp_tdshp_bypass(struct mtk_ddp_comp *comp, int bypass,
 static int disp_tdshp_user_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 	unsigned int cmd, void *data)
 {
-	//struct mtk_disp_tdshp *tdshp = comp_to_tdshp(comp);
+	struct mtk_disp_tdshp *tdshp = comp_to_tdshp(comp);
 
 	pr_notice("%s, cmd: %d\n", __func__, cmd);
 	switch (cmd) {
@@ -1188,6 +1188,11 @@ static const struct mtk_disp_tdshp_data mt6897_tdshp_driver_data = {
 	.need_bypass_shadow = true,
 };
 
+static const struct mtk_disp_tdshp_data mt6899_tdshp_driver_data = {
+	.support_shadow = false,
+	.need_bypass_shadow = true,
+};
+
 static const struct mtk_disp_tdshp_data mt6989_tdshp_driver_data = {
 	.support_shadow = false,
 	.need_bypass_shadow = true,
@@ -1220,6 +1225,8 @@ static const struct of_device_id mtk_disp_tdshp_driver_dt_match[] = {
 	  .data = &mt6878_tdshp_driver_data},
 	{ .compatible = "mediatek,mt6991-disp-tdshp",
 	  .data = &mt6991_tdshp_driver_data},
+	{ .compatible = "mediatek,mt6899-disp-tdshp",
+	  .data = &mt6899_tdshp_driver_data},
 	{},
 };
 

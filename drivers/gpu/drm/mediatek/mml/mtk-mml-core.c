@@ -12,6 +12,7 @@
 #include <cmdq-util.h>
 #include <linux/sched/clock.h>
 #include <linux/delay.h>
+#include <linux/ratelimit.h>
 
 #include "mtk-mml-core.h"
 #include "mtk-mml-buf.h"
@@ -51,6 +52,9 @@ module_param(mml_pkt_dump, int, 0644);
 
 int mml_pkt_dump_p;
 module_param(mml_pkt_dump_p, int, 0644);
+
+int mml_pkt_dump_m = 1;
+module_param(mml_pkt_dump_m, int, 0644);
 
 int mml_comp_dump;
 module_param(mml_comp_dump, int, 0644);
@@ -792,10 +796,15 @@ static void core_comp_dump(struct mml_task *task, u32 pipe, int cnt)
 	struct mml_comp *comp;
 	u32 i;
 
-	mml_err("dump %d task %p pipe %u config %p job %u mode %u",
-		cnt, task, pipe, cfg, task->job.jobid, cfg->info.mode);
+	mml_err("dump %d task %p pipe %u config %p job %u mode %u topology %u%s",
+		cnt, task, pipe, cfg, task->job.jobid, cfg->info.mode, path->path_id,
+		task->dump_full ? "" : " (reduce dump)");
 	/* print info for this task */
 	dump_task(task);
+
+	/* dump simple info to reduce kernel log impact */
+	if (!task->dump_full)
+		return;
 
 	if (cfg->dual) {
 		mml_err("dump another pipe thread status for dual:");
@@ -808,9 +817,9 @@ static void core_comp_dump(struct mml_task *task, u32 pipe, int cnt)
 	mml_clock_lock(cfg->mml);
 	mml_dpc_exc_keep_task(task, path);
 	call_hw_op(path->mmlsys, mminfra_pw_enable);
-	call_hw_op(path->mmlsys, pw_enable);
+	call_hw_op(path->mmlsys, pw_enable, cfg->info.mode);
 	if (path->mmlsys2)
-		call_hw_op(path->mmlsys2, pw_enable);
+		call_hw_op(path->mmlsys2, pw_enable, cfg->info.mode);
 	mml_clock_unlock(cfg->mml);
 
 	for (i = 0; i < path->node_cnt; i++) {
@@ -823,8 +832,8 @@ static void core_comp_dump(struct mml_task *task, u32 pipe, int cnt)
 
 	mml_clock_lock(cfg->mml);
 	if (path->mmlsys2)
-		call_hw_op(path->mmlsys2, pw_disable);
-	call_hw_op(path->mmlsys, pw_disable);
+		call_hw_op(path->mmlsys2, pw_disable, cfg->info.mode);
+	call_hw_op(path->mmlsys, pw_disable, cfg->info.mode);
 	call_hw_op(path->mmlsys, mminfra_pw_disable);
 	mml_dpc_exc_release_task(task, path);
 	mml_clock_unlock(cfg->mml);
@@ -845,9 +854,9 @@ static s32 core_enable(struct mml_task *task, u32 pipe)
 	cmdq_mbox_enable(((struct cmdq_client *)task->pkts[pipe]->cl)->chan);
 	mml_trace_ex_end();
 	mml_trace_ex_begin("%s_%s_%u", __func__, "pw", pipe);
-	call_hw_op(path->mmlsys, pw_enable);
+	call_hw_op(path->mmlsys, pw_enable, cfg->info.mode);
 	if (path->mmlsys2)
-		call_hw_op(path->mmlsys2, pw_enable);
+		call_hw_op(path->mmlsys2, pw_enable, cfg->info.mode);
 	mml_trace_ex_end();
 
 	if (cfg->info.mode == MML_MODE_DIRECT_LINK && cfg->dpc) {
@@ -911,6 +920,7 @@ static s32 core_disable(struct mml_task *task, u32 pipe)
 	mml_trace_ex_begin("%s_%s_%u", __func__, "clk", pipe);
 
 	if (mml_comp_dump) {
+		task->dump_full = true; /* back to full for manually debug */
 		core_comp_dump(task, pipe, -1);
 		/* dump once */
 		if (mml_comp_dump == 2)
@@ -957,8 +967,8 @@ static s32 core_disable(struct mml_task *task, u32 pipe)
 	}
 
 	if (path->mmlsys2)
-		call_hw_op(path->mmlsys2, pw_disable);
-	call_hw_op(path->mmlsys, pw_disable);
+		call_hw_op(path->mmlsys2, pw_disable, cfg->info.mode);
+	call_hw_op(path->mmlsys, pw_disable, cfg->info.mode);
 
 	mml_trace_ex_end();
 
@@ -1933,6 +1943,19 @@ static const cmdq_async_flush_cb dump_cbs[MML_PIPE_CNT] = {
 	[1] = core_taskdump1_cb,
 };
 
+static int aee_cb(struct cmdq_cb_data data)
+{
+	static DEFINE_RATELIMIT_STATE(aee_rate, 30 * HZ, 2);
+	bool ignore = __ratelimit(&aee_rate);
+	struct cmdq_pkt *pkt = data.data;
+	struct mml_task *task = pkt->user_data;
+
+	if (ignore)
+		task->dump_full = false;
+
+	return ignore ? CMDQ_NO_AEE : CMDQ_AEE_WARN;
+}
+
 static void mml_core_stop_racing_pipe(struct mml_frame_config *cfg, u32 pipe, bool force)
 {
 	const struct mml_topology_path *path = cfg->path[pipe];
@@ -2032,7 +2055,9 @@ static s32 core_flush(struct mml_task *task, u32 pipe)
 
 	/* assign error handler */
 	pkt->err_cb.cb = dump_cbs[pipe];
+	pkt->aee_cb = aee_cb;
 	pkt->err_cb.data = (void *)task;
+	task->dump_full = true;
 
 	if (cfg->info.mode == MML_MODE_RACING) {
 		/* force stop current running racing */
@@ -2122,7 +2147,7 @@ static void core_config_pipe(struct mml_task *task, u32 pipe)
 		core_taskdone_check(task);
 	}
 
-	if (mml_pkt_dump && pipe == mml_pkt_dump_p) {
+	if (mml_pkt_dump && pipe == mml_pkt_dump_p && cfg->info.mode == mml_pkt_dump_m) {
 		mml_clock_lock(cfg->mml);
 
 		if (mml_pkt_dump == 1)

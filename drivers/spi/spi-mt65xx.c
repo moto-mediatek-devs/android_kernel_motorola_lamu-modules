@@ -22,6 +22,9 @@
 #include <linux/dma-mapping.h>
 #include <linux/time.h>
 #include <linux/iopoll.h>
+#include <linux/arm-smccc.h>
+#include <linux/soc/mediatek/mtk_sip_svc.h>
+
 
 #define SPI_CFG0_REG                      0x0000
 #define SPI_CFG1_REG                      0x0004
@@ -134,8 +137,14 @@
 #define DMA_ADDR_EXT_BITS (36)
 #define DMA_ADDR_DEF_BITS (32)
 
-/*Reference to core layer timeout (us) */
+/* Reference to core layer timeout (us) */
 #define SPI_FIFO_POLLING_TIMEOUT (200000)
+
+/* define infra request option type */
+#define MTK_SPI_KERNEL_OP_REQ_INFRA 0
+#define MTK_SPI_KERNEL_OP_REL_INFRA 1
+
+#define MTK_INFRA_REQ_RETRY_TIMES 2
 
 struct mtk_spi_compatible {
 	bool need_pad_sel;
@@ -156,6 +165,13 @@ struct mtk_spi_compatible {
 	bool enhance_packet_len;
 	/* some IC use slice enable for high speed timing*/
 	bool slice_en;
+	/* starting from mt6899, IP supports non-8-bit aligned dummy data.
+	 * however, since the kernel interface handles dummy data in bytes units,
+	 * the driver does not currently support this feature.
+	 */
+	bool dummy_cycle;
+	/* some plat IP have infra on/off feature,so should req and rel infra*/
+	bool infra_req;
 };
 
 struct mtk_spi {
@@ -191,6 +207,21 @@ static const struct mtk_spi_compatible mt2712_compat = {
 	.must_tx = true,
 };
 
+static const struct mtk_spi_compatible mt6899_compat = {
+	.need_pad_sel = true,
+	.must_rx = false,
+	.must_tx = false,
+	.enhance_timing = true,
+	.dma_ext = true,
+	.ipm_design = true,
+	.support_quad = true,
+	.sw_cs = true,
+	.enhance_packet_len = true,
+	.slice_en = true,
+	.dummy_cycle = true,
+	.infra_req = true,
+};
+
 static const struct mtk_spi_compatible mt6991_compat = {
 	.need_pad_sel = true,
 	.must_rx = false,
@@ -202,6 +233,8 @@ static const struct mtk_spi_compatible mt6991_compat = {
 	.sw_cs = true,
 	.enhance_packet_len = true,
 	.slice_en = true,
+	.dummy_cycle = false,
+	.infra_req = false,
 };
 
 static const struct mtk_spi_compatible mt6989_compat = {
@@ -324,6 +357,9 @@ static const struct of_device_id mtk_spi_of_match[] = {
 	{ .compatible = "mediatek,mt6893-spi",
 		.data = (void *)&mt6893_compat,
 	},
+	{ .compatible = "mediatek,mt6899-spi",
+		.data = (void *)&mt6899_compat,
+	},
 	{}
 };
 MODULE_DEVICE_TABLE(of, mtk_spi_of_match);
@@ -420,6 +456,26 @@ static void spi_dump_config(struct spi_master *master, struct spi_message *msg)
 	spi_debug("chip_config->chip_select:%d,chip_config->pad_sel:%d\n",
 			spi->chip_select, mdata->pad_sel[MTK_SPI_PAD_SEL]);
 	spi_debug("||**************%s end**************||\n", __func__);
+}
+
+static int spi_req_infra(int ctrl_id)
+{
+	struct arm_smccc_res res;
+
+	arm_smccc_smc(MTK_SIP_KERNEL_SPI_CONTROL,
+		MTK_SPI_KERNEL_OP_REQ_INFRA,
+		ctrl_id, 0, 0, 0, 0, 0, &res);
+	return res.a0;
+}
+
+static int spi_rel_infra(int ctrl_id)
+{
+	struct arm_smccc_res res;
+
+	arm_smccc_smc(MTK_SIP_KERNEL_SPI_CONTROL,
+		MTK_SPI_KERNEL_OP_REL_INFRA,
+		ctrl_id, 0, 0, 0, 0, 0, &res);
+	return res.a0;
 }
 
 static void mtk_spi_reset(struct mtk_spi *mdata)
@@ -1722,7 +1778,7 @@ static int mtk_spi_probe(struct platform_device *pdev)
 				pdev->dev.of_node, "mediatek,autosuspend-delay",
 				0, &mdata->auto_suspend_delay);
 	if (ret < 0)
-		mdata->auto_suspend_delay = 10;
+		mdata->auto_suspend_delay = 250;
 	pm_runtime_set_autosuspend_delay(&pdev->dev, mdata->auto_suspend_delay);
 	dev_info(&pdev->dev, "SPI probe, set auto_suspend delay = %dmS!\n",
 				mdata->auto_suspend_delay);
@@ -1767,12 +1823,18 @@ static int mtk_spi_runtime_suspend(struct device *dev)
 {
 	struct spi_master *master = dev_get_drvdata(dev);
 	struct mtk_spi *mdata = spi_controller_get_devdata(master);
+	int res_val = -1;
 
 	if (mdata->no_need_unprepare)
 		clk_disable(mdata->spi_clk);
 	else
 		clk_disable_unprepare(mdata->spi_clk);
-
+	if (mdata->dev_comp->infra_req) {
+		/* do release infra action */
+		res_val = spi_rel_infra(master->bus_num);
+		if (res_val != 0)
+			dev_err(dev, "fail to release infra\n");
+	}
 	return 0;
 }
 
@@ -1781,11 +1843,30 @@ static int mtk_spi_runtime_resume(struct device *dev)
 	struct spi_master *master = dev_get_drvdata(dev);
 	struct mtk_spi *mdata = spi_controller_get_devdata(master);
 	int ret;
+	int res_val = -1;
+	int retry = MTK_INFRA_REQ_RETRY_TIMES;
 
 	if (mdata->suspend_delay_update) {
 		pm_runtime_set_autosuspend_delay(dev, mdata->auto_suspend_delay);
 		mdata->suspend_delay_update = false;
 		dev_info(dev, "set auto_suspend delay = %dmS!\n", mdata->auto_suspend_delay);
+	}
+	if (mdata->dev_comp->infra_req) {
+		/* because of using auto_suspend , it has grouped the infra_req for us */
+		/* do infra_request by smc call*/
+		do {
+			res_val = spi_req_infra(master->bus_num);
+			if (res_val == 0)
+				break;
+			dev_info(dev, "fail to req infra and then retry, res_val:%d\n",
+				res_val);
+		} while(retry--);
+
+		if (res_val != 0) {
+			dev_err(dev, "infra not ready may cause DEVAPC, try last time\n");
+			res_val = spi_req_infra(master->bus_num);
+			BUG_ON(res_val);
+		}
 	}
 
 	if (mdata->no_need_unprepare)
@@ -1795,6 +1876,10 @@ static int mtk_spi_runtime_resume(struct device *dev)
 
 	if (ret < 0) {
 		dev_err(dev, "failed to enable spi_clk (%d)\n", ret);
+		if (mdata->dev_comp->infra_req) {
+			res_val = spi_rel_infra(master->bus_num);
+			dev_err(dev, "clk operation err and release infra res_val:%d\n", res_val);
+		}
 		return ret;
 	}
 

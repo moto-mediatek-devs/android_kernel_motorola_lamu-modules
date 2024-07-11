@@ -699,6 +699,7 @@ static const char *get_module_by_taskname(const char *taskname)
 void trigger_vcp_dump(enum vcp_core_id core_id, char *user)
 {
 	int i, j;
+	int timeout = 50000; /* max wait 0.5s */
 
 	i = 0;
 	while (!mutex_trylock(&vcp_pw_clk_mutex)) {
@@ -721,13 +722,20 @@ void trigger_vcp_dump(enum vcp_core_id core_id, char *user)
 		/* trigger vcp dump */
 		if (vcpreg.core_nums == 2) {
 			writel(GIPC_MMUP_DUMP, R_GIPC_IN_SET);
-			udelay(1);
+			while ((readl(R_GIPC_IN_SET) & GIPC_MMUP_DUMP)) {
+				if (timeout == 0) {
+					pr_notice("[MMUP] %s failed %x\n", __func__, readl(R_GIPC_IN_SET));
+					break;
+				}
+				timeout --;
+				udelay(10);
+			}
 		}
 		writel(GIPC_VCP_HART0_DUMP, R_GIPC_IN_SET);
 		for (j = 0; j < NUM_FEATURE_ID; j++)
 			if (feature_table[j].enable)
 				pr_info("[VCP] Active feature id %d cnt %d\n",
-					j, feature_table[j].enable);
+					feature_table[j].feature, feature_table[j].enable);
 
 		mtk_smi_dbg_hang_detect("VCP dump");
 	}
@@ -767,7 +775,7 @@ void trigger_vcp_halt(enum vcp_core_id core_id, char *user)
 		for (j = 0; j < NUM_FEATURE_ID; j++)
 			if (feature_table[j].enable)
 				pr_info("[VCP] Active feature id %d cnt %d\n",
-					j, feature_table[j].enable);
+					feature_table[j].feature, feature_table[j].enable);
 		mtk_smi_dbg_hang_detect("VCP EE");
 	} else
 		pr_notice("[VCP] %s tigger vcp core %d halt but VCP not ready\n", user, core_id);
@@ -861,7 +869,7 @@ uint32_t vcp_wait_ready_sync(void)
 			for (j = 0; j < NUM_FEATURE_ID; j++)
 				if (feature_table[j].enable)
 					pr_info("[VCP] feat. id %d cnt %d\n",
-						j, feature_table[j].enable);
+						feature_table[j].feature, feature_table[j].enable);
 			break;
 		}
 	}
@@ -982,8 +990,6 @@ static int vcp_pm_event(struct notifier_block *notifier
 				vcp_ready[i] = 0;
 			mutex_unlock(&vcp_ready_mutex);
 
-			writel(B_CORE0_SUSPEND|B_CORE1_SUSPEND, AP_R_GPR1);
-			writel(B_GIPC4_SETCLR_3 ,R_GIPC_IN_SET);
 			vcp_wait_suspend_resume(1);
 
 #if VCP_LOGGER_ENABLE
@@ -1001,6 +1007,8 @@ static int vcp_pm_event(struct notifier_block *notifier
 				if (ret)
 					pr_notice("[VCP] %s: pm_runtime_put_sync %d\n"
 						, __func__, ret);
+				/* wait vcp clr rdy bit */
+				vcp_wait_rdy_bit(0);
 			}
 		}
 		is_suspending = true;
@@ -1020,10 +1028,10 @@ static int vcp_pm_event(struct notifier_block *notifier
 				if (ret)
 					pr_notice("[VCP] %s: pm_runtime_get_sync %d\n"
 						, __func__, ret);
+				/* wait vcp set rdy bit */
+				vcp_wait_rdy_bit(1);
 			}
 			if (!is_vcp_shutdown) {
-				writel(B_CORE0_RESUME|B_CORE1_RESUME, AP_R_GPR1);
-				writel(B_GIPC4_SETCLR_3 ,R_GIPC_IN_SET);
 				vcp_wait_suspend_resume(0);
 
 #if VCP_RECOVERY_SUPPORT
@@ -1376,35 +1384,35 @@ static inline ssize_t vcp_A_db_test_store(struct device *kobj
 
 DEVICE_ATTR_WO(vcp_A_db_test);
 
-static ssize_t vcp_ee_enable_show(struct device *kobj
+static ssize_t vcp_excep_mode_show(struct device *kobj
 	, struct device_attribute *attr, char *buf)
 {
-	return scnprintf(buf, PAGE_SIZE, "%d\n", vcp_ee_enable);
+	return scnprintf(buf, PAGE_SIZE, "%d\n", vcp_excep_mode);
 }
 
-static ssize_t vcp_ee_enable_store(struct device *kobj
+static ssize_t vcp_excep_mode_store(struct device *kobj
 	, struct device_attribute *attr, const char *buf, size_t n)
 {
 	unsigned int value = 0;
 
 	if (kstrtouint(buf, 10, &value) == 0) {
-		if (value == 0)
-			vcp_ee_enable = 0;
-		else if (value == 1)
-			vcp_ee_enable = 1;
-		else if (value == 2)
+		if (value == VCP_NO_EXCEP)
+			vcp_excep_mode = VCP_NO_EXCEP;
+		else if (value == VCP_KE_ENABLE)
+			vcp_excep_mode = VCP_KE_ENABLE;
+		else if (value == VCP_EE_ENABLE)
+			vcp_excep_mode = VCP_KE_ENABLE;
+		else if (value == 100)
 			vcp_dbg_log = 0;
-		else if (value == 3)
+		else if (value == 101)
 			vcp_dbg_log = 1;
-		else
-			vcp_ee_enable = value;
 
-		pr_debug("[VCP] vcp_ee_enable = %d, vcp_dbg_log = %d (1:enable, 0:disable)\n"
-				, vcp_ee_enable, vcp_dbg_log);
+		pr_debug("[VCP] vcp_excep_mode = %d, vcp_dbg_log = %d (1:enable, 0:disable)\n"
+				, vcp_excep_mode, vcp_dbg_log);
 	}
 	return n;
 }
-DEVICE_ATTR_RW(vcp_ee_enable);
+DEVICE_ATTR_RW(vcp_excep_mode);
 
 static inline ssize_t vcp_A_awake_lock_show(struct device *kobj
 			, struct device_attribute *attr, char *buf)
@@ -1733,7 +1741,7 @@ static int create_files(void)
 		return ret;
 
 	ret = device_create_file(vcp_device.this_device
-					, &dev_attr_vcp_ee_enable);
+					, &dev_attr_vcp_excep_mode);
 	if (unlikely(ret != 0))
 		return ret;
 
@@ -2216,6 +2224,18 @@ void vcp_wait_suspend_resume(bool suspend)
 {
 	int timeout = 50000; /* max wait 0.5s */
 
+	if (suspend) {
+		writel(B_CORE0_SUSPEND|B_CORE1_SUSPEND, AP_R_GPR1);
+		writel(B_GIPC4_SETCLR_3 ,R_GIPC_IN_SET);
+	} else {
+		writel(B_CORE0_RESUME|B_CORE1_RESUME, AP_R_GPR1);
+		writel(B_GIPC4_SETCLR_3 ,R_GIPC_IN_SET);
+	}
+
+	if (!readl(AP_R_GPR1))
+		pr_notice("[VCP] [%s] AP_R_GPR1 is null %x\n",
+			suspend ? "suspend" : "resume", readl(AP_R_GPR1));
+
 	while (--timeout) {
 		if (suspend && (readl(R_GPR3_CFGREG_SEC) & (VCP_AP_SUSPEND))
 			&& (readl(R_GPR3_CFGREG_SEC) & (MMUP_AP_SUSPEND)))
@@ -2231,6 +2251,23 @@ void vcp_wait_suspend_resume(bool suspend)
 			suspend ? "suspend" : "resume", readl(R_GPR3_CFGREG_SEC));
 		vcp_dump_last_regs(1);
 	}
+}
+
+void vcp_wait_rdy_bit(bool rdy)
+{
+	int timeout = 50000; /* max wait 0.5s */
+
+	while (--timeout) {
+		if (rdy && (readl(VLP_AO_RSVD7) & (READY_BIT)))
+			break;
+		else if (!rdy && !(readl(VLP_AO_RSVD7) & (READY_BIT)))
+			break;
+
+		udelay(10);
+	}
+	if (timeout <= 0)
+		pr_notice("[VCP] wait vcp %s timeout 0x%x\n",
+			rdy ? "set rdy bit" : "clr rdy bit", readl(VLP_AO_RSVD7));
 }
 
 void vcp_wait_core_stop_timeout(enum vcp_core_id core_id)
@@ -2360,7 +2397,7 @@ void vcp_sys_reset_ws(struct work_struct *ws)
 	__pm_stay_awake(vcp_reset_lock);
 
 	/*workqueue for vcp ee, vcp reset by cmd will not trigger vcp ee*/
-	if (vcp_reset_by_cmd == 0) {
+	if (vcp_reset_by_cmd == 0 && vcp_excep_mode != VCP_NO_EXCEP) {
 		vcp_aed(vcp_reset_type, core_id);
 		/* vcp_aee_print("[VCP] %s(): vcp_reset_type %d remain %x times, encnt %d\n",
 		 *	__func__, vcp_reset_type, vcp_reset_counts, mmup_enable_count());
@@ -2689,7 +2726,6 @@ static void mbox_setup_pin_table(unsigned int mbox)
 static int vcp_device_probe(struct platform_device *pdev)
 {
 	int ret = 0, i = 0;
-	unsigned int temp_value;
 	struct resource *res;
 	const char *vcp_hwvoter = NULL;
 	struct device *dev = &pdev->dev;
@@ -2879,15 +2915,19 @@ static int vcp_device_probe(struct platform_device *pdev)
 						, &vcpreg.twohart);
 	pr_notice("[VCP] vcpreg.twohart = %d\n", vcpreg.twohart);
 
-	vcp_ee_enable = 0;
+	vcp_excep_mode = VCP_NO_EXCEP;
 	vcpreg.secure_dump = 0;
 	of_property_read_u32(pdev->dev.of_node, "vcp-secure-dump"
 						, &vcpreg.secure_dump);
-	of_property_read_u32(pdev->dev.of_node, "vcp-ee-enable"
-						, &vcp_ee_enable);
+	of_property_read_u32(pdev->dev.of_node, "vcp-excep-mode"
+						, &vcp_excep_mode);
 
-	pr_notice("[VCP] vcpreg.secure_dump = %d, vcp_ee_enable = %d\n",
-			vcpreg.secure_dump, vcp_ee_enable);
+	if (vcp_excep_mode == VCP_EE_ENABLE) {
+		pr_notice("[VCP] not support %u\n", vcp_excep_mode);
+		vcp_excep_mode = VCP_KE_ENABLE;
+	}
+	pr_notice("[VCP] vcpreg.secure_dump = %d, vcp_excep_mode = %d\n",
+			vcpreg.secure_dump, vcp_excep_mode);
 
 	vcpreg.bus_debug_num_ports = 0;
 	of_property_read_u32(pdev->dev.of_node, "bus-debug-num-ports"
@@ -2896,13 +2936,12 @@ static int vcp_device_probe(struct platform_device *pdev)
 		pr_notice("[VCP] bus debug num ports not found\n");
 	pr_debug("[VCP] vcpreg.bus_debug_num_ports = %d\n", vcpreg.bus_debug_num_ports);
 
-	temp_value = 0;
-	of_property_read_u32(pdev->dev.of_node, "res-req-status", &temp_value);
-	if (!temp_value)
-		pr_notice("[VCP] resource request status register not found\n");
-	else
-		vcp_res_req_status_reg = ioremap(temp_value, 4);
-	pr_debug("[VCP] vcpreg.resource request status register = %x\n", temp_value);
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "vcp_vlp_ao_rsvd7");
+	vcpreg.vcp_vlp_ao_rsvd7 = devm_ioremap_resource(dev, res);
+	if (IS_ERR((void const *) vcpreg.vcp_vlp_ao_rsvd7))
+		pr_debug("[VCP] vcpreg.vcp_vlp_ao_rsvd7 error\n");
+
+	pr_notice("[VCP] VLP_AO_RSVD7 value = 0x%x\n", readl(VLP_AO_RSVD7));
 
 	vcpreg.irq0 = platform_get_irq_byname(pdev, "wdt");
 	if (vcpreg.irq0 < 0)

@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (C) 2020 MediaTek Inc.
 
+subdir-ccflags-y += -Wno-unused-but-set-variable
+
 IMGSENSOR_SUBDRV_OBJ := \
 	$(subdrv-rpath)/s5kjnssqmipiraw_Sensor.o \
 

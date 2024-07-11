@@ -183,6 +183,7 @@ enum dp_return_status {
 	DP_RET_EDID_FAIL = 4,
 	DP_RET_TRANING_FAIL = 5,
 	DP_RET_RETRANING = 6,
+	DP_RET_WAIT_TRIGGER = 7,
 };
 
 enum dp_state {
@@ -879,11 +880,11 @@ struct mtk_drm_dp_mst_topology_mgr {
 struct mtk_dp {
 	struct device *dev;
 	struct drm_device *drm_dev;
-	struct mtk_ddp_comp ddp_comp;
+	struct drm_bridge bridge;
+	struct drm_bridge *next_bridge;
 	const struct mtk_dp_data *data;
 	struct drm_connector *conn;
 	struct drm_encoder *enc;
-	struct drm_bridge *next_bridge;
 	int id;
 	struct edid *edid;
 	struct drm_dp_aux aux;
@@ -895,8 +896,6 @@ struct mtk_dp {
 	struct dp_training_info training_info;
 	int training_state;
 	int training_state_pre;
-	wait_queue_head_t control_wq;
-	struct task_struct *control_task;
 
 	struct workqueue_struct *dp_wq;
 	struct work_struct dp_work;
@@ -928,6 +927,7 @@ struct mtk_dp {
 	u32 vsv_mask;
 	u32 vsv_vers;
 	bool swap_enable;
+	struct notifier_block nb;
 
 #if IS_ENABLED(CONFIG_DRM_MEDIATEK_DP_MST_SUPPORT)
 	bool mst_enable;

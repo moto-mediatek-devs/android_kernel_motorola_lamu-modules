@@ -709,6 +709,7 @@ struct mml_task {
 	struct mml_pq_task *pq_task;
 
 	bool err;
+	bool dump_full;
 
 #if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
 	/* frame dump */
@@ -805,8 +806,8 @@ struct mml_comp_config_ops {
 
 struct mml_comp_hw_ops {
 	void (*init_frame_done_event)(struct mml_comp *comp, u32 event);
-	s32 (*pw_enable)(struct mml_comp *comp);
-	s32 (*pw_disable)(struct mml_comp *comp);
+	s32 (*pw_enable)(struct mml_comp *comp, const s8 mode);
+	s32 (*pw_disable)(struct mml_comp *comp, const s8 mode);
 	s32 (*mminfra_pw_enable)(struct mml_comp *comp);
 	s32 (*mminfra_pw_disable)(struct mml_comp *comp);
 	s32 (*clk_enable)(struct mml_comp *comp);

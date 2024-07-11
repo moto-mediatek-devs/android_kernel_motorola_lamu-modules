@@ -56,7 +56,7 @@
 #include <clk-mtk.h>
 #endif
 //TODO:GKI check api
-#if IS_ENABLED(CONFIG_COMMON_CLK_MT6765)
+#if IS_ENABLED(CONFIG_DEVICE_MODULE_COMMON_CLK_MT6765)
 #include <clk-fmeter.h>
 #include <clk-mt6765-fmeter.h>
 #endif
@@ -124,7 +124,7 @@ static int __gpufreq_pdrv_remove(struct platform_device *pdev);
 /*low power*/
 static void __gpufreq_kick_pbm(int enable);
 /*external function*/
-#if 0 //IS_ENABLED(CONFIG_MTK_PBM) [TODO: API NOT defined. Build error]
+#if IS_ENABLED(CONFIG_MTK_PBM)
 extern void kicker_pbm_by_gpu(bool status, unsigned int loading, int voltage);
 #endif
 //thermal
@@ -747,7 +747,7 @@ unsigned int __gpufreq_get_dyn_pgpu(unsigned int freq, unsigned int volt)
  */
 static void __gpufreq_kick_pbm(int enable)
 {
-#if 0 //IS_ENABLED(CONFIG_MTK_PBM)
+#if IS_ENABLED(CONFIG_MTK_PBM)
 	unsigned int power;
 	unsigned int cur_freq;
 	unsigned int cur_volt;
@@ -908,7 +908,7 @@ int __gpufreq_generic_commit_gpu(int target_oppidx, enum gpufreq_dvfs_state key)
 {
 	struct gpufreq_opp_info *opp_table = g_gpu.working_table;
 	int opp_num = g_gpu.opp_num;
-	int cur_oppidx = 0;
+	int cur_oppidx __maybe_unused = 0;
 	unsigned int cur_freq = 0, target_freq = 0;
 	unsigned int cur_volt = 0, target_volt = 0;
 	unsigned int cur_vsram = 0, target_vsram = 0;
@@ -1111,7 +1111,7 @@ void __gpufreq_dump_infra_status(char *log_buf, int *log_len, int log_size)
 	u32 val = 0;
 
 	GPUFREQ_LOGI("== [GPUFREQ INFRA STATUS] ==");
-#if IS_ENABLED(CONFIG_COMMON_CLK_MT6765)
+#if IS_ENABLED(CONFIG_DEVICE_MODULE_COMMON_CLK_MT6765)
 	GPUFREQ_LOGI("mfgpll=%d, GPU[%d] Freq: %d, Vgpu: %d, Vsram: %d",
 		mt_get_abist_freq(AD_MFGPLL_CK), g_gpu.cur_oppidx, g_gpu.cur_freq,
 		g_gpu.cur_volt, g_gpu.cur_vsram);
@@ -1390,7 +1390,7 @@ static enum gpufreq_posdiv __gpufreq_get_posdiv_by_fgpu(unsigned int freq)
 /* API: scale Freq of GPU via CON1 Reg or FHCTL */
 static int __gpufreq_freq_scale_gpu(unsigned int freq_old, unsigned int freq_new)
 {
-	enum gpufreq_posdiv cur_posdiv = POSDIV_POWER_1;
+	enum gpufreq_posdiv cur_posdiv __maybe_unused = POSDIV_POWER_1;
 	enum gpufreq_posdiv target_posdiv = POSDIV_POWER_1;
 	unsigned int pcw = 0;
 	unsigned int pll = 0;
@@ -1404,6 +1404,7 @@ static int __gpufreq_freq_scale_gpu(unsigned int freq_old, unsigned int freq_new
 	 * MFGPLL_CON1[26:24]: MFGPLL_POSDIV
 	 * MFGPLL_CON1[21:0] : MFGPLL_SDM_PCW (DDS)
 	 */
+	//freq_new = 650000;
 	cur_posdiv = __gpufreq_get_real_posdiv_gpu();
 	target_posdiv = __gpufreq_get_posdiv_by_fgpu(freq_new);
 	/* compute PCW based on target Freq */
@@ -1501,7 +1502,7 @@ static void __gpufreq_dump_bringup_status(struct platform_device *pdev)
 }
 static unsigned int __gpufreq_get_fmeter_fgpu(void)
 {
-#if IS_ENABLED(CONFIG_COMMON_CLK_MT6765)
+#if IS_ENABLED(CONFIG_DEVICE_MODULE_COMMON_CLK_MT6765)
 	return mt_get_abist_freq(25);
 #else
 	return 0;
@@ -1519,9 +1520,9 @@ static unsigned int __gpufreq_get_real_fgpu(void)
 	unsigned int pcw = 0;
 
 	mfgpll = readl(MFGPLL_CON1);
-	
+
 	GPUFREQ_LOGD("MFGPLL_CON1 = 0x%x", mfgpll);
-	
+
 	pcw = mfgpll & (0x3FFFFF);
 	posdiv_power = (mfgpll & (0x7 << POSDIV_SHIFT)) >> POSDIV_SHIFT;
 	freq = (((pcw * TO_MHZ_TAIL + ROUNDING_VALUE) * MFGPLL_FIN) >> DDS_SHIFT) /

@@ -28,7 +28,8 @@ enum MVPU_IPI_DIR_TYPE {
 };
 
 enum MVPU_SW_VERSION {
-	MVPU_SW_VER_MVPU2X = 0,
+	MVPU_SW_VER_MVPU20 = 0,
+	MVPU_SW_VER_MVPU25,
 	MVPU_SW_VER_MVPU25a,
 	MVPU_SW_VER_MVPU3,
 };
@@ -76,6 +77,7 @@ extern struct mvpu_platdata mvpu_mt6895_platdata;
 extern struct mvpu_platdata mvpu_mt6985_platdata;
 extern struct mvpu_platdata mvpu_mt6886_platdata;
 extern struct mvpu_platdata mvpu_mt6897_platdata;
+extern struct mvpu_platdata mvpu_mt6899_platdata;
 extern struct mvpu_platdata mvpu_mt6989_platdata;
 extern struct mvpu_platdata mvpu_mt6991_platdata;
 

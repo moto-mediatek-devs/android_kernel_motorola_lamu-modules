@@ -109,6 +109,7 @@ struct mml_dpc {
 	atomic_t task_cnt;
 	atomic_t exc_pw_cnt[mml_max_sys];
 	atomic_t dc_force_cnt[mml_max_sys];
+	struct mutex dpc_mutex[mml_max_sys];
 };
 
 struct mml_sys_state {
@@ -122,6 +123,7 @@ struct mml_dev {
 	struct mml_comp *comps[MML_MAX_COMPONENTS];
 	struct mml_sys_state sys_state[mml_max_sys];
 	struct mml_sys_qos qos[mml_max_sys];
+	u32 vcp_ref;
 	struct mutex sys_state_mutex;
 	struct mml_sys *sys;
 	struct cmdq_base *cmdq_base;
@@ -383,7 +385,25 @@ void mml_qos_init(struct mml_dev *mml, struct platform_device *pdev, u32 sysid)
 	}
 }
 
-u32 mml_qos_update_tput(struct mml_dev *mml, bool dpc, enum mml_sys_id sysid)
+static void mml_dvfs_vcp_enable(struct mml_dev *mml, enum mml_sys_id sysid)
+{
+	mml->vcp_ref++;
+	if (mml->vcp_ref == 1) {
+		mml_mmp(mmdvfs, MMPROFILE_FLAG_START, sysid, 0);
+		mtk_mmdvfs_enable_vcp(true, VCP_PWR_USR_MML);
+	}
+}
+
+static void mml_dvfs_vcp_disable(struct mml_dev *mml, enum mml_sys_id sysid)
+{
+	mml->vcp_ref--;
+	if (mml->vcp_ref == 0) {
+		mtk_mmdvfs_enable_vcp(false, VCP_PWR_USR_MML);
+		mml_mmp(mmdvfs, MMPROFILE_FLAG_END, sysid, 0);
+	}
+}
+
+u32 mml_qos_update_tput(struct mml_dev *mml, bool dpc, enum mml_sys_id sysid, bool enable)
 {
 	struct mml_topology_cache *tp = mml_topology_get_cache(mml);
 	struct mml_sys_qos *sysqos;
@@ -414,6 +434,9 @@ u32 mml_qos_update_tput(struct mml_dev *mml, bool dpc, enum mml_sys_id sysid)
 	if (mml_freq_for_tppa)
 		mml_update_freq_status(sysqos->opp_speeds[i]);
 
+	if (!dpc && sysqos->dvfs_clk && enable)
+		mml_dvfs_vcp_enable(mml, sysid);
+
 	if (sysqos->current_volt == volt)	/* skip for better performance */
 		goto done;
 	sysqos->current_level = i;
@@ -424,37 +447,45 @@ u32 mml_qos_update_tput(struct mml_dev *mml, bool dpc, enum mml_sys_id sysid)
 	mml_trace_begin("mml_volt_%u", volt);
 
 #ifndef MML_FPGA
-	if (!dpc) {
-		int ret;
+	if (dpc)
+		goto no_dvfs;
 
-		if (sysqos->reg) {
-			ret = regulator_set_voltage(sysqos->reg, volt, INT_MAX);
-			if (ret)
-				mml_err("%s sys %u fail to set volt %d",
-					__func__, sysid, volt);
-			else
-				mml_msg("%s sys %u volt %d (%u) tput %u",
-					__func__, sysid, volt, i, tput);
-		} else if (sysqos->dvfs_clk) {
-			/* set dvfs clock rate by unit Hz */
-			mtk_mmdvfs_enable_vcp(true, VCP_PWR_USR_MML);
-			ret = clk_set_rate(sysqos->dvfs_clk,
-				sysqos->opp_speeds[i] * 1000000);
-			if (ret)
-				mml_err("%s sys %u fail to set rate %uMHz error %d",
-					__func__, sysid, sysqos->opp_speeds[i], ret);
-			else
-				mml_msg("%s sys %u rate %uMHz (%u) tput %u",
-					__func__, sysid, sysqos->opp_speeds[i], i, tput);
-			mtk_mmdvfs_enable_vcp(false, VCP_PWR_USR_MML);
-		}
+	if (sysqos->reg) {
+		int ret = regulator_set_voltage(sysqos->reg, volt, INT_MAX);
+
+		if (ret)
+			mml_err("%s sys %u fail to set volt %d",
+				__func__, sysid, volt);
+		else
+			mml_msg("%s sys %u volt %d (%u) tput %u",
+				__func__, sysid, volt, i, tput);
+	} else if (sysqos->dvfs_clk) {
+		/* set dvfs clock rate by unit Hz */
+		int ret = clk_set_rate(sysqos->dvfs_clk, sysqos->opp_speeds[i] * 1000000);
+
+		if (ret)
+			mml_err("%s sys %u %s fail to set rate %uMHz error %d cnt %u",
+				__func__, sysid, enable ? "on" : "off", sysqos->opp_speeds[i],
+				ret, mml->vcp_ref);
+		else
+			mml_msg("%s sys %u %s rate %uMHz (%u) tput %u cnt %u",
+				__func__, sysid, enable ? "on" : "off", sysqos->opp_speeds[i],
+				i, tput, mml->vcp_ref);
 	}
+
+no_dvfs:
 #endif
 	mml_trace_end();
 
 	mml_update_freq_status(sysqos->opp_speeds[i]);
 
 done:
+	if (!dpc && sysqos->dvfs_clk) {
+		if (!enable)
+			mml_dvfs_vcp_disable(mml, sysid);
+		mml_msg("%s vcp ref sys %u ref %u %s",
+			__func__, sysid, mml->vcp_ref, enable ? "on" : "off");
+	}
 	return volt;
 }
 
@@ -483,7 +514,7 @@ u32 mml_qos_update_sys(struct mml_dev *mml, bool dpc,
 	for (sysid = 0; sysid < mml_max_sys; sysid++) {
 		if (!path->sys_en[sysid])
 			continue;
-		tput = max(tput, mml_qos_update_tput(mml, dpc, sysid));
+		tput = max(tput, mml_qos_update_tput(mml, dpc, sysid, enable));
 	}
 
 	return tput;
@@ -919,7 +950,7 @@ s32 mml_comp_init_larb(struct mml_comp *comp, struct device *dev)
 	return 0;
 }
 
-s32 mml_comp_pw_enable(struct mml_comp *comp)
+s32 mml_comp_pw_enable(struct mml_comp *comp, const s8 mode)
 {
 	int ret = 0;
 
@@ -948,7 +979,7 @@ s32 mml_comp_pw_enable(struct mml_comp *comp)
 	return ret;
 }
 
-s32 mml_comp_pw_disable(struct mml_comp *comp)
+s32 mml_comp_pw_disable(struct mml_comp *comp, const s8 mode)
 {
 	comp->pw_cnt--;
 	if (comp->pw_cnt > 0)
@@ -1065,9 +1096,9 @@ void mml_dpc_task_cnt_inc(struct mml_task *task)
 		mml_clock_lock(mml);
 		call_hw_op(path->mmlsys, mminfra_pw_enable);
 		mml_dpc_exc_keep(mml, path->mmlsys->sysid);
-		call_hw_op(path->mmlsys, pw_enable);
+		call_hw_op(path->mmlsys, pw_enable, task->config->info.mode);
 		if (path->mmlsys2)
-			call_hw_op(path->mmlsys2, pw_enable);
+			call_hw_op(path->mmlsys2, pw_enable, task->config->info.mode);
 		mml_mmp(dpc_cfg, MMPROFILE_FLAG_START, 1, 0);
 		mml_dpc_exc_release(mml, path->mmlsys->sysid);
 		call_hw_op(path->mmlsys, mminfra_pw_disable);
@@ -1095,8 +1126,9 @@ void mml_dpc_task_cnt_dec(struct mml_task *task)
 		mml_dpc_exc_keep(mml, path->mmlsys->sysid);
 		mml_mmp(dpc_cfg, MMPROFILE_FLAG_END, 0, 0);
 		if (path->mmlsys2)
-			call_hw_op(path->mmlsys2, pw_disable);
-		call_hw_op(path->mmlsys, pw_disable);
+			call_hw_op(path->mmlsys2, pw_disable,
+				task->config->info.mode);
+		call_hw_op(path->mmlsys, pw_disable, task->config->info.mode);
 		mml_dpc_exc_release(mml, path->mmlsys->sysid);
 		call_hw_op(path->mmlsys, mminfra_pw_disable);
 		mml_clock_unlock(mml);
@@ -1105,36 +1137,48 @@ void mml_dpc_task_cnt_dec(struct mml_task *task)
 
 void mml_dpc_exc_keep(struct mml_dev *mml, u32 sysid)
 {
-	s32 cur_exc_pw_cnt = atomic_inc_return(&mml->dpc.exc_pw_cnt[sysid]);
+	s32 cur_exc_pw_cnt;
 
+	mutex_lock(&mml->dpc.dpc_mutex[sysid]);
+
+	cur_exc_pw_cnt = atomic_inc_return(&mml->dpc.exc_pw_cnt[sysid]);
 	mml_mmp(dpc_exception_flow, MMPROFILE_FLAG_PULSE, 0x10000 | sysid, cur_exc_pw_cnt);
 
 	if (cur_exc_pw_cnt > 1)
-		return;
+		goto done;
 	if (cur_exc_pw_cnt <= 0) {
-		mml_err("%s  cnt %d", __func__, cur_exc_pw_cnt);
-		return;
+		mml_err("%s cnt %d", __func__, cur_exc_pw_cnt);
+		goto done;
 	}
 
 	mml_mmp(dpc_exception_flow, MMPROFILE_FLAG_START, 1, 0);
 	mml_dpc_power_keep(sysid);
+
+done:
+	mutex_unlock(&mml->dpc.dpc_mutex[sysid]);
 }
 
 void mml_dpc_exc_release(struct mml_dev *mml, u32 sysid)
 {
-	s32 cur_exc_pw_cnt = atomic_dec_return(&mml->dpc.exc_pw_cnt[sysid]);
+	s32 cur_exc_pw_cnt;
 
+	mutex_lock(&mml->dpc.dpc_mutex[sysid]);
+
+	cur_exc_pw_cnt = atomic_dec_return(&mml->dpc.exc_pw_cnt[sysid]);
 	mml_mmp(dpc_exception_flow, MMPROFILE_FLAG_PULSE, sysid, cur_exc_pw_cnt);
 
 	if (cur_exc_pw_cnt > 0)
-		return;
+		goto done;
 	if (cur_exc_pw_cnt < 0) {
-		mml_err("%s  cnt %d", __func__, cur_exc_pw_cnt);
-		return;
+		mml_err("%s cnt %d", __func__, cur_exc_pw_cnt);
+		goto done;
 	}
 
 	mml_mmp(dpc_exception_flow, MMPROFILE_FLAG_END, 0, 0);
 	mml_dpc_power_release(sysid);
+
+done:
+	mutex_unlock(&mml->dpc.dpc_mutex[sysid]);
 }
 
 void mml_dpc_exc_keep_task(struct mml_task *task, const struct mml_topology_path *path)
@@ -1183,7 +1227,7 @@ void mml_dpc_dc_enable(struct mml_dev *mml, u32 sysid, bool dcen)
 		mml_mmp(dpc_dc, MMPROFILE_FLAG_END, sysid, 0);
 	}
 
-	mml_dpc_group_enable(!dcen);
+	mml_dpc_group_enable(sysid, !dcen);
 }
 
 void mml_pw_set_kick_cb(struct mml_dev *mml,
@@ -2090,6 +2134,8 @@ static int mml_probe(struct platform_device *pdev)
 	mutex_init(&mml->ctx_mutex);
 	mutex_init(&mml->clock_mutex);
 	mutex_init(&mml->wake_ref_mutex);
+	mutex_init(&mml->dpc.dpc_mutex[mml_sys_tile]);
+	mutex_init(&mml->dpc.dpc_mutex[mml_sys_frame]);
 
 	for (i = 0; i < ARRAY_SIZE(mml->sys_state); i++) {
 		mml->sys_state[i].sys_id = i;

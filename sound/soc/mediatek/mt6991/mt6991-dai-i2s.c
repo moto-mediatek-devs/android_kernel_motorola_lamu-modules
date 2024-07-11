@@ -2372,9 +2372,11 @@ static const struct snd_kcontrol_new mtk_i2sout4_ch2_mix[] = {
 };
 
 static const struct snd_kcontrol_new mtk_i2sout4_ch3_mix[] = {
+	SOC_DAPM_SINGLE_AUTODISABLE("DL3_CH1", AFE_CONN118_1, I_DL3_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL6_CH1", AFE_CONN118_1, I_DL6_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL6_CH2", AFE_CONN118_1, I_DL6_CH2, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL_24CH_CH3", AFE_CONN118_1, I_DL_24CH_CH3, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("DL_24CH_CH13", AFE_CONN118_2, I_DL_24CH_CH13, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL_24CH_CH15", AFE_CONN118_2, I_DL_24CH_CH15, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL24_CH1", AFE_CONN118_2, I_DL24_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL26_CH1", AFE_CONN118_2, I_DL26_CH1, 1, 0),
@@ -2385,7 +2387,9 @@ static const struct snd_kcontrol_new mtk_i2sout4_ch3_mix[] = {
 };
 
 static const struct snd_kcontrol_new mtk_i2sout4_ch4_mix[] = {
+	SOC_DAPM_SINGLE_AUTODISABLE("DL3_CH2", AFE_CONN119_1, I_DL3_CH2, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL_24CH_CH4", AFE_CONN119_1, I_DL_24CH_CH4, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("DL_24CH_CH14", AFE_CONN119_2, I_DL_24CH_CH14, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL_24CH_CH16", AFE_CONN119_2, I_DL_24CH_CH16, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL24_CH2", AFE_CONN119_2, I_DL24_CH2, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL25_CH1", AFE_CONN119_2, I_DL25_CH1, 1, 0),
@@ -2411,15 +2415,20 @@ static const struct snd_kcontrol_new mtk_i2sout4_ch7_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("DL7_CH1", AFE_CONN122_1, I_DL7_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL7_CH2", AFE_CONN122_1, I_DL7_CH2, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL_24CH_CH7", AFE_CONN122_1, I_DL_24CH_CH7, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("DL_24CH_CH15", AFE_CONN122_2, I_DL_24CH_CH15, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("DL26_CH1", AFE_CONN122_2, I_DL26_CH1, 1, 0),
 };
 
 static const struct snd_kcontrol_new mtk_i2sout4_ch8_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("DL8_CH1", AFE_CONN123_1, I_DL8_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL8_CH2", AFE_CONN123_1, I_DL8_CH2, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL_24CH_CH8", AFE_CONN123_1, I_DL_24CH_CH8, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("DL_24CH_CH16", AFE_CONN123_2, I_DL_24CH_CH16, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("DL26_CH2", AFE_CONN123_2, I_DL26_CH2, 1, 0),
 };
 
 static const struct snd_kcontrol_new mtk_i2sout5_ch1_mix[] = {
+	SOC_DAPM_SINGLE_AUTODISABLE("DL5_CH1", AFE_CONN124_1, I_DL5_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL_24CH_CH1", AFE_CONN124_1, I_DL_24CH_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN3_CH1", AFE_CONN124_4, I_I2SIN3_CH1, 1, 0),
 };
@@ -2427,6 +2436,7 @@ static const struct snd_kcontrol_new mtk_i2sout5_ch1_mix[] = {
 static const struct snd_kcontrol_new mtk_i2sout5_ch2_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("DL4_CH1", AFE_CONN125_1, I_DL4_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL4_CH2", AFE_CONN125_1, I_DL4_CH2, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("DL5_CH2", AFE_CONN125_1, I_DL5_CH2, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL_24CH_CH2", AFE_CONN125_1, I_DL_24CH_CH2, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN3_CH2", AFE_CONN124_5, I_I2SIN3_CH1, 1, 0),
 };
@@ -2491,6 +2501,9 @@ static const struct snd_kcontrol_new mtk_i2sout5_ch13_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("DL3_CH1", AFE_CONN136_1, I_DL3_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL4_CH1", AFE_CONN136_1, I_DL4_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL4_CH2", AFE_CONN136_1, I_DL4_CH2, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("DL6_CH1", AFE_CONN136_1, I_DL6_CH1, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("DL6_CH2", AFE_CONN136_1, I_DL6_CH2, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("DL23_CH1", AFE_CONN136_2, I_DL23_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL_24CH_CH13", AFE_CONN136_2, I_DL_24CH_CH13, 1, 0),
 };
 
@@ -2500,11 +2513,15 @@ static const struct snd_kcontrol_new mtk_i2sout5_ch14_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("DL5_CH2", AFE_CONN137_1, I_DL5_CH2, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL_4CH_CH1", AFE_CONN137_1, I_DL_4CH_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL_24CH_CH14", AFE_CONN137_2, I_DL_24CH_CH14, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("DL25_CH1", AFE_CONN137_2, I_DL25_CH1, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("DL25_CH2", AFE_CONN137_2, I_DL25_CH2, 1, 0),
 };
 
 static const struct snd_kcontrol_new mtk_i2sout5_ch15_mix[] = {
 	SOC_DAPM_SINGLE_AUTODISABLE("DL6_CH1", AFE_CONN138_1, I_DL6_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL6_CH2", AFE_CONN138_1, I_DL6_CH2, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("DL7_CH1", AFE_CONN138_1, I_DL7_CH1, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("DL7_CH2", AFE_CONN138_1, I_DL7_CH2, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL_24CH_CH15", AFE_CONN138_2, I_DL_24CH_CH15, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL23_CH1", AFE_CONN138_2, I_DL23_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL23_CH2", AFE_CONN138_2, I_DL23_CH2, 1, 0),
@@ -2512,6 +2529,8 @@ static const struct snd_kcontrol_new mtk_i2sout5_ch15_mix[] = {
 };
 
 static const struct snd_kcontrol_new mtk_i2sout5_ch16_mix[] = {
+	SOC_DAPM_SINGLE_AUTODISABLE("DL8_CH1", AFE_CONN139_1, I_DL8_CH1, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("DL8_CH2", AFE_CONN139_1, I_DL8_CH2, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL_24CH_CH16", AFE_CONN139_2, I_DL_24CH_CH16, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL25_CH1", AFE_CONN139_2, I_DL25_CH1, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("DL25_CH2", AFE_CONN139_2, I_DL25_CH2, 1, 0),
@@ -3997,6 +4016,8 @@ static const struct snd_soc_dapm_route mtk_dai_i2s_routes[] = {
 	{"I2SOUT4_CH6", "DL2_CH2", "DL2"},
 	{"I2SOUT4_CH1", "DL3_CH1", "DL3"},
 	{"I2SOUT4_CH2", "DL3_CH2", "DL3"},
+	{"I2SOUT4_CH3", "DL3_CH1", "DL3"},
+	{"I2SOUT4_CH4", "DL3_CH2", "DL3"},
 	{"I2SOUT4_CH1", "DL4_CH1", "DL4"},
 	{"I2SOUT4_CH1", "DL4_CH2", "DL4"},
 	{"I2SOUT4_CH2", "DL4_CH2", "DL4"},
@@ -4029,6 +4050,10 @@ static const struct snd_soc_dapm_route mtk_dai_i2s_routes[] = {
 	{"I2SOUT4_CH2", "DL_24CH_CH14", "DL_24CH"},
 	{"I2SOUT4_CH3", "DL_24CH_CH15", "DL_24CH"},
 	{"I2SOUT4_CH4", "DL_24CH_CH16", "DL_24CH"},
+	{"I2SOUT4_CH3", "DL_24CH_CH13", "DL_24CH"},
+	{"I2SOUT4_CH4", "DL_24CH_CH14", "DL_24CH"},
+	{"I2SOUT4_CH7", "DL_24CH_CH15", "DL_24CH"},
+	{"I2SOUT4_CH8", "DL_24CH_CH16", "DL_24CH"},
 	{"I2SOUT4_CH1", "DL24_CH1", "DL24"},
 	{"I2SOUT4_CH2", "DL24_CH2", "DL24"},
 	{"I2SOUT4_CH3", "DL24_CH1", "DL24"},
@@ -4037,6 +4062,8 @@ static const struct snd_soc_dapm_route mtk_dai_i2s_routes[] = {
 	{"I2SOUT4_CH4", "DL25_CH2", "DL25"},
 	{"I2SOUT4_CH3", "DL26_CH1", "DL26"},
 	{"I2SOUT4_CH4", "DL26_CH2", "DL26"},
+	{"I2SOUT4_CH7", "DL26_CH1", "DL26"},
+	{"I2SOUT4_CH8", "DL26_CH2", "DL26"},
 
 	{"I2SOUT4", NULL, "I2SOUT4_CH1"},
 	{"I2SOUT4", NULL, "I2SOUT4_CH2"},
@@ -4115,6 +4142,7 @@ static const struct snd_soc_dapm_route mtk_dai_i2s_routes[] = {
 
 	{"I2SOUT5_CH7", "DL23_CH1", "DL23"},
 	{"I2SOUT5_CH8", "DL23_CH2", "DL23"},
+	{"I2SOUT5_CH13", "DL23_CH1", "DL23"},
 
 	{"I2SOUT5_CH8", "DL24_CH1", "DL24"},
 	{"I2SOUT5_CH9", "DL24_CH2", "DL24"},
@@ -4128,6 +4156,8 @@ static const struct snd_soc_dapm_route mtk_dai_i2s_routes[] = {
 	{"I2SOUT5_CH8", "DL25_CH1", "DL25"},
 	{"I2SOUT5_CH8", "DL25_CH2", "DL25"},
 
+	{"I2SOUT5_CH14", "DL25_CH1", "DL25"},
+	{"I2SOUT5_CH14", "DL25_CH2", "DL25"},
 	{"I2SOUT5_CH16", "DL25_CH1", "DL25"},
 	{"I2SOUT5_CH16", "DL25_CH2", "DL25"},
 
@@ -4140,11 +4170,21 @@ static const struct snd_soc_dapm_route mtk_dai_i2s_routes[] = {
 	{"I2SOUT5_CH13", "DL4_CH1", "DL4"},
 	{"I2SOUT5_CH13", "DL4_CH2", "DL4"},
 
+	{"I2SOUT5_CH1", "DL5_CH1", "DL5"},
+	{"I2SOUT5_CH2", "DL5_CH2", "DL5"},
 	{"I2SOUT5_CH14", "DL5_CH1", "DL5"},
 	{"I2SOUT5_CH14", "DL5_CH2", "DL5"},
 
+	{"I2SOUT5_CH13", "DL6_CH1", "DL6"},
+	{"I2SOUT5_CH13", "DL6_CH2", "DL6"},
 	{"I2SOUT5_CH15", "DL6_CH1", "DL6"},
 	{"I2SOUT5_CH15", "DL6_CH2", "DL6"},
+
+	{"I2SOUT5_CH15", "DL7_CH1", "DL7"},
+	{"I2SOUT5_CH15", "DL7_CH2", "DL7"},
+
+	{"I2SOUT5_CH16", "DL8_CH1", "DL8"},
+	{"I2SOUT5_CH16", "DL8_CH2", "DL8"},
 
 	{"I2SOUT5_CH15", "DL23_CH1", "DL23"},
 	{"I2SOUT5_CH15", "DL23_CH2", "DL23"},
@@ -4435,10 +4475,14 @@ static int mtk_dai_connsys_i2s_hw_params(struct snd_pcm_substream *substream,
 	i2s_con |= I2S_FMT_I2S << I2S_FMT_SFT;
 	i2s_con |= 1 << I2S_SRC_SFT;
 	i2s_con |= get_i2s_wlen(SNDRV_PCM_FORMAT_S16_LE) << I2S_WLEN_SFT;
+#if IS_ENABLED(CONFIG_SND_SOC_MTK_AUTO_AUDIO)
+	i2s_con |= 1 << I2SIN_PAD_SEL_SFT;
+#else
 	i2s_con |= 0 << I2SIN_PAD_SEL_SFT;
+#endif
 	regmap_write(afe->regmap, AFE_CONNSYS_I2S_CON, i2s_con);
 
-	/* choose FMI2S_IN B */
+	/* choose FMI2S_IN A OR B mode */
 	regmap_update_bits(afe->regmap,
 			   AUD_TOP_CFG_VLP_RG,
 			   FMI2S_IN_SEL_MASK_SFT,
@@ -4658,7 +4702,7 @@ static int mtk_dai_i2s_config(struct mtk_base_afe *afe,
 		/* 3: pad top 5: no pad top */
 		mtk_regmap_update_bits(afe->regmap, etdm_data.init_point_reg,
 				       etdm_data.init_point_mask,
-				       pad_top,
+				       (i2s_priv->slave_mode ? 0x5 : pad_top),
 				       etdm_data.init_point_shift);
 		mtk_regmap_update_bits(afe->regmap, etdm_data.lrck_reset_reg,
 				       etdm_data.lrck_reset_mask,
@@ -5521,7 +5565,7 @@ static int mt6991_dai_i2s_config(struct mtk_base_afe *afe, int i2s_id,
 		/* 3: pad top 5: no pad top */
 		mtk_regmap_update_bits(afe->regmap, etdm_data.init_point_reg,
 				       etdm_data.init_point_mask,
-				       pad_top,
+				       (i2s_priv->slave_mode ? 0x5 : pad_top),
 				       etdm_data.init_point_shift);
 		mtk_regmap_update_bits(afe->regmap, etdm_data.lrck_reset_reg,
 				       etdm_data.lrck_reset_mask,

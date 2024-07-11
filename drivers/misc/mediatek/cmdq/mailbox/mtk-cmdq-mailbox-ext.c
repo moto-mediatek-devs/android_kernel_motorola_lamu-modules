@@ -1647,6 +1647,14 @@ static void cmdq_thread_irq_handler(struct cmdq *cmdq,
 		cmdq_trace_end("%s pkt:%p", __func__, task->pkt);
 	}
 
+#if IS_ENABLED(CONFIG_VHOST_CMDQ)
+	if (task && ret) {
+		cmdq_err("[host] cmdq tf fault err: %d irq flag:%#x gce:%lx idx:%u hwid:%u pkt:%p",
+			err, irq_flag, (unsigned long)cmdq->base_pa, thread->idx, cmdq->hwid, task->pkt);
+		cmdq_task_callback(task->pkt, -EINVAL);
+	}
+#endif
+
 	if (thread->dirty) {
 		cmdq_log("task in error dump thread:%u pkt:0x%p",
 			thread->idx, task ? task->pkt : NULL);
@@ -1745,8 +1753,8 @@ static irqreturn_t cmdq_irq_handler(int irq, void *dev)
 	unsigned long irq_status, flags = 0L, irq_idx_flag;
 	int bit, i;
 	bool secure_irq = false;
-	u32 thd_cnt = 0;
 #if IS_ENABLED(CONFIG_MTK_IRQ_MONITOR_DEBUG)
+	u32 thd_cnt = 0;
 	u64 start = sched_clock(), end[4];
 	u32 end_cnt = 0;
 #endif
@@ -1808,7 +1816,9 @@ static irqreturn_t cmdq_irq_handler(int irq, void *dev)
 		cmdq_thread_irq_handler(cmdq, thread, &cmdq->irq_removes);
 		spin_unlock_irqrestore(&thread->chan->lock, flags);
 		thread->irq_time = sched_clock() - irq_time;
+#if IS_ENABLED(CONFIG_MTK_IRQ_MONITOR_DEBUG)
 		thd_cnt += 1;
+#endif
 	}
 
 	cmdq_mtcmos_by_fast(cmdq, false);
@@ -1863,8 +1873,8 @@ static irqreturn_t cmdq_vm_irq_handler(int irq, void *dev)
 	unsigned long irq_status_vm, flags = 0L, irq_idx_flag;
 	int bit, i;
 	bool secure_irq = false;
-	u32 thd_cnt = 0;
 #if IS_ENABLED(CONFIG_MTK_IRQ_MONITOR_DEBUG)
+	u32 thd_cnt = 0;
 	u64 start = sched_clock(), end[4];
 	u32 end_cnt = 0;
 #endif
@@ -1924,7 +1934,9 @@ static irqreturn_t cmdq_vm_irq_handler(int irq, void *dev)
 		cmdq_thread_irq_handler(cmdq, thread, &cmdq->irq_removes);
 		spin_unlock_irqrestore(&thread->chan->lock, flags);
 		thread->irq_time = sched_clock() - irq_time;
+#if IS_ENABLED(CONFIG_MTK_IRQ_MONITOR_DEBUG)
 		thd_cnt += 1;
+#endif
 	}
 
 	cmdq_mtcmos_by_fast(cmdq, false);

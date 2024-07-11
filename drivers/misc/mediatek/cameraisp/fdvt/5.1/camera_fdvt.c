@@ -4090,7 +4090,7 @@ EXIT:
  *****************************************************************************/
 static signed int FDVT_release(struct inode *pInode, struct file *pFile)
 {
-	struct FDVT_USER_INFO_STRUCT *pUserInfo;
+	struct FDVT_USER_INFO_STRUCT *pUserInfo __maybe_unused;
 	/*unsigned int Reg;*/
 
 	log_dbg("- E. user_count: %d.", fdvt_info.user_count);
@@ -4782,19 +4782,21 @@ static int fdvt_suspend_pm_event(struct notifier_block *notifier,
 	case PM_POST_HIBERNATION:
 		return NOTIFY_DONE;
 	case PM_SUSPEND_PREPARE: /*enter suspend*/
-		log_dbg("bPass1_On_In_Resume_TG1(%d)\n", bPass1_On_In_Resume_TG1);
+		log_inf("+PM_SUSPEND_PREPARE:clock_enable_count(%d), fdvt_count(%d)\n", clock_enable_count, fdvt_count);
 		bPass1_On_In_Resume_TG1 = 0;
 		if (clock_enable_count > 0) {
 			fdvt_enable_clock(MFALSE);
 			fdvt_count++;
 		}
+		log_inf("-PM_SUSPEND_PREPARE:clock_enable_count(%d), fdvt_count(%d)\n", clock_enable_count, fdvt_count);
 		return NOTIFY_DONE;
 	case PM_POST_SUSPEND:    /*after resume*/
-		log_dbg("bPass1_On_In_Resume_TG1(%d).\n", bPass1_On_In_Resume_TG1);
+		log_inf("+PM_POST_SUSPEND:clock_enable_count(%d), fdvt_count(%d)\n", clock_enable_count, fdvt_count);
 		if (fdvt_count > 0) {
 			fdvt_enable_clock(MTRUE);
 			fdvt_count--;
 		}
+		log_inf("-PM_POST_SUSPEND:clock_enable_count(%d), fdvt_count(%d)\n", clock_enable_count, fdvt_count);
 		return NOTIFY_DONE;
 }
 	return NOTIFY_OK;
@@ -4974,7 +4976,7 @@ static int proc_fdvt_dump_open(struct inode *inode, struct file *file)
 	return single_open(file, fdvt_dump_read, NULL);
 }
 
-static const struct file_operations fdvt_dump_proc_fops = {
+static const struct file_operations fdvt_dump_proc_fops __maybe_unused = {
 	.owner = THIS_MODULE,
 	.open = proc_fdvt_dump_open,
 	.read = seq_read,
@@ -5106,7 +5108,7 @@ static int proc_fdvt_reg_open(struct inode *inode, struct file *file)
 	return single_open(file, fdvt_reg_read, NULL);
 }
 
-static const struct file_operations fdvt_reg_proc_fops = {
+static const struct file_operations fdvt_reg_proc_fops __maybe_unused = {
 	.owner = THIS_MODULE,
 	.open = proc_fdvt_reg_open,
 	.read = seq_read,

@@ -72,7 +72,7 @@ extern int tcpc_device_irq_enable(struct tcpc_device *tcpc);
 extern void *tcpc_get_dev_data(struct tcpc_device *tcpc);
 extern void tcpci_lock_typec(struct tcpc_device *tcpc);
 extern void tcpci_unlock_typec(struct tcpc_device *tcpc);
-extern int tcpci_alert(struct tcpc_device *tcpc);
+extern int tcpci_alert(struct tcpc_device *tcpc, bool masked);
 
 /*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 #if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
@@ -80,8 +80,7 @@ extern int tcpci_alert_power_status_changed(struct tcpc_device *tcpc);
 #endif /* CONFIG_OEM_TCPC_PD_SC2150 */
 /*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 
-extern void tcpci_vbus_level_init(
-		struct tcpc_device *tcpc, uint16_t power_status);
+extern void tcpci_vbus_level_refresh(struct tcpc_device *tcpc);
 int tcpci_alert_wakeup(struct tcpc_device *tcpc);
 
 static inline int tcpci_check_vbus_valid(struct tcpc_device *tcpc)
@@ -103,9 +102,9 @@ int tcpci_set_watchdog(struct tcpc_device *tcpc, bool en);
 #endif /* CONFIG_OEM_TCPC_PD_SC2150 */
 /*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
 int tcpci_get_alert_mask(struct tcpc_device *tcpc, uint32_t *mask);
-int tcpci_get_alert_status(struct tcpc_device *tcpc, uint32_t *alert);
+int tcpci_get_alert_status_and_mask(struct tcpc_device *tcpc, uint32_t *alert, uint32_t *mask);
 int tcpci_get_fault_status(struct tcpc_device *tcpc, uint8_t *fault);
-int tcpci_get_power_status(struct tcpc_device *tcpc, uint16_t *pw_status);
+int tcpci_get_power_status(struct tcpc_device *tcpc);
 int tcpci_init(struct tcpc_device *tcpc, bool sw_reset);
 int tcpci_init_alert_mask(struct tcpc_device *tcpc);
 
@@ -136,7 +135,6 @@ int tcpci_set_low_power_mode(struct tcpc_device *tcpc, bool en);
 int tcpci_alert_vendor_defined_handler(struct tcpc_device *tcpc);
 int tcpci_set_auto_dischg_discnt(struct tcpc_device *tcpc, bool en);
 int tcpci_get_vbus_voltage(struct tcpc_device *tcpc, u32 *vbus);
-int tcpci_is_vsafe0v(struct tcpc_device *tcpc);
 
 #if CONFIG_WATER_DETECTION
 int tcpci_set_water_protection(struct tcpc_device *tcpc, bool en);

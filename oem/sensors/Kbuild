@@ -1,7 +1,3 @@
-ifdef CONFIG_AWINIC_SAR
-	obj-y += aw_sar/
-endif
-
 ifdef CONFIG_HX9031_SAR
 	obj-y += hx9031/
 endif

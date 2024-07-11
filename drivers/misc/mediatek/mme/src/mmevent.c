@@ -27,6 +27,15 @@
 
 #define MIN(x, y)   ((x) <= (y) ? (x) : (y))
 
+/* If it is 64bit use __pa_nodebug, otherwise use __pa_symbol_nodebug or __pa */
+#ifndef __pa_nodebug
+#ifdef __pa_symbol_nodebug
+#define __pa_nodebug __pa_symbol_nodebug
+#else
+#define __pa_nodebug __pa
+#endif
+#endif
+
 static int bmme_init_buffer;
 
 static struct mme_header_t mme_header = {
@@ -202,7 +211,7 @@ EXPORT_SYMBOL(mme_globals);
 
 #if !IS_ENABLED(CONFIG_MTK_GMO_RAM_OPTIMIZE)
 #define DBG_BUFFER_INIT_SIZE (2880*1024)
-#elif
+#else
 #define DBG_BUFFER_INIT_SIZE (4096+67*256)
 #endif
 
@@ -644,9 +653,11 @@ static void get_pid_info(struct mme_unit_t *p_ring_buffer, unsigned int buffer_u
 				if (ret < 0)
 					MMEERR("pid buf name sprintf error,ret:%d", ret);
 			} else {
+				rcu_read_lock();
 				task = find_task_by_vpid(pid);
 				if (task != NULL)
 					get_task_comm(p_pid_buffer[pid_index].name, task);
+				rcu_read_unlock();
 			}
 
 			MMEINFO("pid:%d, pid_name:%s", pid, p_pid_buffer[pid_index].name);

@@ -59,7 +59,6 @@
 
 #define MTK_EDP_MODE_EXTERNAL_MONITOR	"external-monitor"
 #define MTK_EDP_MODE_USE_EDID			"use-edid"
-#define MTK_EDP_MODE_COLOR_DEPTH_10BIT	"color-depth-10bit"
 #define MTK_EDP_MODE_USE_HPD			"use-hpd"
 
 enum {
@@ -89,18 +88,9 @@ struct mtk_dp_train_info {
 	unsigned int channel_eq_pattern;
 };
 
-struct mtk_dp_audio_cfg {
-	bool detect_monitor;
-	int sad_count;
-	int sample_rate;
-	int word_length_bits;
-	int channels;
-};
-
 struct mtk_dp_info {
 	enum dp_pixelformat format;
 	struct videomode vm;
-	struct mtk_dp_audio_cfg audio_cur_cfg;
 };
 
 struct mtk_edp_efuse_fmt {
@@ -141,30 +131,21 @@ struct mtk_edp {
 	struct timer_list debounce_timer;
 
 	/* For eDP attribute */
+	unsigned int color_depth;
 	bool use_hpd;
 	bool use_edid;
 	bool external_monitor;
 	bool edp_ui_enable;
-	bool color_depth_10bit;
 	bool has_fec;
 
-	/* For audio */
-	bool audio_enable;
-	hdmi_codec_plugged_cb plugged_cb;
-	struct platform_device *audio_pdev;
-
-	struct device *codec_dev;
-	/* protect the plugged_cb as it's used in both bridge ops and audio */
-	struct mutex update_plugged_status_lock;
+	bool suspend;
+	struct notifier_block nb;	/* Kernel suspend and resume event */
 };
 
 struct mtk_edp_data {
 	int bridge_type;
 	unsigned int smc_cmd;
 	const struct mtk_edp_efuse_fmt *efuse_fmt;
-	bool audio_supported;
-	bool audio_pkt_in_hblank_area;
-	u16 audio_m_div2_bit;
 };
 
 static const struct mtk_edp_efuse_fmt mt8678_edp_efuse_fmt[MTK_DP_CAL_MAX] = {
@@ -495,31 +476,38 @@ static void mtk_edp_set_msa(struct mtk_edp *mtk_edp)
 static int mtk_edp_set_color_format(struct mtk_edp *mtk_edp,
 				   enum dp_pixelformat color_format)
 {
-	u32 val;
-
-	/* update MISC0 */
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_4P_3034,
-			   color_format << DP_TEST_COLOR_FORMAT_SHIFT,
-			   DP_TEST_COLOR_FORMAT_MASK);
+	u32 val = 0;
+	u32 misc0 = 0;
 
 	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_4P_3034,
 			   BIT(3), BIT(3));
 
 	switch (color_format) {
-	case DP_PIXELFORMAT_YUV422:
-		val = PIXEL_ENCODE_FORMAT_DP_ENC0_P0_YCBCR422;
-		break;
 	case DP_PIXELFORMAT_RGB:
+		misc0 = 0x0;
 		val = PIXEL_ENCODE_FORMAT_DP_ENC0_P0_RGB;
 		break;
+	case DP_PIXELFORMAT_YUV444:
+		misc0 = 0x2;
+		val = PIXEL_ENCODE_FORMAT_DP_ENC0_P0_RGB;
+		break;
+	case DP_PIXELFORMAT_YUV422:
+		misc0 = 0x1;
+		val = PIXEL_ENCODE_FORMAT_DP_ENC0_P0_YCBCR422;
+		break;
 	case DP_PIXELFORMAT_YUV420:
+		misc0 = 0x3;
 		val = PIXEL_ENCODE_FORMAT_DP_ENC0_P0_YCBCR420;
 		break;
 	default:
-		drm_warn(mtk_edp->drm_dev, "Unsupported color format: %d\n",
-			 color_format);
+		pr_info("[eDPTX] Not supported color format: %d\n", color_format);
 		return -EINVAL;
 	}
+
+	/* update MISC0 for color format */
+	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_4P_3034,
+			   misc0 << DP_TEST_COLOR_FORMAT_SHIFT,
+			   DP_TEST_COLOR_FORMAT_MASK);
 
 	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_4P_303C,
 			   val, PIXEL_ENCODE_FORMAT_DP_ENC0_P0_MASK);
@@ -529,15 +517,50 @@ static int mtk_edp_set_color_format(struct mtk_edp *mtk_edp,
 
 static void mtk_edp_set_color_depth(struct mtk_edp *mtk_edp)
 {
-	/* Only support 8 bits currently */
-	/* Update MISC0 */
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_4P_3034,
-			   DP_MSA_MISC_8_BPC, DP_TEST_BIT_DEPTH_MASK);
+	u32 val = 0;
+	u32 misc0 = 0;
 
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_4P_303C,
-			   VIDEO_COLOR_DEPTH_DP_ENC0_P0_8BIT,
-			   VIDEO_COLOR_DEPTH_DP_ENC0_P0_MASK);
+	switch (mtk_edp->color_depth) {
+	case 6:
+		misc0 = DP_MSA_MISC_6_BPC;
+		val = VIDEO_COLOR_DEPTH_DP_ENC0_P0_6BIT;
+		break;
+	case 8:
+		misc0 = DP_MSA_MISC_8_BPC;
+		val = VIDEO_COLOR_DEPTH_DP_ENC0_P0_8BIT;
 
+		/* set MISC0 BT709 */
+		mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_4P_3034,
+				MTK_DP_MISC0_BT709, MTK_DP_MISC0_BT_MASK);
+		break;
+	case 10:
+		misc0 = DP_MSA_MISC_10_BPC;
+		val = VIDEO_COLOR_DEPTH_DP_ENC0_P0_10BIT;
+
+		/* set MISC0 BT601 */
+		mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_4P_3034,
+				MTK_DP_MISC0_BT601, MTK_DP_MISC0_BT_MASK);
+		break;
+	case 12:
+		misc0 = DP_MSA_MISC_12_BPC;
+		val = VIDEO_COLOR_DEPTH_DP_ENC0_P0_12BIT;
+		break;
+	case 16:
+		misc0 = DP_MSA_MISC_16_BPC;
+		val = VIDEO_COLOR_DEPTH_DP_ENC0_P0_16BIT;
+		break;
+	default:
+		misc0 = DP_MSA_MISC_8_BPC;
+		val = VIDEO_COLOR_DEPTH_DP_ENC0_P0_8BIT;
+
+		/* set MISC0 BT709 */
+		mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_4P_3034,
+				MTK_DP_MISC0_BT709, MTK_DP_MISC0_BT_MASK);
+		break;
+	}
+
+	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_4P_3034, misc0, DP_TEST_BIT_DEPTH_MASK);
+	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_4P_303C, val, VIDEO_COLOR_DEPTH_DP_ENC0_P0_MASK);
 }
 
 static void mtk_edp_config_mn_mode(struct mtk_edp *mtk_edp)
@@ -581,168 +604,6 @@ static void mtk_edp_pg_enable(struct mtk_edp *mtk_edp, bool enable)
 			   PGEN_PATTERN_SEL_VAL << 4, PGEN_PATTERN_SEL_MASK);
 }
 
-static void mtk_dp_audio_setup_channels(struct mtk_edp *mtk_edp,
-					struct mtk_dp_audio_cfg *cfg)
-{
-	u32 channel_enable_bits;
-
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC1_P0_3324,
-			   AUDIO_SOURCE_MUX_DP_ENC1_P0_DPRX,
-			   AUDIO_SOURCE_MUX_DP_ENC1_P0_MASK);
-
-	/* audio channel count change reset */
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC1_P0_33F4,
-			   DP_ENC_DUMMY_RW_1, DP_ENC_DUMMY_RW_1);
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC1_P0_3304,
-			   AU_PRTY_REGEN_DP_ENC1_P0_MASK |
-			   AU_CH_STS_REGEN_DP_ENC1_P0_MASK |
-			   AUDIO_SAMPLE_PRSENT_REGEN_DP_ENC1_P0_MASK,
-			   AU_PRTY_REGEN_DP_ENC1_P0_MASK |
-			   AU_CH_STS_REGEN_DP_ENC1_P0_MASK |
-			   AUDIO_SAMPLE_PRSENT_REGEN_DP_ENC1_P0_MASK);
-
-	switch (cfg->channels) {
-	case 2:
-		channel_enable_bits = AUDIO_2CH_SEL_DP_ENC0_P0_MASK |
-				      AUDIO_2CH_EN_DP_ENC0_P0_MASK;
-		break;
-	case 8:
-	default:
-		channel_enable_bits = AUDIO_8CH_SEL_DP_ENC0_P0_MASK |
-				      AUDIO_8CH_EN_DP_ENC0_P0_MASK;
-		break;
-	}
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_P0_3088,
-			   channel_enable_bits | AU_EN_DP_ENC0_P0,
-			   AUDIO_2CH_SEL_DP_ENC0_P0_MASK |
-			   AUDIO_2CH_EN_DP_ENC0_P0_MASK |
-			   AUDIO_8CH_SEL_DP_ENC0_P0_MASK |
-			   AUDIO_8CH_EN_DP_ENC0_P0_MASK |
-			   AU_EN_DP_ENC0_P0);
-
-	/* audio channel count change reset */
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC1_P0_33F4, 0, DP_ENC_DUMMY_RW_1);
-
-	/* enable audio reset */
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC1_P0_33F4,
-			   DP_ENC_DUMMY_RW_1_AUDIO_RST_EN,
-			   DP_ENC_DUMMY_RW_1_AUDIO_RST_EN);
-}
-
-static void mtk_dp_audio_channel_status_set(struct mtk_edp *mtk_edp,
-					    struct mtk_dp_audio_cfg *cfg)
-{
-	struct snd_aes_iec958 iec = { 0 };
-
-	switch (cfg->sample_rate) {
-	case 32000:
-		iec.status[3] = IEC958_AES3_CON_FS_32000;
-		break;
-	case 44100:
-		iec.status[3] = IEC958_AES3_CON_FS_44100;
-		break;
-	case 48000:
-		iec.status[3] = IEC958_AES3_CON_FS_48000;
-		break;
-	case 88200:
-		iec.status[3] = IEC958_AES3_CON_FS_88200;
-		break;
-	case 96000:
-		iec.status[3] = IEC958_AES3_CON_FS_96000;
-		break;
-	case 192000:
-		iec.status[3] = IEC958_AES3_CON_FS_192000;
-		break;
-	default:
-		iec.status[3] = IEC958_AES3_CON_FS_NOTID;
-		break;
-	}
-
-	switch (cfg->word_length_bits) {
-	case 16:
-		iec.status[4] = IEC958_AES4_CON_WORDLEN_20_16;
-		break;
-	case 20:
-		iec.status[4] = IEC958_AES4_CON_WORDLEN_20_16 |
-				IEC958_AES4_CON_MAX_WORDLEN_24;
-		break;
-	case 24:
-		iec.status[4] = IEC958_AES4_CON_WORDLEN_24_20 |
-				IEC958_AES4_CON_MAX_WORDLEN_24;
-		break;
-	default:
-		iec.status[4] = IEC958_AES4_CON_WORDLEN_NOTID;
-	}
-
-	/* IEC 60958 consumer channel status bits */
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_P0_308C,
-			   0, CH_STATUS_0_DP_ENC0_P0_MASK);
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_P0_3090,
-			   iec.status[3] << 8, CH_STATUS_1_DP_ENC0_P0_MASK);
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_P0_3094,
-			   iec.status[4], CH_STATUS_2_DP_ENC0_P0_MASK);
-}
-
-static void mtk_dp_audio_sdp_asp_set_channels(struct mtk_edp *mtk_edp,
-					      int channels)
-{
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_P0_312C,
-			   (min(8, channels) - 1) << 8,
-			   ASP_HB2_DP_ENC0_P0_MASK | ASP_HB3_DP_ENC0_P0_MASK);
-}
-
-static void mtk_dp_audio_set_divider(struct mtk_edp *mtk_edp)
-{
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_P0_30BC,
-			   mtk_edp->data->audio_m_div2_bit,
-			   AUDIO_M_CODE_MULT_DIV_SEL_DP_ENC0_P0_MASK);
-}
-
-static void mtk_dp_sdp_trigger_aui(struct mtk_edp *mtk_edp)
-{
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC1_P0_3280,
-			   MTK_DP_SDP_AUI, SDP_PACKET_TYPE_DP_ENC1_P0_MASK);
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC1_P0_3280,
-			   SDP_PACKET_W_DP_ENC1_P0, SDP_PACKET_W_DP_ENC1_P0);
-}
-
-static void mtk_edp_sdp_set_data(struct mtk_edp *mtk_edp, u8 *data_bytes)
-{
-	mtk_edp_bulk_16bit_write(mtk_edp, MTK_DP_ENC1_P0_3200,
-				data_bytes, 0x10);
-}
-
-static void mtk_dp_sdp_set_header_aui(struct mtk_edp *mtk_edp,
-				      struct dp_sdp_header *header)
-{
-	u32 db_addr = MTK_DP_ENC0_P0_30D8 + (MTK_DP_SDP_AUI - 1) * 8;
-
-	mtk_edp_bulk_16bit_write(mtk_edp, db_addr, (u8 *)header, 4);
-}
-
-static void mtk_dp_disable_sdp_aui(struct mtk_edp *mtk_edp)
-{
-	/* Disable periodic send */
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_P0_30A8 & 0xfffc, 0,
-			   0xff << ((MTK_DP_ENC0_P0_30A8 & 3) * 8));
-}
-
-static void mtk_dp_setup_sdp_aui(struct mtk_edp *mtk_edp,
-				 struct dp_sdp *sdp)
-{
-	u32 shift;
-
-	mtk_edp_sdp_set_data(mtk_edp, sdp->db);
-	mtk_dp_sdp_set_header_aui(mtk_edp, &sdp->sdp_header);
-	mtk_dp_disable_sdp_aui(mtk_edp);
-
-	shift = (MTK_DP_ENC0_P0_30A8 & 3) * 8;
-
-	mtk_dp_sdp_trigger_aui(mtk_edp);
-	/* Enable periodic sending */
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_P0_30A8 & 0xfffc,
-			   0x05 << shift, 0xff << shift);
-}
 
 static void mtk_edp_aux_irq_clear(struct mtk_edp *mtk_edp)
 {
@@ -1032,6 +893,7 @@ static void mtk_edp_initialize_settings(struct mtk_edp *mtk_edp)
 				FEC_CLOCK_EN_MODE_DP_TRANS_4P);
 	mtk_edp_update_bits(mtk_edp, MTK_DP_TRANS_4P_342C,
 						0x68, 0x68);
+	/* MTK request */
 	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_4P_31EC,
 						AUDIO_CH_SRC_SEL_DP_ENC0_4P,
 						AUDIO_CH_SRC_SEL_DP_ENC0_4P);
@@ -1103,17 +965,13 @@ static void mtk_edp_initialize_aux_settings(struct mtk_edp *mtk_edp)
 
 	/* Con Thd = 1.5ms+Vx0.1ms */
 	mtk_edp_update_bits(mtk_edp, REG_367C_AUX_TX_4P,
-				HPD_CONN_THD_AUX_TX_P0_FLDMASK_POS << 8,
+				HPD_CONN_THD_AUX_TX_P0_FLDMASK_POS << 6,
 				HPD_CONN_THD_AUX_TX_P0_FLDMASK);
 
 	/* DisCon Thd = 1.5ms+Vx0.1ms */
 	mtk_edp_update_bits(mtk_edp, REG_37A0_AUX_TX_P0,
 				HPD_DISC_THD_AUX_TX_P0_FLDMASK_POS << 4,
 				HPD_DISC_THD_AUX_TX_P0_FLDMASK);
-
-	mtk_edp_update_bits(mtk_edp, MTK_DP_AUX_4P_3690,
-				RX_REPLY_COMPLETE_MODE_AUX_TX_4P,
-				RX_REPLY_COMPLETE_MODE_AUX_TX_4P);
 
 	mtk_edp_update_bits(mtk_edp, REG_3FF8_DP_ENC_4P_3,
 				XTAL_FREQ_FOR_PSR_DP_ENC_4P_3_VALUE << 9,
@@ -1322,14 +1180,17 @@ static void mtk_edp_training_set_scramble(struct mtk_edp *mtk_edp, bool enable)
 static void mtk_edp_video_mute(struct mtk_edp *mtk_edp, bool enable)
 {
 	struct arm_smccc_res res;
-	u32 val = VIDEO_MUTE_SEL_DP_ENC0_P0 |
-		  (enable ? VIDEO_MUTE_SW_DP_ENC0_P0 : 0);
 	u32 x3 = (EDP_VIDEO_UNMUTE << 16) | enable;
 
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_P0_3000,
-			   val,
-			   VIDEO_MUTE_SEL_DP_ENC0_P0 |
-			   VIDEO_MUTE_SW_DP_ENC0_P0);
+/*  use secure mute and MTK_DP_ENC0_P0_3000 use default mute value
+ *	u32 val = VIDEO_MUTE_SEL_DP_ENC0_P0 |
+ *			(enable ? VIDEO_MUTE_SW_DP_ENC0_P0 : 0);
+ *
+ *	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_P0_3000,
+ *			   val,
+ *			   VIDEO_MUTE_SEL_DP_ENC0_P0 |
+ *		   VIDEO_MUTE_SW_DP_ENC0_P0);
+ */
 
 	arm_smccc_smc(MTK_SIP_DP_CONTROL,
 		      EDP_VIDEO_UNMUTE, enable,
@@ -1337,32 +1198,6 @@ static void mtk_edp_video_mute(struct mtk_edp *mtk_edp, bool enable)
 
 	dev_info(mtk_edp->dev, "[eDPTX] smc cmd: 0x%x, p1: %s, ret: 0x%lx-0x%lx\n",
 		EDP_VIDEO_UNMUTE, enable ? "enable" : "disable", res.a0, res.a1);
-}
-
-static void mtk_dp_audio_mute(struct mtk_edp *mtk_edp, bool mute)
-{
-	u32 val[3];
-
-	if (mute) {
-		val[0] = VBID_AUDIO_MUTE_FLAG_SW_DP_ENC0_P0 |
-			 VBID_AUDIO_MUTE_FLAG_SEL_DP_ENC0_P0;
-		val[1] = 0;
-		val[2] = 0;
-	} else {
-		val[0] = 0;
-		val[1] = AU_EN_DP_ENC0_P0;
-		/* Send one every two frames */
-		val[2] = 0x0F;
-	}
-
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_4P_3030,
-			   val[0],
-			   VBID_AUDIO_MUTE_FLAG_SW_DP_ENC0_P0 |
-			   VBID_AUDIO_MUTE_FLAG_SEL_DP_ENC0_P0);
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_P0_3088,
-			   val[1], AU_EN_DP_ENC0_P0);
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC0_P0_30A4,
-			   val[2], AU_TS_CFG_DP_ENC0_P0_MASK);
 }
 
 static void mtk_edp_aux_panel_poweron(struct mtk_edp *mtk_edp, bool pwron)
@@ -1430,7 +1265,6 @@ static void mtk_edp_initialize_priv_data(struct mtk_edp *mtk_edp)
 	mtk_edp->info.format = DP_PIXELFORMAT_RGB;
 	mtk_edp->has_fec = false;
 	memset(&mtk_edp->info.vm, 0, sizeof(struct videomode));
-	mtk_edp->audio_enable = false;
 }
 
 static void mtk_edp_sdp_set_down_cnt_init(struct mtk_edp *mtk_edp,
@@ -1502,18 +1336,6 @@ static void mtk_edp_sdp_set_down_cnt_init_in_hblank(struct mtk_edp *mtk_edp)
 			   SDP_DOWN_CNT_INIT_IN_HBLANK_DP_ENC1_P0_MASK);
 }
 
-static void mtk_dp_audio_sample_arrange_disable(struct mtk_edp *mtk_edp)
-{
-	/* arrange audio packets into the Hblanking and Vblanking area */
-	if (!mtk_edp->data->audio_pkt_in_hblank_area)
-		return;
-
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC1_P0_3374, 0,
-			   SDP_ASP_INSERT_IN_HBLANK_DP_ENC1_P0_MASK);
-	mtk_edp_update_bits(mtk_edp, MTK_DP_ENC1_P0_3374, 0,
-			   SDP_DOWN_ASP_CNT_INIT_DP_ENC1_P0_MASK);
-}
-
 static void mtk_edp_setup_tu(struct mtk_edp *mtk_edp)
 {
 	u32 sram_read_start = min_t(u32, MTK_DP_TBC_BUF_READ_START_ADDR,
@@ -1524,7 +1346,6 @@ static void mtk_edp_setup_tu(struct mtk_edp *mtk_edp)
 
 	mtk_edp_set_sram_read_start(mtk_edp, sram_read_start);
 	mtk_edp_setup_encoder(mtk_edp);
-	mtk_dp_audio_sample_arrange_disable(mtk_edp);
 	mtk_edp_sdp_set_down_cnt_init_in_hblank(mtk_edp);
 	mtk_edp_sdp_set_down_cnt_init(mtk_edp, sram_read_start);
 }
@@ -1934,46 +1755,6 @@ static void mtk_edp_video_enable(struct mtk_edp *mtk_edp, bool enable)
 	}
 }
 
-static void mtk_dp_audio_sdp_setup(struct mtk_edp *mtk_edp,
-				   struct mtk_dp_audio_cfg *cfg)
-{
-	struct dp_sdp sdp;
-	struct hdmi_audio_infoframe frame;
-
-	hdmi_audio_infoframe_init(&frame);
-	frame.coding_type = HDMI_AUDIO_CODING_TYPE_PCM;
-	frame.channels = cfg->channels;
-	frame.sample_frequency = cfg->sample_rate;
-
-	switch (cfg->word_length_bits) {
-	case 16:
-		frame.sample_size = HDMI_AUDIO_SAMPLE_SIZE_16;
-		break;
-	case 20:
-		frame.sample_size = HDMI_AUDIO_SAMPLE_SIZE_20;
-		break;
-	case 24:
-	default:
-		frame.sample_size = HDMI_AUDIO_SAMPLE_SIZE_24;
-		break;
-	}
-
-	hdmi_audio_infoframe_pack_for_dp(&frame, &sdp, MTK_DP_VERSION);
-
-	mtk_dp_audio_sdp_asp_set_channels(mtk_edp, cfg->channels);
-	mtk_dp_setup_sdp_aui(mtk_edp, &sdp);
-}
-
-static void mtk_dp_audio_setup(struct mtk_edp *mtk_edp,
-			       struct mtk_dp_audio_cfg *cfg)
-{
-	mtk_dp_audio_sdp_setup(mtk_edp, cfg);
-	mtk_dp_audio_channel_status_set(mtk_edp, cfg);
-
-	mtk_dp_audio_setup_channels(mtk_edp, cfg);
-	mtk_dp_audio_set_divider(mtk_edp);
-}
-
 static int mtk_edp_video_config(struct mtk_edp *mtk_edp)
 {
 	mtk_edp_config_mn_mode(mtk_edp);
@@ -2003,6 +1784,7 @@ static irqreturn_t mtk_edp_hpd_event_thread(int hpd, void *dev)
 	struct mtk_edp *mtk_edp = dev;
 	unsigned long flags;
 	u32 status;
+	int ret = 0;
 
 	pr_info("[eDPTX] %s+\n", __func__);
 	if (mtk_edp->need_debounce && mtk_edp->train_info.cable_plugged_in)
@@ -2015,7 +1797,12 @@ static irqreturn_t mtk_edp_hpd_event_thread(int hpd, void *dev)
 
 	if (status & MTK_DP_THREAD_HPD_EVENT) {
 		dev_info(mtk_edp->dev, "[eDPTX] Receive IRQ from sink devices\n");
-		mtk_edp_hpd_sink_event(mtk_edp);
+		// mtk_edp_hpd_sink_event(mtk_edp);
+		ret = mtk_edp_training(mtk_edp);
+		if (ret)
+			pr_info("[eDPTX] link trainning failed %d\n", ret);
+
+		pr_info("[eDPTX] %s-\n", __func__);
 		return IRQ_HANDLED;
 	}
 
@@ -2049,11 +1836,6 @@ static irqreturn_t mtk_edp_hpd_event_thread(int hpd, void *dev)
 
 		if (!mtk_edp->train_info.cable_plugged_in) {
 			dev_info(mtk_edp->dev, "[eDPTX] MTK_DP_HPD_DISCONNECT\n");
-			if (mtk_edp->data->bridge_type != DRM_MODE_CONNECTOR_eDP) {
-				mtk_dp_disable_sdp_aui(mtk_edp);
-				memset(&mtk_edp->info.audio_cur_cfg, 0,
-					sizeof(mtk_edp->info.audio_cur_cfg));
-			}
 			mtk_edp_video_mute(mtk_edp, true);
 			mtk_edp_set_idle_pattern(mtk_edp, true);
 			mtk_edp_update_bits(mtk_edp, MTK_DP_TOP_PWR_STATE,
@@ -2193,32 +1975,15 @@ static int mtk_edp_dt_parse(struct mtk_edp *mtk_edp,
 	ret = of_property_read_u32(dev->of_node, MTK_EDP_MODE_USE_EDID, &read_value);
 	mtk_edp->use_edid = (!ret) ? !!read_value : false;
 
-	ret = of_property_read_u32(dev->of_node, MTK_EDP_MODE_COLOR_DEPTH_10BIT, &read_value);
-	mtk_edp->color_depth_10bit = (!ret) ? !!read_value : false;
-
 	ret = of_property_read_u32(dev->of_node, MTK_EDP_MODE_USE_HPD, &read_value);
 	mtk_edp->use_hpd = (!ret) ? !!read_value : false;
 
-	dev_info(dev, "[eDPTX] use external monitor:%d, use edid:%d use hpd:%d color_dep_10b %d\n",
+	dev_info(dev, "[eDPTX] use external monitor:%d, use edid:%d use hpd:%d\n",
 			mtk_edp->external_monitor,
 			mtk_edp->use_edid,
-			mtk_edp->use_hpd,
-			mtk_edp->color_depth_10bit);
+			mtk_edp->use_hpd);
 
 	return 0;
-}
-
-static void mtk_edp_update_plugged_status(struct mtk_edp *mtk_edp)
-{
-	if (!mtk_edp->data->audio_supported || !mtk_edp->audio_enable)
-		return;
-
-	mutex_lock(&mtk_edp->update_plugged_status_lock);
-	if (mtk_edp->plugged_cb && mtk_edp->codec_dev)
-		mtk_edp->plugged_cb(mtk_edp->codec_dev,
-				   mtk_edp->enabled &
-				   mtk_edp->info.audio_cur_cfg.detect_monitor);
-	mutex_unlock(&mtk_edp->update_plugged_status_lock);
 }
 
 static enum drm_connector_status mtk_edp_bdg_detect(struct drm_bridge *bridge)
@@ -2231,7 +1996,6 @@ static enum drm_connector_status mtk_edp_bdg_detect(struct drm_bridge *bridge)
 	int ret_value = 0;
 
 	pr_info("[eDPTX] %s\n", __func__);
-
 
 	if (!mtk_edp->train_info.cable_plugged_in)
 		return ret;
@@ -2271,7 +2035,6 @@ static struct edid *mtk_edp_get_edid(struct drm_bridge *bridge,
 	struct mtk_edp *mtk_edp = mtk_edp_from_bridge(bridge);
 	bool enabled = mtk_edp->enabled;
 	struct edid *new_edid = NULL;
-	struct mtk_dp_audio_cfg *audio_caps = &mtk_edp->info.audio_cur_cfg;
 
 	pr_info("[eDPTX] %s+\n", __func__);
 
@@ -2292,19 +2055,14 @@ static struct edid *mtk_edp_get_edid(struct drm_bridge *bridge,
 		new_edid = NULL;
 	}
 
-	if (new_edid) {
-		struct cea_sad *sads;
-
-		audio_caps->sad_count = drm_edid_to_sad(new_edid, &sads);
-		kfree(sads);
-
-		audio_caps->detect_monitor = drm_detect_monitor_audio(new_edid);
-	}
-
 	if (!enabled) {
 		mtk_edp_aux_panel_poweron(mtk_edp, false);
 		drm_atomic_bridge_chain_post_disable(bridge, connector->state->state);
 	}
+
+	pr_info("[eDPTX] EDID raw data:\n");
+	print_hex_dump(KERN_NOTICE, "\t", DUMP_PREFIX_NONE, 16, 1,
+					new_edid, EDID_LENGTH * (new_edid->extensions + 1), false);
 
 	pr_info("[eDPTX] %s-\n", __func__);
 	return new_edid;
@@ -2326,7 +2084,7 @@ static ssize_t mtk_edp_aux_transfer(struct drm_dp_aux *mtk_aux,
 
 	if (msg == NULL) {
 		pr_info("[eDPTX] msg is null.\n");
-		goto err;
+		return -EINVAL;
 	}
 
 	switch (msg->request) {
@@ -2530,18 +2288,7 @@ static void mtk_edp_bridge_atomic_enable(struct drm_bridge *bridge,
 
 	mtk_edp_video_enable(mtk_edp, true);
 
-	mtk_edp->audio_enable = false;
-	if (mtk_edp->audio_enable) {
-		mtk_dp_audio_setup(mtk_edp, &mtk_edp->info.audio_cur_cfg);
-		mtk_dp_audio_mute(mtk_edp, false);
-	} else {
-		memset(&mtk_edp->info.audio_cur_cfg, 0,
-		       sizeof(mtk_edp->info.audio_cur_cfg));
-	}
-
 	mtk_edp->enabled = true;
-	mtk_edp_update_plugged_status(mtk_edp);
-
 	dev_info(mtk_edp->dev, "[eDPTX] %s-\n", __func__);
 
 	return;
@@ -2558,9 +2305,7 @@ static void mtk_edp_bridge_atomic_disable(struct drm_bridge *bridge,
 
 	pr_info("[eDPTX] %s+\n", __func__);
 	mtk_edp->enabled = false;
-	mtk_edp_update_plugged_status(mtk_edp);
 	mtk_edp_video_enable(mtk_edp, false);
-	mtk_dp_audio_mute(mtk_edp, true);
 
 	if (mtk_edp->train_info.cable_plugged_in) {
 		drm_dp_dpcd_writeb(&mtk_edp->aux, DP_SET_POWER, DP_SET_POWER_D3);
@@ -2607,13 +2352,17 @@ static u32 *mtk_edp_bridge_atomic_get_output_bus_fmts(struct drm_bridge *bridge,
 {
 	u32 *output_fmts;
 
-	pr_info("[eDPTX] %s\n", __func__);
 	*num_output_fmts = 0;
 	output_fmts = kmalloc(sizeof(*output_fmts), GFP_KERNEL);
 	if (!output_fmts)
 		return NULL;
+
 	*num_output_fmts = 1;
 	output_fmts[0] = MEDIA_BUS_FMT_FIXED;
+
+	pr_info("[eDPTX] %s num_output_fmts:%u output_fmts:0x%04x\n",
+			__func__, *num_output_fmts, output_fmts[0]);
+
 	return output_fmts;
 }
 
@@ -2638,7 +2387,7 @@ static u32 *mtk_edp_bridge_atomic_get_input_bus_fmts(struct drm_bridge *bridge,
 	u32 rate = mtk_edp->train_info.link_rate *
 				mtk_edp->train_info.lane_count;
 
-	pr_info("[eDPTX] %s\n", __func__);
+	pr_info("[eDPTX] %s+\n", __func__);
 	*num_input_fmts = 0;
 
 	/*
@@ -2658,12 +2407,16 @@ static u32 *mtk_edp_bridge_atomic_get_input_bus_fmts(struct drm_bridge *bridge,
 		input_fmts = kcalloc(ARRAY_SIZE(mt8678_input_fmts),
 				     sizeof(*input_fmts),
 				     GFP_KERNEL);
-		if (!input_fmts)
+		if (!input_fmts) {
+			*num_input_fmts = 0;
 			return NULL;
+		}
 
 		*num_input_fmts = ARRAY_SIZE(mt8678_input_fmts);
 		memcpy(input_fmts, mt8678_input_fmts, sizeof(mt8678_input_fmts));
 	}
+
+	pr_info("[eDPTX] input_fmts=0x%04x\n", input_fmts[0]);
 
 	return input_fmts;
 }
@@ -2674,20 +2427,38 @@ static int mtk_edp_bridge_atomic_check(struct drm_bridge *bridge,
 				      struct drm_connector_state *conn_state)
 {
 	struct mtk_edp *mtk_edp = mtk_edp_from_bridge(bridge);
+	struct drm_display_info *display_info =
+		&conn_state->connector->display_info;
 	struct drm_crtc *crtc = conn_state->crtc;
 	unsigned int input_bus_format;
 
-	pr_info("[eDPTX] %s\n", __func__);
+	pr_info("[eDPTX] %s+\n", __func__);
 	input_bus_format = bridge_state->input_bus_cfg.format;
 
-	dev_dbg(mtk_edp->dev, "input format 0x%04x, output format 0x%04x\n",
+	dev_info(mtk_edp->dev, "[eDPTX] input format 0x%04x, output format 0x%04x\n",
 		bridge_state->input_bus_cfg.format,
 		 bridge_state->output_bus_cfg.format);
 
-	if (input_bus_format == MEDIA_BUS_FMT_YUYV8_1X16)
-		mtk_edp->info.format = DP_PIXELFORMAT_YUV422;
+	/* set edp output color depth */
+	if (display_info->bpc)
+		mtk_edp->color_depth = display_info->bpc;
 	else
+		mtk_edp->color_depth = 8;
+
+	switch (input_bus_format) {
+	case MEDIA_BUS_FMT_YUYV8_1X16:
+		mtk_edp->info.format = DP_PIXELFORMAT_YUV422;
+		break;
+	case MEDIA_BUS_FMT_AYUV8_1X32:
+		mtk_edp->info.format = DP_PIXELFORMAT_YUV420;
+		break;
+	default:
 		mtk_edp->info.format = DP_PIXELFORMAT_RGB;
+		break;
+	}
+
+	dev_info(mtk_edp->dev, "[eDPTX] color depth:%u, color format:%d\n",
+		mtk_edp->color_depth, mtk_edp->info.format);
 
 	if (!crtc) {
 		drm_err(mtk_edp->drm_dev,
@@ -2696,6 +2467,7 @@ static int mtk_edp_bridge_atomic_check(struct drm_bridge *bridge,
 	}
 
 	drm_display_mode_to_videomode(&crtc_state->adjusted_mode, &mtk_edp->info.vm);
+	pr_info("[eDPTX] %s-\n", __func__);
 
 	return 0;
 }
@@ -2721,101 +2493,6 @@ static void mtk_edp_debounce_timer(struct timer_list *t)
 	struct mtk_edp *mtk_edp = from_timer(mtk_edp, t, debounce_timer);
 
 	mtk_edp->need_debounce = true;
-}
-
-/*
- * HDMI audio codec callbacks
- */
-
-static int mtk_dp_audio_hw_params(struct device *dev, void *data,
-				  struct hdmi_codec_daifmt *daifmt,
-				  struct hdmi_codec_params *params)
-{
-	struct mtk_edp *mtk_edp = dev_get_drvdata(dev);
-
-	if (!mtk_edp->enabled) {
-		dev_info(mtk_edp->dev, "%s, DP is not ready!\n", __func__);
-		return -ENODEV;
-	}
-
-	mtk_edp->info.audio_cur_cfg.channels = params->cea.channels;
-	mtk_edp->info.audio_cur_cfg.sample_rate = params->sample_rate;
-
-	mtk_dp_audio_setup(mtk_edp, &mtk_edp->info.audio_cur_cfg);
-
-	return 0;
-}
-
-static int mtk_dp_audio_startup(struct device *dev, void *data)
-{
-	struct mtk_edp *mtk_edp = dev_get_drvdata(dev);
-
-	mtk_dp_audio_mute(mtk_edp, false);
-
-	return 0;
-}
-
-static void mtk_dp_audio_shutdown(struct device *dev, void *data)
-{
-	struct mtk_edp *mtk_edp = dev_get_drvdata(dev);
-
-	mtk_dp_audio_mute(mtk_edp, true);
-}
-
-static int mtk_dp_audio_get_eld(struct device *dev, void *data, uint8_t *buf,
-				size_t len)
-{
-	struct mtk_edp *mtk_edp = dev_get_drvdata(dev);
-
-	if (mtk_edp->enabled)
-		memcpy(buf, mtk_edp->conn->eld, len);
-	else
-		memset(buf, 0, len);
-
-	return 0;
-}
-
-static int mtk_dp_audio_hook_plugged_cb(struct device *dev, void *data,
-					hdmi_codec_plugged_cb fn,
-					struct device *codec_dev)
-{
-	struct mtk_edp *mtk_edp = data;
-
-	mutex_lock(&mtk_edp->update_plugged_status_lock);
-	mtk_edp->plugged_cb = fn;
-	mtk_edp->codec_dev = codec_dev;
-	mutex_unlock(&mtk_edp->update_plugged_status_lock);
-
-	mtk_edp_update_plugged_status(mtk_edp);
-
-	return 0;
-}
-
-static const struct hdmi_codec_ops mtk_dp_audio_codec_ops = {
-	.hw_params = mtk_dp_audio_hw_params,
-	.audio_startup = mtk_dp_audio_startup,
-	.audio_shutdown = mtk_dp_audio_shutdown,
-	.get_eld = mtk_dp_audio_get_eld,
-	.hook_plugged_cb = mtk_dp_audio_hook_plugged_cb,
-	.no_capture_mute = 1,
-};
-
-static int mtk_dp_register_audio_driver(struct device *dev)
-{
-	struct mtk_edp *mtk_edp = dev_get_drvdata(dev);
-	struct hdmi_codec_pdata codec_data = {
-		.ops = &mtk_dp_audio_codec_ops,
-		.max_i2s_channels = 8,
-		.i2s = 1,
-		.data = mtk_edp,
-	};
-
-	mtk_edp->audio_pdev = platform_device_register_data(dev,
-							   HDMI_CODEC_DRV_NAME,
-							   PLATFORM_DEVID_AUTO,
-							   &codec_data,
-							   sizeof(codec_data));
-	return PTR_ERR_OR_ZERO(mtk_edp->audio_pdev);
 }
 
 static int mtk_edp_register_phy(struct mtk_edp *mtk_edp)
@@ -2999,6 +2676,27 @@ bool mtk_edp_get_lk_display(void)
 #endif
 }
 
+static int mtk_edp_suspend(struct device *dev);
+static int mtk_edp_resume(struct device *dev);
+
+static int mtk_drm_edp_notifier(struct notifier_block *notifier, unsigned long pm_event, void *unused)
+{
+	struct mtk_edp *mtk_edp = container_of(notifier, struct mtk_edp, nb);
+	struct device *dev = mtk_edp->dev;
+
+	pr_info("%s pm_event %d dev %s usage_count %d\n",
+	       __func__, pm_event, dev_name(dev), atomic_read(&dev->power.usage_count));
+
+	switch (pm_event) {
+	case PM_SUSPEND_PREPARE:
+		mtk_edp_suspend(dev);
+		return NOTIFY_OK;
+	case PM_POST_SUSPEND:
+		mtk_edp_resume(dev);
+		return NOTIFY_OK;
+	}
+	return NOTIFY_DONE;
+}
 
 static int mtk_edp_probe(struct platform_device *pdev)
 {
@@ -3092,17 +2790,6 @@ static int mtk_edp_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, mtk_edp);
 
-	if (mtk_edp->data->audio_supported) {
-		mutex_init(&mtk_edp->update_plugged_status_lock);
-
-		ret = mtk_dp_register_audio_driver(dev);
-		if (ret) {
-			dev_info(dev, "Failed to register audio driver: %d\n",
-				ret);
-			return ret;
-		}
-	}
-
 	ret = mtk_edp_register_phy(mtk_edp);
 	if (ret)
 		return ret;
@@ -3123,24 +2810,36 @@ static int mtk_edp_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	/* unregister pm notifier */
+	mtk_edp->nb.notifier_call = mtk_drm_edp_notifier;
+	ret = register_pm_notifier(&mtk_edp->nb);
+	if (ret)
+		pr_info("[eDPTX] register_pm_notifier failed %d", ret);
+
 	pm_runtime_enable(dev);
 	pm_runtime_get_sync(dev);
 
-	dev_info(dev, "[eDPTX] %s-\n",__func__);
+	dev_info(dev, "[eDPTX] %s power.usage_count %d-\n",
+		 __func__, atomic_read(&dev->power.usage_count));
 	return 0;
 }
 
 static void mtk_edp_remove(struct platform_device *pdev)
 {
 	struct mtk_edp *mtk_edp = platform_get_drvdata(pdev);
+	int ret = 0;
 
 	pm_runtime_put(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
+
+	/* unregister pm notifier */
+	ret = unregister_pm_notifier(&mtk_edp->nb);
+	if (ret)
+		pr_info("[eDPTX] unregister_pm_notifier failed %d", ret);
+
 	if (mtk_edp->data->bridge_type != DRM_MODE_CONNECTOR_eDP)
 		del_timer_sync(&mtk_edp->debounce_timer);
 	platform_device_unregister(mtk_edp->phy_dev);
-	if (mtk_edp->audio_pdev)
-		platform_device_unregister(mtk_edp->audio_pdev);
 }
 
 int mtk_drm_ioctl_enable_edp(struct drm_device *dev, void *data,
@@ -3189,9 +2888,14 @@ static int mtk_edp_suspend(struct device *dev)
 {
 	struct mtk_edp *mtk_edp = dev_get_drvdata(dev);
 
-	dev_info(mtk_edp->dev, "[eDPTX] %s+\n", __func__);
+	if (mtk_edp->suspend) {
+		dev_info(mtk_edp->dev, "[eDPTX] %s already suspend\n", __func__);
+		return 0;
+	}
 
-	if (mtk_edp_plug_state(mtk_edp)) {
+	dev_info(mtk_edp->dev, "[eDPTX] %s usage_count %d +\n", __func__, atomic_read(&dev->power.usage_count));
+
+	if (mtk_edp_plug_state(mtk_edp) && mtk_edp->external_monitor) {
 		drm_dp_dpcd_writeb(&mtk_edp->aux, DP_SET_POWER, DP_SET_POWER_D3);
 		usleep_range(2000, 3000);
 	}
@@ -3201,7 +2905,9 @@ static int mtk_edp_suspend(struct device *dev)
 		mtk_edp_hwirq_enable(mtk_edp, false);
 	pm_runtime_put_sync(dev);
 
-	dev_info(mtk_edp->dev, "[eDPTX] %s-\n", __func__);
+	mtk_edp->suspend = true;
+
+	dev_info(mtk_edp->dev, "[eDPTX] %s usage_count %d -\n", __func__, atomic_read(&dev->power.usage_count));
 
 	return 0;
 }
@@ -3210,7 +2916,12 @@ static int mtk_edp_resume(struct device *dev)
 {
 	struct mtk_edp *mtk_edp = dev_get_drvdata(dev);
 
-	dev_info(mtk_edp->dev, "[eDPTX] %s+\n", __func__);
+	if (!mtk_edp->suspend) {
+		dev_info(mtk_edp->dev, "[eDPTX] %s already resume\n", __func__);
+		return 0;
+	}
+
+	dev_info(mtk_edp->dev, "[eDPTX] %s usage_count %d +\n", __func__, atomic_read(&dev->power.usage_count));
 
 	pm_runtime_get_sync(dev);
 	mtk_edp_init_port(mtk_edp);
@@ -3218,7 +2929,14 @@ static int mtk_edp_resume(struct device *dev)
 		mtk_edp_hwirq_enable(mtk_edp, true);
 	mtk_edp_power_enable(mtk_edp);
 
-	dev_info(mtk_edp->dev, "[eDPTX] %s-\n", __func__);
+	if (mtk_edp->next_bridge) {
+		mtk_edp->train_info.cable_plugged_in = true;
+		mtk_edp->next_bridge->funcs->pre_enable(mtk_edp->next_bridge);
+	}
+
+	mtk_edp->suspend = false;
+
+	dev_info(mtk_edp->dev, "[eDPTX] %s usage_count %d -\n", __func__, atomic_read(&dev->power.usage_count));
 
 	return 0;
 }
@@ -3230,8 +2948,6 @@ static const struct mtk_edp_data mt8678_edp_data = {
 	.bridge_type = DRM_MODE_CONNECTOR_eDP,
 	.smc_cmd = MTK_DP_SIP_ATF_EDP_VIDEO_UNMUTE,
 	.efuse_fmt = mt8678_edp_efuse_fmt,
-	.audio_supported = false,
-	.audio_m_div2_bit = MT8195_AUDIO_M_CODE_MULT_DIV_SEL_DP_ENC0_P0_DIV_2,
 };
 
 static const struct of_device_id mtk_edp_of_match[] = {
@@ -3256,5 +2972,5 @@ static struct platform_driver mtk_edp_driver = {
 module_platform_driver(mtk_edp_driver);
 
 MODULE_AUTHOR("Jie-h.Hu <jie-h.hu@mediatek.com>");
-MODULE_DESCRIPTION("MediaTek DisplayPort Driver");
+MODULE_DESCRIPTION("MediaTek Embedded DisplayPort Driver");
 MODULE_LICENSE("GPL");

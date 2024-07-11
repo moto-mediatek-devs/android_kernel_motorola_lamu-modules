@@ -22,19 +22,17 @@ enum mml_dl_dpc_config {
 #define VLP_VOTE_SET		0x414
 #define VLP_VOTE_CLR		0x418
 
-static struct dpc_funcs mml_dpc_funcs;
-
 /*
  * mml_dpc_register - register dpc driver functions.
  *
  * @funcs:	DPC driver functions.
  */
-void mml_dpc_register(const struct dpc_funcs *funcs);
+void mml_dpc_register(const struct dpc_funcs *funcs, enum mtk_dpc_version version);
 
 void mml_dpc_enable(bool en);
 void mml_dpc_dc_force_enable(bool en);
-void mml_dpc_group_enable(bool en);
-void mml_dpc_mtcmos_auto(u32 sysid, const bool en);
+void mml_dpc_group_enable(u32 sysid, bool en);
+void mml_dpc_mtcmos_auto(u32 sysid, const bool en, const s8 mode);
 void mml_dpc_config(const enum mtk_dpc_subsys subsys, bool en);
 void mml_dpc_mtcmos_vote(const enum mtk_dpc_subsys subsys,
 			 const u8 thread, const bool en);

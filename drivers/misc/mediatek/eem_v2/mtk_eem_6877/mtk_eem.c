@@ -944,7 +944,7 @@ static ssize_t eem_debug_proc_write(struct file *file,
 	char *buf = (char *) __get_free_page(GFP_USER);
 	struct eemsn_det *det = (struct eemsn_det *)pde_data(file_inode(file));
 	struct eem_ipi_data eem_data;
-	int ipi_ret = 0;
+	int ipi_ret __maybe_unused = 0;
 
 	FUNC_ENTER(FUNC_LV_HELP);
 
@@ -987,6 +987,7 @@ out:
 	return (ret < 0) ? ret : count;
 }
 
+#if IS_ENABLED(CONFIG_MTK_PTPOD_ENG_DEBUG)
 /*
  * show current aging margin
  */
@@ -1015,7 +1016,7 @@ static ssize_t eem_setmargin_proc_write(struct file *file,
 	int ret;
 	int aging_val[2];
 	int i = 0;
-	int start_oft, end_oft;
+	int start_oft __maybe_unused, end_oft __maybe_unused;
 	char *buf = (char *) __get_free_page(GFP_USER);
 	struct eemsn_det *det = (struct eemsn_det *)pde_data(file_inode(file));
 	char *tok;
@@ -1045,8 +1046,8 @@ static ssize_t eem_setmargin_proc_write(struct file *file,
 		ret = -EINVAL;
 
 	while ((tok = strsep(&buf, " ")) != NULL) {
-		if (i == 3) {
-			eem_error("number of arguments > 3!\n");
+		if (i >= 2) {
+			eem_error("number of arguments > 2!\n");
 			goto out;
 		}
 
@@ -1082,6 +1083,7 @@ out:
 
 	return ret;
 }
+#endif /* CONFIG_MTK_PTPOD_ENG_DEBUG */
 
 static void dump_sndata_to_de(struct seq_file *m)
 {
@@ -1523,7 +1525,7 @@ static ssize_t eem_log_en_proc_write(struct file *file,
 	int ret;
 	char *buf = (char *) __get_free_page(GFP_USER);
 	struct eem_ipi_data eem_data;
-	unsigned int ipi_ret = 0;
+	unsigned int ipi_ret __maybe_unused = 0;
 
 	FUNC_ENTER(FUNC_LV_HELP);
 
@@ -1585,7 +1587,7 @@ static ssize_t eem_en_proc_write(struct file *file,
 	int ret;
 	char *buf = (char *) __get_free_page(GFP_USER);
 	struct eem_ipi_data eem_data;
-	unsigned int ipi_ret = 0;
+	unsigned int ipi_ret __maybe_unused = 0;
 
 	FUNC_ENTER(FUNC_LV_HELP);
 
@@ -1648,7 +1650,7 @@ static ssize_t eem_sn_en_proc_write(struct file *file,
 	int ret;
 	char *buf = (char *) __get_free_page(GFP_USER);
 	struct eem_ipi_data eem_data;
-	unsigned int ipi_ret = 0;
+	unsigned int ipi_ret __maybe_unused = 0;
 
 	FUNC_ENTER(FUNC_LV_HELP);
 
@@ -1775,7 +1777,7 @@ static ssize_t eem_offset_proc_write(struct file *file,
 	char *buf = (char *) __get_free_page(GFP_USER);
 	int offset = 0;
 	struct eemsn_det *det = (struct eemsn_det *)pde_data(file_inode(file));
-	unsigned int ipi_ret = 0;
+	unsigned int ipi_ret __maybe_unused = 0;
 	struct eem_ipi_data eem_data;
 
 
@@ -1878,7 +1880,9 @@ PROC_FOPS_RW(eem_en);
 PROC_FOPS_RW(eem_sn_en);
 PROC_FOPS_RO(eem_force_sensing);
 PROC_FOPS_RO(eem_pull_data);
+#if IS_ENABLED(CONFIG_MTK_PTPOD_ENG_DEBUG)
 PROC_FOPS_RW(eem_setmargin);
+#endif /* CONFIG_MTK_PTPOD_ENG_DEBUG */
 
 static int create_procfs(void)
 {
@@ -1897,7 +1901,9 @@ static int create_procfs(void)
 		PROC_ENTRY(eem_status),
 		PROC_ENTRY(eem_cur_volt),
 		PROC_ENTRY(eem_offset),
+		#if IS_ENABLED(CONFIG_MTK_PTPOD_ENG_DEBUG)
 		PROC_ENTRY(eem_setmargin),
+		#endif /* CONFIG_MTK_PTPOD_ENG_DEBUG */
 	};
 
 	struct pentry eem_entries[] = {
