@@ -54,6 +54,10 @@
 
 #include "hx9031as.h"
 
+#define KEY_SAR_NEAR   0x2ec
+#define KEY_SAR_CLOSE  0x2ed
+#define KEY_SAR_FAR    0x2ef
+
 static struct i2c_client *hx9031as_i2c_client = NULL;
 static struct hx9031as_platform_data hx9031as_pdata;
 static uint8_t ch_enable_status = 0x00;
@@ -72,10 +76,10 @@ static uint8_t hx9031as_data_accuracy = 16;
 //hx9031as默认阈值设置值，请客户根据实测修改
 static struct hx9031as_near_far_threshold hx9031as_ch_thres[HX9031AS_CH_NUM] = {
     {.thr_near = 320, .thr_far = 320}, //ch0
-    {.thr_near = 320, .thr_far = 320},
+    {.thr_near = 320, .thr_far = 288},
     {.thr_near = 640, .thr_far = 640},
-    {.thr_near = 640, .thr_far = 640},
-    {.thr_near = 960, .thr_far = 960},
+    {.thr_near = 160, .thr_far = 128},
+    {.thr_near = 160, .thr_far = 128},
 };
 
 static DEFINE_MUTEX(hx9031as_i2c_rw_mutex);
@@ -314,7 +318,7 @@ static void hx9031as_ch_cfg(void)
     CH0_POS = CS1;
     CH0_NEG = NA;
     CH1_POS = CS0;
-    CH1_NEG = NA;
+    CH1_NEG = CS1;
     CH2_POS = CS3;
     CH2_NEG = NA;
     CH3_POS = CS2;
@@ -784,7 +788,9 @@ static void hx9031as_input_report_key(void)
             if (hx9031as_pdata.chs_info[ii].state == BODYACTIVE)
                 PRINT_DBG("%s already BODYACTIVE, nothing report\n", hx9031as_pdata.chs_info[ii].name);
             else {
-                input_event(hx9031as_pdata.input_dev_key, EV_KEY, hx9031as_pdata.chs_info[ii].keycode, BODYACTIVE);
+                //input_event(hx9031as_pdata.input_dev_key, EV_KEY, hx9031as_pdata.chs_info[ii].keycode, BODYACTIVE);
+                input_report_key(hx9031as_pdata.input_dev_key, KEY_SAR_CLOSE, 1);
+                input_report_key(hx9031as_pdata.input_dev_key, KEY_SAR_CLOSE, 0);
                 hx9031as_pdata.chs_info[ii].state = BODYACTIVE;
                 PRINT_DBG("%s report BODYACTIVE(5mm)\n", hx9031as_pdata.chs_info[ii].name);
             }
@@ -792,7 +798,9 @@ static void hx9031as_input_report_key(void)
             if (hx9031as_pdata.chs_info[ii].state == PROXACTIVE)
                 PRINT_DBG("%s already PROXACTIVE, nothing report\n", hx9031as_pdata.chs_info[ii].name);
             else {
-                input_event(hx9031as_pdata.input_dev_key, EV_KEY, hx9031as_pdata.chs_info[ii].keycode, PROXACTIVE);
+                //input_event(hx9031as_pdata.input_dev_key, EV_KEY, hx9031as_pdata.chs_info[ii].keycode, PROXACTIVE);
+                input_report_key(hx9031as_pdata.input_dev_key, KEY_SAR_NEAR, 1);
+                input_report_key(hx9031as_pdata.input_dev_key, KEY_SAR_NEAR, 0);
                 hx9031as_pdata.chs_info[ii].state = PROXACTIVE;
                 PRINT_DBG("%s report PROXACTIVE(15mm)\n", hx9031as_pdata.chs_info[ii].name);
             }
@@ -800,7 +808,9 @@ static void hx9031as_input_report_key(void)
             if (hx9031as_pdata.chs_info[ii].state == IDLE)
                 PRINT_DBG("%s already released, nothing report\n", hx9031as_pdata.chs_info[ii].name);
             else {
-                input_event(hx9031as_pdata.input_dev_key, EV_KEY, hx9031as_pdata.chs_info[ii].keycode, IDLE);
+                //input_event(hx9031as_pdata.input_dev_key, EV_KEY, hx9031as_pdata.chs_info[ii].keycode, IDLE);
+                input_report_key(hx9031as_pdata.input_dev_key, KEY_SAR_FAR, 1);
+                input_report_key(hx9031as_pdata.input_dev_key, KEY_SAR_FAR, 0);
                 hx9031as_pdata.chs_info[ii].state = IDLE;
                 PRINT_DBG("%s report released\n", hx9031as_pdata.chs_info[ii].name);
             }
@@ -834,7 +844,9 @@ static void hx9031as_input_report_abs(void)
             if (hx9031as_pdata.chs_info[ii].state == BODYACTIVE)
                 PRINT_DBG("%s already BODYACTIVE, nothing report\n", hx9031as_pdata.chs_info[ii].name);
             else {
-                input_report_abs(hx9031as_pdata.chs_info[ii].input_dev_abs, ABS_DISTANCE, BODYACTIVE);
+                //input_report_abs(hx9031as_pdata.chs_info[ii].input_dev_abs, ABS_DISTANCE, BODYACTIVE);
+                input_report_key(hx9031as_pdata.chs_info[ii].input_dev_abs, KEY_SAR_CLOSE, 1);
+                input_report_key(hx9031as_pdata.chs_info[ii].input_dev_abs, KEY_SAR_CLOSE, 0);
                 input_sync(hx9031as_pdata.chs_info[ii].input_dev_abs);
                 hx9031as_pdata.chs_info[ii].state = BODYACTIVE;
                 PRINT_DBG("%s report BODYACTIVE(5mm)\n", hx9031as_pdata.chs_info[ii].name);
@@ -843,7 +855,9 @@ static void hx9031as_input_report_abs(void)
             if (hx9031as_pdata.chs_info[ii].state == PROXACTIVE)
                 PRINT_DBG("%s already PROXACTIVE, nothing report\n", hx9031as_pdata.chs_info[ii].name);
             else {
-                input_report_abs(hx9031as_pdata.chs_info[ii].input_dev_abs, ABS_DISTANCE, PROXACTIVE);
+                //input_report_abs(hx9031as_pdata.chs_info[ii].input_dev_abs, ABS_DISTANCE, PROXACTIVE);
+                input_report_key(hx9031as_pdata.chs_info[ii].input_dev_abs, KEY_SAR_NEAR, 1);
+                input_report_key(hx9031as_pdata.chs_info[ii].input_dev_abs, KEY_SAR_NEAR, 0);
                 input_sync(hx9031as_pdata.chs_info[ii].input_dev_abs);
                 hx9031as_pdata.chs_info[ii].state = PROXACTIVE;
                 PRINT_DBG("%s report PROXACTIVE(15mm)\n", hx9031as_pdata.chs_info[ii].name);
@@ -852,7 +866,9 @@ static void hx9031as_input_report_abs(void)
             if (hx9031as_pdata.chs_info[ii].state == IDLE)
                 PRINT_DBG("%s already released, nothing report\n", hx9031as_pdata.chs_info[ii].name);
             else {
-                input_report_abs(hx9031as_pdata.chs_info[ii].input_dev_abs, ABS_DISTANCE, IDLE);
+                //input_report_abs(hx9031as_pdata.chs_info[ii].input_dev_abs, ABS_DISTANCE, IDLE);
+                input_report_key(hx9031as_pdata.chs_info[ii].input_dev_abs, KEY_SAR_FAR, 1);
+                input_report_key(hx9031as_pdata.chs_info[ii].input_dev_abs, KEY_SAR_FAR, 0);
                 input_sync(hx9031as_pdata.chs_info[ii].input_dev_abs);
                 hx9031as_pdata.chs_info[ii].state = IDLE;
                 PRINT_DBG("%s report released\n", hx9031as_pdata.chs_info[ii].name);
@@ -1486,8 +1502,7 @@ static int hx9031as_input_init_key(struct i2c_client *client)
     for (ii = 0; ii < HX9031AS_CH_NUM; ii++) {
         snprintf(hx9031as_pdata.chs_info[ii].name,
                  sizeof(hx9031as_pdata.chs_info[ii].name),
-                 "hx9031as_key_ch%d",
-                 ii);
+                 "sar_ch%d",ii);
         PRINT_DBG("name of ch_%d:\"%s\"\n", ii, hx9031as_pdata.chs_info[ii].name);
         hx9031as_pdata.chs_info[ii].used = false;
         hx9031as_pdata.chs_info[ii].enabled = false;
@@ -1543,11 +1558,11 @@ static int hx9031as_input_init_abs(struct i2c_client *client)
         ret = -ENOMEM;
         goto failed_devm_kzalloc;
     }
-
+//TN Begin modified by db 20240712  start
     for (ii = 0; ii < HX9031AS_CH_NUM; ii++) {
         snprintf(hx9031as_pdata.chs_info[ii].name,
                  sizeof(hx9031as_pdata.chs_info[ii].name),
-                 "hx9031as_abs_ch%d",
+                 "sar_ch%d",
                  ii);
         PRINT_DBG("name of ch_%d:\"%s\"\n", ii, hx9031as_pdata.chs_info[ii].name);
         hx9031as_pdata.chs_info[ii].used = false;
@@ -1561,7 +1576,14 @@ static int hx9031as_input_init_abs(struct i2c_client *client)
         }
 
         hx9031as_pdata.chs_info[ii].input_dev_abs->name = hx9031as_pdata.chs_info[ii].name;
-        __set_bit(EV_ABS, hx9031as_pdata.chs_info[ii].input_dev_abs->evbit);
+        hx9031as_pdata.chs_info[ii].input_dev_abs->id.vendor = ii;
+        PRINT_DBG("device NAME = %s VENDOR=%d", hx9031as_pdata.chs_info[ii].input_dev_abs->name,hx9031as_pdata.chs_info[ii].input_dev_abs->id.vendor);
+        __set_bit(EV_KEY, hx9031as_pdata.chs_info[ii].input_dev_abs->evbit);
+        __set_bit(KEY_SAR_FAR, hx9031as_pdata.chs_info[ii].input_dev_abs->keybit); //far state
+        __set_bit(KEY_SAR_NEAR, hx9031as_pdata.chs_info[ii].input_dev_abs->keybit); // near state , first detect
+        __set_bit(KEY_SAR_CLOSE, hx9031as_pdata.chs_info[ii].input_dev_abs->keybit); // closed state, second detect
+//TN Begin modified by db 20240712  end
+        //__set_bit(EV_ABS, hx9031as_pdata.chs_info[ii].input_dev_abs->evbit);
         input_set_abs_params(hx9031as_pdata.chs_info[ii].input_dev_abs, ABS_DISTANCE, -1, 100, 0, 0);
 
         ret = input_register_device(hx9031as_pdata.chs_info[ii].input_dev_abs);

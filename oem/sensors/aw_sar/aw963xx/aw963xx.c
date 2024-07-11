@@ -4,9 +4,6 @@
 
 #define AW963XX_I2C_NAME "aw963xx_sar"
 #define AW963XX_DRIVER_VERSION "v0.4.0"
-#define KEY_SAR_NEAR   0x2ec
-#define KEY_SAR_CLOSE  0x2ed
-#define KEY_SAR_FAR    0x2ef
 
 static void aw963xx_set_cs_as_irq(struct aw_sar *p_sar, int flag);
 static void aw963xx_get_ref_ch_enable(struct aw_sar *p_sar);
@@ -355,18 +352,18 @@ static void aw963xx_irq_handle_func(uint32_t irq_status, void *data)
 			} else if ((ch_th[j] >> 2 & 0x01) == 1) { //th2
 				input_report_abs(p_sar->channels_arr[j].input, ABS_DISTANCE, 3);
 			} else if ((ch_th[j] >> 1 & 0x01) == 1) { //th1
-				input_report_key(p_sar->channels_arr[i].input, KEY_SAR_CLOSE, 1);
-				input_report_key(p_sar->channels_arr[i].input, KEY_SAR_CLOSE, 0);
+				input_report_key(p_sar->channels_arr[j].input, KEY_SAR_CLOSE, 1);
+				input_report_key(p_sar->channels_arr[j].input, KEY_SAR_CLOSE, 0);
 				//input_report_abs(p_sar->channels_arr[j].input, ABS_DISTANCE, 2);
 			} else if ((ch_th[j] >> 0 & 0x01) == 1) { //th0
 				AWLOGD(p_sar->dev, "AAW963XX_TRIGGER_TH0");
-				input_report_key(p_sar->channels_arr[i].input, KEY_SAR_NEAR, 1);
-				input_report_key(p_sar->channels_arr[i].input, KEY_SAR_NEAR, 0);
+				input_report_key(p_sar->channels_arr[j].input, KEY_SAR_NEAR, 1);
+				input_report_key(p_sar->channels_arr[j].input, KEY_SAR_NEAR, 0);
 				//input_report_abs(p_sar->channels_arr[j].input, ABS_DISTANCE, 1);
 			} else {	//far
 				AWLOGD(p_sar->dev, "AW963XX_FAR");
-				input_report_key(p_sar->channels_arr[i].input, KEY_SAR_FAR, 1);
-				input_report_key(p_sar->channels_arr[i].input, KEY_SAR_FAR, 0);
+				input_report_key(p_sar->channels_arr[j].input, KEY_SAR_FAR, 1);
+				input_report_key(p_sar->channels_arr[j].input, KEY_SAR_FAR, 0);
 				//input_report_abs(p_sar->channels_arr[j].input, ABS_DISTANCE, 0);
 			}
 			input_sync(p_sar->channels_arr[j].input);
