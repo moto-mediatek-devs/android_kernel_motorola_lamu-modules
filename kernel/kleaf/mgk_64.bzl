@@ -1946,8 +1946,6 @@ def get_overlay_modules_list():
         mgk_64_device_modules.append("oem/tinno_charger/typec/aw35616/aw35616.ko")
         mgk_64_device_modules.append("oem/tinno_charger/typec/sc2150/sc2150.ko")
         mgk_64_device_modules.append("oem/audiopa/fs1815/snd-soc-fs1815.ko")
-        mgk_64_device_modules.append("oem/aw_sar/awinic_sar.ko")
-        mgk_64_device_modules.append("oem/sensors/hx9031/hx9031_sar.ko")
         mgk_64_device_modules.append("oem/tinno_charger/qc_logic/z350/z350.ko")
         mgk_64_device_modules.append("oem/tinno_charger/qc_logic/wt6670f/wt6670f.ko")
         mgk_64_device_modules.append("oem/tinno_charger/charger_pump/cps2011s/cps2011s.ko")
@@ -1965,7 +1963,6 @@ def get_overlay_modules_list():
         mgk_64_device_modules.append("oem/tinno_charger/switch_charger/sgm41542/sgm41542.ko")
         mgk_64_device_modules.append("oem/tinno_charger/typec/aw35616/aw35616.ko")
         mgk_64_device_modules.append("oem/tinno_charger/typec/husb320/husb320.ko")
-        mgk_64_device_modules.append("oem/aw_sar/awinic_sar.ko")
 
     if "mt6761_overlay.config" in DEFCONFIG_OVERLAYS:
         mgk_64_kleaf_eng_modules.remove("//vendor/mediatek/tests/kernel/ktf_testcase:ktf_testcase")
