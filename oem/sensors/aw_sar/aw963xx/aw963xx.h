@@ -3,7 +3,7 @@
 #define AW963XX_H_
 #include "../comm/aw_sar_type.h"
 
-#define AW963XX_CHANNEL_NUM_MAX				(12)
+#define AW963XX_CHANNEL_NUM_MAX				(5)
 #define AW963XX_VALID_TH				(2)
 #define AW963XX_DATA_PROCESS_FACTOR			(1024)
 #define AW9620X_SAR_VCC_MIN_UV				(1700000)
