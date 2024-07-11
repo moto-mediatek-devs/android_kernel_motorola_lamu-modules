@@ -65,12 +65,6 @@ config NXP_NFC_I2C
     help
       support oem_nxp_pn560uk
 
-config AWINIC_SAR
-        tristate "AW Sar sensor"
-        depends on OEM_PROJECT
-        default m
-        help
-          support AW Sar sensor
 
 source "$(KCONFIG_EXT_PREFIX)/oem/sensors/Kconfig"
 
