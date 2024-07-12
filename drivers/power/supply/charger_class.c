@@ -340,6 +340,16 @@ int charger_dev_enable_adc(struct charger_device *charger_dev, bool enable)
 	return -EOPNOTSUPP;
 }
 EXPORT_SYMBOL(charger_dev_enable_adc);
+
+int charger_dev_enable_ovpgate(struct charger_device *charger_dev, bool enable)
+{
+	if (charger_dev != NULL && charger_dev->ops != NULL &&
+	    charger_dev->ops->enable_ovpgate)
+		return charger_dev->ops->enable_ovpgate(charger_dev, enable);
+
+	return -EOPNOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_enable_ovpgate);
 #endif /* CONFIG_OEM_CHARGER_PUMP */
 /* TN End modified by hao.jia/809321 20240701 CR/EKLAMU-202 */
 

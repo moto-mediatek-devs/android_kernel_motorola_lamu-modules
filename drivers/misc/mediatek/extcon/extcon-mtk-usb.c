@@ -23,7 +23,15 @@
 
 #include "extcon-mtk-usb.h"
 #include "charger_class.h"
-static struct charger_device *primary_charger = NULL;
+
+/* TN Begin modified by hao.jia/809321 20240712 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+static struct charger_device *primary_chg = NULL;
+#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
+static struct charger_device *primary_dvchg = NULL;
+#endif /* CONFIG_OEM_CHARGER_PUMP */
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by hao.jia/809321 20240712 CR/EKLAMU-202 */
 
 #if IS_ENABLED(CONFIG_TCPC_CLASS)
 #include "tcpm.h"
@@ -206,31 +214,51 @@ fail:
 	return ret;
 }
 
+/* TN Begin modified by hao.jia/809321 20240712 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 static int mtk_usb_extcon_set_vbus_v1(struct mtk_extcon_info *extcon, bool is_on)
 {
 	struct device *dev = extcon->dev;
 
-	if (!primary_charger) {
-		primary_charger = get_charger_by_name("primary_chg");
-		if (!primary_charger) {
-			dev_info(dev, "%s : get primary charger device failed\n", __func__);
+	if (!primary_chg) {
+		primary_chg = get_charger_by_name("primary_chg");
+		if (!primary_chg) {
+			dev_err(dev, "%s : get primary_chg device failed\n", __func__);
 			return -ENODEV;
 		}
 	}
 
-	if (is_on) {
-		charger_dev_enable_otg(primary_charger, true);
-	} else {
-		charger_dev_enable_otg(primary_charger, false);
+#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
+	if (!primary_dvchg) {
+		primary_dvchg = get_charger_by_name("primary_dvchg");
+		if (!primary_dvchg) {
+			dev_err(dev, "%s : get primary_dvchg device failed\n", __func__);
+			return -ENODEV;
+		}
 	}
+#endif /* CONFIG_OEM_CHARGER_PUMP */
+
+	if (is_on) {
+		charger_dev_enable_otg(primary_chg, true);
+#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
+		charger_dev_enable_ovpgate(primary_dvchg, true);
+#endif /* CONFIG_OEM_CHARGER_PUMP */
+	} else {
+		charger_dev_enable_otg(primary_chg, false);
+#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
+		charger_dev_enable_ovpgate(primary_dvchg, false);
+#endif /* CONFIG_OEM_CHARGER_PUMP */
+	}
+
 	return 0;
 }
+#endif /* CONFIG_OEM_TINNO_CHARGER */
 
 static int mtk_usb_extcon_set_vbus(struct mtk_extcon_info *extcon,
 							bool is_on)
 {
 	int ret;
-#if 1
+#if IS_ENABLED(CONFIG_OEM_SWITCH_CHARGER)
 	ret = mtk_usb_extcon_set_vbus_v1(extcon, is_on);
 #else
 	struct regulator *vbus = extcon->vbus;
@@ -274,11 +302,11 @@ static int mtk_usb_extcon_set_vbus(struct mtk_extcon_info *extcon,
 	}
 
 	extcon->vbus_on = is_on;
-#endif
+#endif /* CONFIG_OEM_SWITCH_CHARGER */
 	return ret;
 }
 
-#if 0
+#if !IS_ENABLED(CONFIG_OEM_SWITCH_CHARGER)
 static ssize_t vbus_limit_cur_show(struct device *dev,
 				   struct device_attribute *attr, char *buf)
 {
@@ -366,12 +394,11 @@ static ssize_t vbus_switch_store(struct device *dev,
 }
 
 static DEVICE_ATTR_RW(vbus_switch);
-#endif
 
 static int mtk_usb_extcon_vbus_init(struct mtk_extcon_info *extcon)
 {
 	return 0;
-#if 0
+
 	int ret = 0;
 	struct device *dev = extcon->dev;
 
@@ -417,8 +444,9 @@ static int mtk_usb_extcon_vbus_init(struct mtk_extcon_info *extcon)
 		dev_info(dev, "failed to create vbus switch node\n");
 fail:
 	return ret;
-#endif
 }
+#endif /* CONFIG_OEM_SWITCH_CHARGER */
+/* TN End modified by hao.jia/809321 20240712 CR/EKLAMU-202 */
 
 #if IS_ENABLED(CONFIG_TCPC_CLASS)
 static int mtk_extcon_tcpc_notifier(struct notifier_block *nb,
@@ -744,10 +772,14 @@ static int mtk_usb_extcon_probe(struct platform_device *pdev)
 	if (extcon->role_sw)
 		extcon->c_role = USB_ROLE_NONE;
 
+/* TN Begin modified by hao.jia/809321 20240712 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_SWITCH_CHARGER)
 	/* vbus */
 	ret = mtk_usb_extcon_vbus_init(extcon);
 	if (ret < 0)
 		dev_err(dev, "failed to init vbus\n");
+#endif
+/* TN End modified by hao.jia/809321 20240712 CR/EKLAMU-202 */
 
 	extcon->bypss_typec_sink =
 		of_property_read_bool(dev->of_node,
