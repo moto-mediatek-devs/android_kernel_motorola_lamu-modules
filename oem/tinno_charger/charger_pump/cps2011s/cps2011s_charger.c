@@ -46,6 +46,10 @@
 #include <mt-plat/mtk_charger.h>
 #endif /* LINUX_VERSION_CODE */
 
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include <dev_info.h>
+#endif /* CONFIG_OEM_DEVINFO */
+
 /* Information */
 #define cps2011s_DRV_VERSION	"1.0.1_MTK"
 bool cps2011s_enable_flag = 0;
@@ -108,6 +112,8 @@ static struct charger_device *primary_divider_charger;
 
 #define cps2011s_DEVID	            0x03
 #define cps2011s_CTRL0              0x00
+#define cps2011s_ID1                0x05
+#define cps2011s_ID2                0x06
 
 enum cps2011s_irqidx {
 	cps2011s_IRQIDX_IBUSUCPF = 0,
@@ -1826,7 +1832,6 @@ static int __cps2011s_init_chip(struct cps2011s_chip *chip)
 	cps2011s_i2c_write8(chip, 0x07, 0xB5);	//set ibus ucp/ocp enable & ibusocp 5A
 	cps2011s_i2c_write8(chip, 0x08, 0x9D);	//set vbatovp is 4.725V & enable
 	cps2011s_i2c_write8(chip, 0x09, 0x2A);	//set ibatocp disabled
-	cps2011s_i2c_write8(chip, 0x11, 0x80);	//set adc enable
 	cps2011s_i2c_write8(chip, 0x0A, 0x00);  //set vbatreg and ibatreg disable
 	cps2011s_i2c_write8(chip, 0xE2, 0x00);  //set Automatic DPDM detection disable
 
@@ -1836,7 +1841,7 @@ static int __cps2011s_init_chip(struct cps2011s_chip *chip)
 static int cps2011s_check_devinfo(struct i2c_client *client,
 					u8 *chip_rev, enum cps2011s_type *type)
 {
-	int ret;
+	int ret = 0;
 
 	ret = i2c_smbus_read_byte_data(client, cps2011s_DEVID);
 	if (ret < 0) {
@@ -1846,9 +1851,12 @@ static int cps2011s_check_devinfo(struct i2c_client *client,
 
 	*chip_rev = ret & 0xff;
 
-	dev_info(&client->dev, "%s rev(0x%02X)\n", __func__, *chip_rev);
+	dev_info(&client->dev, "%s devid(0x%02X)\n", __func__, *chip_rev);
 
-	return 0;
+	if (*chip_rev != cps2011s_ID1 || *chip_rev != cps2011s_ID2)
+		ret = -ENODEV;
+
+	return ret;
 }
 
 static enum power_supply_property cps2011s_charger_props[] = {
@@ -1966,8 +1974,6 @@ static int cps2011s_psy_register(struct cps2011s_chip *chip)
 	return 0;
 }
 
-bool cps2011s_is_load = false;
-
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
 static int cps2011s_i2c_probe(struct i2c_client *client)
 #else
@@ -1983,7 +1989,6 @@ static int cps2011s_i2c_probe(struct i2c_client *client,
 	dev_info(&client->dev, "%s(%s)\n", __func__, cps2011s_DRV_VERSION);//	"1.0.8_MTK"
 
 	ret = cps2011s_check_devinfo(client, &chip_rev, &type);
-
 	if (ret < 0)
 		return ret;
 
@@ -2062,7 +2067,9 @@ static int cps2011s_i2c_probe(struct i2c_client *client,
 	}
 	#endif
 
-	cps2011s_is_load = true;
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+	FULL_PRODUCT_DEVICE_INFO(ID_CHARGER_PUMP, "CPS2011S");
+#endif
 
 	dev_info(chip->dev, "%s successfully\n", __func__);
 	return 0;
