@@ -977,7 +977,8 @@ int cps2011s_enter_sleep(bool is_on)
 	return 0;
 }
 
-__maybe_unused static int cps2011s_enable_ovpgate(struct charger_device *chg_dev, bool en)
+#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
+static int cps2011s_enable_ovpgate(struct charger_device *chg_dev, bool en)
 {
 	int ret;
 	struct cps2011s_chip *chip = charger_get_data(chg_dev);
@@ -991,6 +992,7 @@ __maybe_unused static int cps2011s_enable_ovpgate(struct charger_device *chg_dev
 
 	return ret;
 }
+#endif /* CONFIG_OEM_CHARGER_PUMP */
 
 static inline enum cps2011s_adc_channel to_cps2011s_adc(enum adc_channel chan)
 {
@@ -1692,7 +1694,9 @@ static const struct charger_ops cps2011s_chg_ops = {
 	//.device_id = cps2011s_read_device_id
 	//.set_switch = cps2011s_set_switch_clk,
 	//.enable_wdt = cps2011s_enable_wdt,
-	//.enable_ovpgate = cps2011s_enable_ovpgate,
+#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
+	.enable_ovpgate = cps2011s_enable_ovpgate,
+#endif /* CONFIG_OEM_CHARGER_PUMP */
 /////////////////////////////////////////////////////////////
 	.set_vbatovp_alarm = cps2011s_set_vbatovp_alarm,
 	.reset_vbatovp_alarm = cps2011s_reset_vbatovp_alarm,
@@ -1853,7 +1857,7 @@ static int cps2011s_check_devinfo(struct i2c_client *client,
 
 	dev_info(&client->dev, "%s devid(0x%02X)\n", __func__, *chip_rev);
 
-	if (*chip_rev != cps2011s_ID1 || *chip_rev != cps2011s_ID2)
+	if (!(*chip_rev == cps2011s_ID1 || *chip_rev == cps2011s_ID2))
 		ret = -ENODEV;
 
 	return ret;

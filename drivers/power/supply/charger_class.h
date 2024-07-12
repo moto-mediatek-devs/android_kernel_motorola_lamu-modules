@@ -111,6 +111,7 @@ struct charger_ops {
 /* TN Begin modified by hao.jia/809321 20240701 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
 	int (*enable_adc)(struct charger_device *dev, bool enable);
+	int (*enable_ovpgate)(struct charger_device *dev, bool enable);
 #endif /* CONFIG_OEM_CHARGER_PUMP */
 /* TN End modified by hao.jia/809321 20240701 CR/EKLAMU-202 */
 
@@ -469,6 +470,7 @@ extern int charger_dev_notify(
 /* TN Begin modified by hao.jia/809321 20240701 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
 extern int charger_dev_enable_adc(struct charger_device *charger_dev, bool enable);
+extern int charger_dev_enable_ovpgate(struct charger_device *charger_dev, bool enable);
 #endif /* CONFIG_OEM_CHARGER_PUMP */
 /* TN End modified by hao.jia/809321 20240701 CR/EKLAMU-202 */
 
