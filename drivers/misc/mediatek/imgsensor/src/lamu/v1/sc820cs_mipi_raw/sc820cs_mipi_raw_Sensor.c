@@ -1032,6 +1032,304 @@ static kal_uint32 set_test_pattern_mode(kal_bool enable)
 	return ERROR_NONE;
 }
 
+struct sc820cs_otp_t sc820cs_otp_info = {0};
+EXPORT_SYMBOL(sc820cs_otp_info);
+
+static kal_uint8 CompareWriteAndRead(kal_uint16 uRegNum, BYTE * pWriteData, BYTE * pReadData, kal_uint16 size)
+{
+    for (int i = 0; i < size; i++)
+    {
+        if (pWriteData[i] != pReadData[i])
+        {
+            CAM_DBG(PFX,"0x%x 的理论烧录值 0x%x 与实际烧录值 0x%x 不一致", uRegNum + i, pWriteData[i], pReadData[i]);
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static kal_uint16 sc820cs_otp_read_group(kal_uint16 page, kal_uint16 addr, kal_uint8 *data, kal_uint16 length)
+{
+    BOOL re = TRUE;
+    BYTE def = 0x00, busy_flag = 0x01;
+
+    BYTE pRegData[2][390] = { 0 };
+    BYTE threshold[2][3] = { {0x48,0x78,0x00},{0x48,0x18,0x41} };
+
+    for (int times = 0; times < 2; times++)
+    {
+        write_cmos_sensor8(0x36b0, threshold[times][0]);
+        write_cmos_sensor8(0x36b1, threshold[times][1]);
+        write_cmos_sensor8(0x36b2, threshold[times][2]);
+
+        //读取开始地址
+        write_cmos_sensor8(0x4408, 0x80 + (page - 1) * 0x02);
+        write_cmos_sensor8(0x4409, 0x00);
+        //读取结束地址
+        write_cmos_sensor8(0x440a, 0x81 + (page - 1) * 0x02);
+        write_cmos_sensor8(0x440b, 0xff);
+
+        write_cmos_sensor8(0x4401, 0x13);
+
+        //设置读取Page
+        write_cmos_sensor8(0x4412, 0x03 + (page - 2) * 0x02);
+        write_cmos_sensor8(0x4407, 0x00);
+
+        write_cmos_sensor8(0x4400, 0x11);
+        mdelay(10);
+
+        for (size_t loop_time = 0; loop_time < 1000; loop_time++)
+        {
+            mdelay(5);
+            def = read_cmos_sensor(0x4420);//[0]busy,0 ok//[1]otp,0 ok
+            busy_flag = def & 0x1;
+            if (0 == busy_flag) break;
+        }
+        CAM_DBG(PFX,"第%d次-busy_flag = %d(0代表读取完成，1代表仍在读取)", times + 1, busy_flag);
+
+        if (busy_flag)
+        {
+            CAM_DBG(PFX,"读取时间超过10s");
+            re = FALSE;
+            goto READ_CLOCK_END;
+        }
+
+        for (int i = 0; i < length; i++)
+        {
+            pRegData[times][i] = read_cmos_sensor(addr+i);
+            CAM_DBG(PFX,"addr = 0x%x, data = 0x%x\n", addr+i, pRegData[times][i]);
+        }
+    }
+    /*对比*/
+    if (CompareWriteAndRead(addr, pRegData[0], pRegData[1], length))
+    {
+        CAM_DBG(PFX,"两次读取一致");
+        //去除前122 Bytes不可用数据
+        //size = 390;
+        memcpy(data, pRegData[0], length);
+    }
+    else
+    {
+        CAM_DBG(PFX,"两次读取不一致");
+        re = -2;//用于识别读取不一致错误，有别于IIC通讯错误
+    }
+
+READ_CLOCK_END:
+    //write_cmos_sensor8(0x3106, 0x01);//时钟退出
+
+    //0TP值读取完成，如果要不断电继续出流，需要下面参数调整部分：如果重新上下电，不需要如下参数操作
+    if (2 == page)
+    {
+        write_cmos_sensor8(0x0100, 0x00);
+        write_cmos_sensor8(0x4424, 0x01);
+        write_cmos_sensor8(0x4408, 0x00);
+        write_cmos_sensor8(0x4409, 0x00);
+        write_cmos_sensor8(0x440a, 0x01);
+        write_cmos_sensor8(0x440b, 0xff);
+        write_cmos_sensor8(0x4401, 0x13);
+        write_cmos_sensor8(0x4412, 0x01);
+        write_cmos_sensor8(0x4407, 0x0e);
+        //WriteIIC(0x3106, 0x01);
+        write_cmos_sensor8(0x363c, 0x8c);
+        write_cmos_sensor8(0x36b0, 0x48);
+        write_cmos_sensor8(0x36b1, 0x38);
+        write_cmos_sensor8(0x36b2, 0x41);
+        write_cmos_sensor8(0x0100, 0x01);
+        mdelay(100);
+    }
+
+    return re;
+}
+
+static int sc820cs_iReadData(kal_uint16 page, unsigned int ui4_offset, unsigned int ui4_length, unsigned char *pinputdata)
+{
+    int i4RetValue = 0;
+    int i4ResidueDataLength;
+    u32 u4CurrentOffset;
+    kal_uint8 *pBuff;
+
+    CAM_DBG(PFX,"ui4_offset = 0x%x, ui4_length = %d \n", ui4_offset, ui4_length);
+
+    i4ResidueDataLength = (int)ui4_length;
+    u4CurrentOffset = ui4_offset;
+    pBuff = pinputdata;
+
+    i4RetValue = sc820cs_otp_read_group(page, (kal_uint16) u4CurrentOffset, pBuff, i4ResidueDataLength);
+    if (i4RetValue != 1) {
+        CAM_DBG(PFX,"I2C iReadData failed!!\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+static bool sc820cs_param_checksum(kal_uint8 *buf, unsigned int size, kal_uint8 checksum)
+{
+    int i, sum = 0;
+
+    for (i = 0; i < size; i++)
+    {
+        sum += buf[i];
+        //CAM_DBG(PFX,"buf[%d] = 0x%x %d", i, buf[i], buf[i]);
+    }
+
+    if ((sum % 256) != checksum)
+    {
+        CAM_DBG(PFX,"checksum fail size = %d sum=%d sum-in-eeprom=%d", size, sum % 256, checksum);
+        return false;
+    }
+    CAM_DBG(PFX,"checksum success size = %d sum=%d sum-in-eeprom=%d", size, sum % 256, checksum);
+    return true;
+}
+
+static bool sc820cs_read_module_info(kal_uint8 moduleflag)
+{
+    bool ret = false;
+    CAM_DBG(PFX,"--------------sc820cs module info read begin------------\n");
+    if (moduleflag == 1) {
+        sc820cs_iReadData(MODULE_GROUP1_INFO_PAGE, MODULE_GROUP1_INFO_ADDR, MODULE_INFO_LENGTH, &sc820cs_otp_info.module_param[0]);
+        sc820cs_iReadData(MODULE_GROUP1_INFO_PAGE, MODULE_GROUP1_CHECKSUM, 1, &sc820cs_otp_info.module_checksum);
+    } else if (moduleflag  == 2) {
+        sc820cs_iReadData(MODULE_GROUP2_INFO_PAGE, MODULE_GROUP2_INFO_ADDR, MODULE_INFO_LENGTH, &sc820cs_otp_info.module_param[0]);
+        sc820cs_iReadData(MODULE_GROUP2_INFO_PAGE, MODULE_GROUP2_CHECKSUM, 1, &sc820cs_otp_info.module_checksum);
+    } else {
+        CAM_DBG(PFX,"--------------sc820cs module info read failed------------\n");
+    }
+    CAM_DBG(PFX,"--------------sc820cs module info read end------------\n");
+    ret = sc820cs_param_checksum(&sc820cs_otp_info.module_param[0], MODULE_INFO_LENGTH, sc820cs_otp_info.module_checksum);
+    if (ret) {
+        CAM_DBG(PFX,"--------------sc820cs module info checksum success------------\n");
+    }
+    return ret;
+}
+
+static bool sc820cs_read_awb_info(kal_uint8 moduleflag)
+{
+    bool ret = false;
+    CAM_DBG(PFX,"--------------sc820cs awb info read begin------------\n");
+    if (moduleflag  == 1) {
+        sc820cs_iReadData(AWB_GROUP1_INFO_PAGE, AWB_GROUP1_INFO_ADDR, AWB_INFO_LENGTH, &sc820cs_otp_info.awb_param[0]);
+        sc820cs_iReadData(AWB_GROUP1_INFO_PAGE, AWB_GROUP1_CHECKSUM, 1, &sc820cs_otp_info.awb_checksum);
+    } else if (moduleflag == 2) {
+        sc820cs_iReadData(AWB_GROUP2_INFO_PAGE, AWB_GROUP2_INFO_ADDR, AWB_INFO_LENGTH, &sc820cs_otp_info.awb_param[0]);
+        sc820cs_iReadData(AWB_GROUP2_INFO_PAGE, AWB_GROUP2_CHECKSUM, 1, &sc820cs_otp_info.awb_checksum);
+    } else {
+        CAM_DBG(PFX,"--------------sc820cs awb info read failed------------\n");
+    }
+    CAM_DBG(PFX,"--------------sc820cs awb info read end------------\n");
+    ret = sc820cs_param_checksum(&sc820cs_otp_info.awb_param[0], AWB_INFO_LENGTH, sc820cs_otp_info.awb_checksum);
+    if (ret) {
+        CAM_DBG(PFX,"--------------sc820cs awb info checksum success------------\n");
+    }
+    return ret;
+}
+
+static bool sc820cs_read_lsc_info(kal_uint8 moduleflag)
+{
+    bool ret = false;
+    int idex = 0;
+    kal_uint8 *pBuff;
+    CAM_DBG(PFX,"--------------sc820cs lsc info read begin------------\n");
+    if (moduleflag  == 1) {
+        CAM_DBG(PFX,"--------------sc820cs lsc info read part1 idex %d------------\n", idex);
+        pBuff = &sc820cs_otp_info.lsc_param[idex];
+        sc820cs_iReadData(LSC_GROUP1_PART1_INFO_PAGE, LSC_GROUP1_PART1_INFO_ADDR, LSC_GROUP1_PART1_INFO_LENGTH, pBuff);
+
+        idex = idex + LSC_GROUP1_PART1_INFO_LENGTH;
+        pBuff = &sc820cs_otp_info.lsc_param[idex];
+        CAM_DBG(PFX,"--------------sc820cs lsc info read part2 idex %d ------------\n", idex);
+        sc820cs_iReadData(LSC_GROUP1_PART2_INFO_PAGE, LSC_GROUP1_PART2_INFO_ADDR, LSC_GROUP1_PART2_INFO_LENGTH,  pBuff/*&sc820cs_otp_info.lsc_param[idex]*/);
+
+        idex = idex + LSC_GROUP1_PART2_INFO_LENGTH;
+        CAM_DBG(PFX,"--------------sc820cs lsc info read part3 idex %d ------------\n", idex);
+        pBuff = &sc820cs_otp_info.lsc_param[idex];
+        sc820cs_iReadData(LSC_GROUP1_PART3_INFO_PAGE, LSC_GROUP1_PART3_INFO_ADDR, LSC_GROUP1_PART3_INFO_LENGTH, pBuff/*&sc820cs_otp_info.lsc_param[idex]*/);
+
+        idex = idex + LSC_GROUP1_PART3_INFO_LENGTH;
+        CAM_DBG(PFX,"--------------sc820cs lsc info read part4 idex %d ------------\n", idex);
+        pBuff = &sc820cs_otp_info.lsc_param[idex];
+        sc820cs_iReadData(LSC_GROUP1_PART4_INFO_PAGE, LSC_GROUP1_PART4_INFO_ADDR, LSC_GROUP1_PART4_INFO_LENGTH, pBuff/*&sc820cs_otp_info.lsc_param[idex]*/);
+
+        idex = idex + LSC_GROUP1_PART4_INFO_LENGTH;
+        CAM_DBG(PFX,"--------------sc820cs lsc info read part5 idex %d ------------\n", idex);
+        pBuff = &sc820cs_otp_info.lsc_param[idex];
+        sc820cs_iReadData(LSC_GROUP1_PART5_INFO_PAGE, LSC_GROUP1_PART5_INFO_ADDR, LSC_GROUP1_PART5_INFO_LENGTH, pBuff/*&sc820cs_otp_info.lsc_param[idex]*/);
+
+        /*for (int i = 0; i < LSC_INFO_LENGTH; i++)
+        {
+            CAM_DBG(PFX,"summation index %d , data = 0x%x\n", i, sc820cs_otp_info.lsc_param[i]);
+        }*/
+
+        CAM_DBG(PFX,"--------------sc820cs lsc info read checksum ------------\n");
+        sc820cs_iReadData(LSC_GROUP1_PART5_INFO_PAGE, LSC_GROUP1_CHECKSUM, 1, &sc820cs_otp_info.lsc_checksum);
+    } else if (moduleflag  == 2) {
+        CAM_DBG(PFX,"--------------sc820cs lsc info read part1 ------------\n");
+        sc820cs_iReadData(LSC_GROUP2_PART1_INFO_PAGE, LSC_GROUP2_PART1_INFO_ADDR, LSC_GROUP2_PART1_INFO_LENGTH, &sc820cs_otp_info.lsc_param[idex]);
+        idex += LSC_GROUP2_PART1_INFO_LENGTH;
+        CAM_DBG(PFX,"--------------sc820cs lsc info read part2 ------------\n");
+        sc820cs_iReadData(LSC_GROUP2_PART2_INFO_PAGE, LSC_GROUP2_PART2_INFO_ADDR, LSC_GROUP2_PART2_INFO_LENGTH, &sc820cs_otp_info.lsc_param[idex]);
+        idex += LSC_GROUP2_PART2_INFO_LENGTH;
+        CAM_DBG(PFX,"--------------sc820cs lsc info read part3 ------------\n");
+        sc820cs_iReadData(LSC_GROUP2_PART3_INFO_PAGE, LSC_GROUP2_PART3_INFO_ADDR, LSC_GROUP2_PART3_INFO_LENGTH, &sc820cs_otp_info.lsc_param[idex]);
+        idex += LSC_GROUP2_PART3_INFO_LENGTH;
+        CAM_DBG(PFX,"--------------sc820cs lsc info read part4 ------------\n");
+        sc820cs_iReadData(LSC_GROUP2_PART4_INFO_PAGE, LSC_GROUP2_PART4_INFO_ADDR, LSC_GROUP2_PART4_INFO_LENGTH, &sc820cs_otp_info.lsc_param[idex]);
+        idex += LSC_GROUP2_PART4_INFO_LENGTH;
+        CAM_DBG(PFX,"--------------sc820cs lsc info read part5 ------------\n");
+        sc820cs_iReadData(LSC_GROUP2_PART5_INFO_PAGE, LSC_GROUP2_PART5_INFO_ADDR, LSC_GROUP2_PART5_INFO_LENGTH, &sc820cs_otp_info.lsc_param[idex]);
+        CAM_DBG(PFX,"--------------sc820cs lsc info read checksum ------------\n");
+        sc820cs_iReadData(LSC_GROUP2_PART5_INFO_PAGE, LSC_GROUP2_CHECKSUM, 1, &sc820cs_otp_info.lsc_checksum);
+    } else {
+        CAM_DBG(PFX,"--------------sc820cs lsc info read failed------------\n");
+    }
+    CAM_DBG(PFX,"--------------sc820cs lsc info read end------------\n");
+    ret = sc820cs_param_checksum(&sc820cs_otp_info.lsc_param[0], LSC_INFO_LENGTH, sc820cs_otp_info.lsc_checksum);
+    if (ret) {
+        CAM_DBG(PFX,"--------------sc820cs lsc info checksum success------------\n");
+    }
+    return ret;
+}
+
+static void read_sc820cs_otp_data(void)
+{
+    kal_uint8 moduleflag =0;
+    kal_uint8 value =0;
+    bool checksum_module = false;
+    bool checksum_awb = false;
+    bool checksum_lsc = false;
+
+    sensor_init();
+    CAM_DBG(PFX,"sc820cs moduleflag read begin");
+    sc820cs_iReadData(AWB_GROUP1_INFO_PAGE, OTP_GROUP1_FLAG, 1, &value);
+    if (value == 1) {
+         moduleflag = 1;
+    } else {
+        CAM_DBG(PFX,"sc820cs group1 flag = 0x%x", value);
+        sc820cs_iReadData(AWB_GROUP2_INFO_PAGE, OTP_GROUP2_FLAG, 1, &value);
+        if (value == 1) {
+            moduleflag = 2;
+        }
+    }
+    CAM_DBG(PFX,"sc820cs moduleflag = 0x%x end", moduleflag);
+    if (moduleflag != 1 && moduleflag != 2) {
+        CAM_DBG(PFX,"sc820cs invalid moduleflag = 0x%x", moduleflag);
+        return;
+    }
+
+    checksum_module = sc820cs_read_module_info(moduleflag);
+    checksum_awb = sc820cs_read_awb_info(moduleflag);
+    checksum_lsc = sc820cs_read_lsc_info(moduleflag);
+
+    if (true == (checksum_module & checksum_awb & checksum_lsc))
+    {
+        CAM_DBG(PFX,"----------------sc820cs otp info check success----------------");
+    }
+    else
+    {
+        CAM_DBG(PFX,"----------------sc820cs otp info check fail-------------------");
+    }
+}
+
 
 /*#if IS_ENABLED(CONFIG_TINNO_DEVINFO)
 
@@ -1076,6 +1374,7 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 					    //Eeprom_DataInit(1, SC820CS_TRULY_SENSOR_ID);
 					    deviceInfo_register_value = 0x01;
 					}
+					read_sc820cs_otp_data();
 					return ERROR_NONE;
 				}
 				CAM_DBG(PFX, "get_imgsensor_id Read sensor id fail, i2c write id: 0x%x,sensor id: 0x%x\n", imgsensor.i2c_write_id,*sensor_id);
