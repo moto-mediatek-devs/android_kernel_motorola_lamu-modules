@@ -3,6 +3,7 @@
 
 #include "./comm/aw_sar_chip_interface.h"
 #include "aw_sar.h"
+#include "./aw963xx/aw963xx.h"
 
 #define AW_SAR_I2C_NAME		"awinic_sar"
 #define AW_SAR_DRIVER_VERSION	"v0.4.0"
@@ -414,12 +415,11 @@ static int32_t aw_sar_input_init_comm(struct aw_sar *p_sar)
 		AWLOGE(p_sar->dev, "devm_kzalloc err");
 		return -AW_ERR;
 	}
-
+//TN Begin modified by db 20240712  start
 	for (i = 0; i < p_sar->p_sar_para->ch_num_max; i++) {
 		snprintf(p_sar->channels_arr[i].name,
 				sizeof(p_sar->channels_arr->name),
-				"aw_sar%u_ch%ud",
-				p_sar->dts_info.sar_num, i);
+				"sar_ch%d", i);
 
 		p_sar->channels_arr[i].last_channel_info = 0;
 
@@ -429,6 +429,13 @@ static int32_t aw_sar_input_init_comm(struct aw_sar *p_sar)
 			if (p_sar->channels_arr[i].input == NULL)
 				return -AW_ERR;
 			p_sar->channels_arr[i].input->name = p_sar->channels_arr[i].name;
+			p_sar->channels_arr[i].input->id.vendor = i;
+			AWLOGE(p_sar->dev, "device NAME = %s VENDOR=%d", p_sar->channels_arr[i].input->name, p_sar->channels_arr[i].input->id.vendor);
+			__set_bit(EV_KEY, p_sar->channels_arr[i].input->evbit);
+			__set_bit(KEY_SAR_FAR, p_sar->channels_arr[i].input->keybit); //far state
+			__set_bit(KEY_SAR_NEAR, p_sar->channels_arr[i].input->keybit); // near state , first detect
+			__set_bit(KEY_SAR_CLOSE, p_sar->channels_arr[i].input->keybit); // closed state, second detect
+//TN Begin modified by db 20240712  end
 			input_set_abs_params(p_sar->channels_arr[i].input,
 						ABS_DISTANCE, -1, 100, 0, 0);
 			ret = input_register_device(p_sar->channels_arr[i].input);

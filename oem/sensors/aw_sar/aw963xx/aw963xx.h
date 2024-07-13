@@ -34,6 +34,10 @@
 #define AW96308						("AW96308")
 #define AW96310						("AW96310")
 
+#define KEY_SAR_NEAR   0x2ec
+#define KEY_SAR_CLOSE  0x2ed
+#define KEY_SAR_FAR    0x2ef
+
 enum aw963xx_cap_mode {
 	AW963XX_UNSIGNED_CAP = 0,
 	AW963XX_SIGNED_CAP = 4,
