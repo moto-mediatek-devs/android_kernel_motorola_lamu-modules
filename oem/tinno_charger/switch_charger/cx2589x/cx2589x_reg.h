@@ -164,6 +164,7 @@
 
 /* DP DM SEL  */
 #define CX2589x_FORCE_DPDM_MASK			BIT(1)
+#define CX2589x_AUTO_DPDM_MASK		BIT(0)
 #define CX2589x_DP_VSEL_MASK		GENMASK(7, 5)
 #define CX2589x_DM_VSEL_MASK		GENMASK(4, 2)
 
@@ -250,6 +251,7 @@ struct cx2589x_device {
 	int batt_vol;
 	int batt_curr;
 	struct iio_channel *vbus;
+	int force_detect_count;
 };
 
 #endif /* _CX2589x_CHARGER_H__ */
