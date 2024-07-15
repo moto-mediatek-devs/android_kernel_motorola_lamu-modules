@@ -43,6 +43,51 @@ static const unsigned int usb_extcon_cable[] = {
 	EXTCON_NONE,
 };
 
+/* TN Begin modified by xinjun.lu/860715 20240713 CR/EKLAMU-202 */
+typedef enum {
+	CC1,
+	CC2,
+	CCNone
+} CC_Orientation;
+
+static int typec_polarity = CCNone;
+
+static ssize_t cc_orient_show(struct device *dev, struct device_attribute *attr,
+			  char *buf)
+{
+	dev_info(dev, "typec cc orient %d\n", typec_polarity);
+	if (typec_polarity == CC1)
+		return snprintf(buf, 16, "%s\n", "CC1");
+	else if (typec_polarity == CC2)
+		return snprintf(buf, 16, "%s\n", "CC2");
+	else
+		return snprintf(buf, 16, "%s\n", "CCNone");
+}
+
+static DEVICE_ATTR_RO(cc_orient);
+
+static struct attribute *typec_attrs[] = {
+	&dev_attr_cc_orient.attr,
+	NULL,
+};
+
+static struct attribute_group typec_group = {
+	.attrs = typec_attrs,
+};
+
+static int extcon_create_typec_sysfs(struct device *dev)
+{
+	int ret = 0;
+
+	ret = sysfs_create_group(&dev->kobj, &typec_group);
+	if (ret) {
+		dev_info(dev, "typec cc_orient node create fail \n");
+		sysfs_remove_group(&dev->kobj, &typec_group);
+	}
+	return ret;
+}
+/* TN End modified by xinjun.lu/860715 20240713 CR/EKLAMU-202 */
+
 static void mtk_usb_extcon_update_role(struct work_struct *work)
 {
 	struct usb_role_info *role = container_of(to_delayed_work(work),
@@ -490,6 +535,9 @@ static int mtk_extcon_tcpc_notifier(struct notifier_block *nb,
 			dev_info(dev, "Type-C plug out\n");
 			mtk_usb_extcon_set_role(extcon, USB_ROLE_NONE);
 		}
+		/* TN Begin modified by xinjun.lu/860715 20240713 CR/EKLAMU-202 */
+		typec_polarity = noti->typec_state.polarity;
+		/* TN End modified by xinjun.lu/860715 20240713 CR/EKLAMU-202 */
 		break;
 	case TCP_NOTIFY_DR_SWAP:
 		dev_info(dev, "%s dr_swap, new role=%d\n",
@@ -812,6 +860,9 @@ static int mtk_usb_extcon_probe(struct platform_device *pdev)
 	ret = mtk_usb_extcon_tcpc_init(extcon);
 	if (ret < 0)
 		dev_err(dev, "failed to init tcpc\n");
+	/* TN Begin modified by xinjun.lu/860715 20240713 CR/EKLAMU-202 */
+	extcon_create_typec_sysfs(extcon->dev);
+	/* TN End modified by xinjun.lu/860715 20240713 CR/EKLAMU-202 */
 #endif
 
 	platform_set_drvdata(pdev, extcon);

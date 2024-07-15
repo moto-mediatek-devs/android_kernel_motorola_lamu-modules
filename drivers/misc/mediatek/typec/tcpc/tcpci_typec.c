@@ -1389,6 +1389,19 @@ int tcpc_typec_handle_cc_change(struct tcpc_device *tcpc)
 	if (typec_is_cc_attach(tcpc)) {
 		typec_disable_low_power_mode(tcpc);
 		typec_attach_wait_entry(tcpc);
+/* TN Begin modified by xinjun.lu/860715 20240713 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+		if (typec_get_cc1() && !typec_get_cc2()) {
+			tcpc->typec_polarity = 0;
+		} else if (!typec_get_cc1() && typec_get_cc2()) {
+			tcpc->typec_polarity = 1;
+		} else {
+			tcpc->typec_polarity = 2;
+		}
+		TYPEC_INFO("[CC_Alert] %d\n", tcpc->typec_polarity);
+	//	tcpci_notify_typec_state(tcpc);
+#endif
+/* TN End modified by xinjun.lu/860715 20240713 CR/EKLAMU-202 */
 	} else {
 		typec_detach_wait_entry(tcpc);
 /*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
