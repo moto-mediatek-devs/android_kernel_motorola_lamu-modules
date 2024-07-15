@@ -71,9 +71,9 @@ enum {
 };
 
 static const char* sgm41600_psy_name[] = {
-	[SGM41600S_STANDALONG] = "sgm-cp-standalone",
-	[SGM41600S_MASTER] = "sgm-cp-master",
-	[SGM41600S_SLAVE] = "sgm-cp-slave",
+	[SGM41600S_STANDALONG] = "cp-standalone",
+	[SGM41600S_MASTER] = "cp-master",
+	[SGM41600S_SLAVE] = "cp-slave",
 };
 
 static const char* sgm41600_irq_name[] = {
@@ -688,6 +688,8 @@ static int sgm41600_get_adc_data(struct sgm41600_chip *sgm,
 	uint8_t val[2] = {0};
 	int ret;
 	int step = 0;
+	struct power_supply *bat_psy;
+	union power_supply_propval prop;
 
 	if (channel >= ADC_MAX_NUM)
 		return -EINVAL;
@@ -698,27 +700,40 @@ static int sgm41600_get_adc_data(struct sgm41600_chip *sgm,
 	}
 
 	switch (channel) {
-	case 0:
+	case ADC_VBUS:
 		step = 4;
 		*result = (val[1] | (val[0] << 8)) * step;
 		break;
-	case 1:
+	case ADC_IBUS:
 		step = 2;
 		*result = (val[1] | (val[0] << 8)) * step;
 		break;
-	case 2:
+	case ADC_VBAT:
 		step = 2;
 		*result = (val[1] | (val[0] << 8)) * step;
 		break;
-	case 3:
+	case ADC_IBAT:
+#if 0 // due to HW design, we can only get the IBAT from external fuel gauge
 		step = 25;
 		*result = (val[1] | (val[0] << 8)) * step / 10;
+#else
+		SGM_INFO("get ibat from fuel gauge\n");
+		bat_psy = power_supply_get_by_name("battery");
+		if (IS_ERR_OR_NULL(bat_psy)) {
+			SGM_INFO("Couldn't get bat_psy\n");
+			*result = 0; // default return 0 mA
+		} else {
+			ret = power_supply_get_property(bat_psy,
+				POWER_SUPPLY_PROP_CURRENT_NOW, &prop);
+			*result = prop.intval; // current in uA
+		}
+#endif
 		break;
-	case 4:
+	case ADC_VOUT:
 		step = 2;
 		*result = (val[1] | (val[0] << 8)) * step;
 		break;
-	case 5:
+	case ADC_TDIE:
 		step = 1;
 		*result = val[0] * step - 40;
 		break;
@@ -826,6 +841,71 @@ __maybe_unused static int sgm41600_is_vbuslowerr(struct sgm41600_chip *sgm, bool
 	return ret;
 }
 
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+static int sgm41600_is_vbushigher(struct sgm41600_chip *sgm, bool *err)
+{
+	int ret;
+	int val;
+
+	ret = sgm41600_field_read(sgm, VBUS_HI_FLAG, &val);
+	if (ret < 0) {
+		return ret;
+	}
+
+	SGM_INFO("set:%d\n", val);
+	*err = (bool)val;
+
+	return ret;
+}
+
+static int sgm41600_is_vbat_present(struct sgm41600_chip *sgm, bool *present)
+{
+	int ret;
+	int val;
+
+	ret = sgm41600_field_read(sgm, BAT_INSERT_FLAG, &val);
+	if (ret < 0) {
+		return ret;
+	}
+
+	SGM_INFO("%d", val);
+
+	*present = (bool)val;
+
+	return ret;
+}
+
+static int sgm41600_is_vbus_present(struct sgm41600_chip *sgm, bool *present)
+{
+	int ret;
+	int val;
+
+	ret = sgm41600_field_read(sgm, BUS_INSERT_FLAG, &val);
+	if (ret < 0) {
+		return ret;
+	}
+
+	SGM_INFO("%d", val);
+
+	*present = (bool)val;
+
+	return ret;
+}
+#endif /* CONFIG_OEM_TURBO_CHARGER */
+
+#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
+static int mtk_sgm41600_enable_adc(struct charger_device *chg_dev, bool enable)
+{
+	int ret;
+	struct sgm41600_chip *sgm = charger_get_data(chg_dev);
+
+	SGM_INFO("%d", enable);
+
+	ret = sgm41600_enable_adc(sgm, enable);
+	return ret;
+}
+#endif /* CONFIG_OEM_CHARGER_PUMP */
+
 __maybe_unused static int sgm41600_init_device(struct sgm41600_chip *sgm)
 {
 	int ret = 0;
@@ -880,7 +960,7 @@ __maybe_unused static int sgm41600_init_device(struct sgm41600_chip *sgm)
 		}
 	}
 
-	sgm41600_enable_adc(sgm, true);
+	//sgm41600_enable_adc(sgm, true);
 	sgm41600_dump_reg(sgm);
 
 	return ret;
@@ -1019,6 +1099,29 @@ static int mtk_sgm41600_is_vbuslowerr(struct charger_device *chg_dev, bool *err)
 	return sgm41600_is_vbuslowerr(sgm,err);
 }
 
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+static int mtk_sgm41600_is_vbushigher(struct charger_device *chg_dev, bool *err)
+{
+	struct sgm41600_chip *sgm = charger_get_data(chg_dev);
+
+	return sgm41600_is_vbushigher(sgm, err);
+}
+
+static int mtk_sgm41600_is_vbat_present(struct charger_device *chg_dev, bool *present)
+{
+	struct sgm41600_chip *sgm = charger_get_data(chg_dev);
+
+	return sgm41600_is_vbat_present(sgm, present);
+}
+
+static int mtk_sgm41600_is_vbus_present(struct charger_device *chg_dev, bool *present)
+{
+	struct sgm41600_chip *sgm = charger_get_data(chg_dev);
+
+	return sgm41600_is_vbus_present(sgm, present);
+}
+#endif
+
 static int mtk_sgm41600_set_vbatovp_alarm(struct charger_device *chg_dev, u32 uV)
 {
 	struct sgm41600_chip *sgm = charger_get_data(chg_dev);
@@ -1080,6 +1183,15 @@ static const struct charger_ops sgm41600_chg_ops = {
 	.set_vbusovp_alarm = mtk_sgm41600_set_vbusovp_alarm,
 	.reset_vbusovp_alarm = mtk_sgm41600_reset_vbusovp_alarm,
 	//.set_cp_mode = mtk_sgm41600_set_mode,
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+	.is_vbushigher = mtk_sgm41600_is_vbushigher,
+	.is_vbat_present = mtk_sgm41600_is_vbat_present,
+	.is_vbus_present = mtk_sgm41600_is_vbus_present,
+#endif /* CONFIG_OEM_TURBO_CHARGER */
+#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
+	.enable_adc = mtk_sgm41600_enable_adc,
+#endif /* CONFIG_OEM_CHARGER_PUMP */
+
 };
 #endif /*CONFIG_MTK_CLASS*/
 
@@ -1315,19 +1427,19 @@ static int sgm41600_charger_get_property(struct power_supply *psy,
 		ret = sgm41600_get_adc_data(sgm, ADC_VBUS, &result);
 		if (!ret)
 			sgm->vbus_volt = result;
-		val->intval = sgm->vbus_volt;
+		val->intval = sgm->vbus_volt * 1000;
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 		ret = sgm41600_get_adc_data(sgm, ADC_IBUS, &result);
 		if (!ret)
 			sgm->ibus_curr = result;
-		val->intval = sgm->ibus_curr;
+		val->intval = sgm->ibus_curr * 1000;
 		break;
 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE:
 		ret = sgm41600_get_adc_data(sgm, ADC_VBAT, &result);
 		if (!ret)
 			sgm->vbat_volt = result;
-		val->intval = sgm->vbat_volt;
+		val->intval = sgm->vbat_volt * 1000;
 		break;
 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT:
 		ret = sgm41600_get_adc_data(sgm, ADC_IBAT, &result);
@@ -1514,6 +1626,7 @@ static int sgm41600_charger_probe(struct i2c_client *client,
 
 	sgm->dev = &client->dev;
 	sgm->client = client;
+	sgm->client->addr = 0x6E;  // due to the same slave address of another charger pump, config the real slave address here.
 
 	sgm->regmap = devm_regmap_init_i2c(client,
 					&sgm41600_regmap_config);
