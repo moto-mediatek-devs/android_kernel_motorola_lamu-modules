@@ -161,7 +161,7 @@
 };
 
 &i2c6 {
-	clock-frequency = <400000>;
+	clock-frequency = <100000>; // fix clock-frequency@100KHz for wt6670f update firmware 
 	status = "ok";
 
 	z350@35 {
