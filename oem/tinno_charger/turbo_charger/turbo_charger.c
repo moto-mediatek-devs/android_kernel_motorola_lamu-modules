@@ -24,6 +24,10 @@ extern bool turbo_charger_active;
 /*TN Begin modified by lingfei.tang/77407 20231201 CR/EKFOGO4G-5993*/
 extern int ffc_reduce_count;
 /*TN End modified by lingfei.tang/77407 20231201 CR/EKFOGO4G-5993*/
+extern int z350_set_volt_count(int count);
+extern int z350_reset_charger_type(void);
+extern int wt6670f_set_volt_count(int count);
+extern int wt6670f_reset_charger_type(void);
 #endif
 
 extern int g_thermal_charging_current_limit;  /*TN add by chao.zhang1/860682 20230926 CR/EKFOGO4G-1785*/
@@ -123,7 +127,7 @@ static int turbo_charger_get_sw_device(struct turbo_charger_algo_info *info)
 		info->sw_chg = get_charger_by_name("primary_chg");
 		if (IS_ERR_OR_NULL(info->sw_chg)) {
 			TURBO_CHARGER_ERR("get primary_chg failed\n");
-			ret = -EINVAL;
+			return -EINVAL;
 		}
 	}
 
@@ -138,28 +142,30 @@ static int turbo_charger_update_sw_status(struct turbo_charger_algo_info *info)
 	bool charge_enabled = false;
 	union power_supply_propval val = { 0,};
 
-	ret = turbo_charger_check_usb_psy(info);
+	ret = power_supply_get_property(info->usb_psy,
+					POWER_SUPPLY_PROP_ONLINE, &val);
 	if (!ret) {
-		ret = power_supply_get_property(info->usb_psy,
-						POWER_SUPPLY_PROP_ONLINE, &val);
-		if (!ret) {
-			info->sw.usb_online = val.intval;
-		}
+		info->sw.usb_online = val.intval;
 	}
+
 	TURBO_CHARGER_DBG("usb is %s\n", info->sw.usb_online ? "online" : "offline");
 
-	ret = turbo_charger_get_sw_device(info);
+
+	ret = charger_dev_is_enabled(info->sw_chg, &charge_enabled);
 	if (!ret) {
-		ret = charger_dev_is_enabled(info->sw_chg, &charge_enabled);
-		if (!ret) {
-			TURBO_CHARGER_DBG("switch charger is %s\n",
-							charge_enabled ? "enabled" : "disabled");
-		} else {
-			TURBO_CHARGER_ERR("get switch charger status failed\n");
-		}
+		TURBO_CHARGER_DBG("switch charger is %s\n",
+						charge_enabled ? "enabled" : "disabled");
+	} else {
+		TURBO_CHARGER_ERR("get switch charger status failed\n");
 	}
 
 	info->sw.charge_enabled = charge_enabled;
+
+	ret = power_supply_get_property(info->usb_psy,
+					POWER_SUPPLY_PROP_USB_TYPE, &val);
+	if (!ret) {
+		info->sw.charger_type = val.intval;
+	}
 
 	return ret;
 }
@@ -169,14 +175,23 @@ static int turbo_charger_get_qc_device(struct turbo_charger_algo_info *info)
 	int ret = 0;
 
 	if (IS_ERR_OR_NULL(info->qc_logic_psy)) {
-		info->qc_logic_psy = power_supply_get_by_name("z350-usb");
+		info->qc_logic_psy = power_supply_get_by_name("qc_phy_z350");
 		if (IS_ERR_OR_NULL(info->qc_logic_psy)) {
-			TURBO_CHARGER_DBG("get z350-usb psy failed\n");
-			ret = -ENODEV;
+			info->qc_logic_psy = power_supply_get_by_name("qc_phy_wt6670f");
+			if (IS_ERR_OR_NULL(info->qc_logic_psy)) {
+				TURBO_CHARGER_DBG("get qc_phy psy failed\n");
+				return -ENODEV;
+			}
 		}
 	}
 
-	TURBO_CHARGER_DBG("get z350-usb psy successfully\n");
+	if (!strncmp(info->qc_logic_psy->desc->name, "qc_phy_z350", 11)) {
+		info->qc_phy_z350 = true;
+	} else if (!strncmp(info->qc_logic_psy->desc->name, "qc_phy_wt6670f", 14)) {
+		info->qc_phy_wt6670f = true;
+	}
+
+	TURBO_CHARGER_DBG("get primary_qc_phy psy successfully\n");
 
 	return ret;
 }
@@ -189,7 +204,7 @@ static int turbo_charger_get_cp_device(struct turbo_charger_algo_info *info)
 		info->cp_chg = get_charger_by_name("primary_dvchg");
 		if (IS_ERR_OR_NULL(info->cp_chg)) {
 			TURBO_CHARGER_ERR("get primary_dvchg failed\n");
-			ret = -EINVAL;
+			return -EINVAL;
 		}
 	}
 
@@ -202,12 +217,6 @@ static int turbo_charger_get_input_voltage_settled(struct turbo_charger_algo_inf
 {
 	int ret = 0;
 	union power_supply_propval val = {0,};
-
-	turbo_charger_check_cp_psy(info);
-	if (IS_ERR_OR_NULL(info->cp_psy)) {
-		TURBO_CHARGER_ERR("cp_psy not found, return directly\n");
-		return -ENODEV;
-	}
 
 	ret = power_supply_get_property(info->cp_psy,
 					POWER_SUPPLY_PROP_VOLTAGE_NOW, &val);
@@ -243,12 +252,6 @@ static int turbo_charger_get_input_current(struct turbo_charger_algo_info *info,
 	int ret = 0;
 	union power_supply_propval val = {0,};
 
-	ret = turbo_charger_check_cp_psy(info);
-	if (ret < 0) {
-		TURBO_CHARGER_ERR("cp_psy not found, return directly\n");
-		return -ENODEV;
-	}
-
 	ret = power_supply_get_property(info->cp_psy,
 					POWER_SUPPLY_PROP_CURRENT_NOW, &val);
 	if (ret) {
@@ -266,24 +269,6 @@ static int turbo_charger_update_cp_status(struct turbo_charger_algo_info *info)
 	int ret = 0;
 	union power_supply_propval val = {0,};
 	bool present = false;
-
-	ret = turbo_charger_check_cp_psy(info);
-	if (ret < 0) {
-		TURBO_CHARGER_ERR("cp_psy not found, return directly\n");
-		return -ENODEV;
-	}
-
-	ret = turbo_charger_check_batt_psy(info);
-	if (ret < 0) {
-		TURBO_CHARGER_ERR("batt_psy not found, return directly\n");
-		return -ENODEV;
-	}
-
-	ret = turbo_charger_get_cp_device(info);
-	if (ret < 0) {
-		TURBO_CHARGER_ERR("cp_psy not found, return directly\n");
-		return -ENODEV;
-	}
 
 	/*get Vbat from CP*/
 	ret = power_supply_get_property(info->cp_psy,
@@ -382,11 +367,6 @@ static int turbo_charger_enable_cp(struct turbo_charger_algo_info *info, bool en
 	int ret;
 
 	TURBO_CHARGER_DBG("enter\n");
-	ret = turbo_charger_get_cp_device(info);
-	if (ret) {
-		TURBO_CHARGER_ERR("failed to get cp chg\n");
-		return -ENODEV;
-	}
 
 	ret = charger_dev_enable(info->cp_chg, enable);
 	if (ret) {
@@ -402,12 +382,6 @@ static int turbo_charger_check_cp_enabled(struct turbo_charger_algo_info *info)
 {
 	int ret;
 	bool enable = false;
-
-	ret = turbo_charger_get_cp_device(info);
-	if (ret) {
-		TURBO_CHARGER_ERR("failed to get cp chg\n");
-		return -ENODEV;
-	}
 
 	ret = charger_dev_is_enabled(info->cp_chg, &enable);
 	if (ret) {
@@ -698,7 +672,19 @@ static bool turbo_charger_find_chrg_step(struct turbo_charger_algo_info *info,
 	return false;
 }
 
-extern int z350_set_volt_count(int count);
+static int turbo_charger_set_volt_count(struct turbo_charger_algo_info *info, int count)
+{
+	int ret = 0;
+
+	if (info->qc_phy_z350) {
+		ret = z350_set_volt_count(count);
+	} else if (info->qc_phy_wt6670f) {
+		ret = wt6670f_set_volt_count(count);
+	}
+
+	return ret;
+}
+
 static void turbo_charger_select_pdo(struct turbo_charger_algo_info *info,
 					int target_uv, int target_ua)
 {
@@ -832,7 +818,7 @@ static void turbo_charger_select_pdo(struct turbo_charger_algo_info *info,
 
 	for (retry_count = 0; retry_count < 3; retry_count++) {
 		/*TN Begin modify vbus ovp by rongxing.li/860682 20231208 CR/EKFOGO4G-8986*/
-		ret = z350_set_volt_count(count); //need to repleace our function call
+		ret = turbo_charger_set_volt_count(info, count);
 		if (count > 0)
 			info->total_count += count;
 		else if (count < 0)
@@ -1782,7 +1768,15 @@ static void turbo_charger_update_status_work(struct work_struct *work)
 	return;
 }
 
-extern int z350_reset_charger_type(void);
+static void turbo_charger_reset_charger_type(struct turbo_charger_algo_info *info)
+{
+	if (info->qc_phy_z350) {
+		z350_reset_charger_type();
+	} else if (info->qc_phy_wt6670f) {
+		wt6670f_reset_charger_type();
+	}
+}
+
 static void turbo_charger_disconnect(struct turbo_charger_algo_info *info)
 {
 	TURBO_CHARGER_DBG("enter\n");
@@ -1804,7 +1798,7 @@ static void turbo_charger_disconnect(struct turbo_charger_algo_info *info)
 	info->total_count = 0;
 	/*TN End modify vbus ovp by rongxing.li/860682 20231208 CR/EKFOGO4G-8986*/
 
-	z350_reset_charger_type();
+	turbo_charger_reset_charger_type(info);
 	turbo_charger_set_curr_limit_sw(info, info->turbo_charging_curr_min);
 	turbo_charger_set_chg_curr_limit_sw(info, 2200000);
 	charger_dev_set_constant_voltage(info->sw_chg, 4500000); //Default battery cv
@@ -1851,12 +1845,6 @@ static int turbo_charger_psy_notifier_cb(struct notifier_block *nb,
 		return NOTIFY_DONE;
 	}
 
-	ret = turbo_charger_get_qc_device(info);
-	if (ret < 0) {
-		TURBO_CHARGER_ERR("failed to get qc logic devices\n");
-		return NOTIFY_DONE;
-	}
-
 	if (psy == info->qc_logic_psy) {
 		ret = power_supply_get_property(info->qc_logic_psy,
 						POWER_SUPPLY_PROP_TYPE, &val);
@@ -1876,8 +1864,9 @@ static int turbo_charger_psy_notifier_cb(struct notifier_block *nb,
 						info->turbo_charger_type, is_qc3_charger_ready, mtk_can_charging);
 		}
 	} else if (psy == info->usb_psy) {
-		if (!info->sw.usb_online && info->turbo_charger_active) {
-			TURBO_CHARGER_DBG("Vbus not present, stop turbo charger\n");
+		//if (!info->sw.usb_online && info->turbo_charger_active) {
+		if (info->sw.charger_type == POWER_SUPPLY_TYPE_UNKNOWN && info->turbo_charger_active) {
+			TURBO_CHARGER_DBG("plug out charger, stop turbo charger\n");
 			is_qc3_charger_ready = false;
 			turbo_charger_disconnect(info);
 		}
@@ -2092,11 +2081,10 @@ static int turbo_charger_probe(struct platform_device *pdev)
 
 	TURBO_CHARGER_INFO("enter\n");
 
-#ifdef OEM_FIXED_ME //need define oem_pcba_chg_15w_exist() in dev_info driver
-	ret = oem_pcba_chg_15w_exist();
-	if (ret > 0) {
-		TURBO_CHARGER_ERR("only support 15W basic charger, "
-					"not init turbo charger algorithm\n");
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+	if (oem_pcba_charge_power() != CHARGE_POWER_33W) {
+		TURBO_CHARGER_ERR("not support 33W turbo charger, "
+					"not init algorithm\n");
 		return -ENODEV;
 	}
 #endif
@@ -2129,10 +2117,36 @@ static int turbo_charger_probe(struct platform_device *pdev)
 	info->turbo_charger_support = false;
 	info->turbo_charger_result = 0;
 	info->turbo_charger_cc_loop_stage = false;
+	info->qc_phy_z350 = false;
+	info->qc_phy_z350 = false;
 
 	mutex_init(&info->turbo_charger_lock);
 
 	device_init_wakeup(info->dev, true);
+
+	ret = turbo_charger_check_usb_psy(info);
+	if (ret < 0)
+		return -ENODEV;
+
+	ret = turbo_charger_check_cp_psy(info);
+	if (ret < 0)
+		return -ENODEV;
+
+	ret = turbo_charger_check_batt_psy(info);
+	if (ret < 0)
+		return -EPROBE_DEFER;
+
+	ret = turbo_charger_get_sw_device(info);
+	if (ret < 0)
+		return -EPROBE_DEFER;
+
+	ret = turbo_charger_get_cp_device(info);
+	if (ret < 0)
+		return -EPROBE_DEFER;
+
+	ret = turbo_charger_get_qc_device(info);
+	if (ret < 0)
+		return -EPROBE_DEFER;
 
 	info->nb.notifier_call = turbo_charger_psy_notifier_cb;
 	power_supply_reg_notifier(&info->nb);

@@ -123,6 +123,7 @@ struct turbo_charger_config {
 struct sw_device {
 	bool	charge_enabled;
 	int	ibus_curr;
+	int	charger_type;
 	bool	usb_online;
 };
 
@@ -299,6 +300,8 @@ struct turbo_charger_algo_info {
 	/*TN Begin modify vbus ovp by rongxing.li/860682 20231208 CR/EKFOGO4G-8986*/
 	int				total_count;
 	/*TN End modify vbus ovp by rongxing.li/860682 20231208 CR/EKFOGO4G-8986*/
+	bool			qc_phy_z350;
+	bool			qc_phy_wt6670f;
 };
 
 #endif /* __MTK_TURBO_CHARGER_H */
