@@ -57,6 +57,10 @@ static struct charger_device *primary_divider_charger;
 
 //CPS <AI_BSP_CHG> <cps> <2021-03-01> modify For 2005R 30w fast charger end
 /* Registers */
+
+#define cps2011s_REG_CONTROL1		0x00
+#define cps2011s_REG_CONTROL2		0x01
+#define cps2011s_REG_CONTROL3		0x02
 #define cps2011s_REG_VBATOVP	    0x08	//cps modify
 #define cps2011s_REG_IBATOCP	    0x09
 #define cps2011s_REG_ACPROTECT	    0x04	// VBUSCON_OVP
@@ -106,6 +110,9 @@ static struct charger_device *primary_divider_charger;
 #define cps2011s_IBATOCP_MASK	    0x3F
 #define cps2011s_VBUS_STAT_MASK 	0x3C
 #define cps2011s_VBUS_STAT_SHIFT	2
+
+#define cps2011s_COMP_EN_MASK		BIT(6)
+
 
 ///////////////////////////////////////////////////////////////////
 //cps2011s Register map
@@ -1020,6 +1027,29 @@ static int switch_clk[] = {
 	300, 400, 500, 600, 700, 800,  900, 1000, 1100, 1200, 1300, 1400, 1500
 };
 
+static int cps2011s_dump_register(struct cps2011s_chip *chip)
+{
+	int rc = 0;
+	int addr = 0;
+	u8 data;
+
+	for (addr = 0x00; addr < 0x1C; addr++) {
+		rc = cps2011s_i2c_read8(chip, addr, &data);
+		if (rc == 0) {
+			dev_info(chip->dev, "%s read register 0x%x = 0x%x\n", __func__, addr, data);
+		}
+	}
+
+	for (addr = 0xE0; addr < 0xF5; addr++) {
+		rc = cps2011s_i2c_read8(chip, addr, &data);
+		if (rc == 0) {
+			dev_info(chip->dev, "%s read register 0x%x = 0x%x\n", __func__, addr, data);
+		}
+	}
+
+	return 0;
+}
+
 static int cps2011s_set_switch_clk(struct cps2011s_chip *chip, int clk)
 {
 	int rc = 0, i;
@@ -1048,26 +1078,11 @@ __maybe_unused static int mtk_set_cps2011s_switch_clk(struct charger_device *chg
 	return rc;
 }
 
-static int cps2011s_dump_reg(struct charger_device *chg_dev)
+static int mtk_cps2011s_dump_register(struct charger_device *chg_dev)
 {
 	struct cps2011s_chip *chip = charger_get_data(chg_dev);
-	int rc = 0;
-	int addr = 0;
-	u8 data;
 
-	for (addr = 0x00; addr < 0x1C; addr++) {
-		rc = cps2011s_i2c_read8(chip, addr, &data);
-		if (rc == 0) {
-			dev_info(chip->dev, "%s read register 0x%x = 0x%x\n", __func__, addr, data);
-		}
-	}
-
-	for (addr = 0xE0; addr < 0xF5; addr++) {
-		rc = cps2011s_i2c_read8(chip, addr, &data);
-		if (rc == 0) {
-			dev_info(chip->dev, "%s read register 0x%x = 0x%x\n", __func__, addr, data);
-		}
-	}
+	cps2011s_dump_register(chip);
 
 	return 0;
 }
@@ -1109,14 +1124,38 @@ static int cps2011s_enable_adc(struct cps2011s_chip *chip, bool enable)
 	return ret;
 }
 
+static int cps2011s_enable_comparators(struct cps2011s_chip *chip, bool enable)
+{
+	int ret = 0;
+
+	dev_info(chip->dev, "%s: %d", __func__, enable);
+
+	if (enable) {
+		ret = cps2011s_i2c_update_bits(chip, cps2011s_REG_CONTROL3,
+						cps2011s_COMP_EN_MASK, cps2011s_COMP_EN_MASK);
+	} else {
+		ret = cps2011s_i2c_update_bits(chip, cps2011s_REG_CONTROL3,
+						0x00, cps2011s_COMP_EN_MASK);
+	}
+
+	if (ret < 0) {
+		dev_err(chip->dev, "%s failed(%d)\n", __func__, ret);
+	}
+
+	return ret;
+}
+
 #if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
 static int mtk_cps2011s_enable_adc(struct charger_device *chg_dev, bool enable)
 {
 	struct cps2011s_chip *chip = charger_get_data(chg_dev);
-	int ret;
+	int ret = 0;
 
 	dev_info(chip->dev, "%s: %d", __func__, enable);
+
 	ret = cps2011s_enable_adc(chip, enable);
+	ret = cps2011s_enable_comparators(chip, enable);
+
 	return ret;
 }
 #endif /* CONFIG_OEM_CHARGER_PUMP */
@@ -1492,6 +1531,62 @@ static int cps2011s_vbuspowerok_irq_handler(struct cps2011s_chip *chip)
 	return 0;
 }
 
+//reigster
+static ssize_t cps2011s_show_registers(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct cps2011s_chip *chip = dev_get_drvdata(dev);
+	uint8_t addr;
+	uint8_t tmpbuf[300];
+	int len;
+	int idx = 0;
+	int ret = 0;
+	u8 data;
+
+	idx = snprintf(buf, PAGE_SIZE, "%s:\n", "cps2011s");
+
+	for (addr = 0x00; addr < 0x1C; addr++) {
+		ret = cps2011s_i2c_read8(chip, addr, &data);
+		if (ret == 0) {
+			len = snprintf(tmpbuf, PAGE_SIZE - idx, "Reg[%.2X] = 0x%.2x\n", addr, data);
+			memcpy(&buf[idx], tmpbuf, len);
+			idx += len;
+		}
+	}
+
+	for (addr = 0xE0; addr < 0xF5; addr++) {
+		ret = cps2011s_i2c_read8(chip, addr, &data);
+		if (ret == 0) {
+			len = snprintf(tmpbuf, PAGE_SIZE - idx, "Reg[%.2X] = 0x%.2x\n", addr, data);
+			memcpy(&buf[idx], tmpbuf, len);
+			idx += len;
+		}
+	}
+
+	return idx;
+}
+
+static ssize_t cps2011s_store_register(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct cps2011s_chip *chip = dev_get_drvdata(dev);
+	int ret;
+	int val;
+	unsigned int reg;
+	ret = sscanf(buf, "%x %x", &reg, &val);
+	if (ret == 2 && ((reg >= 0x00 && reg < 0x1C) || (reg >= 0xE0 && reg < 0xF5)))
+		cps2011s_i2c_write8(chip, reg, (u8)val);
+
+	return count;
+}
+
+static DEVICE_ATTR(registers, 0660, cps2011s_show_registers, cps2011s_store_register);
+
+static void cps2011s_create_device_node(struct device *dev)
+{
+	device_create_file(dev, &dev_attr_registers);
+}
+
 struct irq_map_desc {
 	const char *name;
 	int (*hdlr)(struct cps2011s_chip *chip);
@@ -1690,7 +1785,7 @@ static const struct charger_ops cps2011s_chg_ops = {
 	.set_vbatovp = cps2011s_set_vbatovp,
 	.set_ibatocp = cps2011s_set_ibatocp,
 	.init_chip = cps2011s_init_chip,
-	.dump_registers = cps2011s_dump_reg,
+	.dump_registers = mtk_cps2011s_dump_register,
 	//.device_id = cps2011s_read_device_id
 	//.set_switch = cps2011s_set_switch_clk,
 	//.enable_wdt = cps2011s_enable_wdt,
@@ -1830,7 +1925,7 @@ static int __cps2011s_init_chip(struct cps2011s_chip *chip)
 
 	cps2011s_i2c_write8(chip, 0x01, 0x40);   //switch frequency 500KHz
 	cps2011s_i2c_write8(chip, 0x00, 0x08);   //disable watchdog
-	cps2011s_i2c_write8(chip, 0x02, 0xF2);	//enable ENCOMP and set RLT UVP/OVP
+	cps2011s_i2c_write8(chip, 0x02, 0xB2);	//disable ENCOMP and set RLT UVP/OVP
 	cps2011s_i2c_write8(chip, 0x04, 0x18);	//set vbuscon ovp 12V and vbuscon ovp enable
 	cps2011s_i2c_write8(chip, 0x06, 0xCB);	//set vbus ovp 11.5V and vbus ovp enable
 	cps2011s_i2c_write8(chip, 0x07, 0xB5);	//set ibus ucp/ocp enable & ibusocp 5A
@@ -1839,6 +1934,7 @@ static int __cps2011s_init_chip(struct cps2011s_chip *chip)
 	cps2011s_i2c_write8(chip, 0x0A, 0x00);  //set vbatreg and ibatreg disable
 	cps2011s_i2c_write8(chip, 0xE2, 0x00);  //set Automatic DPDM detection disable
 
+	cps2011s_dump_register(chip);
 	return 0;
 }
 
@@ -2060,6 +2156,8 @@ static int cps2011s_i2c_probe(struct i2c_client *client,
 		dev_notice(chip->dev, "%s init irq fail(%d)\n", __func__, ret);
 		goto err_initirq;
 	}
+
+	cps2011s_create_device_node(&(client->dev));
 
 	#ifdef CONFIG_AI_BSP_MTK_DEVICE_CHECK
 	{
