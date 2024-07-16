@@ -1986,6 +1986,89 @@ static void hx9031as_input_deinit_abs(struct i2c_client *client)
 }
 #endif
 
+static void hx9031as_ps_notify_callback_work(struct work_struct *work)
+{
+	ENTER;
+	hx9031as_manual_offset_calibration_all_chs();
+}
+
+static int hx9031as_ps_get_state(struct power_supply *psy, bool *present)
+{
+	union power_supply_propval pval = { 0 };
+	int retval = 0;
+
+#ifdef CONFIG_USE_POWER_SUPPLY_ONLINE
+	retval =
+		power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE, &pval);
+#else
+	retval = power_supply_get_property(psy, POWER_SUPPLY_PROP_PRESENT,
+					   &pval);
+#endif
+	if (retval) {
+		PRINT_ERR("%s psy get property failed", psy->desc->name);
+		return retval;
+	}
+	*present = (pval.intval) ? true : false;
+
+	return 0;
+}
+
+static int hx9031as_ps_notify_callback(struct notifier_block *self,
+				       unsigned long event, void *p)
+{
+	struct power_supply *psy = p;
+	bool present = 0;
+	int retval = 0;
+
+	if (event == PSY_EVENT_PROP_CHANGED && psy && psy->desc->get_property &&
+	    psy->desc->name &&
+	    !strncmp(psy->desc->name, USB_POWER_SUPPLY_NAME,
+		     sizeof(USB_POWER_SUPPLY_NAME))) {
+		//PRINT_INF("ps notification: event = %lu", event);
+		retval = hx9031as_ps_get_state(psy, &present);
+		if (retval) {
+			PRINT_ERR("psy get property failed");
+			return retval;
+		}
+		if (event == PSY_EVENT_PROP_CHANGED) {
+			if (hx9031as_pdata.ps_is_present == present)
+				//PRINT_ERR("ps present state not change");
+				return 0;
+		}
+		hx9031as_pdata.ps_is_present = present;
+		schedule_work(&hx9031as_pdata.ps_notify_work);
+	}
+	return 0;
+}
+
+static int hx9031as_ps_notify_init(void)
+{
+	struct power_supply *psy = NULL;
+	int ret = 0;
+
+	INIT_WORK(&hx9031as_pdata.ps_notify_work,
+		  hx9031as_ps_notify_callback_work);
+	hx9031as_pdata.ps_notif.notifier_call =
+		(notifier_fn_t)hx9031as_ps_notify_callback;
+	ret = power_supply_reg_notifier(&hx9031as_pdata.ps_notif);
+	if (ret) {
+		PRINT_ERR("Unable to register ps_notifier: %d", ret);
+		return ret;
+	}
+	psy = power_supply_get_by_name(USB_POWER_SUPPLY_NAME);
+	if (psy) {
+		ret = hx9031as_ps_get_state(psy, &hx9031as_pdata.ps_is_present);
+		if (ret) {
+			PRINT_ERR("psy get property failed rc=%d", ret);
+			goto free_ps_notifier;
+		}
+	}
+	return ret;
+free_ps_notifier:
+	power_supply_unreg_notifier(&hx9031as_pdata.ps_notif);
+	return ret;
+}
+
 static int hx9031as_probe(struct i2c_client *client)
 {
 	int ii = 0;
@@ -2083,6 +2166,7 @@ static int hx9031as_probe(struct i2c_client *client)
 	}
 #endif
 
+	hx9031as_ps_notify_init();
 	PRINT_INF("probe success\n");
 	return 0;
 
