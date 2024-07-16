@@ -153,6 +153,47 @@ const struct mtk_chip_config spi_ctrdata = {
 
 static uint8_t bTouchIsAwake = 0;
 
+/*add by yating.zhu@tinno.com for select fw start*/
+#if NEED_SELECT_VENDOR
+int touch_max_width = -1;
+int touch_max_height = -1;
+char app_firmware_name[50];
+char mp_firmware_name[50];
+
+extern int nt36672s_lcd_id;
+extern int nt36528a_lcd_id;
+
+void nvt_set_size_info(int id) {
+
+	pr_info("%s lcd_id is %d\n",__func__,id);
+    if (id == 0x0093) {
+		touch_max_width=1080;
+		touch_max_height=2400;
+
+        sprintf(app_firmware_name, "%s_%s", MODULE_VENDOR_1, DEFAULT_APP_FIRMWARE_NAME);
+        sprintf(mp_firmware_name, "%s_%s", MODULE_VENDOR_1, DEFAULT_MP_FIRMWARE_NAME);
+
+    } else if (id == 0x0101) {
+		touch_max_width=720;
+		touch_max_height=1604;
+
+        sprintf(app_firmware_name, "%s_%s", MODULE_VENDOR_2, DEFAULT_APP_FIRMWARE_NAME);
+        sprintf(mp_firmware_name, "%s_%s", MODULE_VENDOR_2, DEFAULT_MP_FIRMWARE_NAME);
+
+    } else {
+		touch_max_width=1080;
+		touch_max_height=2400;
+
+        strcpy(app_firmware_name, DEFAULT_APP_FIRMWARE_NAME);
+        strcpy(mp_firmware_name, DEFAULT_MP_FIRMWARE_NAME);
+        pr_err("%s unknow lcd_id,id is %d\n",__func__,id);
+
+    }
+	pr_info("%s size:%d*%d, app_firmware: %s, mp_firmware: %s", __func__, touch_max_width, touch_max_height, app_firmware_name, mp_firmware_name);
+}
+#endif
+/*add by yating.zhu@tinno.com for select fw end*/
+
 /*******************************************************
 Description:
 	Novatek touchscreen irq enable/disable function.
@@ -1898,6 +1939,11 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 #endif
 
 	NVT_LOG("start\n");
+
+#if NEED_SELECT_VENDOR
+	int lcd_id = nt36672s_lcd_id | nt36528a_lcd_id;
+	nvt_set_size_info(lcd_id);
+#endif
 
 	ts = (struct nvt_ts_data *)kzalloc(sizeof(struct nvt_ts_data), GFP_KERNEL);
 	if (ts == NULL) {

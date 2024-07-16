@@ -54,6 +54,7 @@
 #endif
 
 #define NVT_DEBUG 1
+#define NEED_SELECT_VENDOR 1
 
 //---GPIO number---
 #define NVTTOUCH_RST_PIN 980
@@ -83,8 +84,18 @@
 #define NVT_PEN_NAME "NVTCapacitivePen"
 
 //---Touch info.---
-#define TOUCH_MAX_WIDTH 720
-#define TOUCH_MAX_HEIGHT 1604
+/*add by yating.zhu@tinno.com for select fw start*/
+#if NEED_SELECT_VENDOR
+extern int touch_max_width;
+extern int touch_max_height;
+#define TOUCH_MAX_WIDTH touch_max_width
+#define TOUCH_MAX_HEIGHT touch_max_height
+/*add by yating.zhu@tinno.com for select fw end*/
+#else
+#define TOUCH_MAX_WIDTH 1080
+#define TOUCH_MAX_HEIGHT 2460
+#endif //NEED_SELECT_VENDOR
+
 #define PEN_MAX_WIDTH 2160
 #define PEN_MAX_HEIGHT 4800
 #define TOUCH_MAX_FINGER_NUM 10
@@ -113,8 +124,25 @@ extern const uint16_t touch_key_array[TOUCH_KEY_NUM];
 extern const uint16_t gesture_key_array[];
 #endif
 #define BOOT_UPDATE_FIRMWARE 1
+/*add by yating.zhu@tinno.com for select fw start*/
+#if NEED_SELECT_VENDOR
+extern char app_firmware_name[50];
+extern char mp_firmware_name[50];
+
+#define BOOT_UPDATE_FIRMWARE_NAME app_firmware_name
+#define MP_UPDATE_FIRMWARE_NAME   mp_firmware_name
+
+#define DEFAULT_APP_FIRMWARE_NAME "novatek_ts_fw.bin"
+#define DEFAULT_MP_FIRMWARE_NAME   "novatek_ts_mp.bin"
+
+#define MODULE_VENDOR_1 "dijin"
+#define MODULE_VENDOR_2 "tianma"
+/*add by yating.zhu@tinno.com for select fw end*/
+#else
 #define BOOT_UPDATE_FIRMWARE_NAME "novatek_ts_fw.bin"
 #define MP_UPDATE_FIRMWARE_NAME   "novatek_ts_mp.bin"
+#endif //NEED_SELECT_VENDOR
+
 #define POINT_DATA_CHECKSUM 1
 #define POINT_DATA_CHECKSUM_LEN 65
 #define NVT_PM_WAIT_BUS_RESUME_COMPLETE 1
