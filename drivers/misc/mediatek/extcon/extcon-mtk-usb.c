@@ -25,6 +25,10 @@
 #include "charger_class.h"
 
 /* TN Begin modified by hao.jia/809321 20240712 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include "../../../../oem/devinfo/dev_info.h"
+#endif
+
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 static struct charger_device *primary_chg = NULL;
 #if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
@@ -228,26 +232,32 @@ static int mtk_usb_extcon_set_vbus_v1(struct mtk_extcon_info *extcon, bool is_on
 		}
 	}
 
-#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
-	if (!primary_dvchg) {
-		primary_dvchg = get_charger_by_name("primary_dvchg");
+#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP) && IS_ENABLED(CONFIG_OEM_DEVINFO)
+	if (oem_pcba_charge_power() == CHARGE_POWER_33W) {
 		if (!primary_dvchg) {
-			dev_err(dev, "%s : get primary_dvchg device failed\n", __func__);
-			return -ENODEV;
+			primary_dvchg = get_charger_by_name("primary_dvchg");
+			if (!primary_dvchg) {
+				dev_err(dev, "%s : get primary_dvchg device failed\n", __func__);
+				return -ENODEV;
+			}
 		}
 	}
-#endif /* CONFIG_OEM_CHARGER_PUMP */
+#endif /* CONFIG_OEM_CHARGER_PUMP && CONFIG_OEM_DEVINFO */
 
 	if (is_on) {
 		charger_dev_enable_otg(primary_chg, true);
-#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
-		charger_dev_enable_ovpgate(primary_dvchg, true);
-#endif /* CONFIG_OEM_CHARGER_PUMP */
+#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP) && IS_ENABLED(CONFIG_OEM_DEVINFO)
+		if (oem_pcba_charge_power() == CHARGE_POWER_33W) {
+			charger_dev_enable_ovpgate(primary_dvchg, true);
+		}
+#endif /* CONFIG_OEM_CHARGER_PUMP && CONFIG_OEM_DEVINFO */
 	} else {
 		charger_dev_enable_otg(primary_chg, false);
-#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
-		charger_dev_enable_ovpgate(primary_dvchg, false);
-#endif /* CONFIG_OEM_CHARGER_PUMP */
+#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP) && IS_ENABLED(CONFIG_OEM_DEVINFO)
+		if (oem_pcba_charge_power() == CHARGE_POWER_33W) {
+			charger_dev_enable_ovpgate(primary_dvchg, false);
+		}
+#endif /* CONFIG_OEM_CHARGER_PUMP && CONFIG_OEM_DEVINFO */
 	}
 
 	return 0;
