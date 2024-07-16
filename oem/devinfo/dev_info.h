@@ -18,6 +18,9 @@
 #define OEM_BUFF_SIZE_32       32
 #define OEM_BUFF_SIZE_128      128
 
+#define CHARGE_POWER_33W       33
+#define CHARGE_POWER_18W       18
+
 #define FULL_PRODUCT_DEVICE_CB(id, cb, args) \
 	do { \
 		full_product_device_info(id, NULL, cb, args); \
@@ -73,7 +76,7 @@ enum product_dev_info_attribute {
 extern int full_product_device_info(int id, const char *info, FuncPtr cb, void *args);
 
 extern unsigned int oem_pcba_nfc_exist(void);
-extern unsigned int oem_pcba_chg_power(void);
+extern unsigned int oem_pcba_charge_power(void);
 extern char *oem_battery_sn(void);
 extern unsigned int oem_boot_mode(void);
 
