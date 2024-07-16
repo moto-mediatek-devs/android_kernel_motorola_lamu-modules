@@ -1161,7 +1161,7 @@ static int isp_pinctrl_enable(struct wt6670f_charger *chip)
 		pr_info("step 4\n");
 
 		ret = wt6670f_i2c_get_chip_id(chip->client, &chip_id);
-		pr_info("step4 chip_id = 0x%02x, ret(%d)\n", ret, chip_id);
+		pr_info("step4 chip_id = 0x%02x, ret(%d)\n", chip_id, ret);
 	}
 	return 0;
 
@@ -1484,7 +1484,7 @@ static enum power_supply_usb_type wt6670f_usb_type[] = {
 #endif
 
 static struct power_supply_desc wt6670f_desc = {
-	.name = "primary_qc_phy",
+	.name = "qc_phy_wt6670f",
 	.type = POWER_SUPPLY_TYPE_USB,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 	.usb_types = wt6670f_usb_type,
@@ -1644,7 +1644,12 @@ static int wt6670f_charger_probe(struct i2c_client *client,
 	mdelay(5);
 
 	ret = wt6670f_get_firmware_version(chip, &firmware_version);
-	pr_info("firmware_version = 0x%x, ret(%d)\n", firmware_version, ret);
+	if ((ret < 0) || firmware_version != WT6670F_FIRMWARE_VERSION) {
+		ret = -ENODEV;
+		goto err_register_psy;
+	} else {
+		pr_info("firmware_version = 0x%x, ret(%d)\n", firmware_version, ret);
+	}
 
 	INIT_DELAYED_WORK(&chip->get_charger_type_work, wt6670f_get_charger_type_func_work);
 

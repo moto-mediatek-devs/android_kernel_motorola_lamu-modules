@@ -934,7 +934,7 @@ static enum power_supply_usb_type z350_usb_type[] = {
 };
 #endif
 static struct power_supply_desc z350_desc = {
-	.name = "z350-usb",
+	.name = "qc_phy_z350",
 	.type = POWER_SUPPLY_TYPE_USB,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 	.usb_types = z350_usb_type,
@@ -1212,15 +1212,15 @@ static int z350_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	chip->i2c = client;
 	i2c_set_clientdata(client, chip);
 
-	ret = z350_check_vendor_id(chip);
-	if (ret < 0) {
-		dev_err(cdev, "%s: no dev, check vendor id failed\n", __func__);
-		goto err_parse_dt;
-	}
-
 	ret = z350_parse_dts(np, chip);
 	if (ret < 0) {
 		dev_err(cdev, "%s: parse dt failed\n", __func__);
+		goto err_parse_dt;
+	}
+
+	ret = z350_check_vendor_id(chip);
+	if (ret < 0) {
+		dev_err(cdev, "%s: no dev, check vendor id failed\n", __func__);
 		goto err_parse_dt;
 	}
 
