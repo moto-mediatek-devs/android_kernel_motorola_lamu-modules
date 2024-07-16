@@ -51,6 +51,10 @@
 #include "dvchg_class.h"
 #endif /*CONFIG_SGM_DVCHG_CLASS*/
 
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include <dev_info.h>
+#endif /* CONFIG_OEM_DEVINFO */
+
 #define SGM41600S_DRV_VERSION		"V1.0"
 
 #define SGM_KERNEL_DEBUG
@@ -1714,6 +1718,11 @@ static int sgm41600_charger_probe(struct i2c_client *client,
 		goto err_register_sc_charger;
 	}
 #endif /* CONFIG_SGM_DVCHG_CLASS */
+
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+	FULL_PRODUCT_DEVICE_INFO(ID_CHARGER_PUMP, "SGM41600S");
+#endif /* CONFIG_OEM_DEVINFO */
+
 	SGM_ERR("sgm41600[%s] probe successfully!\n",
 				sgm->mode == SGM41600S_MASTER ? "master" : "slave");
 	return 0;

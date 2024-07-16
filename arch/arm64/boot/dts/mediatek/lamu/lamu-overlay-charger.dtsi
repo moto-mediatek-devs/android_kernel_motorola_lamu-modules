@@ -376,7 +376,7 @@
 
 		sgm,sgm41600,vbus-low-en = <0>;
 		sgm,sgm41600,vbus-low = <3>;/*0:1.01 1:1.02 2:1.03 3:1.04*/
-		sgm,sgm41600,vbus-high-en = <1>;
+		sgm,sgm41600,vbus-high-en = <0>;
 		sgm,sgm41600,vbus-high = <0>;/*0:1.10 1:1.15 2:1.20 3:1.25*/
 
 		sgm,sgm41600,vdrop-ovp-en = <1>;
