@@ -44,6 +44,9 @@
 int gesture_mode = -1;
 #endif
 
+int nt36672s_lcd_id = 0;
+EXPORT_SYMBOL(nt36672s_lcd_id);
+
 int hbm;
 bool is_hbm;
 bool is_suspend;
@@ -1407,6 +1410,7 @@ static int djn_probe(struct mipi_dsi_device *dsi)
 	ptx = ctx;
 	hbm = 0;
 
+	nt36672s_lcd_id = 0x0093;
 	pr_info("nt36672s %s --- end\n", __func__);
 
 	return ret;

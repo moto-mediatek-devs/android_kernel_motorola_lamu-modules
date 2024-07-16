@@ -43,6 +43,9 @@
 int gesture_mode = -1;
 #endif
 
+int nt36528a_lcd_id = 0;
+EXPORT_SYMBOL(nt36528a_lcd_id);
+
 int hbm;
 bool is_hbm;
 bool is_suspend;
@@ -478,7 +481,7 @@ static int tianma_enable(struct drm_panel *panel)
 #define HFP (56)
 #define HSA (4)
 #define HBP (36)
-#define VFP_60 (284)
+#define VFP_60 (1240)
 //#define VFP_90 (300)
 #define VSA (4)
 #define VBP (20)
@@ -579,7 +582,7 @@ static int tianma_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 }
 
 static struct mtk_panel_params ext_params = {
-	.pll_clk = 281,
+	.pll_clk = 463,
 	.cust_esd_check = 0,
 	.esd_check_enable = 0,
 	.lcm_esd_check_table[0] = {
@@ -1032,6 +1035,7 @@ static int tianma_probe(struct mipi_dsi_device *dsi)
 	ptx = ctx;
 	hbm = 0;
 
+	nt36528a_lcd_id = 0x0101;
 	pr_info("nt36528a %s --- end\n", __func__);
 
 	return ret;
