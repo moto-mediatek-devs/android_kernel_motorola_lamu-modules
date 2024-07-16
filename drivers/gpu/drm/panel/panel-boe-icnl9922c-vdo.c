@@ -21,6 +21,7 @@
 #include <linux/of_platform.h>
 #include <linux/of_graph.h>
 #include <linux/platform_device.h>
+#include <linux/proc_fs.h>
 
 #define CONFIG_MTK_PANEL_EXT
 #if defined(CONFIG_MTK_PANEL_EXT)
@@ -47,8 +48,8 @@ int hbm;
 bool is_hbm;
 bool is_suspend;
 unsigned int dre_en;
-//static unsigned char dre_en_buf[16] = {0};
-//static unsigned char hbm_buf[16] = {0};
+static unsigned char dre_en_buf[16] = {0};
+static unsigned char hbm_buf[16] = {0};
 struct boe *ptx;
 
 struct boe {
@@ -574,6 +575,8 @@ static int boe_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 	if (!cb)
 		return -1;
 
+	pr_info("%s: level=%d\n", __func__,level);
+
 /* 	if (is_hbm & (level > 0x6b8)) {
 		pr_info("%s: Enter hbm mode,return 0! level=%x\n", __func__, level);
 		return 0;
@@ -728,16 +731,16 @@ static const struct drm_panel_funcs boe_drm_funcs = {
 	.get_modes = boe_get_modes,
 };
 
-/* static struct proc_dir_entry *proc_dir_boe_lcd_info;
+static struct proc_dir_entry *proc_dir_boe_lcd_info;
 
 typedef struct {
 	char *name;
 	struct proc_dir_entry *node;
 	struct proc_ops *fops;
 	bool isCreated;
-} boe_proc_node; */
+} boe_proc_node;
 
-#if 0
+#if 1
 static ssize_t boe_disp_set_dre_read(struct file *filp, char __user *buff, size_t size, loff_t *pos)
 {
 	u32 len = 0;
@@ -918,7 +921,7 @@ static int boe_probe(struct mipi_dsi_device *dsi)
 	struct boe *ctx;
 	struct device_node *backlight;
 	int ret;
-	//int i = 0;
+	int i = 0;
 	struct device_node *dsi_node, *remote_node = NULL, *endpoint = NULL;
 
 	pr_info("icnl9922c %s --- begin\n", __func__);
@@ -991,7 +994,6 @@ static int boe_probe(struct mipi_dsi_device *dsi)
 	}
 	devm_gpiod_put(dev, ctx->bias_neg);
 
-/*
 	ctx->bl_en_gpio = devm_gpiod_get(dev, "bl-enable", GPIOD_OUT_LOW);
 	if (IS_ERR(ctx->bl_en_gpio)) {
 		dev_info(dev, "%s: cannot get bl-enable-gpios %ld\n",
@@ -1000,7 +1002,6 @@ static int boe_probe(struct mipi_dsi_device *dsi)
 	}
 	gpiod_set_value(ctx->bl_en_gpio, 0);
 	devm_gpiod_put(dev, ctx->bl_en_gpio);
-*/
 
 	ctx->prepared = true;
 	ctx->enabled = true;
@@ -1015,7 +1016,7 @@ static int boe_probe(struct mipi_dsi_device *dsi)
 	if (ret < 0)
 		drm_panel_remove(&ctx->panel);
 
-/* 	pr_info("lcd_info_node_init\n");
+	pr_info("lcd_info_node_init\n");
 	proc_dir_boe_lcd_info = proc_mkdir("lcd_info", NULL);
 	for (; i < ARRAY_SIZE(lcd_info_proc); i++) {
 		lcd_info_proc[i].node = proc_create(lcd_info_proc[i].name, 0644,
@@ -1027,7 +1028,7 @@ static int boe_probe(struct mipi_dsi_device *dsi)
 			lcd_info_proc[i].isCreated = true;
 			pr_err("Succeed to create %s under /proc\n", lcd_info_proc[i].name);
 		}
-	} */
+	}
 
 #if defined(CONFIG_MTK_PANEL_EXT)
 	//mtk_panel_tch_handle_reg(&ctx->panel);
