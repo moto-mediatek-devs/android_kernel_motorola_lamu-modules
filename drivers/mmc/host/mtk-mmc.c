@@ -46,6 +46,12 @@
 #include <linux/arm-smccc.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h>
 #include <mt-plat/mtk_blocktag.h>
+// TN Begin modified by yang.chen1/860621 20240717 CR/EKLAMU-1615
+#if IS_ENABLED(CONFIG_PROJECT_LAMU)
+#include <linux/gpio/consumer.h>
+#include <dev_info.h>
+#endif
+// TN End modified by yang.chen1/860621 20240717 CR/EKLAMU-1615
 
 #if IS_ENABLED(CONFIG_DEVICE_MODULES_MMC_MTK_SW_CQHCI)
 #include "mtk-mmc-swcqhci.h"
@@ -88,6 +94,19 @@ static int msdc_get_gpio_version(void)
 	pr_info("msdc_gpio %d\n", msdc_gpio);
 	return msdc_gpio;
 }
+
+// TN Begin modified by yang.chen1/860621 20240717 CR/EKLAMU-1615
+#if IS_ENABLED(CONFIG_PROJECT_LAMU)
+struct mmc_gpio {
+	struct gpio_desc *ro_gpio;
+	struct gpio_desc *cd_gpio;
+	irqreturn_t (*cd_gpio_isr)(int irq, void *dev_id);
+	char *ro_label;
+	char *cd_label;
+	u32 cd_debounce_delay_ms;
+};
+#endif
+// TN End modified by yang.chen1/860621 20240717 CR/EKLAMU-1615
 
 static const struct mtk_mmc_compatible mt8135_compat = {
 	.clk_div_bits = 8,
@@ -884,6 +903,35 @@ static void msdc_prepare_data(struct msdc_host *host, struct mmc_data *data)
 					    mmc_get_dma_dir(data));
 	}
 }
+
+// TN Begin modified by yang.chen1/860621 20240717 CR/EKLAMU-1615
+#if IS_ENABLED(CONFIG_PROJECT_LAMU)
+static struct gpio_desc *slot_state_gd;
+static int set_slot_state_gd(struct mmc_host *host)
+{
+	struct mmc_gpio *ctx = host->slot.handler_priv;
+
+	if (!ctx || !ctx->cd_gpio)
+		return -ENOSYS;
+
+	slot_state_gd = ctx->cd_gpio;
+	return 0;
+}
+
+static int get_slot_state_value(void)
+{
+	int cansleep;
+
+	if (!slot_state_gd)
+		return -ENOSYS;
+
+	cansleep = gpiod_cansleep(slot_state_gd);
+	return cansleep ?
+		gpiod_get_value_cansleep(slot_state_gd) :
+		gpiod_get_value(slot_state_gd);
+}
+#endif
+// TN End modified by yang.chen1/860621 20240717 CR/EKLAMU-1615
 
 static void msdc_unprepare_data(struct msdc_host *host, struct mmc_data *data)
 {
@@ -3387,6 +3435,19 @@ static int msdc_get_cd(struct mmc_host *mmc)
 		goto end;
 	} else if (!host->internal_cd) {
 		host->card_inserted = mmc_gpio_get_cd(mmc);
+		// TN Begin modified by yang.chen1/860621 20240717 CR/EKLAMU-1615
+		#if IS_ENABLED(CONFIG_PROJECT_LAMU)
+		if (get_slot_state_value() == 1) {
+			#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+			FULL_PRODUCT_DEVICE_INFO(ID_CARDSLOT, "insert");
+			#endif
+		} else {
+			#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+			FULL_PRODUCT_DEVICE_INFO(ID_CARDSLOT, "no-insert");
+			#endif
+		}
+		#endif
+		// TN End modified by yang.chen1/860621 20240717 CR/EKLAMU-1615
 	} else {
 		val = readl(host->base + MSDC_PS) & MSDC_PS_CDSTS;
 		if (mmc->caps2 & MMC_CAP2_CD_ACTIVE_HIGH)
@@ -4518,6 +4579,15 @@ static int msdc_drv_probe(struct platform_device *pdev)
 	spin_lock_init(&host->lock);
 
 	platform_set_drvdata(pdev, mmc);
+
+	// TN Begin modified by yang.chen1/860621 20240717 CR/EKLAMU-1615
+	#if IS_ENABLED(CONFIG_PROJECT_LAMU)
+	ret = set_slot_state_gd(mmc);
+	if (!ret)
+		dev_info(host->dev, "Got slot GPIO\n");
+	#endif
+	// TN End modified by yang.chen1/860621 20240717 CR/EKLAMU-1615
+
 	ret = msdc_ungate_clock(host);
 	if (ret) {
 		dev_info(&pdev->dev, "Cannot ungate clocks!\n");

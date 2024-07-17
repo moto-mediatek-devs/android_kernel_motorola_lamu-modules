@@ -2,6 +2,10 @@
 #
 # Makefile for MMC/SD host controller drivers
 #
+
+# TN Begin modified by yang.chen1/860621 20240717 CR/EKLAMU-1615
+subdir-ccflags-$(CONFIG_PROJECT_LAMU) += -Werror -I$(srctree)/$(DEVICE_MODULES_REL_DIR)/oem/devinfo
+
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/char/rpmb/
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/include/
 ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/blocktag/
