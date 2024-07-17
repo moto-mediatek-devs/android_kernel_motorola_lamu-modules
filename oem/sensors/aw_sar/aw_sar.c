@@ -146,6 +146,42 @@ aw_sar_soft_reset_func(struct i2c_client *i2c, const struct aw_sar_soft_rst_t *p
 	msleep(p_soft_rst->delay_ms);
 
 	return AW_OK;
+}	
+
+static int32_t
+aw_sar_enable_func(struct i2c_client *i2c, const struct aw_sar_enable_t *p_sar_enable)	//todo
+{
+	int32_t ret = 0;
+
+	AWLOGD(&i2c->dev, "enter");
+
+	ret = aw_sar_i2c_write(i2c, p_sar_enable->reg_sar_enable, p_sar_enable->reg_sar_enable_val);
+	if (ret < 0) {
+		AWLOGE(&i2c->dev, "soft_reset error: %d", ret);
+		return -AW_ERR;
+	}
+
+	msleep(p_sar_enable->delay_ms);
+
+	return AW_OK;
+}
+
+static int32_t
+aw_sar_disable_func(struct i2c_client *i2c, const struct aw_sar_disable_t *p_sar_disable)	//todo
+{
+	int32_t ret = 0;
+
+	AWLOGD(&i2c->dev, "enter");
+	ret = aw_sar_i2c_write(i2c, p_sar_disable->reg_sar_disable, p_sar_disable->reg_sar_disable_val);
+	if (ret < 0) {
+		AWLOGE(&i2c->dev, "soft_reset error: %d", ret);
+		return -AW_ERR;
+	}
+
+	msleep(p_sar_disable->delay_ms);
+
+
+	return AW_OK;
 }
 //Chip logic part end
 
@@ -549,6 +585,34 @@ int32_t aw_sar_soft_reset(struct aw_sar *p_sar)
 		return p_sar->p_sar_para->p_soft_rst->p_soft_reset_fn(p_sar);
 
 	return aw_sar_soft_reset_func(p_sar->i2c, p_sar->p_sar_para->p_soft_rst);
+}
+
+int32_t aw_sar_enable(struct aw_sar *p_sar)	//todo
+{
+	AWLOGD(p_sar->dev, "enter");
+
+	if (p_sar->p_sar_para->p_sar_enable == NULL)
+		return AW_INVALID_PARA;
+
+	//If a private interface is defined, the private interface is used
+	if (p_sar->p_sar_para->p_sar_enable->p_sar_enable_fn != NULL)
+		return p_sar->p_sar_para->p_sar_enable->p_sar_enable_fn(p_sar);
+
+	return aw_sar_enable_func(p_sar->i2c, p_sar->p_sar_para->p_sar_enable);
+}
+
+int32_t aw_sar_disable(struct aw_sar *p_sar)	//todo
+{
+	AWLOGD(p_sar->dev, "enter");
+
+	if (p_sar->p_sar_para->p_sar_disable == NULL)
+		return AW_INVALID_PARA;
+
+	//If a private interface is defined, the private interface is used
+	if (p_sar->p_sar_para->p_sar_disable->p_sar_disable_fn != NULL)
+		return p_sar->p_sar_para->p_sar_disable->p_sar_disable_fn(p_sar);
+
+	return aw_sar_disable_func(p_sar->i2c, p_sar->p_sar_para->p_sar_disable);
 }
 
 static int32_t aw_sar_check_chipid(struct aw_sar *p_sar)
@@ -1022,6 +1086,53 @@ soft_rst_store(struct device *dev, struct device_attribute *attr, const char *bu
 	return count;
 }
 
+//set chip enable
+static ssize_t
+enable_sar_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)	//todo
+{
+	uint32_t flag = 0;
+	struct aw_sar *p_sar = dev_get_drvdata(dev);
+
+	if (kstrtouint(buf, 0, &flag) != 0) {
+		AWLOGE(p_sar->dev, "kstrtouint parse err");
+		return count;
+	}
+
+	if (flag == 1)
+	{
+		aw_sar_enable(p_sar);
+	}
+	else if (flag == 0)
+	{
+		
+		aw_sar_disable(p_sar);
+	}else
+	{
+		AWLOGE(p_sar->dev, "enable sar input_num err");
+	}
+
+	return count;
+}
+
+//set chip disable
+/*
+static ssize_t
+disable_sar_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+	uint32_t flag = 0;
+	struct aw_sar *p_sar = dev_get_drvdata(dev);
+
+	if (kstrtouint(buf, 0, &flag) != 0) {
+		AWLOGE(p_sar->dev, "kstrtouint parse err");
+		return count;
+	}
+
+	if (flag == 0)
+		aw_sar_disable(p_sar);
+
+	return count;
+}*/
+
 static int32_t aw_sar_aot(struct aw_sar *p_sar)
 {
 	if (p_sar->p_sar_para->p_aot == NULL)
@@ -1215,6 +1326,7 @@ static DEVICE_ATTR_RO(diff);
 static DEVICE_ATTR_RW(mode_operation);
 static DEVICE_ATTR_RO(chip_info);
 static DEVICE_ATTR_RO(offset);
+static DEVICE_ATTR_WO(enable_sar);	//todo
 
 static struct attribute *aw_sar_attributes[] = {
 	&dev_attr_awrw.attr,
@@ -1226,6 +1338,7 @@ static struct attribute *aw_sar_attributes[] = {
 	&dev_attr_mode_operation.attr,
 	&dev_attr_chip_info.attr,
 	&dev_attr_offset.attr,
+	&dev_attr_enable_sar.attr,	//todo
 	NULL
 };
 
