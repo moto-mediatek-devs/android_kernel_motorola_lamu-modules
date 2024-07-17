@@ -44,9 +44,6 @@
 int gesture_mode = -1;
 #endif
 
-int td4376_lcd_id = 0;
-EXPORT_SYMBOL(td4376_lcd_id);
-
 int hbm;
 bool is_hbm;
 bool is_suspend;
@@ -1062,8 +1059,6 @@ static int td4376_probe(struct mipi_dsi_device *dsi)
 
 	ptx = ctx;
 	hbm = 0;
-
-	td4376_lcd_id = 0x010d;
 
 	pr_info("td4376 %s --- end\n", __func__);
 
