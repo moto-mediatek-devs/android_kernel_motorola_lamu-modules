@@ -43,8 +43,6 @@
 
 /*#define FW_IMAGE_NAME "omnivision/hdl_firmware.img"*/
 #define FW_IMAGE_NAME "hdl_firmware.img"
-#define MODULE_VENDOR_1 "dijin"
-#define MODULE_VENDOR_2 "tianma"
 
 #define BOOT_CONFIG_ID "BOOT_CONFIG"
 
@@ -520,25 +518,6 @@ static int zeroflash_parse_fw_image(void)
 
 	return 0;
 }
-/*add by yating.zhu@tinno.com for select fw start*/
-extern int td4160_lcd_id;
-extern int td4376_lcd_id;
-
-char* omnivision_get_fw_image_name(int id) {
-    static char name[50];
-
-    if (id == 0x000d) {
-        sprintf(name, "%s_%s", MODULE_VENDOR_1, FW_IMAGE_NAME);
-    } else if (id == 0x010d) {
-        sprintf(name, "%s_%s", MODULE_VENDOR_2, FW_IMAGE_NAME);
-    } else {
-        strcpy(name, FW_IMAGE_NAME);
-	pr_err("%s unknow lcd_id,id is %d\n",__func__,id);
-    }
-    pr_info("omnivision_tcm fw name is %s\n",name);
-    return name;
-}
-/*add by yating.zhu@tinno.com for select fw end*/
 
 static int zeroflash_get_fw_image(void)
 {
@@ -549,13 +528,6 @@ static int zeroflash_get_fw_image(void)
 	struct ovt_tcm_hcd *tcm_hcd = zeroflash_hcd->tcm_hcd;
 
 #if USE_OMNIVSION_IMG_FILE
-/*add by yating.zhu@tinno.com for select fw start*/
-	char fw_image_name[50];
-
-	int lcd_id = td4160_lcd_id | td4376_lcd_id;
-
-	strcpy(fw_image_name, omnivision_get_fw_image_name(lcd_id));
-/*add by yating.zhu@tinno.com for select fw end*/
 	if (zeroflash_hcd->fw_entry != NULL) {
 		release_firmware(zeroflash_hcd->fw_entry);
 		zeroflash_hcd->fw_entry = NULL;
@@ -564,12 +536,12 @@ static int zeroflash_get_fw_image(void)
 
 	while(retry_cnt--) {
 		retval = request_firmware(&zeroflash_hcd->fw_entry,
-				fw_image_name,
+				FW_IMAGE_NAME,
 				tcm_hcd->pdev->dev.parent);
 		if (retval < 0) {
 			LOGE(tcm_hcd->pdev->dev.parent,
 					"Failed to request %s, retry_cnt:%d\n",
-					fw_image_name, retry_cnt);
+					FW_IMAGE_NAME, retry_cnt);
 			if (retry_cnt == 0) {
 				return retval;
 			}

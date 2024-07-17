@@ -43,9 +43,6 @@
 int gesture_mode = -1;
 #endif
 
-int td4160_lcd_id = 0;
-EXPORT_SYMBOL(td4160_lcd_id);
-
 int hbm;
 bool is_hbm;
 bool is_suspend;
@@ -1034,8 +1031,6 @@ static int dijin_probe(struct mipi_dsi_device *dsi)
 
 	ptx = ctx;
 	hbm = 0;
-
-	td4160_lcd_id = 0x000d;
 
 	pr_info("td4160 %s --- end\n", __func__);
 
