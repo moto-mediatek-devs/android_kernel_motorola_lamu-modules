@@ -137,6 +137,13 @@ config OEM_TCPC_PD_SC2150
 	help
 	  support oem_tcpc_pd_sc2150
 
+config OEM_TCPC_PD_CPS8851
+	tristate "oem tcpc pd cps8851"
+	depends on OEM_TCPC
+	default n
+	help
+	  support oem_tcpc_pd_cps8851
+
 config OEM_TCPC_PD_AW35615
 	tristate "oem tcpc pd aw35615"
 	depends on OEM_TCPC
