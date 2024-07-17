@@ -445,6 +445,10 @@
 	};
 };
 
+&mobicore {
+	trustonic,real-drv = <1>;
+ };
+
 /* DISPSYS GPIO standardization end*/
 
 #include <lamu/cust.dtsi>
