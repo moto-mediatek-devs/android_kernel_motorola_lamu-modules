@@ -596,7 +596,7 @@ static inline int sc2150_fault_status_vconn_ov(struct tcpc_device *tcpc)
 static int sc2150_set_vconn(struct tcpc_device *tcpc, int enable);
 static int sc2150_fault_status_clear(struct tcpc_device *tcpc, uint8_t status)
 {
-	int ret = 0;
+	int ret;
 
 	if (status & TCPC_V10_REG_FAULT_STATUS_VCONN_OV)
 		ret = sc2150_fault_status_vconn_ov(tcpc);
@@ -604,7 +604,7 @@ static int sc2150_fault_status_clear(struct tcpc_device *tcpc, uint8_t status)
 		ret = sc2150_set_vconn(tcpc, false);
 
 	sc2150_i2c_write8(tcpc, TCPC_V10_REG_FAULT_STATUS, status);
-	return ret;
+	return 0;
 }
 
 static int sc2150_get_alert_mask(struct tcpc_device *tcpc, uint32_t *mask)
@@ -647,20 +647,7 @@ int sc2150_get_alert_status_and_mask(struct tcpc_device *tcpc,
 
 	v2 = (uint8_t) ret;
 	*alert |= v2 << 16;
-
-	/* get alert mask */
-	ret = sc2150_i2c_read16(tcpc, TCPC_V10_REG_ALERT_MASK);
-	if (ret < 0)
-		return ret;
-
-	*mask = (uint16_t) ret;
-
-	ret = sc2150_i2c_read8(tcpc, SC2150_REG_ANA_MASK);
-	if (ret < 0)
-		return ret;
-
-	v2 = (uint8_t) ret;
-	*mask |= v2 << 16;
+	sc2150_get_alert_mask(tcpc, mask);
 
 	return 0;
 }
@@ -668,27 +655,20 @@ int sc2150_get_alert_status_and_mask(struct tcpc_device *tcpc,
 static int sc2150_get_power_status(struct tcpc_device *tcpc)
 {
 	int ret;
-	uint16_t pwr_status;
 
 	ret = sc2150_i2c_read8(tcpc, TCPC_V10_REG_POWER_STATUS);
 	if (ret < 0)
 		return ret;
 
-	pwr_status = 0;
-
-	if (ret & TCPC_V10_REG_POWER_STATUS_VBUS_PRES)
-		pwr_status |= TCPC_REG_POWER_STATUS_VBUS_PRES;
+	tcpc->vbus_present = !!(ret & TCPC_V10_REG_POWER_STATUS_VBUS_PRES);
 
 	ret = sc2150_i2c_read8(tcpc, SC2150_REG_ANA_STATUS);
 	if (ret < 0)
 		return ret;
 
-	if (ret & SC2150_REG_VBUS_80)
-		pwr_status |= TCPC_REG_POWER_STATUS_EXT_VSAFE0V;
+	tcpc->vbus_safe0v = !!(ret & SC2150_REG_VBUS_80);
 
-	SC2150_INFO("%s pwr_status:0x%x\n", __func__, pwr_status);
-
-	return ret;
+	return 0;
 }
 #else
 int sc2150_get_alert_status(struct tcpc_device *tcpc, uint32_t *alert)
