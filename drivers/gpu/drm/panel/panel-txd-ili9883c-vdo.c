@@ -738,8 +738,8 @@ static int panel_ata_check(struct drm_panel *panel)
 static int txd_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 	void *handle, unsigned int level)
 {
-	char bl_tb0[] = {0x51, 0xFF, 0x0E};
-	unsigned int bl_lvl = 0xFF0E;
+	char bl_tb0[] = {0x51, 0x07,0xFF};
+	//unsigned int bl_lvl = 0xFF0E;
 	if (!cb)
 		return -1;
 
@@ -750,8 +750,8 @@ static int txd_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
  */
 	//bl_lvl = ((level << 5) & 0xFF00) | (level & 0x0F);
 
-	bl_tb0[1] = (u8)((bl_lvl >> 8) & 0xFF);
-	bl_tb0[2] = (u8)(bl_lvl & 0x0F);
+	bl_tb0[1] = (u8)((level >> 8) & 0x0F);
+	bl_tb0[2] = (u8)(level & 0xFF);
 
 	cb(dsi, handle, bl_tb0, ARRAY_SIZE(bl_tb0));
 
