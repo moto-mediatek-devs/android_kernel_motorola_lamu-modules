@@ -75,7 +75,7 @@ extern void tcpci_unlock_typec(struct tcpc_device *tcpc);
 extern int tcpci_alert(struct tcpc_device *tcpc, bool masked);
 
 /*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
-#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150) || IS_ENABLED(CONFIG_OEM_TCPC_PD_CPS8851)
 extern int tcpci_alert_power_status_changed(struct tcpc_device *tcpc);
 #endif /* CONFIG_OEM_TCPC_PD_SC2150 */
 /*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/

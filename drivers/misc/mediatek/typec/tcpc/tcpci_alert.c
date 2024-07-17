@@ -70,7 +70,7 @@ static int tcpci_vbus_level_changed(struct tcpc_device *tcpc)
 	return rv;
 }
 /*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
-#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150) || IS_ENABLED(CONFIG_OEM_TCPC_PD_CPS8851)
 int tcpci_alert_power_status_changed(struct tcpc_device *tcpc)
 #else
 static int tcpci_alert_power_status_changed(struct tcpc_device *tcpc)
@@ -89,7 +89,7 @@ static int tcpci_alert_power_status_changed(struct tcpc_device *tcpc)
 	return rv;
 }
 /*TN Begin modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
-#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150)
+#if IS_ENABLED(CONFIG_OEM_TCPC_PD_SC2150) || IS_ENABLED(CONFIG_OEM_TCPC_PD_CPS8851)
 EXPORT_SYMBOL(tcpci_alert_power_status_changed);
 #endif /* CONFIG_OEM_TCPC_PD_SC2150 */
 /*TN End modified by jirui.li/860702 20240706 CR/EKLAMU-202*/
