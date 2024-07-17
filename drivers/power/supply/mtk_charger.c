@@ -66,6 +66,12 @@
 #include "mtk_charger.h"
 #include "mtk_battery.h"
 
+/* TN Begin modified by hao.jia/809321 20240717 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include "../../../oem/devinfo/dev_info.h"
+#endif /* CONFIG_OEM_DEVINFO */
+/* TN End modified by hao.jia/809321 20240717 CR/EKLAMU-202 */
+
 /*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
 bool qc_logic_probe_done = 0;
@@ -3109,17 +3115,19 @@ static int hvdcp_charger_detect_notifier_cb(struct notifier_block *nb,
 		return NOTIFY_DONE;
 	}
 
-	#if 0
-	if (!oem_pcba_chg_15w_exist()) {
+
+	if (oem_pcba_charge_power() == CHARGE_POWER_33W) {
 		if (IS_ERR_OR_NULL(info->hvdcp_logic_psy)) {
-			info->hvdcp_logic_psy = power_supply_get_by_name("z350-usb");
+			info->hvdcp_logic_psy = power_supply_get_by_name("qc_phy_z350");
 			if (IS_ERR_OR_NULL(info->hvdcp_logic_psy)) {
-				chr_err("%s: failed to get z350 device\n", __func__);
-				return NOTIFY_DONE;
+				info->hvdcp_logic_psy = power_supply_get_by_name("qc_phy_wt6670f");
+				if (IS_ERR_OR_NULL(info->hvdcp_logic_psy)) {
+					chr_err("%s: failed to get qc phy device\n", __func__);
+					return NOTIFY_DONE;
+				}
 			}
 		}
 	}
-	#endif
 
 	if (psy == info->chg_psy || psy == info->hvdcp_logic_psy) {
 		chr_err("%s: %s first insert cable\n", __func__, first_insert ? "is" : "not");
@@ -3131,8 +3139,7 @@ static int hvdcp_charger_detect_notifier_cb(struct notifier_block *nb,
 			} else {
 				chr_type = val.intval;
 				if (chr_type == POWER_SUPPLY_USB_TYPE_DCP) {
-					#if 0
-					if (!oem_pcba_chg_15w_exist()) {
+					if (oem_pcba_charge_power() == CHARGE_POWER_33W) {
 						chr_err("%s: found 33W device, is_hvdcp_charger_ready:%d\n", __func__, is_hvdcp_charger_ready);
 						if (is_hvdcp_charger_ready) {
 							chr_err("%s: detect hvdcp charger, try to tuning voltage\n", __func__);
@@ -3141,16 +3148,11 @@ static int hvdcp_charger_detect_notifier_cb(struct notifier_block *nb,
 							first_insert = false;
 						}
 					} else {
-						chr_err("%s: found 15W device, try to detect hvdcp charger\n", __func__);
+						chr_err("%s: found 18W device, try to detect hvdcp charger\n", __func__);
 						charger_dev_set_dp_voltage(info->chg1_dev, 600000);
 						schedule_delayed_work(&info->hvdcp_work, msecs_to_jiffies(1500));
 						first_insert = false;
 					}
-					#endif
-					chr_err("%s: found 15W device, try to detect hvdcp charger\n", __func__);
-					charger_dev_set_dp_voltage(info->chg1_dev, 600000);
-					schedule_delayed_work(&info->hvdcp_work, msecs_to_jiffies(1500));
-					first_insert = false;
 				}
 			}
 		}
