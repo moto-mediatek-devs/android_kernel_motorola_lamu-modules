@@ -17,37 +17,30 @@
  * Upper this line, this part is controlled by CC/CQ. DO NOT MODIFY!!
  *============================================================================
  ****************************************************************************/
-
-
-#include <linux/videodev2.h>
-#include <linux/i2c.h>
-#include <linux/platform_device.h>
-#include <linux/delay.h>
-#include <linux/cdev.h>
-#include <linux/uaccess.h>
 #include <linux/fs.h>
-#include <linux/atomic.h>
+#include <linux/i2c.h>
+#include <linux/cdev.h>
 #include <linux/types.h>
-#include "sc820cs_mipi_raw_Sensor.h"
-
-/*#if IS_ENABLED(CONFIG_TINNO_DEVINFO)
-#include "../../../../../../../oem/dev_info/dev_info.h"
-#endif*/
-
-#define PFX "sc820cs_camera_sensor"
-#define LOG_INF(PFXformat, args...)    pr_err(PFX "[%s] " format, __FUNCTION__, ##args)
-
-#define SC820CS_SENSOR_GAIN_MAX_VALID_INDEX  6
-#define SC820CS_SENSOR_GAIN_MAP_SIZE         6
-
-#define MULTI_WRITE 1
-
-#ifdef CONFIG_T_PRODUCT_INFO
+#include <linux/delay.h>
+#include <linux/atomic.h>
+#include <linux/videodev2.h>
+#include <linux/uaccess.h>
+#include <linux/platform_device.h>
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
 #include <dev_info.h>
 #endif
 
-#define SC820CS_SENSOR_BASE_GAIN           0x400
-#define SC820CS_SENSOR_MAX_GAIN            (32 * SC820CS_SENSOR_BASE_GAIN )
+#include "sc820cs_mipi_raw_Sensor.h"
+
+#define MULTI_WRITE 1
+#define SC820CS_SENSOR_GAIN_MAX_VALID_INDEX  6
+#define SC820CS_SENSOR_GAIN_MAP_SIZE         6
+#define SC820CS_SENSOR_BASE_GAIN             0x400
+#define SC820CS_SENSOR_MAX_GAIN              (32 * SC820CS_SENSOR_BASE_GAIN )
+
+#define PFX "sc820cs_camera_sensor"
+#define LOG_INF(format, args...)		pr_err(PFX "[%s] " format, __func__, ##args)
+
 static DEFINE_SPINLOCK(imgsensor_drv_lock);
 
 static kal_uint8 deviceInfo_register_value = 0x00;
@@ -498,6 +491,7 @@ static void night_mode(kal_bool enable)
 {
 	/* No Need to implement this function */
 }
+
 #if MULTI_WRITE
 kal_uint16 addr_data_pair_init_w1sc820cswidely[] = {
 /* update20230322��wangruo */
@@ -1175,10 +1169,10 @@ static bool sc820cs_param_checksum(kal_uint8 *buf, unsigned int size, kal_uint8 
 
     if ((sum % 256) != checksum)
     {
-        CAM_DBG(PFX,"checksum fail size = %d sum=%d sum-in-eeprom=%d", size, sum % 256, checksum);
+        LOG_INF("checksum fail size = %d sum=%d sum-in-eeprom=%d", size, sum % 256, checksum);
         return false;
     }
-    CAM_DBG(PFX,"checksum success size = %d sum=%d sum-in-eeprom=%d", size, sum % 256, checksum);
+    LOG_INF("checksum success size = %d sum=%d sum-in-eeprom=%d", size, sum % 256, checksum);
     return true;
 }
 
@@ -1198,7 +1192,7 @@ static bool sc820cs_read_module_info(kal_uint8 moduleflag)
     CAM_DBG(PFX,"--------------sc820cs module info read end------------\n");
     ret = sc820cs_param_checksum(&sc820cs_otp_info.module_param[0], MODULE_INFO_LENGTH, sc820cs_otp_info.module_checksum);
     if (ret) {
-        CAM_DBG(PFX,"--------------sc820cs module info checksum success------------\n");
+        LOG_INF("--------------sc820cs module info checksum success------------\n");
     }
     return ret;
 }
@@ -1219,7 +1213,7 @@ static bool sc820cs_read_awb_info(kal_uint8 moduleflag)
     CAM_DBG(PFX,"--------------sc820cs awb info read end------------\n");
     ret = sc820cs_param_checksum(&sc820cs_otp_info.awb_param[0], AWB_INFO_LENGTH, sc820cs_otp_info.awb_checksum);
     if (ret) {
-        CAM_DBG(PFX,"--------------sc820cs awb info checksum success------------\n");
+        LOG_INF("--------------sc820cs awb info checksum success------------\n");
     }
     return ret;
 }
@@ -1285,7 +1279,7 @@ static bool sc820cs_read_lsc_info(kal_uint8 moduleflag)
     CAM_DBG(PFX,"--------------sc820cs lsc info read end------------\n");
     ret = sc820cs_param_checksum(&sc820cs_otp_info.lsc_param[0], LSC_INFO_LENGTH, sc820cs_otp_info.lsc_checksum);
     if (ret) {
-        CAM_DBG(PFX,"--------------sc820cs lsc info checksum success------------\n");
+        LOG_INF("--------------sc820cs lsc info checksum success------------\n");
     }
     return ret;
 }
@@ -1322,53 +1316,43 @@ static void read_sc820cs_otp_data(void)
 
     if (true == (checksum_module & checksum_awb & checksum_lsc))
     {
-        CAM_DBG(PFX,"----------------sc820cs otp info check success----------------");
+        LOG_INF("----------------sc820cs otp info check success----------------");
     }
     else
     {
-        CAM_DBG(PFX,"----------------sc820cs otp info check fail-------------------");
+        LOG_INF("----------------sc820cs otp info check fail-------------------");
     }
 }
 
-
-/*#if IS_ENABLED(CONFIG_TINNO_DEVINFO)
-
-static void build_sc820cs_cam_sn()
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+static int front_cam_get_info(char *buf, void *arg0)
 {
-	sprintf(sc820cs_cameraSn, "8SSC28%02X%02X%02X0000%01d%01X0%02X%02X",
-		read_cmos_sensor(0x2),read_cmos_sensor(0x3),
-			read_cmos_sensor(0x4), (read_cmos_sensor(0x19) % 10),
-			read_cmos_sensor(0x1a), read_cmos_sensor(0x05), read_cmos_sensor(0x16));
+	long resolv = 0;
+	int pi = 0;
+	resolv = imgsensor_info.cap.grabwindow_width * imgsensor_info.cap.grabwindow_height;
+	pi = resolv/1000/1000 + (resolv/1000/100%10 > 5 ? 1 : 0);
+	return sprintf(buf, "%s [%d*%d] %dM", "sc820cs_front_sw_|_mipi_raw", imgsensor_info.cap.grabwindow_width, imgsensor_info.cap.grabwindow_height, pi);
 }
-
-int front1_8m_cam_get_info(char *buf, void *arg0)
-{
-    return sprintf(buf, "txd_sc820cs_front_i");
-}
-#endif*/
+#endif
 
 static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 {
 	kal_uint8 i = 0;
 	kal_uint8 retry = 2;
-	CAM_DBG(PFX, "[get_imgsensor_id] ");
+	LOG_INF("[get_imgsensor_id] ");
 	while (imgsensor_info.i2c_addr_table[i] != 0xff) {
 			spin_lock(&imgsensor_drv_lock);
 			imgsensor.i2c_write_id = imgsensor_info.i2c_addr_table[i];
 			spin_unlock(&imgsensor_drv_lock);
 			do {
 				*sensor_id =return_sensor_id();
-				CAM_DBG(PFX, "sensor id: 0x%x\n",*sensor_id);
+				LOG_INF("sensor id: 0x%x\n",*sensor_id);
 				if (*sensor_id == imgsensor_info.sensor_id) {
-					CAM_DBG(PFX, "i2c write id  : 0x%x, sensor id: 0x%x\n", imgsensor.i2c_write_id,*sensor_id);
+					LOG_INF( "i2c write id  : 0x%x, sensor id: 0x%x\n", imgsensor.i2c_write_id,*sensor_id);
 
-/*#if IS_ENABLED(CONFIG_TINNO_DEVINFO)
-					FULL_PRODUCT_DEVICE_CB(ID_FRONT1_CAM, front1_8m_cam_get_info, NULL);
-					imgsensor.i2c_write_id = 0xa0;
-					build_sc820cs_cam_sn();
-					FULL_PRODUCT_DEVICE_INFO(ID_FRONT1_CAM_SN, sc820cs_cameraSn);
-					imgsensor.i2c_write_id = imgsensor_info.i2c_addr_table[i];
-#endif*/
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+				FULL_PRODUCT_DEVICE_CB(ID_FRONT1_CAM, front_cam_get_info, NULL);
+#endif
 
 					if(deviceInfo_register_value == 0x00){
 					    //Eeprom_DataInit(1, SC820CS_TRULY_SENSOR_ID);
@@ -1377,7 +1361,7 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 					read_sc820cs_otp_data();
 					return ERROR_NONE;
 				}
-				CAM_DBG(PFX, "get_imgsensor_id Read sensor id fail, i2c write id: 0x%x,sensor id: 0x%x\n", imgsensor.i2c_write_id,*sensor_id);
+				LOG_INF("get_imgsensor_id Read sensor id fail, i2c write id: 0x%x,sensor id: 0x%x\n", imgsensor.i2c_write_id,*sensor_id);
 				retry--;
 			} while(retry > 0);
 			i++;

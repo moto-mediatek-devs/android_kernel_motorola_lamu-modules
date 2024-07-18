@@ -21,37 +21,28 @@
  *
 
  ******************************************************************************/
-
-
-
-#include <linux/videodev2.h>
-#include <linux/i2c.h>
-#include <linux/platform_device.h>
-#include <linux/delay.h>
-#include <linux/cdev.h>
-#include <linux/uaccess.h>
 #include <linux/fs.h>
-#include <linux/atomic.h>
+#include <linux/i2c.h>
+#include <linux/cdev.h>
 #include <linux/types.h>
+#include <linux/delay.h>
+#include <linux/atomic.h>
+#include <linux/uaccess.h>
+#include <linux/videodev2.h>
+#include <linux/platform_device.h>
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include <dev_info.h>
+#endif
 
-#include "kd_camera_typedef.h"
 #include "kd_imgsensor.h"
+#include "kd_camera_typedef.h"
 #include "kd_imgsensor_define.h"
 #include "kd_imgsensor_errcode.h"
-/* #include <dev_info.h> */
 
 #include "gc05a2_mipi_raw_Sensor.h"
 
-/************************** Modify Following Strings for Debug **************************/
 #define PFX "gc05a2_camera_sensor"
-#define LOG_1 LOG_INF("GC05A2, MIPI 2LANE\n")
-/****************************   Modify end    *******************************************/
-#define GC05A2_DEBUG                0
-#if GC05A2_DEBUG
-#define LOG_INF(format, args...)    pr_debug(PFX "[%s] " format, __func__, ##args)
-#else
-#define LOG_INF(format, args...)
-#endif
+#define LOG_INF(format, args...)    pr_err(PFX "[%s] " format, __func__, ##args)
 
 static DEFINE_SPINLOCK(imgsensor_drv_lock);
 
@@ -1083,7 +1074,7 @@ static void slim_video_setting(void)
 
 static kal_uint32 set_test_pattern_mode(kal_bool enable)
 {
-	CAM_DBG(PFX,"enable: %d\n", enable);
+	LOG_INF("enable: %d\n", enable);
 
 	if (enable)
 		write_cmos_sensor_8bit(0x008c, 0x01);
@@ -1248,10 +1239,10 @@ static bool gc05a2_param_checksum(kal_uint8 *buf, unsigned int size, kal_uint8 c
 
     if ((sum % 256) != checksum)
     {
-        CAM_DBG(PFX,"checksum fail size = %d sum=%d sum-in-eeprom=%d", size, sum % 256, checksum);
+        LOG_INF("checksum fail size = %d sum=%d sum-in-eeprom=%d", size, sum % 256, checksum);
         return false;
     }
-    CAM_DBG(PFX,"checksum success size = %d sum=%d sum-in-eeprom=%d", size, sum % 256, checksum);
+    LOG_INF("checksum success size = %d sum=%d sum-in-eeprom=%d", size, sum % 256, checksum);
     return true;
 }
 
@@ -1272,12 +1263,12 @@ static bool gc05a2_read_module_info(kal_uint8 moduleflag)
         /* gc05a2_otp_read_byte(MODULE_GROUP3_CHECKSUM, 1, &gc05a2_otp_info.module_checksum); */
 		gc05a2_otp_info.module_checksum = gc05a2_otp_read_byte(MODULE_GROUP3_CHECKSUM);
 	} else {
-		CAM_DBG(PFX,"--------------gc05a2 module info read failed------------\n");
+		LOG_INF("--------------gc05a2 module info read failed------------\n");
 	}
 	CAM_DBG(PFX,"--------------gc05a2 module info read end------------\n");
 	ret = gc05a2_param_checksum(&gc05a2_otp_info.module_param[0], MODULE_INFO_LENGTH, gc05a2_otp_info.module_checksum);
 	if (ret) {
-        CAM_DBG(PFX,"--------------gc05a2 module info checksum success------------\n");
+        LOG_INF("--------------gc05a2 module info checksum success------------\n");
 	}
 	return ret;
 }
@@ -1304,7 +1295,7 @@ static bool gc05a2_read_awb_info(kal_uint8 moduleflag)
 	CAM_DBG(PFX,"--------------gc05a2 awb info read end------------\n");
 	ret = gc05a2_param_checksum(&gc05a2_otp_info.awb_param[0], AWB_INFO_LENGTH, gc05a2_otp_info.awb_checksum);
 	if (ret) {
-        CAM_DBG(PFX,"--------------gc05a2 awb info checksum success------------\n");
+        LOG_INF("--------------gc05a2 awb info checksum success------------\n");
 	}
 	return ret;
 }
@@ -1331,7 +1322,7 @@ static bool gc05a2_read_lsc_info(kal_uint8 moduleflag)
 	CAM_DBG(PFX,"--------------gc05a2 lsc info read end------------\n");
 	ret = gc05a2_param_checksum(&gc05a2_otp_info.lsc_param[0], LSC_INFO_LENGTH, gc05a2_otp_info.lsc_checksum);
 	if (ret) {
-        CAM_DBG(PFX,"--------------gc05a2 lsc info checksum success------------\n");
+        LOG_INF("--------------gc05a2 lsc info checksum success------------\n");
 	}
 	return ret;
 }
@@ -1357,13 +1348,24 @@ static void read_gc05a2_otp_data(void)
 
 	if (true == (checksum_module & checksum_awb & checksum_lsc))
 	{
-		CAM_DBG(PFX,"----------------gc05a2 otp info check success----------------");
+		LOG_INF("----------------gc05a2 otp info check success----------------");
 	}
 	else
 	{
-		CAM_DBG(PFX,"----------------gc05a2 otp info check fail-------------------");
+		LOG_INF("----------------gc05a2 otp info check fail-------------------");
 	}
 }
+
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+static int wide_cam_get_info(char *buf, void *arg0)
+{
+	long resolv = 0;
+	int pi = 0;
+	resolv = imgsensor_info.cap.grabwindow_width * imgsensor_info.cap.grabwindow_height;
+	pi = resolv/1000/1000 + (resolv/1000/100%10 > 5 ? 1 : 0);
+	return sprintf(buf, "%s [%d*%d] %dM", "gc05a2_wide_sw_|_mipi_raw", imgsensor_info.cap.grabwindow_width, imgsensor_info.cap.grabwindow_height, pi);
+}
+#endif
 
 static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 {
@@ -1377,12 +1379,16 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 		do {
 			*sensor_id = return_sensor_id();
 			if (*sensor_id == imgsensor_info.sensor_id) {
-				pr_err("[gc05a2_camera_sensor]get_imgsensor_id:i2c write id: 0x%x, sensor id: 0x%x\n",
+				LOG_INF("[gc05a2_camera_sensor]get_imgsensor_id:i2c write id: 0x%x, sensor id: 0x%x\n",
 					imgsensor.i2c_write_id, *sensor_id);
 				read_gc05a2_otp_data();
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+				FULL_PRODUCT_DEVICE_CB(ID_MAIN2_CAM, wide_cam_get_info, NULL);
+#endif
+
 				return ERROR_NONE;
 			}
-			pr_err("[gc05a2_camera_sensor]get_imgsensor_id:Read sensor id fail, write id: 0x%x, id: 0x%x\n",
+			LOG_INF("[gc05a2_camera_sensor]get_imgsensor_id:Read sensor id fail, write id: 0x%x, id: 0x%x\n",
 				imgsensor.i2c_write_id, *sensor_id);
 			retry--;
 		} while (retry > 0);
@@ -1406,7 +1412,6 @@ static kal_uint32 open(void)
 	kal_uint8 retry = 2;
 	kal_uint32 sensor_id = 0;
 
-	LOG_1;
 	CAM_DBG(PFX,"imgsensor_open\n");
 	while (imgsensor_info.i2c_addr_table[i] != 0xff) {
 		spin_lock(&imgsensor_drv_lock);
