@@ -11,6 +11,9 @@
 #include "cts_earjack_detect.h"
 #include "cts_tcs.h"
 
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+extern u16 cts_fw_ver;
+#endif
 
 #ifdef CONFIG_CTS_I2C_HOST
 static int cts_i2c_writeb(const struct cts_device *cts_dev,
@@ -1254,6 +1257,9 @@ static int cts_init_fwdata(struct cts_device *cts_dev)
     memset(fwdata, 0, sizeof(*fwdata));
 
     ret = cts_tcs_get_fw_ver(cts_dev, &fwdata->version);
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+    cts_fw_ver = fwdata->version;
+#endif
     if (ret < 0) {
         cts_err("get_fw_ver failed");
         return -EINVAL;

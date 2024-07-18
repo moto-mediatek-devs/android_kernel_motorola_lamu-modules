@@ -15,6 +15,11 @@
 #include "../../../drivers/gpu/drm/mediatek/mediatek_v2/mtk_disp_notify.h"
 #include "../../../drivers/gpu/drm/mediatek/mediatek_v2/mtk_panel_ext.h"
 
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include "../../devinfo/dev_info.h"
+u16 cts_fw_ver = 0;
+#endif
+
 static void cts_resume_work_func(struct work_struct *work);
 #ifdef CFG_CTS_DRM_NOTIFIER
 #include <drm/drm_panel.h>
@@ -376,6 +381,17 @@ static int cts_init_pm_disp_fb_notifier(struct chipone_ts_data *cts_data)
     return mtk_disp_notifier_register("cts_ts", &cts_data->pdata->fb_notifier);
 }
 
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+static int cts_get_tp_info(char *buf, void *arg0)
+{
+        return sprintf(buf,
+        "%s-%s-%s-v0x%04x",
+        "BOE",
+        "P329A",
+        "ICNL9922C",
+        cts_fw_ver);
+}
+#endif
 
 #ifdef CONFIG_CTS_I2C_HOST
 static int cts_driver_probe(struct i2c_client *client,
@@ -581,6 +597,10 @@ static int cts_driver_probe(struct spi_device *client)
         msecs_to_jiffies(3 * 1000));
 
     INIT_WORK(&cts_data->ts_resume_work, cts_resume_work_func);
+
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+	FULL_PRODUCT_DEVICE_CB(ID_TP, cts_get_tp_info, NULL);
+#endif
 
     return 0;
 

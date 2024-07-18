@@ -42,6 +42,10 @@
 #include "../../../drivers/gpu/drm/mediatek/mediatek_v2/mtk_disp_notify.h"
 #endif
 
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include "../../devinfo/dev_info.h"
+#endif
+
 #if NVT_TOUCH_ESD_PROTECT
 #include <linux/jiffies.h>
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
@@ -1904,6 +1908,30 @@ static int nvt_ts_check_dt(struct device_node *np)
 }
 #endif
 
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+static int nvt_get_tp_info(char *buf, void *arg0)
+{
+	int id = nt36672s_lcd_id | nt36528a_lcd_id;
+	if(id == 0x0093)
+        return sprintf(buf,
+        "%s-%s-%s-v0x%02x",
+        "DIJIN",
+        "P329A",
+        "NT36672S",
+        ts->fw_ver);
+	else if(id == 0x0101)
+        return sprintf(buf,
+        "%s-%s-%s-v0x%02x",
+        "TIANMA",
+        "P329A",
+        "NT36672S",
+        ts->fw_ver);
+	else
+        return sprintf(buf,
+        "unknown TP");
+}
+#endif
+
 /*******************************************************
 Description:
 	Novatek touchscreen driver probe function.
@@ -2269,6 +2297,9 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 
 	nvt_irq_enable(true);
 
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+	FULL_PRODUCT_DEVICE_CB(ID_TP, nvt_get_tp_info, NULL);
+#endif
 	return 0;
 
 #if IS_ENABLED(NVT_DRM_PANEL_NOTIFY)

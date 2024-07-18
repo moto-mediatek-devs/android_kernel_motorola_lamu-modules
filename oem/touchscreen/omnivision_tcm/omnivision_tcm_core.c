@@ -37,6 +37,13 @@
 #include "../../../drivers/gpu/drm/mediatek/mediatek_v2/mtk_disp_notify.h"
 #include "../../../drivers/gpu/drm/mediatek/mediatek_v2/mtk_panel_ext.h"
 
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include "../../devinfo/dev_info.h"
+extern int td4160_lcd_id;
+extern int td4376_lcd_id;
+struct ovt_tcm_hcd *onmivision_tcm_hcd;
+#endif
+
 /* #define RESET_ON_RESUME */
 
 /* #define RESUME_EARLY_UNBLANK */
@@ -4396,6 +4403,30 @@ static int ovt_tcm_sensor_detection(struct ovt_tcm_hcd *tcm_hcd)
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+static int ovt_get_tp_info(char *buf, void *arg0)
+{
+	int id = td4160_lcd_id | td4376_lcd_id;
+	if(id == 0x000d)
+        return sprintf(buf,
+        "%s-%s-%s-v0x%02x",
+        "DIJIN",
+        "P329A",
+        "TD4160",
+        onmivision_tcm_hcd->app_info.customer_config_id[15]);
+	else if(id == 0x010d)
+        return sprintf(buf,
+        "%s-%s-%s-v0x%02x",
+        "TIANMA",
+        "P329A",
+        "TD4376",
+        onmivision_tcm_hcd->app_info.customer_config_id[15]);
+	else
+        return sprintf(buf,
+        "unknown TP");
+}
+#endif
+
 static int ovt_tcm_probe(struct platform_device *pdev)
 {
 	int retval;
@@ -4607,6 +4638,10 @@ static int ovt_tcm_probe(struct platform_device *pdev)
 		}
 	}
 
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+	onmivision_tcm_hcd = tcm_hcd;
+	FULL_PRODUCT_DEVICE_CB(ID_TP, ovt_get_tp_info, NULL);
+#endif
 
 	tcm_hcd->fb_notifier.notifier_call = ovt_tcm_disp_notifier_cb;
 	retval = mtk_disp_notifier_register("tcm_ts", &tcm_hcd->fb_notifier);
