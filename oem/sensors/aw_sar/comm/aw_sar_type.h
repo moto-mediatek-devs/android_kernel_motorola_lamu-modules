@@ -203,22 +203,6 @@ struct aw_sar_soft_rst_t {
 	int32_t (*p_soft_reset_fn)(void *data);
 };
 
-struct aw_sar_enable_t {	//todo
-	uint16_t reg_sar_enable;
-	uint32_t reg_sar_enable_val;
-	uint32_t delay_ms;
-	/*Perform different soft reset operations*/
-	int32_t (*p_sar_enable_fn)(void *data);
-};
-
-struct aw_sar_disable_t {	//todo
-	uint16_t reg_sar_disable;
-	uint32_t reg_sar_disable_val;
-	uint32_t delay_ms;
-	/*Perform different soft reset operations*/
-	int32_t (*p_sar_disable_fn)(void *data);
-};
-
 struct aw_sar_aot_t {
 	uint32_t aot_reg;
 	uint32_t aot_mask;
@@ -295,9 +279,7 @@ struct aw_sar_chip_config {
 	//Parameters required for verification of chipid
 	const struct aw_sar_check_chipid_t *p_check_chipid;
 	//Parameters required for soft reset
-	const struct aw_sar_soft_rst_t *p_soft_rst;	
-	const struct aw_sar_enable_t *p_sar_enable;	//todo
-	const struct aw_sar_disable_t *p_sar_disable;	//todo
+	const struct aw_sar_soft_rst_t *p_soft_rst;
 	//Verify the parameters required to initialize a complete interrupt
 	const struct aw_sar_init_over_irq_t *p_init_over_irq;
 	//Parameters required for load boot bin file,

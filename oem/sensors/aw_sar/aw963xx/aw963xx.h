@@ -104,8 +104,6 @@ struct aw963xx {
 #define REG_SA_RSTNALL					(0xFF0C)
 #define AW963XX_SOFT_RST_EN				(0)
 #define AW963XX_CHIP_INIT_MAX_TIME_MS			(30)
-#define AW963XX_sar_enable				(0x001F)	//todo
-#define AW963XX_sar_disable				(0)	//todo
 
 #define AW963XX_RAM_START_ADDR				(0x2000)
 
