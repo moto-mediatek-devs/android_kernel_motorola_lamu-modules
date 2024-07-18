@@ -3,6 +3,7 @@
 /*
  * Copyright (c) 2023 Suncore Corp.
  */
+#define pr_fmt(fmt) "[cx2589x] %s: " fmt, __func__
 
 #include <linux/types.h>
 #include <linux/init.h>		/* For init/exit macros */
@@ -658,12 +659,7 @@ __maybe_unused static int cx2589x_set_hiz_en(struct charger_device *chg_dev, boo
 	u8 reg_val;
 	struct cx2589x_device *cx = charger_get_data(chg_dev);
 
-	dev_notice(cx->dev, "%s:%d", __func__, hiz_en);
-
-	if (hiz_en) {
-		cx2589x_set_input_curr_lim(chg_dev, 100000);
-		cx2589x_set_ichrg_curr(chg_dev, 128000);
-	}
+	pr_info("set %s\n", hiz_en ? "enable" : "disable");
 
 	reg_val = hiz_en ? CX2589x_HIZ_EN : 0;
 
@@ -696,7 +692,7 @@ static int cx2589x_disable_charger(struct cx2589x_device *cx)
 	ret = cx2589x_set_input_curr_lim(s_chg_dev_otg, 100000);
 	ret = cx2589x_set_ichrg_curr(s_chg_dev_otg, 128000);
 
-	pr_err("%s: disable charger enter\n", __func__);
+	pr_info("disable charger enter\n");
 
 	ret = cx2589x_update_bits(cx, CX2589x_REG_03, CX2589x_CHRG_EN, 0);
 

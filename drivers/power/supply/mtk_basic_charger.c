@@ -418,6 +418,20 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 	info->setting.input_current_limit_dvchg1 =
 		pdata_dvchg->thermal_input_current_limit;
 
+/* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
+	if (pdata->factory_charging_current_limit != -1) {
+			pdata->charging_current_limit =
+					pdata->factory_charging_current_limit;
+	}
+
+	if (pdata->factory_input_current_limit != -1) {
+			pdata->input_current_limit =
+					pdata->factory_input_current_limit;
+	}
+#endif /* CONFIG_OEM_TINNO_CHARGER && CONFIG_FACTORY_BUILD */
+/* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
+
 done:
 
 	ret = charger_dev_get_min_charging_current(info->chg1_dev, &ichg1_min);
@@ -438,6 +452,31 @@ done:
 		is_basic = true;
 	}
 	/* For TC_018, pleasae don't modify the format */
+
+/* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
+	chr_err("m:%d chg1:%d,%d,%d,%d,%d,%d chg2:%d,%d,%d,%d dvchg1:%d sc:%d %d %d type:%d:%d usb_unlimited:%d usbif:%d usbsm:%d aicl:%d atm:%d bm:%d b:%d\n",
+		info->config,
+		_uA_to_mA(pdata->thermal_input_current_limit),
+		_uA_to_mA(pdata->thermal_charging_current_limit),
+		_uA_to_mA(pdata->input_current_limit),
+		_uA_to_mA(pdata->charging_current_limit),
+		_uA_to_mA(pdata->factory_input_current_limit),
+		_uA_to_mA(pdata->factory_charging_current_limit),
+		_uA_to_mA(pdata2->thermal_input_current_limit),
+		_uA_to_mA(pdata2->thermal_charging_current_limit),
+		_uA_to_mA(pdata2->input_current_limit),
+		_uA_to_mA(pdata2->charging_current_limit),
+		_uA_to_mA(pdata_dvchg->thermal_input_current_limit),
+		info->sc.pre_ibat,
+		info->sc.sc_ibat,
+		info->sc.solution,
+		info->chr_type, info->ta_status[info->select_adapter_idx],
+		info->usb_unlimited,
+		IS_ENABLED(CONFIG_USBIF_COMPLIANCE), info->usb_state,
+		pdata->input_current_limit_by_aicl, info->atm_enabled,
+		info->bootmode, is_basic);
+#else
 	chr_err("m:%d chg1:%d,%d,%d,%d chg2:%d,%d,%d,%d dvchg1:%d sc:%d %d %d type:%d:%d usb_unlimited:%d usbif:%d usbsm:%d aicl:%d atm:%d bm:%d b:%d\n",
 		info->config,
 		_uA_to_mA(pdata->thermal_input_current_limit),
@@ -457,6 +496,8 @@ done:
 		IS_ENABLED(CONFIG_USBIF_COMPLIANCE), info->usb_state,
 		pdata->input_current_limit_by_aicl, info->atm_enabled,
 		info->bootmode, is_basic);
+#endif /* CONFIG_OEM_TINNO_CHARGER && CONFIG_FACTORY_BUILD */
+/* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 
 	return is_basic;
 }

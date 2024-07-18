@@ -1570,6 +1570,147 @@ static ssize_t BatteryNotify_store(struct device *dev,
 
 static DEVICE_ATTR_RW(BatteryNotify);
 
+/* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
+static ssize_t factory_input_charging_current_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	struct mtk_charger *pinfo = dev->driver_data;
+	int fac_icc = 0;
+
+	fac_icc = pinfo->chg_data[CHG1_SETTING].factory_input_current_limit;
+	chr_err("%s: %d\n", __func__, fac_icc);
+	return sprintf(buf, "%d\n", fac_icc);
+}
+
+static ssize_t factory_input_charging_current_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t size)
+{
+	struct mtk_charger *pinfo = dev->driver_data;
+	struct charger_data *chg_data;
+	signed int temp;
+
+	chg_data = &pinfo->chg_data[CHG1_SETTING];
+	if (kstrtoint(buf, 10, &temp) == 0) {
+		if (temp < 0)
+			chg_data->factory_input_current_limit = 0;
+		else
+			chg_data->factory_input_current_limit = temp;
+	} else {
+		chr_err("%s: format error!\n", __func__);
+	}
+	return size;
+}
+
+static DEVICE_ATTR_RW(factory_input_charging_current);
+
+static ssize_t factory_charging_current_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	struct mtk_charger *pinfo = dev->driver_data;
+	int fac_cc = 0;
+
+	fac_cc = pinfo->chg_data[CHG1_SETTING].factory_charging_current_limit;
+	chr_err("%s: %d\n", __func__, fac_cc);
+	return sprintf(buf, "%d\n", fac_cc);
+}
+
+static ssize_t factory_charging_current_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t size)
+{
+	struct mtk_charger *pinfo = dev->driver_data;
+	struct charger_data *chg_data;
+	signed int temp;
+
+	chg_data = &pinfo->chg_data[CHG1_SETTING];
+	if (kstrtoint(buf, 10, &temp) == 0) {
+		if (temp < 0)
+			chg_data->factory_charging_current_limit = 0;
+		else
+			chg_data->factory_charging_current_limit = temp;
+	} else {
+		chr_err("%s: format error!\n", __func__);
+	}
+	return size;
+}
+
+static DEVICE_ATTR_RW(factory_charging_current);
+#endif /* CONFIG_FACTORY_BUILD */
+
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+static ssize_t enable_hiz_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	struct mtk_charger *pinfo = dev->driver_data;
+	bool en_hiz = false;
+
+	en_hiz = pinfo->enable_hiz;
+
+	chr_err("%s: %d\n", __func__, en_hiz);
+	return sprintf(buf, "%d\n", en_hiz);
+}
+
+static ssize_t enable_hiz_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t size)
+{
+	struct mtk_charger *pinfo = dev->driver_data;
+	signed int temp;
+
+	if (kstrtoint(buf, 10, &temp) == 0) {
+		if (temp == 1) {
+			pinfo->enable_hiz = true;
+		} else {
+			pinfo->enable_hiz = false;
+		}
+		charger_dev_enable_hz(pinfo->chg1_dev, pinfo->enable_hiz);
+	} else {
+		chr_err("%s: format error!\n", __func__);
+	}
+	return size;
+}
+
+static DEVICE_ATTR_RW(enable_hiz);
+
+static ssize_t enable_charger_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	struct mtk_charger *pinfo = dev->driver_data;
+	bool en_chg = true;
+
+	en_chg = pinfo->enable_charger;
+
+	chr_err("%s: %d\n", __func__, en_chg);
+	return sprintf(buf, "%d\n", en_chg);
+}
+
+static ssize_t enable_charger_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t size)
+{
+	struct mtk_charger *pinfo = dev->driver_data;
+	signed int temp;
+
+	if (kstrtoint(buf, 10, &temp) == 0) {
+		if (temp == 1) {
+			pinfo->enable_charger = true;
+		} else {
+			pinfo->enable_charger = false;
+		}
+		charger_dev_enable(pinfo->chg1_dev, pinfo->enable_charger);
+	} else {
+		chr_err("%s: format error!\n", __func__);
+	}
+	return size;
+}
+
+static DEVICE_ATTR_RW(enable_charger);
+
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
+
 /* procfs */
 static int mtk_chg_set_cv_show(struct seq_file *m, void *data)
 {
@@ -2719,6 +2860,15 @@ static void charger_check_status(struct mtk_charger *info)
 		charging = false;
 	if (info->sc.disable_charger == true)
 		charging = false;
+/* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	if (info->enable_hiz == true)
+		charging = false;
+	if (info->enable_charger == false)
+		charging = false;
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
+
 stop_charging:
 	mtk_battery_notify_check(info);
 
@@ -3923,6 +4073,28 @@ static int mtk_charger_setup_files(struct platform_device *pdev)
 	if (ret)
 		goto _out;
 
+/* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
+	ret = device_create_file(&(pdev->dev), &dev_attr_factory_input_charging_current);
+	if (ret)
+		goto _out;
+
+	ret = device_create_file(&(pdev->dev), &dev_attr_factory_charging_current);
+	if (ret)
+		goto _out;
+#endif /* CONFIG_OEM_TINNO_CHARGER && CONFIG_FACTORY_BUILD */
+
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	ret = device_create_file(&(pdev->dev), &dev_attr_enable_hiz);
+	if (ret)
+		goto _out;
+
+	ret = device_create_file(&(pdev->dev), &dev_attr_enable_charger);
+	if (ret)
+		goto _out;
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
+
 	battery_dir = proc_mkdir("mtk_battery_cmd", NULL);
 	if (!battery_dir) {
 		chr_err("%s: mkdir /proc/mtk_battery_cmd failed\n", __func__);
@@ -4486,6 +4658,12 @@ static int mtk_charger_probe(struct platform_device *pdev)
 		info->chg_data[i].thermal_charging_current_limit = -1;
 		info->chg_data[i].thermal_input_current_limit = -1;
 		info->chg_data[i].input_current_limit_by_aicl = -1;
+/* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
+		info->chg_data[i].factory_input_current_limit = -1;
+		info->chg_data[i].factory_charging_current_limit = -1;
+#endif /* CONFIG_OEM_TINNO_CHARGER && CONFIG_FACTORY_BUILD */
+/* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 	}
 	info->enable_hv_charging = true;
 
@@ -4653,6 +4831,13 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	info->is_charging = false;
 	info->safety_timer_cmd = -1;
 	info->cmd_pp = -1;
+
+/* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	info->enable_hiz = false;
+	info->enable_charger = true;
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 
 	/* 8 = KERNEL_POWER_OFF_CHARGING_BOOT */
 	/* 9 = LOW_POWER_OFF_CHARGING_BOOT */
