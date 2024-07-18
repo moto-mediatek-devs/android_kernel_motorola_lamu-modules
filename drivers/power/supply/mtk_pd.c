@@ -60,6 +60,12 @@
 #include "mtk_pd.h"
 #include "mtk_charger_algorithm_class.h"
 
+/* TN Begin modified by xinjun.lu/860715 20240718 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_PDC_ALGO)
+#define PD_IBUS_P_IBAT 55
+#endif
+/* TN End modified by xinjun.lu/860715 20240718 CR/EKLAMU-202 */
+
 static int pd_dbg_level = PD_DEBUG_LEVEL;
 #define PD_VBUS_IR_DROP_THRESHOLD 1200
 
@@ -521,7 +527,12 @@ int mtk_pd_input_current_protection(struct chg_alg_device *alg, int vbus)
 int __mtk_pdc_get_setting(struct chg_alg_device *alg, int *newvbus, int *newcur,
 			int *newidx)
 {
+/* TN Begin modified by xinjun.lu/860715 20240718 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_PDC_ALGO)
 	int ret = 0;
+#endif
+/* TN End modified by xinjun.lu/860715 20240718 CR/EKLAMU-202 */
+
 	int idx, selected_idx;
 	unsigned int pd_max_watt, pd_min_watt, now_max_watt;
 	struct mtk_pd *pd = dev_get_drvdata(&alg->dev);
@@ -543,12 +554,15 @@ int __mtk_pdc_get_setting(struct chg_alg_device *alg, int *newvbus, int *newcur,
 
 	if (cap->nr == 0)
 		return -1;
-
+/* TN Begin modified by xinjun.lu/860715 20240718 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_PDC_ALGO)
 	ret = pd_hal_get_ibus(alg, &ibus);
 	if (ret < 0) {
 		pd_err("[%s] get ibus fail, keep default voltage\n", __func__);
 		return -1;
 	}
+#endif
+/* TN End modified by xinjun.lu/860715 20240718 CR/EKLAMU-202 */
 
 #ifdef FIXME
 	if (info->data.parallel_vbus) {
@@ -590,9 +604,14 @@ int __mtk_pdc_get_setting(struct chg_alg_device *alg, int *newvbus, int *newcur,
 	}
 
 	vbus = pd_hal_get_vbus(alg);
+
+/* TN Begin modified by xinjun.lu/860715 20240718 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_PDC_ALGO)
 	ibus = ibus / 1000;
 	if (ibus == 0)
 		ibus = 1000;
+#endif
+/* TN End modified by xinjun.lu/860715 20240718 CR/EKLAMU-202 */
 
 	if ((chg1_mivr && (vbus < mivr1 / 1000 - 500)) ||
 	    (chg2_mivr && (vbus < mivr2 / 1000 - 500)))
@@ -603,6 +622,21 @@ int __mtk_pdc_get_setting(struct chg_alg_device *alg, int *newvbus, int *newcur,
 
 	if (idx < 0 || idx >= PD_CAP_MAX_NR)
 		idx = selected_idx = 0;
+
+/* TN Begin modified by xinjun.lu/860715 20240718 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_PDC_ALGO)
+	ibus = pd_hal_get_current(alg);
+	pd_err("[%s]vbus %d, ta %d, cur %d\n", __func__, vbus, cap->max_mv[idx], ibus);
+	if (ibus <= 0) {
+		pd_err("[%s] ibus<=0\n", __func__);
+		ibus = 1000;
+	} else {
+		if( (cap->max_mv[idx] > 5000) && ((cap->max_mv[idx] - abs(vbus))< 1000) )
+			ibus = (ibus * PD_IBUS_P_IBAT) / 100;
+		pd_err("[%s] ibus=%d\n", __func__, ibus);
+	}
+#endif
+/* TN End modified by xinjun.lu/860715 20240718 CR/EKLAMU-202 */
 
 	pd_dbg("idx:%d %d %d %d %d %d\n", idx,
 		cap->max_mv[idx],

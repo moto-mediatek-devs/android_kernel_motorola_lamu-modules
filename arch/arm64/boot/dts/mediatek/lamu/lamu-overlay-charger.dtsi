@@ -16,6 +16,14 @@
 	hvdcp_charging_current_limit = <3600000>;
 };
 
+&pdc {
+	min_charger_voltage = <4600000>;
+	pd_vbus_low_bound = <5000000>;
+	pd_vbus_upper_bound = <9000000>;
+	vsys_watt = <5000000>;
+	ibus_err = <50>;
+};
+
 &turbo_charger {
 	compatible = "tinno,turbo_charger";
 	status = "okay";

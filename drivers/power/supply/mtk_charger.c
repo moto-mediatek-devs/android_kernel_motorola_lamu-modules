@@ -4640,8 +4640,9 @@ static int mtk_charger_probe(struct platform_device *pdev)
 
 	sc_init(&info->sc);
 	info->chg_alg_nb.notifier_call = chg_alg_event;
-
-	info->fast_charging_indicator = 0;
+/* TN Begin modified by xinjun.lu/860715 20240717 CR/EKLAMU-202 */
+	info->fast_charging_indicator = PDC_ID;
+/* TN End modified by xinjun.lu/860715 20240717 CR/EKLAMU-202 */
 	info->enable_meta_current_limit = 1;
 
 	if (strcmp(info->curr_select_name,"NULL")) {
