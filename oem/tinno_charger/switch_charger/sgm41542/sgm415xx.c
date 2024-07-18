@@ -3,6 +3,7 @@
 /*
  * Copyright (c) 2021 MediaTek Inc.
  */
+#define pr_fmt(fmt) "[sgm415xx] %s: " fmt, __func__
 
 #include <linux/types.h>
 #include <linux/init.h>		/* For init/exit macros */
@@ -776,7 +777,7 @@ __maybe_unused static int sgm4154x_set_hiz_en(struct charger_device *chg_dev, bo
 	u8 reg_val;
 	struct sgm4154x_device *sgm = charger_get_data(chg_dev);
 
-	dev_notice(sgm->dev, "%s:%d", __func__, hiz_en);
+	pr_info("set %s\n", hiz_en ? "enable" : "disable");
 	reg_val = hiz_en ? SGM4154x_HIZ_EN : 0;
 
 	return sgm4154x_update_bits(sgm, SGM4154x_CHRG_CTRL_0,
@@ -840,18 +841,27 @@ static int sgm4154x_disable_charger(struct sgm4154x_device *sgm)
 	return ret;
 }
 
-static int sgm4154x_is_charging(struct charger_device *chg_dev, bool *en)
+static int sgm4154x_is_charging(struct sgm4154x_device *sgm, bool *en)
 {
 	int ret;
 	u8 val;
-	struct sgm4154x_device *sgm = charger_get_data(chg_dev);
 
 	ret = sgm4154x_read_reg(sgm, SGM4154x_CHRG_CTRL_1, &val);
 	if (ret) {
-		pr_err("%s read SGM4154x_CHRG_CTRL_a fail\n", __func__);
+		pr_err("read SGM4154x_CHRG_CTRL_a fail\n");
 		return ret;
 	}
 	*en = (val & SGM4154x_CHRG_EN) ? 1 : 0;
+
+	return ret;
+}
+
+static int sgm4154x_check_charging_enabled(struct charger_device *chg_dev, bool *en)
+{
+	int ret = 0;
+	struct sgm4154x_device *sgm = charger_get_data(chg_dev);
+
+	ret = sgm4154x_is_charging(sgm, en);
 
 	return ret;
 }
@@ -1057,6 +1067,39 @@ static int sgm4154x_get_charging_status(struct charger_device *chg_dev, bool *is
 #endif
 
 	return 0;
+}
+
+__maybe_unused static int sgm4154x_enable_powerpath(struct charger_device *chg_dev, bool en)
+{
+	int ret = 0;
+	struct sgm4154x_device *sgm = charger_get_data(chg_dev);
+
+	pr_info("enter\n");
+
+	/* Enable/Disable charging */
+	if (en) {
+		ret = sgm4154x_enable_charger(sgm);
+	} else {
+		ret = sgm4154x_disable_charger(sgm);
+	}
+
+	if (ret) {
+		pr_info("Failed to %s charger\n", en ? "enable" : "disable");
+	}
+
+	return ret;
+}
+
+__maybe_unused static int sgm4154x_is_powerpath_enabled(struct charger_device *chg_dev, bool *en)
+{
+	int ret = 0;
+	struct sgm4154x_device *sgm = charger_get_data(chg_dev);
+
+	pr_info("enter\n");
+
+	ret = sgm4154x_is_charging(sgm, en);
+
+	return ret;
 }
 
 static int sgm4154x_set_en_timer(struct sgm4154x_device *sgm)
@@ -2122,7 +2165,7 @@ static int sgm4154x_get_property(struct charger_device *chg_dev,
 	switch (prop) {
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	case CHARGER_PROP_CHARGER_ENABLED:
-		ret = sgm4154x_is_charging(sgm->chg_dev, &is_enabled);
+		ret = sgm4154x_is_charging(sgm, &is_enabled);
 		if (!ret) {
 			val->intval = is_enabled;
 		}
@@ -2192,7 +2235,7 @@ static struct charger_ops sgm4154x_chg_ops = {
 	.plug_out = sgm4154x_plug_out,
 	/* enable */
 	.enable = sgm4154x_charging_switch,
-	.is_enabled = sgm4154x_is_charging,
+	.is_enabled = sgm4154x_check_charging_enabled,
 	/* charging current */
 	.set_charging_current = sgm4154x_set_ichrg_curr,
 	.get_charging_current = sgm4154x_get_ichg_curr,
@@ -2222,8 +2265,8 @@ static struct charger_ops sgm4154x_chg_ops = {
 	//.safety_check = mt6375_sw_check_eoc,
 	.is_charging_done = sgm4154x_get_charging_status,
 	/* power path */
-	//.enable_powerpath = mt6375_enable_buck,
-	//.is_powerpath_enabled = mt6375_is_buck_enabled,
+	//.enable_powerpath = sgm4154x_enable_powerpath,
+	//.is_powerpath_enabled = sgm4154x_is_powerpath_enabled,
 	/* timer */
 	.enable_safety_timer = sgm4154x_enable_safetytimer,
 	.is_safety_timer_enabled = sgm4154x_get_is_safetytimer_enable,

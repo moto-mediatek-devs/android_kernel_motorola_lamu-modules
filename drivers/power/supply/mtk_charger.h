@@ -314,6 +314,13 @@ struct charger_data {
 	int hvdcp_temp_charging_current_limit;
 #endif
 /* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+
+/* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
+	int factory_input_current_limit;
+	int factory_charging_current_limit;
+#endif /* CONFIG_OEM_TINNO_CHARGER  && CONFIG_FACTORY_BUILD */
+/* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 };
 
 enum chg_data_idx_enum {
@@ -552,6 +559,14 @@ struct mtk_charger {
 	int target_mv;
 #endif /* CONFIG_OEM_TURBO_CHARGER */
 /* TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+
+/* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	bool enable_hiz;
+	bool enable_charger;
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
+
 };
 
 static inline int mtk_chg_alg_notify_call(struct mtk_charger *info,
