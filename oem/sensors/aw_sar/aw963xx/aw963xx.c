@@ -392,6 +392,7 @@ static ssize_t aw963xx_operation_mode_get(void *data, char *buf)
 static void aw963xx_sar_chip_info_get(void *data, char *buf, ssize_t *p_len)
 {
 	uint32_t reg_data = 0;
+	uint32_t enable_state = 0;
 	struct aw_sar *p_sar = (struct aw_sar *)data;
 
 	*p_len += snprintf(buf + *p_len, PAGE_SIZE - *p_len, "sar%u, aw963xx chip driver version:%s\n",
@@ -406,6 +407,16 @@ static void aw963xx_sar_chip_info_get(void *data, char *buf, ssize_t *p_len)
 
 	*p_len += snprintf(buf + *p_len, PAGE_SIZE - *p_len, "aw963xx Bin data version:0x%08x\n",
 							p_sar->load_bin.bin_data_ver);
+    aw_sar_i2c_read(p_sar->i2c, REG_SCANCTRL0, &reg_data);
+	if(((reg_data)&0x1F) == 0x1F)
+	{
+		enable_state = 1;
+	}else if(((reg_data)&0x1F) == 0)
+	{
+		enable_state = 0;
+	}
+	*p_len += snprintf(buf + *p_len, PAGE_SIZE - *p_len, "aw963xx Sar enable:%d\n",
+							enable_state);
 }
 
 static int32_t aw963xx_get_signed_cap(void *data, uint16_t reg_addr)
@@ -902,6 +913,21 @@ static const struct aw_sar_soft_rst_t g_aw963xx_soft_rst = {
 	.p_soft_reset_fn = NULL,
 };
 
+static const struct aw_sar_enable_t g_aw963xx_sar_enable = {
+	.reg_sar_enable = REG_SCANCTRL0,
+	.reg_sar_enable_val = AW963XX_sar_enable,
+	.delay_ms = AW963XX_CHIP_INIT_MAX_TIME_MS,
+	.p_sar_enable_fn = NULL,
+};
+
+static const struct aw_sar_disable_t g_aw963xx_sar_disable = {
+	.reg_sar_disable = REG_SCANCTRL0,
+	.reg_sar_disable_val = AW963XX_sar_disable,
+	.delay_ms = AW963XX_CHIP_INIT_MAX_TIME_MS,
+	.p_sar_disable_fn = NULL,
+};
+
+
 static const struct aw_sar_init_over_irq_t g_aw963xx_init_over_irq = {
 	.wait_times = 100,
 	.daley_step = 1,
@@ -965,6 +991,8 @@ static const struct aw_sar_chip_config g_aw963xx_chip_config = {
 
 	.p_check_chipid = &g_aw963xx_check_chipid,
 	.p_soft_rst = &g_aw963xx_soft_rst,
+	.p_sar_enable = &g_aw963xx_sar_enable,	//todo
+	.p_sar_disable = &g_aw963xx_sar_disable, //todo
 	.p_init_over_irq = &g_aw963xx_init_over_irq,
 	.p_fw_bin = &g_aw963xx_load_fw_bin,
 	.p_reg_bin = &g_aw963xx_load_reg_bin,

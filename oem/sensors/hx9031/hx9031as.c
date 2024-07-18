@@ -1656,6 +1656,72 @@ static ssize_t hx9031as_offset_dac_show(const struct class *class,
 	return (p - buf);
 }
 
+static ssize_t diff_show(const struct class *class,
+			 const struct class_attribute *attr, char *buf)
+{
+	char *p = buf;
+	int ii = 0;
+
+	ENTER;
+	hx9031as_sample();
+	for (ii = 0; ii < HX9031AS_CH_NUM; ii++) {
+		p += snprintf(p, PAGE_SIZE, "ch[%d]: DIFF=%-8d\n", ii,
+			      data_diff[ii]);
+	}
+	return (p - buf); //返回实际放到buf中的实际字符个数
+}
+
+static ssize_t ic_check_show(const struct class *class,
+			     const struct class_attribute *attr, char *buf)
+{
+	int ret = -1;
+
+	ENTER;
+	ret = hx9031as_id_check();
+	if (0 != ret) {
+		return sprintf(buf, "%s\n", "0x01");
+	} else {
+		return sprintf(buf, "%s\n", "0x00");
+	}
+}
+
+static ssize_t enable_store(const struct class *class,
+					 const struct class_attribute *attr,
+					 const char *buf, size_t count)
+{
+	int en = 0;
+	int ii = 0;
+
+	ENTER;
+	if (sscanf(buf, "%d", &en) != 1) {
+		PRINT_ERR("please input a HEX number\n");
+		return -EINVAL;
+	}  
+	for (ii = 0; ii < HX9031AS_CH_NUM; ii++) {
+		if ((hx9031as_pdata.channel_used_flag >> ii) & 0x1) {
+			hx9031as_ch_en_hal(ii, (en > 0) ? 1 : 0);
+		}
+    else {
+		PRINT_ERR(
+			"ch_%d is unused, you can not enable or disable an unused channel\n",
+			ii);
+	  }
+  }
+	return count;
+}
+
+static ssize_t enable_show(const struct class *class,
+					const struct class_attribute *attr,
+					char *buf)
+{
+	ENTER;
+    if(((hx9031as_pdata.channel_used_flag)&0x1F) == 0x1F){
+		return sprintf(buf, "%s\n", "0x00");
+	} else {
+		return sprintf(buf, "%s\n", "0x01");
+	}
+}
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
 static struct class_attribute class_attr_raw_data =
 	__ATTR(raw_data, 0664, hx9031as_raw_data_show, NULL);
@@ -1681,9 +1747,15 @@ static struct class_attribute class_attr_accuracy =
 static struct class_attribute class_attr_dump =
 	__ATTR(dump, 0664, hx9031as_dump_show, NULL);
 static struct class_attribute class_attr_offset_dac =
-	__ATTR(offset_dac, 0664, hx9031as_offset_dac_show, NULL);
+	__ATTR(offset, 0664, hx9031as_offset_dac_show, NULL);
+static struct class_attribute class_attr_diff =
+	__ATTR(diff, 0664, diff_show, NULL);
+static struct class_attribute class_attr_ic_check =
+	__ATTR(ic_check, 0664, ic_check_show, NULL);
+static struct class_attribute class_attr_enable = 
+	__ATTR(enable, 0664, enable_show, enable_store);
 
-static struct attribute *hx9031as_class_attrs[] = {
+static struct attribute *sar_class_attrs[] = {
 	&class_attr_raw_data.attr,
 	&class_attr_reg_write.attr,
 	&class_attr_reg_read.attr,
@@ -1696,11 +1768,14 @@ static struct attribute *hx9031as_class_attrs[] = {
 	&class_attr_accuracy.attr,
 	&class_attr_dump.attr,
 	&class_attr_offset_dac.attr,
+	&class_attr_diff.attr,
+	&class_attr_ic_check.attr,
+	&class_attr_enable.attr,
 	NULL,
 };
-ATTRIBUTE_GROUPS(hx9031as_class);
+ATTRIBUTE_GROUPS(sar_class);
 #else
-static struct class_attribute hx9031as_class_attributes[] = {
+static struct class_attribute sar_class_attributes[] = {
 	__ATTR(raw_data, 0664, hx9031as_raw_data_show, NULL),
 	__ATTR(reg_write, 0664, NULL, hx9031as_reg_write_store),
 	__ATTR(reg_read, 0664, NULL, hx9031as_reg_read_store),
@@ -1716,17 +1791,20 @@ static struct class_attribute hx9031as_class_attributes[] = {
 	__ATTR(loglevel, 0664, hx9031as_loglevel_show, hx9031as_loglevel_store),
 	__ATTR(accuracy, 0664, hx9031as_accuracy_show, hx9031as_accuracy_store),
 	__ATTR(dump, 0664, hx9031as_dump_show, NULL),
-	__ATTR(offset_dac, 0664, hx9031as_offset_dac_show, NULL),
+	__ATTR(offset, 0664, hx9031as_offset_dac_show, NULL),
+	__ATTR(diff, 0664, diff_show, NULL);
+	__ATTR(ic_check, 0664, ic_check_show, NULL);
+    __ATTR(enable, 0664, enable_show, enable_store);
 	__ATTR_NULL,
 };
 #endif
 
-struct class hx9031as_class = {
-	.name = "hx9031as",
+struct class sar_class = {
+	.name = "sar",
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
-	.class_groups = hx9031as_class_groups,
+	.class_groups = sar_class_groups,
 #else
-	.class_attrs = hx9031as_class_attributes,
+	.class_attrs = sar_class_attributes,
 #endif
 };
 //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^sysfs for test end
@@ -1978,7 +2056,7 @@ static int hx9031as_probe(struct i2c_client *client)
 #endif
 
 	ret = class_register(
-		&hx9031as_class); //debug fs path:/sys/class/hx9031as/*
+		&sar_class); //debug fs path:/sys/class/sar/*
 	if (ret < 0) {
 		PRINT_ERR("class_register failed\n");
 		goto failed_class_register;
@@ -2009,7 +2087,7 @@ static int hx9031as_probe(struct i2c_client *client)
 	return 0;
 
 failed_request_irq:
-	class_unregister(&hx9031as_class);
+	class_unregister(&sar_class);
 failed_class_register:
 #if HX9031AS_REPORT_EVKEY
 	hx9031as_input_deinit_key(client);
@@ -2030,7 +2108,7 @@ static void hx9031as_remove(struct i2c_client *client)
 {
 	ENTER;
 	free_irq(hx9031as_pdata.irq, &hx9031as_pdata);
-	class_unregister(&hx9031as_class);
+	class_unregister(&sar_class);
 #if HX9031AS_REPORT_EVKEY
 	hx9031as_input_deinit_key(client);
 #else

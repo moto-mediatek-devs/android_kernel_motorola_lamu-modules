@@ -5,36 +5,36 @@
 #include "aw_sar.h"
 #include "./aw963xx/aw963xx.h"
 
-#define AW_SAR_I2C_NAME		"awinic_sar"
-#define AW_SAR_DRIVER_VERSION	"v0.4.0"
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,9,0)
+#define AW_SAR_I2C_NAME "awinic_sar"
+#define AW_SAR_DRIVER_VERSION "v0.4.0"
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 #ifdef CONFIG_AW96XX_MTK_KERNEL419_CHARGER_TYPE
-#define USB_POWER_SUPPLY_NAME   "mtk_charger_type"
+#define USB_POWER_SUPPLY_NAME "mtk_charger_type"
 #elif defined(CONFIG_AW96XX_MTK_KERNEL5XX_CHARGER_TYPE)
-#define USB_POWER_SUPPLY_NAME   "mtk-master-charger"
+#define USB_POWER_SUPPLY_NAME "mtk-master-charger"
 #else
-#define USB_POWER_SUPPLY_NAME   "charger"
+#define USB_POWER_SUPPLY_NAME "charger"
 #endif
 #else
-#define USB_POWER_SUPPLY_NAME   "usb"
+#define USB_POWER_SUPPLY_NAME "usb"
 #endif
 
-#define AW_I2C_RW_RETRY_TIME_MIN		(2000)
-#define AW_I2C_RW_RETRY_TIME_MAX		(3000)
-#define AW_RETRIES				(5)
+#define AW_I2C_RW_RETRY_TIME_MIN (2000)
+#define AW_I2C_RW_RETRY_TIME_MAX (3000)
+#define AW_RETRIES (5)
 
-#define AW_SAR_AWRW_OffSET			(20)
-#define AW_SAR_AWRW_DATA_WIDTH			(5)
-#define AW_DATA_OffSET_2			(2)
-#define AW_DATA_OffSET_3			(3)
-#define AW_SAR_CH_MAX				(20)
-#define AW_POWER_ON_SYSFS_DELAY_MS		(5000)
-#define AW_SAR_OFFSET_LEN			(15)
-#define AW_SAR_VCC_MIN_UV			(1700000)
-#define AW_SAR_VCC_MAX_UV			(3600000)
+#define AW_SAR_AWRW_OffSET (20)
+#define AW_SAR_AWRW_DATA_WIDTH (5)
+#define AW_DATA_OffSET_2 (2)
+#define AW_DATA_OffSET_3 (3)
+#define AW_SAR_CH_MAX (20)
+#define AW_POWER_ON_SYSFS_DELAY_MS (5000)
+#define AW_SAR_OFFSET_LEN (15)
+#define AW_SAR_VCC_MIN_UV (1700000)
+#define AW_SAR_VCC_MAX_UV (3600000)
 
 static struct mutex aw_sar_lock;
-
+struct aw_sar *p_class;
 static int32_t aw_sar_get_chip_info(struct aw_sar *p_sar);
 static void aw_sar_sensor_free(struct aw_sar *p_sar);
 
@@ -58,19 +58,19 @@ void aw_sar_enable_irq(struct aw_sar *p_sar)
 //Chip logic part start
 //Load default array function
 static int32_t
-aw_sar_para_loaded_func(struct i2c_client *i2c, const struct aw_sar_para_load_t *para_load)
+aw_sar_para_loaded_func(struct i2c_client *i2c,
+			const struct aw_sar_para_load_t *para_load)
 {
 	int32_t i = 0;
 	int32_t ret = 0;
 
 	for (i = 0; i < para_load->reg_arr_len; i = i + 2) {
 		ret = aw_sar_i2c_write(i2c, (uint16_t)para_load->reg_arr[i],
-						para_load->reg_arr[i + 1]);
+				       para_load->reg_arr[i + 1]);
 		if (ret != AW_OK)
 			return -AW_REG_LOAD_ERR;
 		AWLOGD(&i2c->dev, "reg_addr = 0x%04x, reg_data = 0x%08x",
-				para_load->reg_arr[i],
-				para_load->reg_arr[i + 1]);
+		       para_load->reg_arr[i], para_load->reg_arr[i + 1]);
 	}
 
 	AWLOGD(&i2c->dev, "para writen completely");
@@ -79,9 +79,10 @@ aw_sar_para_loaded_func(struct i2c_client *i2c, const struct aw_sar_para_load_t 
 }
 
 //Mode setting function
-static void
-aw_sar_mode_set_func(struct i2c_client *i2c, int to_irq, struct aw_sar_mode_set_t *mode_set_para,
-				const struct aw_sar_mode_set_t *mode_set, uint8_t len)
+static void aw_sar_mode_set_func(struct i2c_client *i2c, int to_irq,
+				 struct aw_sar_mode_set_t *mode_set_para,
+				 const struct aw_sar_mode_set_t *mode_set,
+				 uint8_t len)
 {
 	uint8_t i = 0;
 
@@ -89,16 +90,19 @@ aw_sar_mode_set_func(struct i2c_client *i2c, int to_irq, struct aw_sar_mode_set_
 
 	for (i = 0; i < len; i++) {
 		//AWLOGD(&i2c->dev, "i = %d mode_set:%d chip_id:%d", i, mode_set[i].chip_id, mode_set_para->chip_id);
-		if ((mode_set[i].chip_mode.curr_mode == mode_set_para->chip_mode.curr_mode) &&
-				(mode_set[i].chip_mode.last_mode == mode_set_para->chip_mode.last_mode) &&
-				((mode_set[i].chip_id == AW_SAR_NONE_CHECK_CHIP) ||
-					((mode_set[i].chip_id & mode_set_para->chip_id) != 0))) {
+		if ((mode_set[i].chip_mode.curr_mode ==
+		     mode_set_para->chip_mode.curr_mode) &&
+		    (mode_set[i].chip_mode.last_mode ==
+		     mode_set_para->chip_mode.last_mode) &&
+		    ((mode_set[i].chip_id == AW_SAR_NONE_CHECK_CHIP) ||
+		     ((mode_set[i].chip_id & mode_set_para->chip_id) != 0))) {
 			if (mode_set[i].mode_switch_ops.enable_clock != NULL)
 				mode_set[i].mode_switch_ops.enable_clock(i2c);
 			if (mode_set[i].mode_switch_ops.rc_irqscr != NULL)
 				mode_set[i].mode_switch_ops.rc_irqscr(i2c);
 			if (mode_set[i].mode_switch_ops.mode_update != NULL) {
-				AWLOGD(&i2c->dev, "set curr_mode:%d, ok", mode_set_para->chip_mode.curr_mode);
+				AWLOGD(&i2c->dev, "set curr_mode:%d, ok",
+				       mode_set_para->chip_mode.curr_mode);
 				mode_set[i].mode_switch_ops.mode_update(i2c);
 			}
 			break;
@@ -106,8 +110,9 @@ aw_sar_mode_set_func(struct i2c_client *i2c, int to_irq, struct aw_sar_mode_set_
 	}
 }
 
-static int32_t aw_sar_check_init_over_irq_func(struct i2c_client *i2c,
-					const struct aw_sar_init_over_irq_t *p_check_irq)
+static int32_t aw_sar_check_init_over_irq_func(
+	struct i2c_client *i2c,
+	const struct aw_sar_init_over_irq_t *p_check_irq)
 {
 	int32_t ret = -AW_ERR;
 	uint32_t irq_stat = 0;
@@ -117,7 +122,8 @@ static int32_t aw_sar_check_init_over_irq_func(struct i2c_client *i2c,
 		ret = aw_sar_i2c_read(i2c, p_check_irq->reg_irqsrc, &irq_stat);
 		if (ret < 0)
 			return -AW_ERR;
-		if (((irq_stat >> p_check_irq->irq_offset_bit) & p_check_irq->irq_mask) == p_check_irq->irq_flag) {
+		if (((irq_stat >> p_check_irq->irq_offset_bit) &
+		     p_check_irq->irq_mask) == p_check_irq->irq_flag) {
 			AWLOGD(&i2c->dev, "check_init_over_irqt ok!");
 			return AW_OK;
 		}
@@ -131,13 +137,15 @@ static int32_t aw_sar_check_init_over_irq_func(struct i2c_client *i2c,
 }
 
 static int32_t
-aw_sar_soft_reset_func(struct i2c_client *i2c, const struct aw_sar_soft_rst_t *p_soft_rst)
+aw_sar_soft_reset_func(struct i2c_client *i2c,
+		       const struct aw_sar_soft_rst_t *p_soft_rst)
 {
 	int32_t ret = 0;
 
 	AWLOGD(&i2c->dev, "enter");
 
-	ret = aw_sar_i2c_write(i2c, p_soft_rst->reg_rst, p_soft_rst->reg_rst_val);
+	ret = aw_sar_i2c_write(i2c, p_soft_rst->reg_rst,
+			       p_soft_rst->reg_rst_val);
 	if (ret < 0) {
 		AWLOGE(&i2c->dev, "soft_reset error: %d", ret);
 		return -AW_ERR;
@@ -147,9 +155,49 @@ aw_sar_soft_reset_func(struct i2c_client *i2c, const struct aw_sar_soft_rst_t *p
 
 	return AW_OK;
 }
+
+static int32_t
+aw_sar_enable_func(struct i2c_client *i2c,
+		   const struct aw_sar_enable_t *p_sar_enable) //todo
+{
+	int32_t ret = 0;
+
+	AWLOGD(&i2c->dev, "enter");
+
+	ret = aw_sar_i2c_write(i2c, p_sar_enable->reg_sar_enable,
+			       p_sar_enable->reg_sar_enable_val);
+	if (ret < 0) {
+		AWLOGE(&i2c->dev, "soft_reset error: %d", ret);
+		return -AW_ERR;
+	}
+
+	msleep(p_sar_enable->delay_ms);
+
+	return AW_OK;
+}
+
+static int32_t
+aw_sar_disable_func(struct i2c_client *i2c,
+		    const struct aw_sar_disable_t *p_sar_disable) //todo
+{
+	int32_t ret = 0;
+
+	AWLOGD(&i2c->dev, "enter");
+	ret = aw_sar_i2c_write(i2c, p_sar_disable->reg_sar_disable,
+			       p_sar_disable->reg_sar_disable_val);
+	if (ret < 0) {
+		AWLOGE(&i2c->dev, "soft_reset error: %d", ret);
+		return -AW_ERR;
+	}
+
+	msleep(p_sar_disable->delay_ms);
+
+	return AW_OK;
+}
 //Chip logic part end
 
-static int32_t aw_sar_parse_bin(const struct firmware *cont, struct aw_sar *p_sar)
+static int32_t aw_sar_parse_bin(const struct firmware *cont,
+				struct aw_sar *p_sar)
 {
 	struct aw_bin *aw_bin = NULL;
 	int32_t ret = -AW_ERR;
@@ -184,12 +232,15 @@ static int32_t aw_sar_parse_bin(const struct firmware *cont, struct aw_sar *p_sa
 		if (ret != AW_OK) {
 			AWLOGE(p_sar->dev, "load_bin_to_chip error!");
 			if (p_sar->load_bin.bin_load_fail_opera_func != NULL) {
-				ret = p_sar->load_bin.bin_load_fail_opera_func(aw_bin, p_sar);
+				ret = p_sar->load_bin.bin_load_fail_opera_func(
+					aw_bin, p_sar);
 				if (ret != AW_OK) {
-					AWLOGE(p_sar->dev, "bin_load_fail_opera_func error!");
+					AWLOGE(p_sar->dev,
+					       "bin_load_fail_opera_func error!");
 					goto err;
 				} else {
-					AWLOGD(p_sar->dev, "bin_load_fail_opera_func OK!");
+					AWLOGD(p_sar->dev,
+					       "bin_load_fail_opera_func OK!");
 				}
 			} else {
 				goto err;
@@ -228,14 +279,16 @@ int32_t aw_sar_load_bin_comm(struct aw_sar *p_sar)
 
 	ret = aw_sar_parse_bin(fw, p_sar);
 	if (ret != AW_OK) {
-		AWLOGE(p_sar->dev, "reg_bin %s load error!", p_sar->load_bin.bin_name);
+		AWLOGE(p_sar->dev, "reg_bin %s load error!",
+		       p_sar->load_bin.bin_name);
 		return -AW_ERR;
 	}
 
 	return AW_OK;
 }
 
-int32_t aw_sar_parse_dts_comm(struct device *dev, struct device_node *np, struct aw_sar_dts_info *p_dts_info)
+int32_t aw_sar_parse_dts_comm(struct device *dev, struct device_node *np,
+			      struct aw_sar_dts_info *p_dts_info)
 {
 	int32_t val = 0;
 
@@ -255,7 +308,8 @@ int32_t aw_sar_parse_dts_comm(struct device *dev, struct device_node *np, struct
 		AWLOGI(dev, "irq gpio provided ok.");
 	}
 
-	val = of_property_read_u32(np, "channel_use_flag", &p_dts_info->channel_use_flag);
+	val = of_property_read_u32(np, "channel_use_flag",
+				   &p_dts_info->channel_use_flag);
 	AWLOGI(dev, "channel_use_flag = 0x%x", p_dts_info->channel_use_flag);
 	if (val != 0) {
 		AWLOGE(dev, "channel_use_flag failed!");
@@ -263,17 +317,22 @@ int32_t aw_sar_parse_dts_comm(struct device *dev, struct device_node *np, struct
 	}
 
 	//GPIO is set as internal pull-up input
-	p_dts_info->use_inter_pull_up = of_property_read_bool(np, "aw_sar,pin_set_inter_pull-up");
-	AWLOGI(dev, "aw_sar,use_inter_pull_up = <%d>", p_dts_info->use_inter_pull_up);
+	p_dts_info->use_inter_pull_up =
+		of_property_read_bool(np, "aw_sar,pin_set_inter_pull-up");
+	AWLOGI(dev, "aw_sar,use_inter_pull_up = <%d>",
+	       p_dts_info->use_inter_pull_up);
 
 	p_dts_info->use_pm = of_property_read_bool(np, "aw_sar,using_pm_ops");
 	AWLOGI(dev, "aw_sar,pin_set_inter_pull-up = <%d>", p_dts_info->use_pm);
 
-	p_dts_info->update_fw_flag = of_property_read_bool(np, "aw_sar,update_fw");
+	p_dts_info->update_fw_flag =
+		of_property_read_bool(np, "aw_sar,update_fw");
 	AWLOGI(dev, "aw_sar,update_fw = <%d>", p_dts_info->update_fw_flag);
 
-	p_dts_info->use_plug_cail_flag = of_property_read_bool(np, "aw_sar,use_plug_cail");
-	AWLOGI(dev, "aw_sar,use_plug_cail_flag = <%d>", p_dts_info->use_plug_cail_flag);
+	p_dts_info->use_plug_cail_flag =
+		of_property_read_bool(np, "aw_sar,use_plug_cail");
+	AWLOGI(dev, "aw_sar,use_plug_cail_flag = <%d>",
+	       p_dts_info->use_plug_cail_flag);
 	return AW_OK;
 }
 
@@ -283,11 +342,13 @@ static int32_t aw_sar_parse_dts(struct aw_sar *p_sar)
 
 	AWLOGD(p_sar->dev, "enter");
 
-	ret = aw_sar_parse_dts_comm(p_sar->dev, p_sar->i2c->dev.of_node, &p_sar->dts_info);
+	ret = aw_sar_parse_dts_comm(p_sar->dev, p_sar->i2c->dev.of_node,
+				    &p_sar->dts_info);
 
 	//Special requirements of SAR chip
 	if (p_sar->p_sar_para->p_platform_config->p_add_parse_dts_fn != NULL)
-		ret |= p_sar->p_sar_para->p_platform_config->p_add_parse_dts_fn(p_sar);
+		ret |= p_sar->p_sar_para->p_platform_config->p_add_parse_dts_fn(
+			p_sar);
 
 	return ret;
 }
@@ -296,66 +357,68 @@ static irqreturn_t aw_sar_irq(int32_t irq, void *data)
 {
 	struct aw_sar *p_sar = (struct aw_sar *)data;
 	uint32_t irq_status = 0;
-	
+
 	//step1: read clear interrupt
 	if (p_sar->p_sar_para->p_platform_config->p_irq_init->rc_irq_fn != NULL)
-		irq_status = p_sar->p_sar_para->p_platform_config->p_irq_init->rc_irq_fn(p_sar->i2c);
+		irq_status = p_sar->p_sar_para->p_platform_config->p_irq_init
+				     ->rc_irq_fn(p_sar->i2c);
 
 	//step2: Read the status register for status reporting
-	if (p_sar->p_sar_para->p_platform_config->p_irq_init->irq_spec_handler_fn != NULL)
-		p_sar->p_sar_para->p_platform_config->p_irq_init->irq_spec_handler_fn(irq_status, p_sar);
+	if (p_sar->p_sar_para->p_platform_config->p_irq_init
+		    ->irq_spec_handler_fn != NULL)
+		p_sar->p_sar_para->p_platform_config->p_irq_init
+			->irq_spec_handler_fn(irq_status, p_sar);
 
-	//step3: The chip 
+	//step3: The chip
 
-	if(p_sar->fault_flag == AW_SAR_UNHEALTHY) {
+	if (p_sar->fault_flag == AW_SAR_UNHEALTHY) {
 		p_sar->fault_flag = AW_SAR_HEALTHY;
 		disable_irq_nosync(p_sar->irq_init.to_irq);
 		p_sar->irq_init.host_irq_stat = IRQ_DISABLE;
 		//aw_sar_soft_reset(p_sar);
-		schedule_delayed_work(&p_sar->update_work, msecs_to_jiffies(500));
+		schedule_delayed_work(&p_sar->update_work,
+				      msecs_to_jiffies(500));
 	}
 
 	return IRQ_HANDLED;
 }
 
-static int32_t aw_sar_irq_init_comm(struct aw_sar *p_sar, const struct aw_sar_irq_init_t *p_irq_init)
+static int32_t aw_sar_irq_init_comm(struct aw_sar *p_sar,
+				    const struct aw_sar_irq_init_t *p_irq_init)
 {
 	int32_t ret = 0;
 	irq_handler_t thread_fn = p_irq_init->thread_fn;
 
 	snprintf(p_sar->irq_init.label, sizeof(p_sar->irq_init.label),
-				"aw_sar%u_gpio", p_sar->dts_info.sar_num);
+		 "aw_sar%u_gpio", p_sar->dts_info.sar_num);
 	snprintf(p_sar->irq_init.dev_id, sizeof(p_sar->irq_init.dev_id),
-				"aw_sar%u_irq", p_sar->dts_info.sar_num);
+		 "aw_sar%u_irq", p_sar->dts_info.sar_num);
 
 	if (gpio_is_valid(p_sar->dts_info.irq_gpio)) {
 		p_sar->irq_init.to_irq = gpio_to_irq(p_sar->dts_info.irq_gpio);
 		ret = devm_gpio_request_one(p_sar->dev,
-						p_sar->dts_info.irq_gpio,
-						p_irq_init->flags,
-						p_sar->irq_init.label);
+					    p_sar->dts_info.irq_gpio,
+					    p_irq_init->flags,
+					    p_sar->irq_init.label);
 		if (ret) {
-			AWLOGE(p_sar->dev,
-				"request irq gpio failed, ret = %d", ret);
+			AWLOGE(p_sar->dev, "request irq gpio failed, ret = %d",
+			       ret);
 			ret = -AW_ERR;
 		} else {
 			if (thread_fn == NULL)
 				thread_fn = aw_sar_irq;
-			ret = devm_request_threaded_irq(p_sar->dev,
-							p_sar->irq_init.to_irq,
-							p_irq_init->handler,
-							thread_fn,
-							p_irq_init->irq_flags,
-							p_sar->irq_init.dev_id,
-							p_sar);
+			ret = devm_request_threaded_irq(
+				p_sar->dev, p_sar->irq_init.to_irq,
+				p_irq_init->handler, thread_fn,
+				p_irq_init->irq_flags, p_sar->irq_init.dev_id,
+				p_sar);
 			if (ret != 0) {
 				AWLOGE(p_sar->dev,
-						"failed to request IRQ %d: %d",
-						p_sar->irq_init.to_irq, ret);
+				       "failed to request IRQ %d: %d",
+				       p_sar->irq_init.to_irq, ret);
 				ret = -AW_ERR;
 			} else {
-				AWLOGI(p_sar->dev,
-					"IRQ request successfully!");
+				AWLOGI(p_sar->dev, "IRQ request successfully!");
 				ret = AW_OK;
 			}
 		}
@@ -375,31 +438,34 @@ static int32_t aw_sar_irq_init_comm(struct aw_sar *p_sar, const struct aw_sar_ir
 
 static int32_t aw_sar_irq_init(struct aw_sar *p_sar)
 {
-
 	if (p_sar->p_sar_para->p_platform_config->p_irq_init == NULL) {
 		AWLOGE(p_sar->dev, "AW_INVALID_PARA");
 		return AW_INVALID_PARA;
 	}
 
-	if (p_sar->p_sar_para->p_platform_config->p_irq_init->p_irq_init_fn != NULL) {
+	if (p_sar->p_sar_para->p_platform_config->p_irq_init->p_irq_init_fn !=
+	    NULL) {
 		AWLOGE(p_sar->dev, "p_irq_init_fn");
-		return p_sar->p_sar_para->p_platform_config->p_irq_init->p_irq_init_fn(p_sar);
+		return p_sar->p_sar_para->p_platform_config->p_irq_init
+			->p_irq_init_fn(p_sar);
 	}
 
-	return aw_sar_irq_init_comm(p_sar, p_sar->p_sar_para->p_platform_config->p_irq_init);
+	return aw_sar_irq_init_comm(
+		p_sar, p_sar->p_sar_para->p_platform_config->p_irq_init);
 }
 
 static void aw_sar_irq_free(struct aw_sar *p_sar)
 {
 	if ((p_sar->p_sar_para->p_platform_config != NULL) &&
-		(p_sar->p_sar_para->p_platform_config->p_irq_init != NULL) &&
-		(p_sar->p_sar_para->p_platform_config->p_irq_init->p_irq_deinit_fn != NULL)) {
-		p_sar->p_sar_para->p_platform_config->p_irq_init->p_irq_deinit_fn(p_sar);
+	    (p_sar->p_sar_para->p_platform_config->p_irq_init != NULL) &&
+	    (p_sar->p_sar_para->p_platform_config->p_irq_init->p_irq_deinit_fn !=
+	     NULL)) {
+		p_sar->p_sar_para->p_platform_config->p_irq_init
+			->p_irq_deinit_fn(p_sar);
 		AWLOGE(p_sar->dev, "AW_INVALID_PARA");
 		return;
 	}
 	AWLOGE(p_sar->dev, "aw_sar_irq_free");
-
 }
 
 static int32_t aw_sar_input_init_comm(struct aw_sar *p_sar)
@@ -407,19 +473,18 @@ static int32_t aw_sar_input_init_comm(struct aw_sar *p_sar)
 	uint32_t i = 0;
 	int32_t ret = 0;
 
-	p_sar->channels_arr = devm_kzalloc(p_sar->dev,
-				sizeof(struct aw_channels_info) *
-				p_sar->p_sar_para->ch_num_max,
-				GFP_KERNEL);
+	p_sar->channels_arr = devm_kzalloc(
+		p_sar->dev,
+		sizeof(struct aw_channels_info) * p_sar->p_sar_para->ch_num_max,
+		GFP_KERNEL);
 	if (p_sar->channels_arr == NULL) {
 		AWLOGE(p_sar->dev, "devm_kzalloc err");
 		return -AW_ERR;
 	}
-//TN Begin modified by db 20240712  start
+	//TN Begin modified by db 20240712  start
 	for (i = 0; i < p_sar->p_sar_para->ch_num_max; i++) {
 		snprintf(p_sar->channels_arr[i].name,
-				sizeof(p_sar->channels_arr->name),
-				"sar_ch%d", i);
+			 sizeof(p_sar->channels_arr->name), "sar_ch%d", i);
 
 		p_sar->channels_arr[i].last_channel_info = 0;
 
@@ -428,19 +493,34 @@ static int32_t aw_sar_input_init_comm(struct aw_sar *p_sar)
 			p_sar->channels_arr[i].input = input_allocate_device();
 			if (p_sar->channels_arr[i].input == NULL)
 				return -AW_ERR;
-			p_sar->channels_arr[i].input->name = p_sar->channels_arr[i].name;
+			p_sar->channels_arr[i].input->name =
+				p_sar->channels_arr[i].name;
 			p_sar->channels_arr[i].input->id.vendor = i;
-			AWLOGE(p_sar->dev, "device NAME = %s VENDOR=%d", p_sar->channels_arr[i].input->name, p_sar->channels_arr[i].input->id.vendor);
+			AWLOGE(p_sar->dev, "device NAME = %s VENDOR=%d",
+			       p_sar->channels_arr[i].input->name,
+			       p_sar->channels_arr[i].input->id.vendor);
 			__set_bit(EV_KEY, p_sar->channels_arr[i].input->evbit);
-			__set_bit(KEY_SAR_FAR, p_sar->channels_arr[i].input->keybit); //far state
-			__set_bit(KEY_SAR_NEAR, p_sar->channels_arr[i].input->keybit); // near state , first detect
-			__set_bit(KEY_SAR_CLOSE, p_sar->channels_arr[i].input->keybit); // closed state, second detect
-//TN Begin modified by db 20240712  end
+			__set_bit(KEY_SAR_FAR,
+				  p_sar->channels_arr[i]
+					  .input->keybit); //far state
+			__set_bit(
+				KEY_SAR_NEAR,
+				p_sar->channels_arr[i]
+					.input
+					->keybit); // near state , first detect
+			__set_bit(
+				KEY_SAR_CLOSE,
+				p_sar->channels_arr[i]
+					.input
+					->keybit); // closed state, second detect
+			//TN Begin modified by db 20240712  end
 			input_set_abs_params(p_sar->channels_arr[i].input,
-						ABS_DISTANCE, -1, 100, 0, 0);
-			ret = input_register_device(p_sar->channels_arr[i].input);
+					     ABS_DISTANCE, -1, 100, 0, 0);
+			ret = input_register_device(
+				p_sar->channels_arr[i].input);
 			if (ret) {
-				AWLOGE(p_sar->dev, "failed to register input device");
+				AWLOGE(p_sar->dev,
+				       "failed to register input device");
 				return -AW_ERR;
 			}
 		} else {
@@ -455,7 +535,8 @@ static int32_t aw_sar_input_init_comm(struct aw_sar *p_sar)
 static int32_t aw_sar_input_init(struct aw_sar *p_sar)
 {
 	if (p_sar->p_sar_para->p_platform_config->p_input_init_fn != NULL)
-		return p_sar->p_sar_para->p_platform_config->p_input_init_fn(p_sar);
+		return p_sar->p_sar_para->p_platform_config->p_input_init_fn(
+			p_sar);
 
 	return aw_sar_input_init_comm(p_sar);
 }
@@ -476,7 +557,7 @@ static void aw_sar_input_free_comm(struct aw_sar *p_sar)
 static void aw_sar_input_free(struct aw_sar *p_sar)
 {
 	if ((p_sar->p_sar_para->p_platform_config != NULL) &&
-		(p_sar->p_sar_para->p_platform_config->p_input_deinit_fn != NULL)) {
+	    (p_sar->p_sar_para->p_platform_config->p_input_deinit_fn != NULL)) {
 		p_sar->p_sar_para->p_platform_config->p_input_deinit_fn(p_sar);
 		AWLOGE(p_sar->dev, "AW_INVALID_PARA");
 		return;
@@ -495,12 +576,15 @@ static int32_t aw_sar_check_init_over_irq_comm(struct aw_sar *p_sar)
 	if (p_sar->p_sar_para->p_init_over_irq == NULL)
 		return AW_INVALID_PARA;
 
-	ret = aw_sar_check_init_over_irq_func(p_sar->i2c, p_sar->p_sar_para->p_init_over_irq);
+	ret = aw_sar_check_init_over_irq_func(
+		p_sar->i2c, p_sar->p_sar_para->p_init_over_irq);
 	if (ret == -AW_ERR_IRQ_INIT_OVER) {
 		AWLOGD(p_sar->dev, "ret is AW_ERR_IRQ_INIT_OVER");
-		if (p_sar->p_sar_para->p_init_over_irq->p_get_err_type_fn != NULL) {
+		if (p_sar->p_sar_para->p_init_over_irq->p_get_err_type_fn !=
+		    NULL) {
 			//Consider the abnormality reasonable
-			if (p_sar->p_sar_para->p_init_over_irq->p_get_err_type_fn(p_sar) == AW_OK) {
+			if (p_sar->p_sar_para->p_init_over_irq
+				    ->p_get_err_type_fn(p_sar) == AW_OK) {
 				AWLOGD(p_sar->dev, "get_err_type return ok");
 				p_sar->fw_fail_flag = AW_TRUE;
 				return AW_OK;
@@ -517,8 +601,10 @@ int32_t aw_sar_check_init_over_irq(struct aw_sar *p_sar)
 	if (p_sar->p_sar_para->p_init_over_irq == NULL)
 		return AW_INVALID_PARA;
 
-	if (p_sar->p_sar_para->p_init_over_irq->p_check_init_over_irq_fn != NULL)
-		return p_sar->p_sar_para->p_init_over_irq->p_check_init_over_irq_fn(p_sar);
+	if (p_sar->p_sar_para->p_init_over_irq->p_check_init_over_irq_fn !=
+	    NULL)
+		return p_sar->p_sar_para->p_init_over_irq
+			->p_check_init_over_irq_fn(p_sar);
 
 	return aw_sar_check_init_over_irq_comm(p_sar);
 }
@@ -548,7 +634,38 @@ int32_t aw_sar_soft_reset(struct aw_sar *p_sar)
 	if (p_sar->p_sar_para->p_soft_rst->p_soft_reset_fn != NULL)
 		return p_sar->p_sar_para->p_soft_rst->p_soft_reset_fn(p_sar);
 
-	return aw_sar_soft_reset_func(p_sar->i2c, p_sar->p_sar_para->p_soft_rst);
+	return aw_sar_soft_reset_func(p_sar->i2c,
+				      p_sar->p_sar_para->p_soft_rst);
+}
+
+int32_t aw_sar_enable(struct aw_sar *p_sar) //todo
+{
+	AWLOGD(p_sar->dev, "enter");
+
+	if (p_sar->p_sar_para->p_sar_enable == NULL)
+		return AW_INVALID_PARA;
+
+	//If a private interface is defined, the private interface is used
+	if (p_sar->p_sar_para->p_sar_enable->p_sar_enable_fn != NULL)
+		return p_sar->p_sar_para->p_sar_enable->p_sar_enable_fn(p_sar);
+
+	return aw_sar_enable_func(p_sar->i2c, p_sar->p_sar_para->p_sar_enable);
+}
+
+int32_t aw_sar_disable(struct aw_sar *p_sar) //todo
+{
+	AWLOGD(p_sar->dev, "enter");
+
+	if (p_sar->p_sar_para->p_sar_disable == NULL)
+		return AW_INVALID_PARA;
+
+	//If a private interface is defined, the private interface is used
+	if (p_sar->p_sar_para->p_sar_disable->p_sar_disable_fn != NULL)
+		return p_sar->p_sar_para->p_sar_disable->p_sar_disable_fn(
+			p_sar);
+
+	return aw_sar_disable_func(p_sar->i2c,
+				   p_sar->p_sar_para->p_sar_disable);
 }
 
 static int32_t aw_sar_check_chipid(struct aw_sar *p_sar)
@@ -557,8 +674,10 @@ static int32_t aw_sar_check_chipid(struct aw_sar *p_sar)
 		return AW_INVALID_PARA;
 
 	if (p_sar->p_sar_para->p_check_chipid != NULL) {
-		if (p_sar->p_sar_para->p_check_chipid->p_check_chipid_fn != NULL)
-			return p_sar->p_sar_para->p_check_chipid->p_check_chipid_fn(p_sar);
+		if (p_sar->p_sar_para->p_check_chipid->p_check_chipid_fn !=
+		    NULL)
+			return p_sar->p_sar_para->p_check_chipid
+				->p_check_chipid_fn(p_sar);
 	}
 
 	return -AW_ERR;
@@ -569,16 +688,19 @@ int32_t aw_sar_load_def_reg_bin(struct aw_sar *p_sar)
 	AWLOGD(p_sar->dev, "enter");
 
 	if ((p_sar->p_sar_para->p_reg_bin == NULL) ||
-		(p_sar->p_sar_para->p_reg_bin->bin_name == NULL)) {
-		AWLOGE(p_sar->dev, "p_reg_bin is NULL or bin_name is NULL error");
+	    (p_sar->p_sar_para->p_reg_bin->bin_name == NULL)) {
+		AWLOGE(p_sar->dev,
+		       "p_reg_bin is NULL or bin_name is NULL error");
 		p_sar->ret_val = AW_BIN_PARA_INVALID;
 		return AW_INVALID_PARA;
 	}
 
 	snprintf(p_sar->load_bin.bin_name, sizeof(p_sar->load_bin.bin_name),
-			"%s_%u.bin", p_sar->p_sar_para->p_reg_bin->bin_name, p_sar->dts_info.sar_num);
+		 "%s_%u.bin", p_sar->p_sar_para->p_reg_bin->bin_name,
+		 p_sar->dts_info.sar_num);
 
-	p_sar->load_bin.bin_opera_func = p_sar->p_sar_para->p_reg_bin->bin_opera_func;
+	p_sar->load_bin.bin_opera_func =
+		p_sar->p_sar_para->p_reg_bin->bin_opera_func;
 
 	return aw_sar_load_bin_comm(p_sar);
 }
@@ -597,18 +719,22 @@ static int32_t aw_sar_reg_update_boot_work(struct aw_sar *p_sar)
 {
 	AWLOGD(p_sar->dev, "enter");
 
-	if ((p_sar->p_sar_para->p_boot_bin == NULL) || (p_sar->p_sar_para->p_boot_bin->bin_name == NULL))
+	if ((p_sar->p_sar_para->p_boot_bin == NULL) ||
+	    (p_sar->p_sar_para->p_boot_bin->bin_name == NULL))
 		return AW_INVALID_PARA;
 
 	snprintf(p_sar->load_bin.bin_name, sizeof(p_sar->load_bin.bin_name),
-			"%s_%u.bin", p_sar->p_sar_para->p_boot_bin->bin_name, p_sar->dts_info.sar_num);
+		 "%s_%u.bin", p_sar->p_sar_para->p_boot_bin->bin_name,
+		 p_sar->dts_info.sar_num);
 
-	p_sar->load_bin.bin_opera_func = p_sar->p_sar_para->p_boot_bin->bin_opera_func;
+	p_sar->load_bin.bin_opera_func =
+		p_sar->p_sar_para->p_boot_bin->bin_opera_func;
 
 	return aw_sar_load_bin_comm(p_sar);
 }
 
-static int32_t aw_sar_update_fw_para(struct aw_sar *p_sar, const struct aw_sar_load_bin_t *p_bin)
+static int32_t aw_sar_update_fw_para(struct aw_sar *p_sar,
+				     const struct aw_sar_load_bin_t *p_bin)
 {
 	if ((p_bin == NULL) || (p_bin->bin_name == NULL))
 		return AW_INVALID_PARA;
@@ -617,7 +743,7 @@ static int32_t aw_sar_update_fw_para(struct aw_sar *p_sar, const struct aw_sar_l
 	p_sar->load_bin.bin_load_fail_opera_func = p_bin->bin_load_fail_opera;
 
 	snprintf(p_sar->load_bin.bin_name, sizeof(p_sar->load_bin.bin_name),
-			"%s_%u.bin", p_bin->bin_name, p_sar->dts_info.sar_num);
+		 "%s_%u.bin", p_bin->bin_name, p_sar->dts_info.sar_num);
 
 	return AW_OK;
 }
@@ -652,7 +778,8 @@ static int32_t aw_sar_node_reg_update_fw(struct aw_sar *p_sar)
 	return aw_sar_load_bin_comm(p_sar);
 }
 
-static int32_t aw_sar_awrw_data_analysis(struct aw_sar *p_sar, const char *buf, uint8_t len)
+static int32_t aw_sar_awrw_data_analysis(struct aw_sar *p_sar, const char *buf,
+					 uint8_t len)
 {
 	uint32_t i = 0;
 	uint8_t data_temp[2] = { 0 };
@@ -664,18 +791,21 @@ static int32_t aw_sar_awrw_data_analysis(struct aw_sar *p_sar, const char *buf, 
 	AWLOGD(p_sar->dev, "enter");
 
 	if (theory_len != actual_len) {
-		AWLOGD(p_sar->dev, "error theory_len = %d actual_len = %d", theory_len, actual_len);
+		AWLOGD(p_sar->dev, "error theory_len = %d actual_len = %d",
+		       theory_len, actual_len);
 		return -AW_ERR;
 	}
 
-	for (i = 0; i < len * AW_SAR_AWRW_DATA_WIDTH; i += AW_SAR_AWRW_DATA_WIDTH) {
+	for (i = 0; i < len * AW_SAR_AWRW_DATA_WIDTH;
+	     i += AW_SAR_AWRW_DATA_WIDTH) {
 		data_temp[0] = buf[AW_SAR_AWRW_OffSET + i + AW_DATA_OffSET_2];
 		data_temp[1] = buf[AW_SAR_AWRW_OffSET + i + AW_DATA_OffSET_3];
 
 		if (sscanf(data_temp, "%02x", &tranfar_data_temp) == 1) {
-			p_sar->awrw_info.p_i2c_tranfar_data[index] = (uint8_t)tranfar_data_temp;
+			p_sar->awrw_info.p_i2c_tranfar_data[index] =
+				(uint8_t)tranfar_data_temp;
 			AWLOGD(p_sar->dev, "tranfar_data = 0x%2x",
-				p_sar->awrw_info.p_i2c_tranfar_data[index]);
+			       p_sar->awrw_info.p_i2c_tranfar_data[index]);
 		}
 		index++;
 	}
@@ -687,10 +817,12 @@ static int32_t aw_sar_awrw_write(struct aw_sar *p_sar, const char *buf)
 {
 	int32_t ret = 0;
 
-	ret = aw_sar_awrw_data_analysis(p_sar, buf, p_sar->awrw_info.i2c_tranfar_data_len);
-	if (ret == 0)
-		aw_sar_i2c_write_seq(p_sar->i2c, p_sar->awrw_info.p_i2c_tranfar_data,
+	ret = aw_sar_awrw_data_analysis(p_sar, buf,
 					p_sar->awrw_info.i2c_tranfar_data_len);
+	if (ret == 0)
+		aw_sar_i2c_write_seq(p_sar->i2c,
+				     p_sar->awrw_info.p_i2c_tranfar_data,
+				     p_sar->awrw_info.i2c_tranfar_data_len);
 
 	return ret;
 }
@@ -698,16 +830,20 @@ static int32_t aw_sar_awrw_write(struct aw_sar *p_sar, const char *buf)
 static int32_t aw_sar_awrw_read(struct aw_sar *p_sar, const char *buf)
 {
 	int32_t ret = 0;
-	uint8_t *p_buf = p_sar->awrw_info.p_i2c_tranfar_data + p_sar->awrw_info.addr_len;
-	uint32_t len = (uint16_t)(p_sar->awrw_info.data_len * p_sar->awrw_info.reg_num);
+	uint8_t *p_buf =
+		p_sar->awrw_info.p_i2c_tranfar_data + p_sar->awrw_info.addr_len;
+	uint32_t len = (uint16_t)(p_sar->awrw_info.data_len *
+				  p_sar->awrw_info.reg_num);
 
 	ret = aw_sar_awrw_data_analysis(p_sar, buf, p_sar->awrw_info.addr_len);
 	if (ret == 0) {
 		ret = aw_sar_i2c_read_seq(p_sar->i2c,
-					p_sar->awrw_info.p_i2c_tranfar_data,
-					p_sar->awrw_info.addr_len,
-					p_sar->awrw_info.p_i2c_tranfar_data + p_sar->awrw_info.addr_len,
-					(uint16_t)(p_sar->awrw_info.data_len * p_sar->awrw_info.reg_num));
+					  p_sar->awrw_info.p_i2c_tranfar_data,
+					  p_sar->awrw_info.addr_len,
+					  p_sar->awrw_info.p_i2c_tranfar_data +
+						  p_sar->awrw_info.addr_len,
+					  (uint16_t)(p_sar->awrw_info.data_len *
+						     p_sar->awrw_info.reg_num));
 		if (ret != AW_OK)
 			memset(p_buf, 0xff, len);
 	}
@@ -728,12 +864,16 @@ static int32_t aw_sar_awrw_get_func(struct aw_sar *p_sar, char *buf)
 	if (p_sar->awrw_info.rw_flag == AW_SAR_PACKAGE_RD) {
 		for (i = 0; i < p_sar->awrw_info.i2c_tranfar_data_len; i++) {
 			len += snprintf(buf + len, PAGE_SIZE - len, "0x%02x,",
-				p_sar->awrw_info.p_i2c_tranfar_data[i]);
+					p_sar->awrw_info.p_i2c_tranfar_data[i]);
 		}
 	} else {
-		for (i = 0; i < (p_sar->awrw_info.data_len) * (p_sar->awrw_info.reg_num); i++) {
-			len += snprintf(buf + len, PAGE_SIZE - len, "0x%02x,",
-				p_sar->awrw_info.p_i2c_tranfar_data[p_sar->awrw_info.addr_len + i]);
+		for (i = 0; i < (p_sar->awrw_info.data_len) *
+					(p_sar->awrw_info.reg_num);
+		     i++) {
+			len += snprintf(
+				buf + len, PAGE_SIZE - len, "0x%02x,",
+				p_sar->awrw_info.p_i2c_tranfar_data
+					[p_sar->awrw_info.addr_len + i]);
 		}
 	}
 	snprintf(buf + len - 1, PAGE_SIZE - len, "\n");
@@ -745,15 +885,17 @@ static int32_t aw_sar_awrw_get_func(struct aw_sar *p_sar, char *buf)
 }
 
 //Function: continuous read register interface
-static ssize_t awrw_show(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t awrw_show(struct device *dev, struct device_attribute *attr,
+			 char *buf)
 {
 	struct aw_sar *p_sar = dev_get_drvdata(dev);
 	ssize_t ret = 0;
 
 	mutex_lock(&aw_sar_lock);
 	if ((p_sar->p_sar_para->p_aw_sar_awrw != NULL) &&
-		(p_sar->p_sar_para->p_aw_sar_awrw->p_get_awrw_node_fn != NULL)) {
-		ret = (ssize_t)p_sar->p_sar_para->p_aw_sar_awrw->p_get_awrw_node_fn(p_sar, buf);
+	    (p_sar->p_sar_para->p_aw_sar_awrw->p_get_awrw_node_fn != NULL)) {
+		ret = (ssize_t)p_sar->p_sar_para->p_aw_sar_awrw
+			      ->p_get_awrw_node_fn(p_sar, buf);
 		mutex_unlock(&aw_sar_lock);
 		return ret;
 	}
@@ -769,16 +911,17 @@ static int32_t aw_sar_awrw_handle(struct aw_sar *p_sar, const char *buf)
 {
 	int32_t ret = 0;
 
-	p_sar->awrw_info.i2c_tranfar_data_len = p_sar->awrw_info.addr_len +
-						p_sar->awrw_info.data_len *
-						p_sar->awrw_info.reg_num;
+	p_sar->awrw_info.i2c_tranfar_data_len =
+		p_sar->awrw_info.addr_len +
+		p_sar->awrw_info.data_len * p_sar->awrw_info.reg_num;
 
 	if (p_sar->awrw_info.p_i2c_tranfar_data != NULL) {
 		devm_kfree(p_sar->dev, p_sar->awrw_info.p_i2c_tranfar_data);
 		p_sar->awrw_info.p_i2c_tranfar_data = NULL;
 	}
 
-	p_sar->awrw_info.p_i2c_tranfar_data = devm_kzalloc(p_sar->dev, p_sar->awrw_info.i2c_tranfar_data_len, GFP_KERNEL);
+	p_sar->awrw_info.p_i2c_tranfar_data = devm_kzalloc(
+		p_sar->dev, p_sar->awrw_info.i2c_tranfar_data_len, GFP_KERNEL);
 	if (p_sar->awrw_info.p_i2c_tranfar_data == NULL) {
 		AWLOGE(p_sar->dev, "devm_kzalloc error");
 		return -AW_ERR;
@@ -789,7 +932,8 @@ static int32_t aw_sar_awrw_handle(struct aw_sar *p_sar, const char *buf)
 		if (ret != 0)
 			AWLOGE(p_sar->dev, "awrw_write error");
 		if (p_sar->awrw_info.p_i2c_tranfar_data != NULL) {
-			devm_kfree(p_sar->dev, p_sar->awrw_info.p_i2c_tranfar_data);
+			devm_kfree(p_sar->dev,
+				   p_sar->awrw_info.p_i2c_tranfar_data);
 			p_sar->awrw_info.p_i2c_tranfar_data = NULL;
 		}
 	} else if (p_sar->awrw_info.rw_flag == AW_SAR_I2C_RD) {
@@ -807,7 +951,7 @@ static int32_t aw_sar_awrw_set_func(struct aw_sar *p_sar, const char *buf)
 {
 	uint32_t rw_flag = 0;
 	uint32_t addr_bytes = 0;
-	uint32_t data_bytes =  0;
+	uint32_t data_bytes = 0;
 	uint32_t package_nums = 0;
 	uint32_t reg_num = 0;
 	uint32_t i = 0;
@@ -822,7 +966,8 @@ static int32_t aw_sar_awrw_set_func(struct aw_sar *p_sar, const char *buf)
 	uint32_t actual_len = 0;
 
 	//step1: Parse frame header
-	if (sscanf(buf, "0x%02x 0x%02x 0x%02x ", &rw_flag, &addr_bytes, &data_bytes) != 3) {
+	if (sscanf(buf, "0x%02x 0x%02x 0x%02x ", &rw_flag, &addr_bytes,
+		   &data_bytes) != 3) {
 		AWLOGE(p_sar->dev, "sscanf0 parse error!");
 		return -AW_ERR;
 	}
@@ -844,26 +989,32 @@ static int32_t aw_sar_awrw_set_func(struct aw_sar *p_sar, const char *buf)
 		aw_sar_awrw_handle(p_sar, buf);
 	} else if (rw_flag == AW_SAR_PACKAGE_RD) {
 		//step2: Get number of packages
-		if (sscanf(buf + AW_SAR_OFFSET_LEN, "0x%02x ", &package_nums) != 1) {
+		if (sscanf(buf + AW_SAR_OFFSET_LEN, "0x%02x ", &package_nums) !=
+		    1) {
 			AWLOGE(p_sar->dev, "sscanf2 parse error!");
 			return -AW_ERR;
 		}
-		theory_len = AW_SAR_OFFSET_LEN + AW_SAR_AWRW_DATA_WIDTH +
-				package_nums * (AW_SAR_AWRW_DATA_WIDTH +
-				AW_SAR_AWRW_DATA_WIDTH * addr_bytes);
+		theory_len =
+			AW_SAR_OFFSET_LEN + AW_SAR_AWRW_DATA_WIDTH +
+			package_nums * (AW_SAR_AWRW_DATA_WIDTH +
+					AW_SAR_AWRW_DATA_WIDTH * addr_bytes);
 		actual_len = strlen(buf);
-	//	AWLOGD(p_sar->dev, "theory_len:%d, actual_len:%d", theory_len, actual_len);
+		//	AWLOGD(p_sar->dev, "theory_len:%d, actual_len:%d", theory_len, actual_len);
 		if (theory_len != actual_len) {
-
-			AWLOGE(p_sar->dev, "theory_len:%d, actual_len:%d error!", theory_len, actual_len);
+			AWLOGE(p_sar->dev,
+			       "theory_len:%d, actual_len:%d error!",
+			       theory_len, actual_len);
 			return -AW_ERR;
 		}
 
 		//step3: Get the size of read data and apply for space
-	//	AWLOGE(p_sar->dev, "package_nums:%d", package_nums);
+		//	AWLOGE(p_sar->dev, "package_nums:%d", package_nums);
 		for (i = 0; i < package_nums; i++) {
-			buf_index0 = AW_SAR_OFFSET_LEN + AW_SAR_AWRW_DATA_WIDTH +
-					(AW_SAR_AWRW_DATA_WIDTH * addr_bytes + AW_SAR_AWRW_DATA_WIDTH) * i;
+			buf_index0 = AW_SAR_OFFSET_LEN +
+				     AW_SAR_AWRW_DATA_WIDTH +
+				     (AW_SAR_AWRW_DATA_WIDTH * addr_bytes +
+				      AW_SAR_AWRW_DATA_WIDTH) *
+					     i;
 			if (sscanf(buf + buf_index0, "0x%02x", &reg_num) != 1) {
 				AWLOGE(p_sar->dev, "sscanf3 parse error!");
 				return -AW_ERR;
@@ -872,15 +1023,16 @@ static int32_t aw_sar_awrw_set_func(struct aw_sar *p_sar, const char *buf)
 			r_buf_len += reg_num * data_bytes;
 		}
 
-	//	AWLOGD(p_sar->dev, "r_buf_len:%d", r_buf_len);
+		//	AWLOGD(p_sar->dev, "r_buf_len:%d", r_buf_len);
 		p_sar->awrw_info.i2c_tranfar_data_len = r_buf_len;
 
 		if (p_sar->awrw_info.p_i2c_tranfar_data != NULL) {
-			devm_kfree(p_sar->dev, p_sar->awrw_info.p_i2c_tranfar_data);
+			devm_kfree(p_sar->dev,
+				   p_sar->awrw_info.p_i2c_tranfar_data);
 			p_sar->awrw_info.p_i2c_tranfar_data = NULL;
 		}
-		p_sar->awrw_info.p_i2c_tranfar_data = devm_kzalloc(p_sar->dev,
-								r_buf_len, GFP_KERNEL);
+		p_sar->awrw_info.p_i2c_tranfar_data =
+			devm_kzalloc(p_sar->dev, r_buf_len, GFP_KERNEL);
 		if (p_sar->awrw_info.p_i2c_tranfar_data == NULL) {
 			AWLOGE(p_sar->dev, "devm_kzalloc error");
 			return -AW_ERR;
@@ -888,30 +1040,36 @@ static int32_t aw_sar_awrw_set_func(struct aw_sar *p_sar, const char *buf)
 
 		//step3: Resolve register address and read data in packets
 		for (i = 0; i < package_nums; i++) {
-			buf_index0 = AW_SAR_OFFSET_LEN + AW_SAR_AWRW_DATA_WIDTH +
-				(AW_SAR_AWRW_DATA_WIDTH * addr_bytes + AW_SAR_AWRW_DATA_WIDTH) * i;
+			buf_index0 = AW_SAR_OFFSET_LEN +
+				     AW_SAR_AWRW_DATA_WIDTH +
+				     (AW_SAR_AWRW_DATA_WIDTH * addr_bytes +
+				      AW_SAR_AWRW_DATA_WIDTH) *
+					     i;
 			if (sscanf(buf + buf_index0, "0x%02x", &reg_num) != 1) {
 				AWLOGE(p_sar->dev, "sscanf4 parse error!");
 				return -AW_ERR;
 			}
 
 			for (j = 0; j < addr_bytes; j += 1) {
-				buf_index1 = buf_index0 + AW_SAR_AWRW_DATA_WIDTH + (j * AW_SAR_AWRW_DATA_WIDTH);
+				buf_index1 = buf_index0 +
+					     AW_SAR_AWRW_DATA_WIDTH +
+					     (j * AW_SAR_AWRW_DATA_WIDTH);
 				//AWLOGD(p_sar->dev, "buf_index1 = %d", buf_index1);
-				if (sscanf(buf + buf_index1, "0x%02x", &addr_tmp) == 1) {
+				if (sscanf(buf + buf_index1, "0x%02x",
+					   &addr_tmp) == 1) {
 					addr[j] = (uint8_t)addr_tmp;
 					//AWLOGD(p_sar->dev, "tranfar_data = 0x%2x", addr[j]);
 				} else {
-					AWLOGE(p_sar->dev, "sscanf5 parse error!");
+					AWLOGE(p_sar->dev,
+					       "sscanf5 parse error!");
 					return -AW_ERR;
 				}
 			}
-		//	AWLOGD(p_sar->dev, "tr_offset = %d", tr_offset);
-			aw_sar_i2c_read_seq(p_sar->i2c,
-					addr,
-					addr_bytes,
-					p_sar->awrw_info.p_i2c_tranfar_data + tr_offset,
-					(uint16_t)(data_bytes * reg_num));
+			//	AWLOGD(p_sar->dev, "tr_offset = %d", tr_offset);
+			aw_sar_i2c_read_seq(
+				p_sar->i2c, addr, addr_bytes,
+				p_sar->awrw_info.p_i2c_tranfar_data + tr_offset,
+				(uint16_t)(data_bytes * reg_num));
 			tr_offset += data_bytes * reg_num;
 		}
 	}
@@ -920,16 +1078,17 @@ static int32_t aw_sar_awrw_set_func(struct aw_sar *p_sar, const char *buf)
 }
 
 //Function: continuous write register interface
-static ssize_t
-awrw_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+static ssize_t awrw_store(struct device *dev, struct device_attribute *attr,
+			  const char *buf, size_t count)
 {
 	struct aw_sar *p_sar = dev_get_drvdata(dev);
 
 	mutex_lock(&aw_sar_lock);
 
 	if ((p_sar->p_sar_para->p_aw_sar_awrw != NULL) &&
-		(p_sar->p_sar_para->p_aw_sar_awrw->p_set_awrw_node_fn != NULL)) {
-		p_sar->p_sar_para->p_aw_sar_awrw->p_set_awrw_node_fn (p_sar, buf, count);
+	    (p_sar->p_sar_para->p_aw_sar_awrw->p_set_awrw_node_fn != NULL)) {
+		p_sar->p_sar_para->p_aw_sar_awrw->p_set_awrw_node_fn(p_sar, buf,
+								     count);
 		mutex_unlock(&aw_sar_lock);
 		return count;
 	}
@@ -941,7 +1100,8 @@ awrw_store(struct device *dev, struct device_attribute *attr, const char *buf, s
 	return count;
 }
 //Print all readable register values
-static ssize_t reg_show(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t reg_show(struct device *dev, struct device_attribute *attr,
+			char *buf)
 {
 	struct aw_sar *p_sar = dev_get_drvdata(dev);
 	ssize_t len = 0;
@@ -956,15 +1116,20 @@ static ssize_t reg_show(struct device *dev, struct device_attribute *attr, char 
 	reg_rd_access = p_sar->p_sar_para->p_reg_list->reg_rd_access;
 
 	for (i = 0; i < p_sar->p_sar_para->p_reg_list->reg_num; i++) {
-		if (p_sar->p_sar_para->p_reg_list->reg_perm[i].rw & reg_rd_access) {
-			ret = aw_sar_i2c_read(p_sar->i2c, p_sar->p_sar_para->p_reg_list->reg_perm[i].reg, &reg_data);
+		if (p_sar->p_sar_para->p_reg_list->reg_perm[i].rw &
+		    reg_rd_access) {
+			ret = aw_sar_i2c_read(
+				p_sar->i2c,
+				p_sar->p_sar_para->p_reg_list->reg_perm[i].reg,
+				&reg_data);
 			if (ret < 0)
 				len += snprintf(buf + len, PAGE_SIZE - len,
-						"i2c read error ret = %d\n", ret);
-			len += snprintf(buf + len, PAGE_SIZE - len,
-						"%x,%x\n",
-						p_sar->p_sar_para->p_reg_list->reg_perm[i].reg,
-						reg_data);
+						"i2c read error ret = %d\n",
+						ret);
+			len += snprintf(
+				buf + len, PAGE_SIZE - len, "%x,%x\n",
+				p_sar->p_sar_para->p_reg_list->reg_perm[i].reg,
+				reg_data);
 		}
 	}
 	AWLOGD(p_sar->dev, "len %d", (int)len);
@@ -973,8 +1138,8 @@ static ssize_t reg_show(struct device *dev, struct device_attribute *attr, char 
 }
 
 //Write register interface with write permission
-static ssize_t
-reg_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+static ssize_t reg_store(struct device *dev, struct device_attribute *attr,
+			 const char *buf, size_t count)
 {
 	uint16_t i = 0;
 	struct aw_sar *p_sar = dev_get_drvdata(dev);
@@ -992,10 +1157,13 @@ reg_store(struct device *dev, struct device_attribute *attr, const char *buf, si
 		return count;
 
 	for (i = 0; i < p_sar->p_sar_para->p_reg_list->reg_num; i++) {
-		if ((uint16_t)databuf[0] == p_sar->p_sar_para->p_reg_list->reg_perm[i].reg) {
-			if (p_sar->p_sar_para->p_reg_list->reg_perm[i].rw & reg_wd_access) {
+		if ((uint16_t)databuf[0] ==
+		    p_sar->p_sar_para->p_reg_list->reg_perm[i].reg) {
+			if (p_sar->p_sar_para->p_reg_list->reg_perm[i].rw &
+			    reg_wd_access) {
 				aw_sar_i2c_write(p_sar->i2c,
-					(uint16_t)databuf[0], (uint32_t)databuf[1]);
+						 (uint16_t)databuf[0],
+						 (uint32_t)databuf[1]);
 			}
 			break;
 		}
@@ -1005,8 +1173,8 @@ reg_store(struct device *dev, struct device_attribute *attr, const char *buf, si
 }
 
 //set chip Soft reset
-static ssize_t
-soft_rst_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+static ssize_t soft_rst_store(struct device *dev, struct device_attribute *attr,
+			      const char *buf, size_t count)
 {
 	uint32_t flag = 0;
 	struct aw_sar *p_sar = dev_get_drvdata(dev);
@@ -1022,6 +1190,49 @@ soft_rst_store(struct device *dev, struct device_attribute *attr, const char *bu
 	return count;
 }
 
+//set chip enable
+static ssize_t enable_sar_store(struct device *dev,
+				struct device_attribute *attr, const char *buf,
+				size_t count) //todo
+{
+	uint32_t flag = 0;
+	struct aw_sar *p_sar = dev_get_drvdata(dev);
+
+	if (kstrtouint(buf, 0, &flag) != 0) {
+		AWLOGE(p_sar->dev, "kstrtouint parse err");
+		return count;
+	}
+
+	if (flag == 1) {
+		aw_sar_enable(p_sar);
+	} else if (flag == 0) {
+		aw_sar_disable(p_sar);
+	} else {
+		AWLOGE(p_sar->dev, "enable sar input_num err");
+	}
+
+	return count;
+}
+
+//set chip disable
+/*
+static ssize_t
+disable_sar_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+	uint32_t flag = 0;
+	struct aw_sar *p_sar = dev_get_drvdata(dev);
+
+	if (kstrtouint(buf, 0, &flag) != 0) {
+		AWLOGE(p_sar->dev, "kstrtouint parse err");
+		return count;
+	}
+
+	if (flag == 0)
+		aw_sar_disable(p_sar);
+
+	return count;
+}*/
+
 static int32_t aw_sar_aot(struct aw_sar *p_sar)
 {
 	if (p_sar->p_sar_para->p_aot == NULL)
@@ -1030,13 +1241,15 @@ static int32_t aw_sar_aot(struct aw_sar *p_sar)
 	if (p_sar->p_sar_para->p_aot->p_set_aot_node_fn != NULL)
 		return p_sar->p_sar_para->p_aot->p_set_aot_node_fn(p_sar);
 
-	return aw_sar_i2c_write_bits(p_sar->i2c, p_sar->p_sar_para->p_aot->aot_reg,
-					p_sar->p_sar_para->p_aot->aot_mask, p_sar->p_sar_para->p_aot->aot_flag);
+	return aw_sar_i2c_write_bits(p_sar->i2c,
+				     p_sar->p_sar_para->p_aot->aot_reg,
+				     p_sar->p_sar_para->p_aot->aot_mask,
+				     p_sar->p_sar_para->p_aot->aot_flag);
 }
 
 //Perform Auto-Offset-Tuning (AOT)
-static ssize_t
-aot_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+static ssize_t aot_store(struct device *dev, struct device_attribute *attr,
+			 const char *buf, size_t count)
 {
 	struct aw_sar *p_sar = dev_get_drvdata(dev);
 	uint32_t cali_flag = 0;
@@ -1064,8 +1277,9 @@ int32_t aw_sar_update_reg_set_func(struct aw_sar *p_sar)
 }
 
 //Update register configuration
-static ssize_t
-update_reg_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+static ssize_t update_reg_store(struct device *dev,
+				struct device_attribute *attr, const char *buf,
+				size_t count)
 {
 	uint32_t flag = 0;
 	struct aw_sar *p_sar = dev_get_drvdata(dev);
@@ -1100,24 +1314,28 @@ static ssize_t aw_sar_get_diff(struct aw_sar *p_sar, char *buf)
 
 	//If a private interface is defined, the private interface is used
 	if (p_sar->p_sar_para->p_diff->p_get_diff_node_fn != NULL)
-		return p_sar->p_sar_para->p_diff->p_get_diff_node_fn(p_sar, buf);
+		return p_sar->p_sar_para->p_diff->p_get_diff_node_fn(p_sar,
+								     buf);
 
 	for (i = 0; i < p_sar->p_sar_para->ch_num_max; i++) {
-		ret = aw_sar_i2c_read(p_sar->i2c, diff->diff0_reg + i * diff->diff_step, &data);
+		ret = aw_sar_i2c_read(p_sar->i2c,
+				      diff->diff0_reg + i * diff->diff_step,
+				      &data);
 		if (ret != AW_OK) {
 			AWLOGE(p_sar->dev, "read diff err: %d", ret);
 			return -AW_ERR;
 		}
 		diff_val = (int32_t)data / (int32_t)diff->rm_float;
-		len += snprintf(buf + len, PAGE_SIZE - len, "DIFF_CH%u = %d\n", i, diff_val);
+		len += snprintf(buf + len, PAGE_SIZE - len, "DIFF_CH%u = %d\n",
+				i, diff_val);
 	}
 
 	return len;
 }
 
-
 //Print diff values of all channels of the chip.
-static ssize_t diff_show(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t diff_show(struct device *dev, struct device_attribute *attr,
+			 char *buf)
 {
 	struct aw_sar *p_sar = dev_get_drvdata(dev);
 
@@ -1142,13 +1360,15 @@ void aw_sar_mode_set(struct aw_sar *p_sar, uint8_t curr_mode)
 	mode_set_para.chip_mode.last_mode = p_sar->last_mode;
 
 	aw_sar_mode_set_func(p_sar->i2c, p_sar->irq_init.to_irq, &mode_set_para,
-		p_sar->p_sar_para->p_mode->mode_set_arr, p_sar->p_sar_para->p_mode->mode_set_arr_len);
+			     p_sar->p_sar_para->p_mode->mode_set_arr,
+			     p_sar->p_sar_para->p_mode->mode_set_arr_len);
 	p_sar->last_mode = curr_mode;
 }
 
 //Set the chip to enter different modes
-static ssize_t mode_operation_store(struct device *dev, struct device_attribute *attr,
-						const char *buf, size_t count)
+static ssize_t mode_operation_store(struct device *dev,
+				    struct device_attribute *attr,
+				    const char *buf, size_t count)
 {
 	struct aw_sar *p_sar = dev_get_drvdata(dev);
 	uint32_t mode = 0;
@@ -1163,7 +1383,8 @@ static ssize_t mode_operation_store(struct device *dev, struct device_attribute 
 }
 
 //Get the current mode of the chip
-static ssize_t mode_operation_show(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t mode_operation_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
 {
 	ssize_t len = 0;
 	struct aw_sar *p_sar = dev_get_drvdata(dev);
@@ -1178,30 +1399,37 @@ static ssize_t mode_operation_show(struct device *dev, struct device_attribute *
 }
 
 //Print information related information
-static ssize_t chip_info_show(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t chip_info_show(struct device *dev, struct device_attribute *attr,
+			      char *buf)
 {
 	struct aw_sar *p_sar = dev_get_drvdata(dev);
 	ssize_t len = 0;
 
-	len += snprintf(buf + len, PAGE_SIZE - len, "driver version: %s\n", AW_SAR_DRIVER_VERSION);
-	len += snprintf(buf + len, PAGE_SIZE - len, "reg_load_state: %d\n", p_sar->ret_val);
+	len += snprintf(buf + len, PAGE_SIZE - len, "driver version: %s\n",
+			AW_SAR_DRIVER_VERSION);
+	len += snprintf(buf + len, PAGE_SIZE - len, "reg_load_state: %d\n",
+			p_sar->ret_val);
 
 	if ((p_sar->p_sar_para->p_get_chip_info != NULL) &&
-		(p_sar->p_sar_para->p_get_chip_info->p_get_chip_info_node_fn != NULL)) {
-		p_sar->p_sar_para->p_get_chip_info->p_get_chip_info_node_fn(p_sar, buf, &len);
+	    (p_sar->p_sar_para->p_get_chip_info->p_get_chip_info_node_fn !=
+	     NULL)) {
+		p_sar->p_sar_para->p_get_chip_info->p_get_chip_info_node_fn(
+			p_sar, buf, &len);
 	}
 
 	return len;
 }
 
-static ssize_t offset_show(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t offset_show(struct device *dev, struct device_attribute *attr,
+			   char *buf)
 {
 	struct aw_sar *p_sar = dev_get_drvdata(dev);
 	ssize_t len = 0;
 
 	if ((p_sar->p_sar_para->p_offset != NULL) &&
-		(p_sar->p_sar_para->p_offset->p_get_offset_node_fn != NULL))
-		len = (ssize_t)p_sar->p_sar_para->p_offset->p_get_offset_node_fn(p_sar, buf);
+	    (p_sar->p_sar_para->p_offset->p_get_offset_node_fn != NULL))
+		len = (ssize_t)p_sar->p_sar_para->p_offset->p_get_offset_node_fn(
+			p_sar, buf);
 
 	return len;
 }
@@ -1215,6 +1443,7 @@ static DEVICE_ATTR_RO(diff);
 static DEVICE_ATTR_RW(mode_operation);
 static DEVICE_ATTR_RO(chip_info);
 static DEVICE_ATTR_RO(offset);
+static DEVICE_ATTR_WO(enable_sar); //todo
 
 static struct attribute *aw_sar_attributes[] = {
 	&dev_attr_awrw.attr,
@@ -1226,7 +1455,138 @@ static struct attribute *aw_sar_attributes[] = {
 	&dev_attr_mode_operation.attr,
 	&dev_attr_chip_info.attr,
 	&dev_attr_offset.attr,
+	&dev_attr_enable_sar.attr, //todo
 	NULL
+};
+
+static ssize_t
+aw_manual_offset_calibration_store(const struct class *class,
+				   const struct class_attribute *attr,
+				   const char *buf, size_t count)
+{
+	uint32_t cali_flag = 0;
+
+	if (kstrtouint(buf, 0, &cali_flag) != 0)
+		return count;
+
+	if (cali_flag == 99)
+		aw_sar_aot(p_class);
+	else
+		AWLOGE(p_class->dev, "fail to set aot cali");
+
+	return count;
+}
+
+static ssize_t aw_offset_dac_show(const struct class *class,
+				  const struct class_attribute *attr, char *buf)
+{
+	ssize_t len = 0;
+
+	if ((p_class->p_sar_para->p_offset != NULL) &&
+	    (p_class->p_sar_para->p_offset->p_get_offset_node_fn != NULL))
+		len = (ssize_t)p_class->p_sar_para->p_offset
+			      ->p_get_offset_node_fn(p_class, buf);
+
+	return len;
+}
+
+static ssize_t aw_diff_show(const struct class *class,
+			    const struct class_attribute *attr, char *buf)
+{
+	return aw_sar_get_diff(p_class, buf);
+}
+
+static ssize_t ic_check_show(const struct class *class,
+			     const struct class_attribute *attr, char *buf)
+{
+	int ret = -1;
+
+	ret = aw_sar_check_chipid(p_class);
+	if (0 != ret) {
+		return sprintf(buf, "%s\n", "0x01");
+	} else {
+		return sprintf(buf, "%s\n", "0x00");
+	}
+}
+
+static ssize_t enable_store(const struct class *class,
+			    const struct class_attribute *attr, const char *buf,
+			    size_t count)
+{
+	uint32_t flag = 0;
+	if (kstrtouint(buf, 0, &flag) != 0) {
+		AWLOGE(p_class->dev, "kstrtouint parse err");
+		return count;
+	}
+
+	if (flag == 1) {
+		aw_sar_enable(p_class);
+	} else if (flag == 0) {
+		aw_sar_disable(p_class);
+	} else {
+		AWLOGE(p_class->dev, "enable sar input_num err");
+	}
+	return count;
+}
+
+static ssize_t enable_show(const struct class *class,
+			   const struct class_attribute *attr, char *buf)
+{
+	ssize_t len = 0;
+	if ((p_class->p_sar_para->p_get_chip_info != NULL) &&
+	    (p_class->p_sar_para->p_get_chip_info->p_get_chip_info_node_fn !=
+	     NULL)) {
+		p_class->p_sar_para->p_get_chip_info->p_get_chip_info_node_fn(
+			p_class, buf, &len);
+	}
+    char last_char = buf[len - 2];
+    int ret  = (int)(last_char);
+    AWLOGE(p_class->dev, "last_char is %c, %d\n",last_char,ret);
+    if(ret == 49){
+		return sprintf(buf, "%s\n", "0x00");
+	} else {
+		return sprintf(buf, "%s\n", "0x01");
+	}
+}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
+static struct class_attribute class_attr_calibrate =
+	__ATTR(calibrate, 0664, NULL, aw_manual_offset_calibration_store);
+static struct class_attribute class_attr_offset_dac =
+	__ATTR(offset, 0664, aw_offset_dac_show, NULL);
+static struct class_attribute class_attr_diff =
+	__ATTR(diff, 0664, aw_diff_show, NULL);
+static struct class_attribute class_attr_ic_check =
+	__ATTR(ic_check, 0664, ic_check_show, NULL);
+static struct class_attribute class_attr_enable =
+	__ATTR(enable, 0664, enable_show, enable_store);
+
+static struct attribute *sar_class_attrs[] = {
+	&class_attr_calibrate.attr, &class_attr_offset_dac.attr,
+	&class_attr_diff.attr,	    &class_attr_ic_check.attr,
+	&class_attr_enable.attr,    NULL,
+};
+ATTRIBUTE_GROUPS(sar_class);
+#else
+static struct class_attribute sar_class_attributes[] = {
+	__ATTR(calibrate, 0664, aw_calibration_show,
+	       aw_manual_offset_calibration_store),
+	__ATTR(offset, 0664, aw_offset_dac_show, NULL),
+	__ATTR(diff, 0664, diff_show, NULL);
+__ATTR(ic_check, 0664, ic_check_show, NULL);
+__ATTR(enable, 0664, enable_show, enable_store);
+__ATTR_NULL,
+}
+;
+#endif
+
+struct class sar_class = {
+	.name = "sar",
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
+	.class_groups = sar_class_groups,
+#else
+	.class_attrs = sar_class_attributes,
+#endif
 };
 
 static const struct attribute_group aw_sar_attribute_group = {
@@ -1235,11 +1595,10 @@ static const struct attribute_group aw_sar_attribute_group = {
 
 //firmware upgrade through write register mode, and the operation is supported by flash chip
 static ssize_t prot_update_fw_store(struct device *dev,
-						struct device_attribute *attr,
-						const char *buf, size_t count)
+				    struct device_attribute *attr,
+				    const char *buf, size_t count)
 {
 	struct aw_sar *p_sar = dev_get_drvdata(dev);
-
 
 	mutex_lock(&aw_sar_lock);
 	aw_sar_disable_irq(p_sar);
@@ -1255,8 +1614,8 @@ static ssize_t prot_update_fw_store(struct device *dev,
 
 //firmware upgrade throughr Write register mode,and the operation is supported by flash chip
 static ssize_t reg_update_fw_store(struct device *dev,
-						struct device_attribute *attr,
-						const char *buf, size_t count)
+				   struct device_attribute *attr,
+				   const char *buf, size_t count)
 {
 	struct aw_sar *p_sar = dev_get_drvdata(dev);
 
@@ -1274,8 +1633,8 @@ static ssize_t reg_update_fw_store(struct device *dev,
 
 //boot upgrade throughr Write register mode,and the operation is supported by flash chip
 static ssize_t reg_update_boot_store(struct device *dev,
-						struct device_attribute *attr,
-						const char *buf, size_t count)
+				     struct device_attribute *attr,
+				     const char *buf, size_t count)
 {
 	struct aw_sar *p_sar = dev_get_drvdata(dev);
 
@@ -1298,17 +1657,19 @@ static ssize_t reg_update_boot_store(struct device *dev,
 //Print the protocol upgrade status. 0 is success, Not 0 is failure
 //Print the current firmware version number
 static ssize_t prot_update_fw_show(struct device *dev,
-				struct device_attribute *attr, char *buf)
+				   struct device_attribute *attr, char *buf)
 {
 	struct aw_sar *p_sar = dev_get_drvdata(dev);
 	ssize_t len = 0;
 
 	len += snprintf(buf + len, PAGE_SIZE - len,
-		"protocol update state:%s!\n",
-		(p_sar->prot_update_state == 0) ? "ok" : "error");
+			"protocol update state:%s!\n",
+			(p_sar->prot_update_state == 0) ? "ok" : "error");
 	if ((p_sar->p_sar_para->p_prox_fw != NULL) &&
-		(p_sar->p_sar_para->p_prox_fw->p_get_prot_update_fw_node_fn != NULL))
-		p_sar->p_sar_para->p_prox_fw->p_get_prot_update_fw_node_fn(p_sar, buf, &len);
+	    (p_sar->p_sar_para->p_prox_fw->p_get_prot_update_fw_node_fn !=
+	     NULL))
+		p_sar->p_sar_para->p_prox_fw->p_get_prot_update_fw_node_fn(
+			p_sar, buf, &len);
 
 	return len;
 }
@@ -1318,10 +1679,8 @@ static DEVICE_ATTR_WO(reg_update_fw);
 static DEVICE_ATTR_WO(reg_update_boot);
 
 static struct attribute *aw_sar_update_attributes[] = {
-	&dev_attr_prot_update_fw.attr,
-	&dev_attr_reg_update_fw.attr,
-	&dev_attr_reg_update_boot.attr,
-	NULL
+	&dev_attr_prot_update_fw.attr, &dev_attr_reg_update_fw.attr,
+	&dev_attr_reg_update_boot.attr, NULL
 };
 
 static const struct attribute_group aw_sar_update_attribute_group = {
@@ -1331,7 +1690,8 @@ static const struct attribute_group aw_sar_update_attribute_group = {
 static void aw_sar_update_work(struct work_struct *work)
 {
 	int32_t ret = 0;
-	struct aw_sar *p_sar = container_of(work, struct aw_sar, update_work.work);
+	struct aw_sar *p_sar =
+		container_of(work, struct aw_sar, update_work.work);
 
 	mutex_lock(&aw_sar_lock);
 
@@ -1375,7 +1735,8 @@ static void aw_sar_update(struct aw_sar *p_sar)
 		p_sar->p_sar_para->p_reg_bin->p_update_fn(p_sar);
 
 	INIT_DELAYED_WORK(&p_sar->update_work, aw_sar_update_work);
-	schedule_delayed_work(&p_sar->update_work, msecs_to_jiffies(AW_POWER_ON_SYSFS_DELAY_MS));
+	schedule_delayed_work(&p_sar->update_work,
+			      msecs_to_jiffies(AW_POWER_ON_SYSFS_DELAY_MS));
 }
 
 static int32_t aw_sar_create_node(struct aw_sar *p_sar)
@@ -1386,14 +1747,17 @@ static int32_t aw_sar_create_node(struct aw_sar *p_sar)
 
 	i2c_set_clientdata(p_sar->i2c, p_sar);
 
-	ret = sysfs_create_group(&p_sar->i2c->dev.kobj, &aw_sar_attribute_group);
+	ret = sysfs_create_group(&p_sar->i2c->dev.kobj,
+				 &aw_sar_attribute_group);
 
 	if (p_sar->dts_info.update_fw_flag == true)
-		ret |= sysfs_create_group(&p_sar->i2c->dev.kobj, &aw_sar_update_attribute_group);
+		ret |= sysfs_create_group(&p_sar->i2c->dev.kobj,
+					  &aw_sar_update_attribute_group);
 
 	//Special requirements of SAR chip
 	if (p_sar->p_sar_para->p_platform_config->p_add_node_create_fn != NULL)
-		ret |= p_sar->p_sar_para->p_platform_config->p_add_node_create_fn(p_sar);
+		ret |= p_sar->p_sar_para->p_platform_config
+			       ->p_add_node_create_fn(p_sar);
 
 	return ret;
 }
@@ -1403,11 +1767,12 @@ static void aw_sar_node_free(struct aw_sar *p_sar)
 	sysfs_remove_group(&p_sar->i2c->dev.kobj, &aw_sar_attribute_group);
 
 	if (p_sar->dts_info.update_fw_flag == true)
-		sysfs_remove_group(&p_sar->i2c->dev.kobj, &aw_sar_update_attribute_group);
+		sysfs_remove_group(&p_sar->i2c->dev.kobj,
+				   &aw_sar_update_attribute_group);
 
 	//Special requirements of SAR chip
 	if ((p_sar->p_sar_para->p_platform_config != NULL) &&
-		(p_sar->p_sar_para->p_platform_config->p_add_node_free_fn != NULL))
+	    (p_sar->p_sar_para->p_platform_config->p_add_node_free_fn != NULL))
 		p_sar->p_sar_para->p_platform_config->p_add_node_free_fn(p_sar);
 }
 
@@ -1417,14 +1782,17 @@ void aw_sar_int_output(struct aw_sar *p_sar, int32_t level)
 	pr_info("%s enter aw_sar int level:%d\n", __func__, level);
 	if (level == 0) {
 		if (p_sar->pinctrl.pinctrl)
-			pinctrl_select_state(p_sar->pinctrl.pinctrl, p_sar->pinctrl.int_out_low);
+			pinctrl_select_state(p_sar->pinctrl.pinctrl,
+					     p_sar->pinctrl.int_out_low);
 		else
 			pr_info("%s Failed set int pin output low\n", __func__);
 	} else if (level == 1) {
 		if (p_sar->pinctrl.pinctrl)
-			pinctrl_select_state(p_sar->pinctrl.pinctrl, p_sar->pinctrl.int_out_high);
+			pinctrl_select_state(p_sar->pinctrl.pinctrl,
+					     p_sar->pinctrl.int_out_high);
 		else
-			pr_info("%s Failed set int pin output high\n", __func__);
+			pr_info("%s Failed set int pin output high\n",
+				__func__);
 	}
 }
 
@@ -1444,28 +1812,31 @@ static int32_t aw_sar_pinctrl_init(struct aw_sar *p_sar)
 		return -EINVAL;
 	}
 
-	snprintf(pin_default_name, sizeof(pin_default_name),
-					"aw_default_sar%u", p_sar->dts_info.sar_num);
+	snprintf(pin_default_name, sizeof(pin_default_name), "aw_default_sar%u",
+		 p_sar->dts_info.sar_num);
 	AWLOGD(p_sar->dev, "pin_default_name = %s", pin_default_name);
-	pinctrl->default_sta = pinctrl_lookup_state(pinctrl->pinctrl, pin_default_name);
+	pinctrl->default_sta =
+		pinctrl_lookup_state(pinctrl->pinctrl, pin_default_name);
 	if (IS_ERR_OR_NULL(pinctrl->default_sta)) {
 		AWLOGE(p_sar->dev, "Failed get pinctrl state:default state");
 		goto exit_pinctrl_init;
 	}
 
 	snprintf(pin_output_high_name, sizeof(pin_output_high_name),
-				"aw_int_output_high_sar%u", p_sar->dts_info.sar_num);
+		 "aw_int_output_high_sar%u", p_sar->dts_info.sar_num);
 	AWLOGD(p_sar->dev, "pin_output_high_name = %s", pin_output_high_name);
-	pinctrl->int_out_high = pinctrl_lookup_state(pinctrl->pinctrl, pin_output_high_name);
+	pinctrl->int_out_high =
+		pinctrl_lookup_state(pinctrl->pinctrl, pin_output_high_name);
 	if (IS_ERR_OR_NULL(pinctrl->int_out_high)) {
 		AWLOGE(p_sar->dev, "Failed get pinctrl state:output_high");
 		goto exit_pinctrl_init;
 	}
 
 	snprintf(pin_output_low_name, sizeof(pin_output_low_name),
-				"aw_int_output_low_sar%u", p_sar->dts_info.sar_num);
+		 "aw_int_output_low_sar%u", p_sar->dts_info.sar_num);
 	AWLOGD(p_sar->dev, "pin_output_low_name = %s", pin_output_low_name);
-	pinctrl->int_out_low = pinctrl_lookup_state(pinctrl->pinctrl, pin_output_low_name);
+	pinctrl->int_out_low =
+		pinctrl_lookup_state(pinctrl->pinctrl, pin_output_low_name);
 	if (IS_ERR_OR_NULL(pinctrl->int_out_low)) {
 		AWLOGE(p_sar->dev, "Failed get pinctrl state:output_low");
 		goto exit_pinctrl_init;
@@ -1497,8 +1868,8 @@ static int32_t aw_sar_regulator_power_init(struct aw_sar *p_sar)
 
 	AWLOGD(p_sar->dev, "aw_sar power init enter");
 
-//	if (p_sar->p_sar_para->p_platform_config->p_regulator_config == NULL)
-//		return AW_INVALID_PARA;
+	//	if (p_sar->p_sar_para->p_platform_config->p_regulator_config == NULL)
+	//		return AW_INVALID_PARA;
 
 	snprintf(vcc_name, sizeof(vcc_name), "vcc%u", p_sar->dts_info.sar_num);
 	AWLOGD(p_sar->dev, "vcc_name = %s", vcc_name);
@@ -1511,9 +1882,11 @@ static int32_t aw_sar_regulator_power_init(struct aw_sar *p_sar)
 	}
 
 	if (regulator_count_voltages(p_sar->vcc) > 0) {
-		rc = regulator_set_voltage(p_sar->vcc, AW_SAR_VCC_MIN_UV, AW_SAR_VCC_MAX_UV);
+		rc = regulator_set_voltage(p_sar->vcc, AW_SAR_VCC_MIN_UV,
+					   AW_SAR_VCC_MAX_UV);
 		if (rc) {
-			AWLOGE(p_sar->dev, "regulator set vol failed rc = %d", rc);
+			AWLOGE(p_sar->dev, "regulator set vol failed rc = %d",
+			       rc);
 			goto reg_vcc_put;
 		}
 	}
@@ -1545,7 +1918,8 @@ static void aw_sar_power_enable(struct aw_sar *p_sar, bool on)
 	if (on) {
 		rc = regulator_enable(p_sar->vcc);
 		if (rc) {
-			AWLOGE(p_sar->dev, "regulator_enable vol failed rc = %d", rc);
+			AWLOGE(p_sar->dev,
+			       "regulator_enable vol failed rc = %d", rc);
 		} else {
 			p_sar->power_enable = AW_TRUE;
 			msleep(20);
@@ -1553,7 +1927,8 @@ static void aw_sar_power_enable(struct aw_sar *p_sar, bool on)
 	} else {
 		rc = regulator_disable(p_sar->vcc);
 		if (rc) {
-			AWLOGE(p_sar->dev, "regulator_disable vol failed rc = %d", rc);
+			AWLOGE(p_sar->dev,
+			       "regulator_disable vol failed rc = %d", rc);
 		} else {
 			p_sar->power_enable = AW_FALSE;
 		}
@@ -1594,25 +1969,30 @@ static void aw_sar_init_lock(struct aw_sar *p_sar)
 // AW_SAR_USB_PLUG_CAIL start
 static void aw_sar_ps_notify_callback_work(struct work_struct *work)
 {
-	struct aw_sar *p_sar = container_of(work, struct aw_sar, ps_notify_work);
+	struct aw_sar *p_sar =
+		container_of(work, struct aw_sar, ps_notify_work);
 
 	AWLOGD(p_sar->dev, "enter");
 
 	aw_sar_aot(p_sar);
 }
 
-static int aw_sar_ps_get_state(struct aw_sar *p_sar, struct power_supply *psy, bool *present)
+static int aw_sar_ps_get_state(struct aw_sar *p_sar, struct power_supply *psy,
+			       bool *present)
 {
 	union power_supply_propval pval = { 0 };
 	int retval = 0;
 
 #ifdef CONFIG_USE_POWER_SUPPLY_ONLINE
-	retval = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE, &pval);
+	retval =
+		power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE, &pval);
 #else
-	retval = power_supply_get_property(psy, POWER_SUPPLY_PROP_PRESENT, &pval);
+	retval = power_supply_get_property(psy, POWER_SUPPLY_PROP_PRESENT,
+					   &pval);
 #endif
 	if (retval) {
-		AWLOGE(p_sar->dev, "%s psy get property failed", psy->desc->name);
+		AWLOGE(p_sar->dev, "%s psy get property failed",
+		       psy->desc->name);
 		return retval;
 	}
 	*present = (pval.intval) ? true : false;
@@ -1621,21 +2001,22 @@ static int aw_sar_ps_get_state(struct aw_sar *p_sar, struct power_supply *psy, b
 }
 
 static int aw_sar_ps_notify_callback(struct notifier_block *self,
-		unsigned long event, void *p)
+				     unsigned long event, void *p)
 {
 	struct aw_sar *p_sar = container_of(self, struct aw_sar, ps_notif);
 	struct power_supply *psy = p;
 	bool present = 0;
 	int retval = 0;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,9,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 	if (event == PSY_EVENT_PROP_CHANGED
 #else
-//	if ((event == PSY_EVENT_PROP_ADDED || event == PSY_EVENT_PROP_CHANGED)
+	//	if ((event == PSY_EVENT_PROP_ADDED || event == PSY_EVENT_PROP_CHANGED)
 	if (event == PSY_EVENT_PROP_CHANGED
 #endif
-		&& psy && psy->desc->get_property && psy->desc->name &&
-		!strncmp(psy->desc->name, USB_POWER_SUPPLY_NAME, sizeof(USB_POWER_SUPPLY_NAME))) {
+	    && psy && psy->desc->get_property && psy->desc->name &&
+	    !strncmp(psy->desc->name, USB_POWER_SUPPLY_NAME,
+		     sizeof(USB_POWER_SUPPLY_NAME))) {
 		//AWLOGI(p_sar->dev, "ps notification: event = %lu", event);
 		retval = aw_sar_ps_get_state(p_sar, psy, &present);
 		if (retval) {
@@ -1659,17 +2040,19 @@ static int aw_sar_ps_notify_init(struct aw_sar *p_sar)
 	int ret = 0;
 
 	INIT_WORK(&p_sar->ps_notify_work, aw_sar_ps_notify_callback_work);
-	p_sar->ps_notif.notifier_call = (notifier_fn_t)aw_sar_ps_notify_callback;
+	p_sar->ps_notif.notifier_call =
+		(notifier_fn_t)aw_sar_ps_notify_callback;
 	ret = power_supply_reg_notifier(&p_sar->ps_notif);
 	if (ret) {
-		AWLOGE(p_sar->dev,"Unable to register ps_notifier: %d", ret);
+		AWLOGE(p_sar->dev, "Unable to register ps_notifier: %d", ret);
 		return -AW_ERR;
 	}
 	psy = power_supply_get_by_name(USB_POWER_SUPPLY_NAME);
 	if (psy) {
 		ret = aw_sar_ps_get_state(p_sar, psy, &p_sar->ps_is_present);
 		if (ret) {
-			AWLOGE(p_sar->dev, "psy get property failed rc=%d", ret);
+			AWLOGE(p_sar->dev, "psy get property failed rc=%d",
+			       ret);
 			goto free_ps_notifier;
 		}
 	}
@@ -1679,7 +2062,6 @@ free_ps_notifier:
 	return -AW_ERR;
 }
 // AW_SAR_USB_PLUG_CAIL end
-
 
 static int32_t aw_sar_platform_rsc_init(struct aw_sar *p_sar)
 {
@@ -1702,7 +2084,8 @@ static int32_t aw_sar_platform_rsc_init(struct aw_sar *p_sar)
 	if (p_sar->dts_info.use_plug_cail_flag == true) {
 		ret = aw_sar_ps_notify_init(p_sar);
 		if (ret < 0) {
-			AWLOGE(p_sar->dev, "error creating power supply notify");
+			AWLOGE(p_sar->dev,
+			       "error creating power supply notify");
 			goto free_usb_plug_cail;
 		}
 	}
@@ -1751,12 +2134,12 @@ free_irq:
 free_sysfs_nodes:
 	aw_sar_node_free(p_sar);
 err_pinctrl:
-if (p_sar->dts_info.use_inter_pull_up == true)
-	aw_sar_pinctrl_deinit(p_sar);
+	if (p_sar->dts_info.use_inter_pull_up == true)
+		aw_sar_pinctrl_deinit(p_sar);
 free_usb_plug_cail:
-if (p_sar->dts_info.use_plug_cail_flag == true) {
-	power_supply_unreg_notifier(&p_sar->ps_notif);
-}
+	if (p_sar->dts_info.use_plug_cail_flag == true) {
+		power_supply_unreg_notifier(&p_sar->ps_notif);
+	}
 
 	return -AW_ERR;
 }
@@ -1841,9 +2224,10 @@ static int32_t aw_sar_regulator_power(struct aw_sar *p_sar)
 	struct aw_sar_dts_info *p_dts_info = &p_sar->dts_info;
 	int32_t ret = 0;
 
-	p_dts_info->use_regulator_flag =
-		of_property_read_bool(p_sar->i2c->dev.of_node, "aw_sar,regulator-power-supply");
-	AWLOGI(p_sar->dev, "regulator-power-supply = <%d>", p_dts_info->use_regulator_flag);
+	p_dts_info->use_regulator_flag = of_property_read_bool(
+		p_sar->i2c->dev.of_node, "aw_sar,regulator-power-supply");
+	AWLOGI(p_sar->dev, "regulator-power-supply = <%d>",
+	       p_dts_info->use_regulator_flag);
 
 	//Configure the use of regulator power supply in DTS
 	if (p_sar->dts_info.use_regulator_flag == true) {
@@ -1879,13 +2263,18 @@ static int32_t aw_sar_get_chip_info(struct aw_sar *p_sar)
 		if (g_aw_sar_driver_list[i].p_who_am_i != NULL) {
 			ret = g_aw_sar_driver_list[i].p_who_am_i(p_sar);
 			if (ret == AW_OK) {
-				p_sar->curr_use_driver_type = g_aw_sar_driver_list[i].driver_type;
-				if (g_aw_sar_driver_list[i].p_chip_init == NULL) {
-					AWLOGE(p_sar->dev, "drvier:%d p_chip_init is null  error!", i);
+				p_sar->curr_use_driver_type =
+					g_aw_sar_driver_list[i].driver_type;
+				if (g_aw_sar_driver_list[i].p_chip_init ==
+				    NULL) {
+					AWLOGE(p_sar->dev,
+					       "drvier:%d p_chip_init is null  error!",
+					       i);
 					continue;
 				}
 				g_aw_sar_driver_list[i].p_chip_init(p_sar);
-				AWLOGI(p_sar->dev, "current use drvier is :%d", g_aw_sar_driver_list[i].driver_type);
+				AWLOGI(p_sar->dev, "current use drvier is :%d",
+				       g_aw_sar_driver_list[i].driver_type);
 				return AW_OK;
 			}
 		}
@@ -1902,16 +2291,17 @@ static int32_t aw_sar_get_chip_info(struct aw_sar *p_sar)
  */
 static void aw_sar_sensor_free(struct aw_sar *p_sar)
 {
-	if (g_aw_sar_driver_list[p_sar->curr_use_driver_type].p_chip_deinit != NULL)
-		g_aw_sar_driver_list[p_sar->curr_use_driver_type].p_chip_deinit(p_sar);
+	if (g_aw_sar_driver_list[p_sar->curr_use_driver_type].p_chip_deinit !=
+	    NULL)
+		g_aw_sar_driver_list[p_sar->curr_use_driver_type].p_chip_deinit(
+			p_sar);
 }
-
 
 /**
  * @brief Drive logic entry
  *
  */
-static int32_t aw_sar_i2c_probe(struct i2c_client *i2c)//todo
+static int32_t aw_sar_i2c_probe(struct i2c_client *i2c) //todo
 {
 	int32_t ret = 0;
 	struct aw_sar *p_sar = NULL;
@@ -1922,6 +2312,7 @@ static int32_t aw_sar_i2c_probe(struct i2c_client *i2c)//todo
 	}
 
 	p_sar = devm_kzalloc(&i2c->dev, sizeof(struct aw_sar), GFP_KERNEL);
+	p_class = devm_kzalloc(&i2c->dev, sizeof(struct aw_sar), GFP_KERNEL);
 	if (p_sar == NULL) {
 		pr_err("p_sar failed to malloc memory!");
 		ret = -AW_ERR;
@@ -1954,13 +2345,19 @@ static int32_t aw_sar_i2c_probe(struct i2c_client *i2c)//todo
 	}
 
 	AWLOGD(&i2c->dev, "probe success!");
-
+	p_class = p_sar;
+	ret = class_register(&sar_class); //debug fs path:/sys/class/sar/*
+	if (ret < 0) {
+		AWLOGE(&i2c->dev, "class_register failed\n");
+		goto err_malloc;
+	}
 	return 0;
+
 err_chip_init:
 	aw_sar_sensor_free(p_sar);
 err_get_voltage:
-if (p_sar->dts_info.use_regulator_flag == true)
-	aw_sar_power_deinit(p_sar);
+	if (p_sar->dts_info.use_regulator_flag == true)
+		aw_sar_power_deinit(p_sar);
 
 err_malloc:
 	return ret;
@@ -1968,13 +2365,15 @@ err_malloc:
 
 static void aw_sar_i2c_remove(struct i2c_client *i2c)
 {
-	struct aw_sar *p_sar  = i2c_get_clientdata(i2c);
+	struct aw_sar *p_sar = i2c_get_clientdata(i2c);
 
 	aw_sar_chip_other_operation_free(p_sar);
 
 	aw_sar_node_free(p_sar);
 
 	aw_sar_irq_free(p_sar);
+
+	class_unregister(&sar_class);
 
 	aw_sar_input_free(p_sar);
 
@@ -1991,7 +2390,6 @@ static void aw_sar_i2c_remove(struct i2c_client *i2c)
 	aw_sar_sensor_free(p_sar);
 
 	AWLOGI(p_sar->dev, "%s ok!", __func__);
-
 }
 
 static int aw_sar_suspend(struct device *dev)
@@ -2003,13 +2401,18 @@ static int aw_sar_suspend(struct device *dev)
 
 	if (p_sar->dts_info.use_pm == true) {
 		if ((p_sar->p_sar_para->p_platform_config == NULL) ||
-			(p_sar->p_sar_para->p_platform_config->p_pm_chip_mode == NULL))
+		    (p_sar->p_sar_para->p_platform_config->p_pm_chip_mode ==
+		     NULL))
 			return 0;
-		if (p_sar->p_sar_para->p_platform_config->p_pm_chip_mode->p_suspend_fn) {
-			p_sar->p_sar_para->p_platform_config->p_pm_chip_mode->p_suspend_fn(p_sar);
+		if (p_sar->p_sar_para->p_platform_config->p_pm_chip_mode
+			    ->p_suspend_fn) {
+			p_sar->p_sar_para->p_platform_config->p_pm_chip_mode
+				->p_suspend_fn(p_sar);
 			return 0;
 		}
-		aw_sar_mode_set(p_sar, p_sar->p_sar_para->p_platform_config->p_pm_chip_mode->suspend_set_mode);
+		aw_sar_mode_set(p_sar,
+				p_sar->p_sar_para->p_platform_config
+					->p_pm_chip_mode->suspend_set_mode);
 	}
 
 	return 0;
@@ -2024,33 +2427,40 @@ static int aw_sar_resume(struct device *dev)
 
 	if (p_sar->dts_info.use_pm == true) {
 		if ((p_sar->p_sar_para->p_platform_config == NULL) ||
-			(p_sar->p_sar_para->p_platform_config->p_pm_chip_mode == NULL))
+		    (p_sar->p_sar_para->p_platform_config->p_pm_chip_mode ==
+		     NULL))
 			return 0;
-		if (p_sar->p_sar_para->p_platform_config->p_pm_chip_mode->p_resume_fn) {
-			p_sar->p_sar_para->p_platform_config->p_pm_chip_mode->p_resume_fn(p_sar);
+		if (p_sar->p_sar_para->p_platform_config->p_pm_chip_mode
+			    ->p_resume_fn) {
+			p_sar->p_sar_para->p_platform_config->p_pm_chip_mode
+				->p_resume_fn(p_sar);
 			return 0;
 		}
-		aw_sar_mode_set(p_sar, p_sar->p_sar_para->p_platform_config->p_pm_chip_mode->resume_set_mode);
+		aw_sar_mode_set(p_sar,
+				p_sar->p_sar_para->p_platform_config
+					->p_pm_chip_mode->resume_set_mode);
 	}
 	return 0;
 }
 
 static void aw_sar_i2c_shutdown(struct i2c_client *i2c)
 {
-	struct aw_sar *p_sar  = i2c_get_clientdata(i2c);
+	struct aw_sar *p_sar = i2c_get_clientdata(i2c);
 
 	AWLOGI(p_sar->dev, "enter");
 
 	if ((p_sar->p_sar_para->p_platform_config == NULL) ||
-		(p_sar->p_sar_para->p_platform_config->p_pm_chip_mode == NULL))
+	    (p_sar->p_sar_para->p_platform_config->p_pm_chip_mode == NULL))
 		return;
 
 	if (p_sar->p_sar_para->p_platform_config->p_pm_chip_mode->p_shutdown_fn) {
-		p_sar->p_sar_para->p_platform_config->p_pm_chip_mode->p_shutdown_fn(p_sar);
+		p_sar->p_sar_para->p_platform_config->p_pm_chip_mode
+			->p_shutdown_fn(p_sar);
 		return;
 	}
 
-	aw_sar_mode_set(p_sar, p_sar->p_sar_para->p_platform_config->p_pm_chip_mode->shutdown_set_mode);
+	aw_sar_mode_set(p_sar, p_sar->p_sar_para->p_platform_config
+				       ->p_pm_chip_mode->shutdown_set_mode);
 }
 
 static const struct dev_pm_ops aw_sar_pm_ops = {
@@ -2059,16 +2469,14 @@ static const struct dev_pm_ops aw_sar_pm_ops = {
 };
 
 static const struct of_device_id aw_sar_dt_match[] = {
-	{ .compatible = "awinic,aw96103" },
-	{ .compatible = "awinic,aw96105" },
-	{ .compatible = "awinic,aw96303" },
-	{ .compatible = "awinic,aw96305" },
+	{ .compatible = "awinic,aw96103" }, { .compatible = "awinic,aw96105" },
+	{ .compatible = "awinic,aw96303" }, { .compatible = "awinic,aw96305" },
 	{ .compatible = "awinic,aw96308" },
 };
 
 static const struct i2c_device_id aw_sar_i2c_id[] = {
 	{ AW_SAR_I2C_NAME, 0 },
-	{ },
+	{},
 };
 MODULE_DEVICE_TABLE(i2c, aw_sar_i2c_id);
 
