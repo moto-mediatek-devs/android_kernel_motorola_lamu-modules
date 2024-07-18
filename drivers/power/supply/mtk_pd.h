@@ -161,6 +161,13 @@ extern int pd_hal_get_adapter_cap(struct chg_alg_device *alg,
 	struct pd_power_cap *cap);
 extern int pd_hal_get_vbus(struct chg_alg_device *alg);
 extern int pd_hal_get_ibus(struct chg_alg_device *alg, int *ibus);
+
+/* TN Begin modified by xinjun.lu/860715 20240718 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_PDC_ALGO)
+extern int pd_hal_get_current(struct chg_alg_device *alg);
+#endif
+/* TN End modified by xinjun.lu/860715 20240718 CR/EKLAMU-202 */
+
 extern int pd_hal_get_mivr_state(struct chg_alg_device *alg,
 	enum chg_idx chgidx, bool *in_loop);
 extern int pd_hal_get_mivr(struct chg_alg_device *alg,

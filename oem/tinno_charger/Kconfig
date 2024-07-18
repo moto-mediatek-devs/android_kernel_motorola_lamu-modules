@@ -191,3 +191,10 @@ config OEM_HVDCP_ALGO
 	default n
 	help
 	  support oem_hvdcp_algo
+
+config OEM_PDC_ALGO
+	tristate "oem pdc algo"
+	depends on OEM_TINNO_CHARGER
+	default n
+	help
+	  support oem_pdc_algo
