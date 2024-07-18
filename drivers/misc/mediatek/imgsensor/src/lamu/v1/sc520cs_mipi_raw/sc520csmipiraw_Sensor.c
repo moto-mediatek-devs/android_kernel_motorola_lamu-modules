@@ -10,46 +10,38 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
-
-#include <linux/videodev2.h>
-#include <linux/i2c.h>
-#include <linux/platform_device.h>
-#include <linux/delay.h>
-#include <linux/cdev.h>
-#include <linux/uaccess.h>
 #include <linux/fs.h>
-#include <linux/atomic.h>
+#include <linux/i2c.h>
+#include <linux/cdev.h>
+#include <linux/delay.h>
 #include <linux/types.h>
-
-#ifdef CONFIG_TINNO_DEVINFO
+#include <linux/atomic.h>
+#include <linux/uaccess.h>
+#include <linux/videodev2.h>
+#include <linux/platform_device.h>
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
 #include <dev_info.h>
 #endif
 
 #include "sc520csmipiraw_Sensor.h"
 
-#define PFX "sc520cs_mipi_raw"
-#define LOG_INF(format, args...)		pr_err(PFX "[%s] " format, __func__, ##args)
+
 unsigned char fusion_id_main_dd[96];
 unsigned char sn_main_dd[96];
 #define SC520CS_MODULE_ID  0x47 
-#define MULTI_WRITE 0
-
-
 
 #define MODULE_GROUP1_ADDR 0x80E6
 #define MODULE_GROUP2_ADDR 0x8106
-
-
 
 #define PD_GROUP1_FLAG 0x80f7
 #define PD_GROUP2_FLAG 0x8117
 
 #define VALID_OTP_FLAG 0x01
 int wb_rgain = 0x80, wb_ggain = 0x80, wb_bgain = 0x80;
-//static unsigned char sc520cs_data_pd[PD_DATA_SIZE + 1] = { 0 };/*Add check sum*/
-//static unsigned char sc520cs_data_awb[AWB_DATA_SIZE + 1] = { 0 };/*Add check sum*/
-//static unsigned char sc520cs_data_info[MODULE_INFO_SIZE + 1] = { 0 };/*Add check sum*/
 
+#define MULTI_WRITE 0
+#define PFX "sc520cs_mipi_raw"
+#define LOG_INF(format, args...)		pr_err(PFX "[%s] " format, __func__, ##args)
 
 static DEFINE_SPINLOCK(imgsensor_drv_lock);
 
@@ -343,6 +335,7 @@ static void write_shutter(kal_uint32 shutter)
 	CAM_DBG(PFX,"shutter =%d, framelength =%d",
 			shutter, imgsensor.frame_length);
 } /*	write_shutter  */
+
 static void set_shutter_frame_length(kal_uint32 shutter,kal_uint16 frame_length)
 {
 	unsigned long flags;
@@ -1034,11 +1027,11 @@ static int read_sc520cs_lsc_info(kal_uint32 addr,kal_uint32 threshold,kal_uint32
 	check_sum_cal = check_sum_cal1 + check_sum_cal;
     check_sum_cal = (check_sum_cal % 255) + 1;
 	if (check_sum == check_sum_cal) {
-        CAM_DBG(PFX,"sc520cs-otp lsc checksum ok\n");
+        LOG_INF("sc520cs-otp lsc checksum ok\n");
 		return 1;
 	}
 	else {
-        CAM_DBG(PFX,"sc520cs-otp lsc checksum not ok\n");
+        LOG_INF("sc520cs-otp lsc checksum not ok\n");
 		return 0;
 	}
 }
@@ -1063,16 +1056,16 @@ static int read_sc520cs_module_info(kal_uint32 addr)
 	month = sc520cs_otp_info.module_param[2];
 	day = sc520cs_otp_info.module_param[3];
 
-	CAM_DBG(PFX,"sc520cs-otp=== SC520CS INFO module_id=0x%x  ===\n", mid);
-	CAM_DBG(PFX,"sc520cs-otp=== SC520CS INFO lens_id=0x%x ===\n", lens_id);
+	LOG_INF("sc520cs-otp=== SC520CS INFO module_id=0x%x  ===\n", mid);
+	LOG_INF("sc520cs-otp=== SC520CS INFO lens_id=0x%x ===\n", lens_id);
 	CAM_DBG(PFX,"sc520cs-otp=== SC520CS INFO date is 20%d-%d-%d ===\n", year, month, day);
 	CAM_DBG(PFX,"sc520cs-otp=== SC520CS INFO check_sum=0x%x,check_sum_cal=0x%x ===\n", check_sum, check_sum_cal);
 	if (check_sum == check_sum_cal) {
-        CAM_DBG(PFX,"sc520cs-otp module checksum ok\n");
+        LOG_INF("sc520cs-otp module checksum ok\n");
 		return 1;
 	}
 	else {
-        CAM_DBG(PFX,"sc520cs-otp module checksum not ok\n");
+        LOG_INF("sc520cs-otp module checksum not ok\n");
 		return 0;
 	}
 }
@@ -1124,12 +1117,12 @@ static int read_sc520cs_awb_info(kal_uint32 addr)
 
 
 		CAM_DBG(PFX,"sc520cs-otp R_GAIN=0x%x,G_GAIN=0x%x,B_GAIN=0x%x\n,", wb_rgain, wb_ggain, wb_bgain);
-        CAM_DBG(PFX,"sc520cs-otp awb checksum ok\n");
+        LOG_INF("sc520cs-otp awb checksum ok\n");
 
 		return 1;
 	}
 	else {
-        CAM_DBG(PFX,"sc520cs-otp awb checksum not ok\n");
+        LOG_INF("sc520cs-otp awb checksum not ok\n");
 		return 0;
 	}
 }
@@ -1239,14 +1232,14 @@ static int sc520cs_sensor_otp_info(kal_uint32 threshold,kal_uint32 threshold1)
 
 /*end sc520cs-otp otp check*/
 
-#ifdef CONFIG_TINNO_DEVINFO
-int main_5m_cam_get_info(char *buf, void *arg0)
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+static int wide_cam_get_info(char *buf, void *arg0)
 {
 	long resolv = 0;
 	int pi = 0;
 	resolv = imgsensor_info.cap.grabwindow_width * imgsensor_info.cap.grabwindow_height;
 	pi = resolv/1000/1000 + (resolv/1000/100%10 > 5 ? 1 : 0);
-	return sprintf(buf, "%s [%d*%d] %dM", "sc520cs_mipi_raw", imgsensor_info.cap.grabwindow_width, imgsensor_info.cap.grabwindow_height, pi);
+	return sprintf(buf, "%s [%d*%d] %dM", "sc520cs_wide_dd_||_mipi_raw", imgsensor_info.cap.grabwindow_width, imgsensor_info.cap.grabwindow_height, pi);
 }
 #endif
 
@@ -1268,28 +1261,29 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 		{
 			*sensor_id = return_sensor_id();
 			if (*sensor_id == imgsensor_info.sensor_id) {
-				CAM_DBG(PFX,"i2c write id  : 0x%x, sensor id: 0x%x\n", imgsensor.i2c_write_id, *sensor_id);
-				CAM_DBG(PFX,"[sc520cs-otp]sc520cs,check OTP \n");
+				LOG_INF("i2c write id  : 0x%x, sensor id: 0x%x\n", imgsensor.i2c_write_id, *sensor_id);
+				LOG_INF("[sc520cs-otp]sc520cs,check OTP \n");
                 for(j=0;j<2;j++){
                                 rc = 0;
                                 rc = sc520cs_sensor_otp_info(threshold[j],threshold1[j]);
                                 if (rc == 0x0f) {
-                                    CAM_DBG(PFX,"sc520cs-otp %d st read otp success", j);
+                                    LOG_INF("sc520cs-otp %d st read otp success", j);
                                 } else {
-                                    CAM_DBG(PFX,"sc520cs-otp %d st read otp failed", j);
+                                    LOG_INF("sc520cs-otp %d st read otp failed", j);
                                     continue;
                                 }
                             }
                             if (sc520cs_otp_info.module_param[0]==SC520CS_MODULE_ID) {
-                                CAM_DBG(PFX,"sc520cs-otp %d st read module id success", j);
+                                LOG_INF("sc520cs-otp %d st read module id success", j);
                                 return ERROR_NONE;
                             }
-#ifdef CONFIG_TINNO_DEVINFO
-							FULL_PRODUCT_DEVICE_CB(ID_MAIN_CAM, main_5m_cam_get_info, NULL);
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+				FULL_PRODUCT_DEVICE_CB(ID_MAIN2_CAM, wide_cam_get_info, NULL);
 #endif
+
 							return ERROR_NONE;
 			}
-			CAM_DBG(PFX,"get_imgsensor_id Read sensor id fail, i2c write id: 0x%x,sensor id: 0x%x\n,module id: 0x%x",imgsensor.i2c_write_id, *sensor_id,sc520cs_otp_info.module_param[0]);
+			LOG_INF("get_imgsensor_id Read sensor id fail, i2c write id: 0x%x,sensor id: 0x%x\n,module id: 0x%x",imgsensor.i2c_write_id, *sensor_id,sc520cs_otp_info.module_param[0]);
 
 			retry--;
 		} while (retry > 0);
@@ -1339,7 +1333,7 @@ static kal_uint32 open(void)
 			sensor_id = return_sensor_id();
 			if (sensor_id == imgsensor_info.sensor_id)
 			{
-				CAM_DBG(PFX,"i2c write id: 0x%x, sensor id: 0x%x\n",
+				LOG_INF("i2c write id: 0x%x, sensor id: 0x%x\n",
 						imgsensor.i2c_write_id, sensor_id);
 				break;
 			}
@@ -1353,7 +1347,7 @@ static kal_uint32 open(void)
 	}
 	if (imgsensor_info.sensor_id != sensor_id)
 	{
-		CAM_DBG(PFX,"open sensor id fail: 0x%x\n", sensor_id);
+		LOG_INF("open sensor id fail: 0x%x\n", sensor_id);
 
 		return ERROR_SENSOR_CONNECT_FAIL;
 	}
@@ -1375,6 +1369,7 @@ static kal_uint32 open(void)
 	spin_unlock(&imgsensor_drv_lock);
 	return ERROR_NONE;
 } /*	open  */
+
 static kal_uint32 close(void)
 {
 	return ERROR_NONE;
@@ -1460,6 +1455,7 @@ static kal_uint32 capture(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 	return ERROR_NONE;
 
 } /* capture() */
+
 static kal_uint32 normal_video(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 							   MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
 {
@@ -1888,7 +1884,7 @@ static kal_uint32 get_default_framerate_by_scenario(
 
 static kal_uint32 set_test_pattern_mode(kal_bool enable)
 {
-	CAM_DBG(PFX,"set_test_pattern_mode enable: %d", enable);
+	LOG_INF("set_test_pattern_mode enable: %d", enable);
 
 	if (enable)
 	{

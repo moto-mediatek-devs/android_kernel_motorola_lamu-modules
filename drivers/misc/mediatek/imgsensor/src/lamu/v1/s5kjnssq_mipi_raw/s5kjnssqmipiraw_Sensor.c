@@ -14,20 +14,23 @@
  * Upper this line, this part is controlled by CC/CQ. DO NOT MODIFY!!
  *============================================================================
  ****************************************************************************/
-#include <linux/videodev2.h>
-#include <linux/i2c.h>
-#include <linux/platform_device.h>
-#include <linux/delay.h>
-#include <linux/cdev.h>
-#include <linux/uaccess.h>
 #include <linux/fs.h>
-#include <linux/atomic.h>
+#include <linux/i2c.h>
+#include <linux/cdev.h>
+#include <linux/delay.h>
 #include <linux/types.h>
+#include <linux/atomic.h>
+#include <linux/uaccess.h>
+#include <linux/videodev2.h>
+#include <linux/platform_device.h>
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include <dev_info.h>
+#endif
+
 #include "kd_imgsensor.h"
+#include "kd_camera_typedef.h"
 #include "kd_imgsensor_define.h"
 #include "kd_imgsensor_errcode.h"
-#include "kd_camera_typedef.h"
-
 #include "s5kjnssqmipiraw_Sensor.h"
 
 #define FPTPDAFSUPPORT
@@ -36,7 +39,6 @@
 #define OTP_DATA_NUMBER 9
 
 #define PFX "S5KJNSSQ_camera_sensor"
-
 #define LOG_INF(format, args...)		pr_err(PFX "[%s] " format, __func__, ##args)
 
 static DEFINE_SPINLOCK(imgsensor_drv_lock);
@@ -2538,7 +2540,7 @@ UINT32 S5KJNSSQ_Get_Module_Id(void)
 	return moduleid;
 }
 
-#if 0
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
 int main_cam_get_info(char *buf, void *arg0)
 {
 	long resolv = 0;
@@ -2565,24 +2567,23 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 		spin_unlock(&imgsensor_drv_lock);
 		do {
 			*sensor_id = return_sensor_id();
-    			CAM_DBG(PFX,"get_imgsensor_id  sensor_id: 0x%x\n",*sensor_id);
+			LOG_INF("get_imgsensor_id  sensor_id: 0x%x\n",*sensor_id);
 
 			if (*sensor_id == imgsensor_info.sensor_id) {
 				S5KJNSSQ_Get_Module_Id();
-				pr_info("s5kjnssq_ofilm i2c 0x%x, sid 0x%x\n",
-			 		imgsensor.i2c_write_id, *sensor_id);
-#if 0
+				LOG_INF("s5kjnssq_ofilm i2c 0x%x, sid 0x%x\n", imgsensor.i2c_write_id, *sensor_id);
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
 				FULL_PRODUCT_DEVICE_CB(ID_MAIN1_CAM, main_cam_get_info, NULL);
 #endif
 				return ERROR_NONE;
 
 			} else {
-				CAM_DBG(PFX,"check id fail i2c 0x%x, sid: 0x%x\n",
+				LOG_INF("check id fail i2c 0x%x, sid: 0x%x\n",
 					 imgsensor.i2c_write_id,
 					 *sensor_id);
 					*sensor_id = 0xFFFFFFFF;
 				}
-				CAM_DBG(PFX,"Read fail, i2cid: 0x%x, Rsid: 0x%x, info.sid:0x%x.\n",
+				LOG_INF("Read fail, i2cid: 0x%x, Rsid: 0x%x, info.sid:0x%x.\n",
 			 	imgsensor.i2c_write_id, *sensor_id,
 			 	imgsensor_info.sensor_id);
 			retry--;
@@ -2627,13 +2628,13 @@ static kal_uint32 open(void)
 		spin_unlock(&imgsensor_drv_lock);
 		do {
 			sensor_id = return_sensor_id();
-			CAM_DBG(PFX,"open sensor_id: 0x%x, imgsensor_info.sensor_id \n", sensor_id);
+			LOG_INF("open sensor_id: 0x%x, imgsensor_info.sensor_id \n", sensor_id);
 			if (sensor_id == imgsensor_info.sensor_id) {
-				CAM_DBG(PFX,"i2c write id : 0x%x, sensor id: 0x%x\n",
+				LOG_INF("i2c write id : 0x%x, sensor id: 0x%x\n",
 				 imgsensor.i2c_write_id, sensor_id);
 				break;
 			}
-			CAM_DBG(PFX,"Read sensor id fail , id: 0x%x, sensor id: 0x%x\n",
+			LOG_INF("Read sensor id fail , id: 0x%x, sensor id: 0x%x\n",
 			 imgsensor.i2c_write_id, sensor_id);
 			retry--;
 		} while (retry > 0);
@@ -2681,7 +2682,7 @@ static kal_uint32 open(void)
 *************************************************************************/
 static kal_uint32 close(void)
 {
-	CAM_DBG(PFX,"E\n");
+	LOG_INF("E\n");
 
 	return ERROR_NONE;
 }
@@ -2707,7 +2708,7 @@ static kal_uint32
 preview(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *
 		image_window, MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
 {
-	CAM_DBG(PFX,"preview start\n");
+	LOG_INF("preview start\n");
 	spin_lock(&imgsensor_drv_lock);
 	imgsensor.sensor_mode = IMGSENSOR_MODE_CAPTURE;
 	imgsensor.pclk = imgsensor_info.pre.pclk;
@@ -2743,7 +2744,7 @@ capture(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *
 {
 	int i;
 
-	CAM_DBG(PFX,"capture start\n");
+	LOG_INF("capture start\n");
 	spin_lock(&imgsensor_drv_lock);
 	imgsensor.sensor_mode = IMGSENSOR_MODE_CAPTURE;
 	imgsensor.pclk = imgsensor_info.cap.pclk;
@@ -2770,7 +2771,7 @@ static kal_uint32
 normal_video(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *
 	 image_window, MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
 {
-	CAM_DBG(PFX,"normal_video start\n");
+	LOG_INF("normal_video start\n");
 	spin_lock(&imgsensor_drv_lock);
 	imgsensor.sensor_mode = IMGSENSOR_MODE_CAPTURE;
 	imgsensor.pclk = imgsensor_info.normal_video.pclk;
@@ -2789,7 +2790,7 @@ static kal_uint32
 hs_video(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *
 		 image_window, MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
 {
-	CAM_DBG(PFX,"hs_video start\n");
+	LOG_INF("hs_video start\n");
 	spin_lock(&imgsensor_drv_lock);
 	imgsensor.sensor_mode = IMGSENSOR_MODE_HIGH_SPEED_VIDEO;
 	imgsensor.pclk = imgsensor_info.hs_video.pclk;
@@ -2811,7 +2812,7 @@ static kal_uint32
 slim_video(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *
 		 image_window, MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
 {
-	CAM_DBG(PFX,"hs_video start\n");
+	LOG_INF("hs_video start\n");
 	spin_lock(&imgsensor_drv_lock);
 	imgsensor.sensor_mode = IMGSENSOR_MODE_SLIM_VIDEO;
 	imgsensor.pclk = imgsensor_info.slim_video.pclk;
@@ -2833,7 +2834,7 @@ static kal_uint32
 custom1(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *
 		image_window, MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
 {
-	CAM_DBG(PFX,"E\n");
+	LOG_INF("E\n");
 	spin_lock(&imgsensor_drv_lock);
 	imgsensor.sensor_mode = IMGSENSOR_MODE_CUSTOM1;
 	imgsensor.pclk = imgsensor_info.custom1.pclk;
@@ -3230,7 +3231,7 @@ kal_uint16 addr_data_pair_set_test_pattern_s5kjnssq[] = {
 static kal_uint32 set_test_pattern_mode(kal_uint32 modes, struct SET_SENSOR_PATTERN_SOLID_COLOR *pTestpatterndata)
 {
 	kal_uint16 Color_R, Color_Gr, Color_Gb, Color_B;
-	CAM_DBG(PFX,"set_test_pattern enum: %d\n", modes);
+	LOG_INF("set_test_pattern enum: %d\n", modes);
 	if (modes) {
 		if (modes == 1 && (pTestpatterndata != NULL)) { //Solid Color
 			write_cmos_sensor(0x0600, 0x0001);
@@ -3301,7 +3302,7 @@ feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 			break;
 		case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
 		        *feature_return_para_32 = 2; /*BINNING_AVERAGED*/
-                        break;	
+                        break;
 		case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
 		case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
 		case MSDK_SCENARIO_ID_CUSTOM1:
@@ -3754,7 +3755,7 @@ static struct SENSOR_FUNCTION_STRUCT sensor_func = {
 
 UINT32 S5KJNSSQ_MIPI_RAW_SensorInit(struct SENSOR_FUNCTION_STRUCT **pfFunc)
 {
-	CAM_DBG(PFX,"S5KJNSSQ_MIPI_RAW_SensorInit in\n");
+	LOG_INF("S5KJNSSQ_MIPI_RAW_SensorInit in\n");
 	/* To Do : Check Sensor status here */
 	if (pfFunc != NULL)
 		*pfFunc =  &sensor_func;

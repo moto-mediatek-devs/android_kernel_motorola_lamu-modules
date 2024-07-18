@@ -23,36 +23,30 @@
  * Upper this line, this part is controlled by CC/CQ. DO NOT MODIFY!!
  *============================================================================
  ****************************************************************************/
-
-#define PFX "OV08D_camera_sensor"
-#define pr_fmt(fmt) PFX "[%s] " fmt, __func__
-
-#include <linux/videodev2.h>
-#include <linux/i2c.h>
-#include <linux/platform_device.h>
-#include <linux/delay.h>
-#include <linux/cdev.h>
-#include <linux/uaccess.h>
 #include <linux/fs.h>
-#include <linux/atomic.h>
+#include <linux/i2c.h>
+#include <linux/cdev.h>
+#include <linux/delay.h>
 #include <linux/types.h>
-/* #include <dev_info.h> */
+#include <linux/atomic.h>
+#include <linux/uaccess.h>
+#include <linux/videodev2.h>
+#include <linux/platform_device.h>
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include <dev_info.h>
+#endif
 
 #include "ov08d10_mipi_raw_Sensor.h"
 
-#define _I2C_BUF_SIZE 4096
-// kal_uint16 ov08d_i2c_data[_I2C_BUF_SIZE];
-// unsigned int _size_to_write;
-
-#define SEAMLESS_ 0
-#define SEAMLESS_NO_USE 0
-
+#define PFX "OV08D_camera_sensor"
 #define LOG_INF(format, args...)    \
 	pr_err(PFX "[%s] " format, __func__, ##args)
 
-#define MULTI_WRITE 1
 
+#define SEAMLESS_ 0
+#define MULTI_WRITE 1
 #define FPT_PDAF_SUPPORT 0
+#define _I2C_BUF_SIZE 4096
 
 static DEFINE_SPINLOCK(imgsensor_drv_lock);
 
@@ -215,6 +209,7 @@ static struct IMGSENSOR_I2C_CFG *get_i2c_cfg(void)
 	return &(((struct IMGSENSOR_SENSOR_INST *)
 		  (imgsensor.psensor_func->psensor_inst))->i2c_cfg);
 }
+
 #ifdef Table_write
 static kal_uint16 ov08d_table_write_cmos_sensor(
 					kal_uint16 *para, kal_uint32 len)
@@ -263,6 +258,7 @@ static kal_uint16 ov08d_table_write_cmos_sensor(
 	return 0;
 }
 #endif
+
 static kal_uint16 read_cmos_sensor(kal_uint32 addr)
 {
 	kal_uint16 get_byte = 0;
@@ -530,7 +526,7 @@ static void init_setting(void)
 
 static void preview_setting(void)
 {
-    CAM_DBG(PFX,"%s start\n", __func__);
+    LOG_INF("%s start\n", __func__);
     write_cmos_sensor(0xfd, 0x00);
     write_cmos_sensor(0x20, 0x0e);
     write_cmos_sensor(0x20, 0x0b);
@@ -672,7 +668,7 @@ static void preview_setting(void)
 
 static void capture_setting(kal_uint16 currefps)
 {
-    CAM_DBG(PFX,"%s start currefps = %d\n", __func__, currefps);
+    LOG_INF("%s start currefps = %d\n", __func__, currefps);
     write_cmos_sensor(0xfd, 0x00);
     write_cmos_sensor(0x20, 0x0e);
     write_cmos_sensor(0x20, 0x0b);
@@ -814,7 +810,7 @@ static void capture_setting(kal_uint16 currefps)
 
 static void normal_video_setting(kal_uint16 currefps)
 {
-    CAM_DBG(PFX,"%s start currefps = %d\n", __func__, currefps);
+    LOG_INF("%s start currefps = %d\n", __func__, currefps);
     write_cmos_sensor(0xfd, 0x00);
     write_cmos_sensor(0x20, 0x0e);
     write_cmos_sensor(0x20, 0x0b);
@@ -956,7 +952,7 @@ static void normal_video_setting(kal_uint16 currefps)
 
 static void hs_video_setting(void)
 {
-    CAM_DBG(PFX,"%s start\n", __func__);
+    LOG_INF("%s start\n", __func__);
     write_cmos_sensor(0xfd, 0x00);
     write_cmos_sensor(0x20, 0x0e);
     write_cmos_sensor(0x20, 0x0b);
@@ -1098,7 +1094,7 @@ static void hs_video_setting(void)
 
 static void slim_video_setting(void)
 {
-    CAM_DBG(PFX,"%s start\n", __func__);
+    LOG_INF("%s start\n", __func__);
     write_cmos_sensor(0xfd, 0x00);
     write_cmos_sensor(0x20, 0x0e);
     write_cmos_sensor(0x20, 0x0b);
@@ -1240,7 +1236,7 @@ static void slim_video_setting(void)
 
 static void sensor_init(void)
 {
-	CAM_DBG(PFX,"%s E\n", __func__);
+	LOG_INF("%s E\n", __func__);
 	init_setting();
 	set_mirror_flip(imgsensor.mirror);
 	CAM_DBG(PFX,"%s X\n", __func__);
@@ -1251,6 +1247,17 @@ static kal_uint32 return_sensor_id(void)
 	write_cmos_sensor(0xfd, 0x00);
 	return ((read_cmos_sensor(0x00) << 16) | (read_cmos_sensor(0x01) << 8) | read_cmos_sensor(0x02));
 }
+
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+static int front_cam_get_info(char *buf, void *arg0)
+{
+	long resolv = 0;
+	int pi = 0;
+	resolv = imgsensor_info.cap.grabwindow_width * imgsensor_info.cap.grabwindow_height;
+	pi = resolv/1000/1000 + (resolv/1000/100%10 > 5 ? 1 : 0);
+	return sprintf(buf, "%s [%d*%d] %dM", "ov08d10_front_sw_||_mipi_raw", imgsensor_info.cap.grabwindow_width, imgsensor_info.cap.grabwindow_height, pi);
+}
+#endif
 
 static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 {
@@ -1264,9 +1271,11 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 		do {
 			*sensor_id = return_sensor_id();
 			if (*sensor_id == imgsensor_info.sensor_id) {
-				CAM_DBG(PFX,"[%s] i2c write id_v1-1: 0x%x, sensor id: 0x%x\n",
+				LOG_INF("[%s] i2c write id_v1-1: 0x%x, sensor id: 0x%x\n",
 					__func__, imgsensor.i2c_write_id, *sensor_id);
-
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+				FULL_PRODUCT_DEVICE_CB(ID_FRONT1_CAM, front_cam_get_info, NULL);
+#endif
 				return ERROR_NONE;
 			}
 			retry--;
@@ -1275,7 +1284,7 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 		retry = 1;
 	}
 	if (*sensor_id != imgsensor_info.sensor_id) {
-		CAM_DBG(PFX,"%s: 0x%x fail\n", __func__, *sensor_id);
+		LOG_INF("%s: 0x%x fail\n", __func__, *sensor_id);
 		*sensor_id = 0xFFFFFFFF;
 		return ERROR_SENSOR_CONNECT_FAIL;
 	}
@@ -1288,7 +1297,7 @@ static kal_uint32 open(void)
 	kal_uint8 i = 0;
 	kal_uint8 retry = 2;
 	kal_uint32 sensor_id = 0;
-	CAM_DBG(PFX,"%s +\n", __func__);
+	LOG_INF("%s +\n", __func__);
 
 	while (imgsensor_info.i2c_addr_table[i] != 0xff) {
 		spin_lock(&imgsensor_drv_lock);
@@ -1297,7 +1306,7 @@ static kal_uint32 open(void)
 		do {
 			sensor_id = return_sensor_id();
 			if (sensor_id == imgsensor_info.sensor_id) {
-				CAM_DBG(PFX,"i2c write id_v1-1: 0x%x, sensor id: 0x%x\n",
+				LOG_INF("i2c write id_v1-1: 0x%x, sensor id: 0x%x\n",
 					imgsensor.i2c_write_id, sensor_id);
 				break;
 			}
@@ -1309,7 +1318,7 @@ static kal_uint32 open(void)
 		retry = 2;
 	}
 	if (imgsensor_info.sensor_id != sensor_id) {
-		CAM_DBG(PFX,"Open sensor id: 0x%x fail\n", sensor_id);
+		LOG_INF("Open sensor id: 0x%x fail\n", sensor_id);
 		return ERROR_SENSOR_CONNECT_FAIL;
 	}
 
@@ -1343,7 +1352,7 @@ static kal_uint32 close(void)
 static kal_uint32 preview(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 		      MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
 {
-	CAM_DBG(PFX,"%s E\n", __func__);
+	LOG_INF("%s E\n", __func__);
 	spin_lock(&imgsensor_drv_lock);
 	imgsensor.sensor_mode = IMGSENSOR_MODE_PREVIEW;
     imgsensor.vblank_convert = 1252; //for 1632x1224 30fps
@@ -1362,7 +1371,7 @@ static kal_uint32 preview(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 static kal_uint32 capture(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 		  MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
 {
-	CAM_DBG(PFX,"%s E\n", __func__);
+	LOG_INF("%s E\n", __func__);
 	spin_lock(&imgsensor_drv_lock);
 	imgsensor.sensor_mode = IMGSENSOR_MODE_CAPTURE;
 	imgsensor.vblank_convert = 2504; //for 3264x2448
@@ -1382,7 +1391,7 @@ static kal_uint32 normal_video(
 			MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 			MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
 {
-	CAM_DBG(PFX,"%s E\n", __func__);
+	LOG_INF("%s E\n", __func__);
 	spin_lock(&imgsensor_drv_lock);
 	imgsensor.sensor_mode = IMGSENSOR_MODE_VIDEO;
 	imgsensor.vblank_convert = 2504; //for 3264x2448
@@ -1402,7 +1411,7 @@ static kal_uint32 hs_video(
 			MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 			MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
 {
-	CAM_DBG(PFX,"%s E\n", __func__);
+	LOG_INF("%s E\n", __func__);
 	spin_lock(&imgsensor_drv_lock);
 	imgsensor.sensor_mode = IMGSENSOR_MODE_HIGH_SPEED_VIDEO;
 	imgsensor.vblank_convert = 776;
@@ -1812,7 +1821,7 @@ static kal_uint32 get_default_framerate_by_scenario(
 
 static kal_uint32 set_test_pattern_mode(kal_uint32 modes)
 {
-	CAM_DBG(PFX,"Test_Pattern modes: %d\n", modes);
+	LOG_INF("Test_Pattern modes: %d\n", modes);
 	if (modes == 2) {//colorbar
 		write_cmos_sensor(0xfd, 0x00);
 		write_cmos_sensor(0xb6, 0x21);

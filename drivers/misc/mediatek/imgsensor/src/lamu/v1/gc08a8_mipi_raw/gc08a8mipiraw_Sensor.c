@@ -32,39 +32,32 @@
  *
  * Version:  V20211202143358 by GC-S-TEAM
  *
-
  */
-#define PFX "gc08a8_camera_sensor"
-#define pr_fmt(fmt) PFX "[%s] " fmt, __func__
-
-#include <linux/videodev2.h>
-#include <linux/i2c.h>
-#include <linux/platform_device.h>
-#include <linux/delay.h>
-#include <linux/cdev.h>
-#include <linux/uaccess.h>
 #include <linux/fs.h>
-#include <linux/atomic.h>
+#include <linux/i2c.h>
+#include <linux/cdev.h>
 #include <linux/types.h>
+#include <linux/delay.h>
+#include <linux/atomic.h>
+#include <linux/uaccess.h>
+#include <linux/videodev2.h>
+#include <linux/platform_device.h>
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include <dev_info.h>
+#endif
 
-#include "kd_camera_typedef.h"
 #include "kd_imgsensor.h"
+#include "kd_camera_typedef.h"
 #include "kd_imgsensor_define.h"
 #include "kd_imgsensor_errcode.h"
-
 #include "gc08a8mipiraw_Sensor.h"
 
-//#include <linux/dev_info.h>
 #define GC08A8_OTP_DEBUG  0
-#define LOG_1 LOG_INF("GC08A8, MIPI 4LANE\n")
-#define GC08A8_DEBUG                1
-#if GC08A8_DEBUG
-#define LOG_INF(format, args...)		pr_err(PFX "[%s] " format, __func__, ##args)
-#else
-#define LOG_INF(format, args...)
-#endif
-static DEFINE_SPINLOCK(imgsensor_drv_lock);
 
+#define PFX "gc08a8_camera_sensor"
+#define LOG_INF(format, args...)		pr_err(PFX "[%s] " format, __func__, ##args)
+
+static DEFINE_SPINLOCK(imgsensor_drv_lock);
 
 static struct imgsensor_info_struct imgsensor_info = {
 	.sensor_id = GC08A8_SENSOR_ID,
@@ -176,9 +169,6 @@ static struct imgsensor_info_struct imgsensor_info = {
 	.i2c_speed = 400,
 };
 
-
-
-
 static struct imgsensor_struct imgsensor = {
 
 	.sensor_mode = IMGSENSOR_MODE_INIT,
@@ -209,7 +199,6 @@ static struct imgsensor_struct imgsensor = {
 #endif
 
 };
-
 
 /* Sensor output window information */
 static struct SENSOR_WINSIZE_INFO_STRUCT imgsensor_winsize_info[5] = {
@@ -309,11 +298,13 @@ static void gc08a8_otp_init(void)
 	write_cmos_sensor_8bit(0x0ace, 0x0c);
 	mdelay(10);//add
 }
+
 static void gc08a8_otp_close(void)
 {
 	write_cmos_sensor_8bit(0x0316, 0x01);
 	write_cmos_sensor_8bit(0x0a67, 0x00);
 }
+
 static kal_uint16 gc08a8_otp_read_group(kal_uint16 addr, kal_uint8 *data, kal_uint16 length)
 {
 	kal_uint16 i = 0;
@@ -332,6 +323,7 @@ static kal_uint16 gc08a8_otp_read_group(kal_uint16 addr, kal_uint8 *data, kal_ui
 	}
 	return 0;
 }
+
 static kal_uint16 gc08a8_otp_read_byte(kal_uint16 addr)
 {
 	kal_uint16 val = 0;
@@ -346,6 +338,7 @@ static kal_uint16 gc08a8_otp_read_byte(kal_uint16 addr)
 #endif
 	return val;
 }
+
 static int gc08a8_iReadData(unsigned int ui4_offset, unsigned int ui4_length, unsigned char *pinputdata)
 {
 	int i4RetValue = 0;
@@ -353,9 +346,7 @@ static int gc08a8_iReadData(unsigned int ui4_offset, unsigned int ui4_length, un
 	u32 u4CurrentOffset;
 	kal_uint8 *pBuff;
 
-
 	CAM_DBG(PFX,"ui4_offset = 0x%x, ui4_length = %d \n", ui4_offset, ui4_length);
-
 	i4ResidueDataLength = (int)ui4_length;
 	u4CurrentOffset = ui4_offset;
 	pBuff = pinputdata;
@@ -365,10 +356,9 @@ static int gc08a8_iReadData(unsigned int ui4_offset, unsigned int ui4_length, un
 		CAM_DBG(PFX,"I2C iReadData failed!!\n");
 		return -1;
 	}
-
-
 	return 0;
 }
+
 static bool check_sum(kal_uint8 *buf, unsigned int size, kal_uint8 chksum)
 {
 	int i, sum = 0;
@@ -381,7 +371,7 @@ static bool check_sum(kal_uint8 *buf, unsigned int size, kal_uint8 chksum)
 
 	if (((sum % 255) + 1) != chksum)
 	{
-		CAM_DBG(PFX,"chksum fail size = %d sum=%d sum-in-eeprom=%d", size, ((sum % 255) + 1), chksum);
+		LOG_INF("chksum fail size = %d sum=%d sum-in-eeprom=%d", size, ((sum % 255) + 1), chksum);
 		return false;
 	}
 	return true;
@@ -389,7 +379,6 @@ static bool check_sum(kal_uint8 *buf, unsigned int size, kal_uint8 chksum)
 
 bool check_gc08a8_otp(void)
 {
-
 	kal_uint8 moduleflag =0;
 	kal_uint8 awbflag =0;
 	kal_uint8 lscflag =0;
@@ -402,32 +391,32 @@ bool check_gc08a8_otp(void)
 	moduleflag = gc08a8_otp_read_byte(MODULE_GROUP_FLAG);
 	awbflag = gc08a8_otp_read_byte(AWB_GROUP_FLAG);
 	lscflag = gc08a8_otp_read_byte(LSC_GROUP_FLAG);
-	CAM_DBG(PFX,"moduleflag, = 0x%x", moduleflag);
-	CAM_DBG(PFX,"awbflag, = 0x%x", awbflag);
-	CAM_DBG(PFX,"lscflag, = 0x%x", lscflag);
+	LOG_INF("moduleflag, = 0x%x", moduleflag);
+	LOG_INF("awbflag, = 0x%x", awbflag);
+	LOG_INF("lscflag, = 0x%x", lscflag);
 
 	//for module info otp read
     if ((moduleflag & 0x03) == 0x01) {
-        CAM_DBG(PFX,"group1_module, size %d, block flag 0x01", MODULE_LENGTH);
+        LOG_INF("group1_module, size %d, block flag 0x01", MODULE_LENGTH);
         gc08a8_iReadData(MODULE_INFO_FLAG, MODULE_LENGTH,&gc08a8_otp_info.module_param[0]);
 		gc08a8_iReadData(MODULE_INFO_FLAG + (MODULE_LENGTH-1) * 8, 1, &gc08a8_otp_info.moduleChksum);
     } else if ((moduleflag & 0x0c) == 0x04) {
-        CAM_DBG(PFX,"group2_module, size %d, block flag 0x03", MODULE_LENGTH);
+        LOG_INF("group2_module, size %d, block flag 0x03", MODULE_LENGTH);
         gc08a8_iReadData(MODULE_INFO_FLAG + GROUP_LENGTH * 8, MODULE_LENGTH,&gc08a8_otp_info.module_param[0]);
 		gc08a8_iReadData(MODULE_INFO_FLAG + GROUP_LENGTH * 8 + (MODULE_LENGTH-1) * 8, 1, &gc08a8_otp_info.moduleChksum);
     } else if ((moduleflag & 0x0f) == 0x00) {
-        CAM_DBG(PFX,"module info is empty");
+        LOG_INF("module info is empty");
     } else {
-        CAM_DBG(PFX,"invalid block module flag 0x%x", moduleflag);
+        LOG_INF("invalid block module flag 0x%x", moduleflag);
     }
 
 	//for muduleinfo checksum
 	if (check_sum(&gc08a8_otp_info.module_param[0], MODULE_LENGTH-1, gc08a8_otp_info.moduleChksum))
 	{
-		CAM_DBG(PFX,"[yy]gc08a8OTP:module flag chksum pass");
+		LOG_INF("[yy]gc08a8OTP:module flag chksum pass");
 		checksum_module = 1;
 
-		CAM_DBG(PFX,"module id = 0x%x", gc08a8_otp_info.module_param[0]);
+		LOG_INF("module id = 0x%x", gc08a8_otp_info.module_param[0]);
 		CAM_DBG(PFX,"Year = 0x%x", gc08a8_otp_info.module_param[1]);
 		CAM_DBG(PFX,"Month = 0x%x", gc08a8_otp_info.module_param[2]);
 		CAM_DBG(PFX,"Day = 0x%x", gc08a8_otp_info.module_param[3]);
@@ -439,23 +428,23 @@ bool check_gc08a8_otp(void)
 
 	//for awb otp read
     if ((awbflag & 0x03) == 0x01) {
-        CAM_DBG(PFX,"group1_awb, size %d, block flag 0x01", AWB_LENGTH);
+        LOG_INF("group1_awb, size %d, block flag 0x01", AWB_LENGTH);
         gc08a8_iReadData(AWB_INFO_FLAG, AWB_LENGTH,&gc08a8_otp_info.awb_param[0]);
 		gc08a8_iReadData(AWB_INFO_FLAG + (AWB_LENGTH-1) * 8, 1, &gc08a8_otp_info.awbChksum);
     } else if ((awbflag & 0x0c) == 0x04) {
-        CAM_DBG(PFX,"group2_awb, size %d, block flag 0x03", AWB_LENGTH);
+        LOG_INF("group2_awb, size %d, block flag 0x03", AWB_LENGTH);
         gc08a8_iReadData(AWB_INFO_FLAG + GROUP_LENGTH * 8, AWB_LENGTH,&gc08a8_otp_info.awb_param[0]);
 		gc08a8_iReadData(AWB_INFO_FLAG + GROUP_LENGTH * 8 + (AWB_LENGTH-1) * 8, 1, &gc08a8_otp_info.awbChksum);
     } else if ((awbflag & 0x0f) == 0x00) {
-        CAM_DBG(PFX,"awb info is empty");
+        LOG_INF("awb info is empty");
     } else {
-        CAM_DBG(PFX,"invalid block awb flag 0x%x", awbflag);
+        LOG_INF("invalid block awb flag 0x%x", awbflag);
     }
 	//for awb checksum
 	if (check_sum(&gc08a8_otp_info.awb_param[0], AWB_LENGTH-1, gc08a8_otp_info.awbChksum))
 	{
 		checksum_awb = 1;
-		CAM_DBG(PFX,"[yy]gc08a8OTP:awb flag chksum pass");
+		LOG_INF("[yy]gc08a8OTP:awb flag chksum pass");
 	}
 	else
 	{
@@ -466,26 +455,26 @@ bool check_gc08a8_otp(void)
 
 	//for lsc otp read
     if ((lscflag & 0x03) == 0x01) {
-        CAM_DBG(PFX,"group1_lsc, size %d, block flag 0x01", LSC_LENGTH);
+        LOG_INF("group1_lsc, size %d, block flag 0x01", LSC_LENGTH);
 		gc08a8_otp_info.lsc_flag = 0x01;
         gc08a8_iReadData(LSC_INFO_FLAG, LSC_LENGTH,&gc08a8_otp_info.lsc_param[0]);
 		gc08a8_iReadData(LSC_INFO_FLAG + (LSC_LENGTH-1) * 8, 1, &gc08a8_otp_info.lscChksum);
     } else if ((lscflag & 0x0c) == 0x04) {
-        CAM_DBG(PFX,"group2_lsc, size %d, block flag 0x03", LSC_LENGTH);
+        LOG_INF("group2_lsc, size %d, block flag 0x03", LSC_LENGTH);
         gc08a8_otp_info.lsc_flag = 0x04;
         gc08a8_iReadData(LSC_INFO_FLAG + GROUP_LENGTH * 8, LSC_LENGTH,&gc08a8_otp_info.lsc_param[0]);
 		gc08a8_iReadData(LSC_INFO_FLAG + GROUP_LENGTH * 8 + (LSC_LENGTH-1) * 8, 1, &gc08a8_otp_info.lscChksum);
     } else if ((lscflag & 0x0f) == 0x00) {
-        CAM_DBG(PFX,"lsc info is empty");
+        LOG_INF("lsc info is empty");
     } else {
-        CAM_DBG(PFX,"invalid block lsc flag 0x%x", lscflag);
+        LOG_INF("invalid block lsc flag 0x%x", lscflag);
     }
 
 	//for lsc checksum
 	if (check_sum(&gc08a8_otp_info.lsc_param[0], LSC_LENGTH-1, gc08a8_otp_info.lscChksum))
 	{
 		checksum_lsc = 1;
-		CAM_DBG(PFX,"[yy]gc08a8OTP:lsc flag chksum pass");
+		LOG_INF("[yy]gc08a8OTP:lsc flag chksum pass");
 	}
 
     gc08a8_otp_close();
@@ -496,11 +485,10 @@ bool check_gc08a8_otp(void)
 	}
 	else
 	{
-		CAM_DBG(PFX,"otp check fail");
+		LOG_INF("otp check fail");
 		return false;
 	}
 }
-
 //end 20220402 add for otp check
 
 static kal_uint32 return_sensor_id(void)
@@ -510,6 +498,7 @@ static kal_uint32 return_sensor_id(void)
 	sensor_id = (read_cmos_sensor(0x03f0) << 8) | read_cmos_sensor(0x03f1);
 	return sensor_id;
 }
+
 static void set_dummy(void)
 {
 	CAM_DBG(PFX,"frame length = %d\n", imgsensor.frame_length);
@@ -1629,13 +1618,13 @@ static void slim_video_setting(void)
 
 static kal_uint32 set_test_pattern_mode(kal_bool enable)
 {
-	CAM_DBG(PFX,"set_test_pattern_mode enable: %d\n", enable);
+	LOG_INF("set_test_pattern_mode enable: %d\n", enable);
 
 	if (enable)
 	{//write_cmos_sensor_8bit(0x008c, 0x01);
 		write_cmos_sensor_8bit(0x008c, 0x01);
 	write_cmos_sensor_8bit(0x008d, 0x00);
-	CAM_DBG(PFX,"set_test_pattern_mode black\n");
+	LOG_INF("set_test_pattern_mode black\n");
 	}
 	else
 		write_cmos_sensor_8bit(0x008c, 0x00);
@@ -1645,6 +1634,17 @@ static kal_uint32 set_test_pattern_mode(kal_bool enable)
 	spin_unlock(&imgsensor_drv_lock);
 	return ERROR_NONE;
 }
+
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+static int front_cam_get_info(char *buf, void *arg0)
+{
+	long resolv = 0;
+	int pi = 0;
+	resolv = imgsensor_info.cap.grabwindow_width * imgsensor_info.cap.grabwindow_height;
+	pi = resolv/1000/1000 + (resolv/1000/100%10 > 5 ? 1 : 0);
+	return sprintf(buf, "%s [%d*%d] %dM", "gc08a8_front_dd_||_mipi_raw", imgsensor_info.cap.grabwindow_width, imgsensor_info.cap.grabwindow_height, pi);
+}
+#endif
 
 /*************************************************************************
  * FUNCTION
@@ -1676,16 +1676,19 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 		do {
 			*sensor_id = return_sensor_id();
 			if (*sensor_id == imgsensor_info.sensor_id) {
-				printk("[gc08a8_camera_sensor]get_imgsensor_id:i2c write id: 0x%x, sensor id: 0x%x\n",
+				LOG_INF("[gc08a8_camera_sensor]get_imgsensor_id:i2c write id: 0x%x, sensor id: 0x%x\n",
 					imgsensor.i2c_write_id, *sensor_id);
 			        if(check_gc08a8_otp())
 			        {
-			              CAM_DBG(PFX,"[yy]gc08a8,check OTP pass\n");
+			              LOG_INF("[yy]gc08a8,check OTP pass\n");
 				      *sensor_id |= 0x01000000;
 			        }
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+				FULL_PRODUCT_DEVICE_CB(ID_FRONT1_CAM, front_cam_get_info, NULL);
+#endif
 				return ERROR_NONE;
 			}
-			printk("[gc08a8_camera_sensor]get_imgsensor_id:Read sensor id fail, write id: 0x%x, id: 0x%x\n",
+			LOG_INF("[gc08a8_camera_sensor]get_imgsensor_id:Read sensor id fail, write id: 0x%x, id: 0x%x\n",
 				imgsensor.i2c_write_id, *sensor_id);
 			retry--;
 		} while (retry > 0);
@@ -1725,8 +1728,7 @@ static kal_uint32 open(void)
 	kal_uint8 retry = 2;
 	kal_uint16 sensor_id = 0;
 
-	CAM_DBG(PFX,"%s +\n", __func__);
-	CAM_DBG(PFX,"imgsensor_open\n");
+	LOG_INF("imgsensor_open\n");
 	while (imgsensor_info.i2c_addr_table[i] != 0xff) {
 		spin_lock(&imgsensor_drv_lock);
 		imgsensor.i2c_write_id = imgsensor_info.i2c_addr_table[i];
@@ -1820,7 +1822,7 @@ static kal_uint32 close(void)
 static kal_uint32 preview(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 			  MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
 {
-	CAM_DBG(PFX,"%s E\n", __func__);
+	LOG_INF("%s E\n", __func__);
 
 	spin_lock(&imgsensor_drv_lock);
 	imgsensor.sensor_mode = IMGSENSOR_MODE_PREVIEW;
@@ -1854,7 +1856,7 @@ static kal_uint32 preview(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 static kal_uint32 capture(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 			  MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
 {
-	CAM_DBG(PFX,"E\n");
+	LOG_INF("E\n");
 	spin_lock(&imgsensor_drv_lock);
 	imgsensor.sensor_mode = IMGSENSOR_MODE_CAPTURE;
 
@@ -1878,7 +1880,7 @@ static kal_uint32 capture(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 static kal_uint32 normal_video(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 				MSDK_SENSOR_CONFIG_STRUCT *sensor_config_data)
 {
-	CAM_DBG(PFX,"E\n");
+	LOG_INF("E\n");
 
 	spin_lock(&imgsensor_drv_lock);
 	imgsensor.sensor_mode = IMGSENSOR_MODE_VIDEO;
@@ -2120,8 +2122,6 @@ static kal_uint32 control(enum MSDK_SCENARIO_ID_ENUM scenario_id,
 	return ERROR_NONE;
 }
 
-
-
 static kal_uint32 set_video_mode(UINT16 framerate)
 {
 	CAM_DBG(PFX,"framerate = %d\n ", framerate);
@@ -2142,7 +2142,6 @@ static kal_uint32 set_auto_flicker_mode(kal_bool enable, UINT16 framerate)
 
 	return ERROR_NONE;
 }
-
 
 static kal_uint32 set_max_framerate_by_scenario(
 		enum MSDK_SCENARIO_ID_ENUM scenario_id, MUINT32 framerate)
@@ -2258,7 +2257,6 @@ static kal_uint32 set_max_framerate_by_scenario(
 	return ERROR_NONE;
 }
 
-
 static kal_uint32 get_default_framerate_by_scenario(
 		enum MSDK_SCENARIO_ID_ENUM scenario_id, MUINT32 *framerate)
 {
@@ -2286,7 +2284,6 @@ static kal_uint32 get_default_framerate_by_scenario(
 
 	return ERROR_NONE;
 }
-
 
 static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 				 UINT8 *feature_para, UINT32 *feature_para_len)
