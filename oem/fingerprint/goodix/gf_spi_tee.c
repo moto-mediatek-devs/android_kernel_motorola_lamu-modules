@@ -123,7 +123,7 @@ static const struct attribute_group gf_debug_attr_group = {
 	.name = "debug"
 };
 static int gf_spi_probe(struct spi_device  *pdev);
-static int gf_spi_remove(struct spi_device  *pdev);
+void gf_spi_remove(struct spi_device  *pdev);
 static struct spi_driver gf_spi_driver = {
 	.driver = {
 		.name = GF_DEV_NAME,
@@ -144,11 +144,11 @@ static int gf_spi_probe(struct spi_device *spi)
 	return 0;
 
 }
-static int gf_spi_remove(struct spi_device *spi)
+void gf_spi_remove(struct spi_device *spi)
 {
 	gf_debug(INFO_LOG, "%s gf_spi_remove\n", __func__);
 	goodix_dev.spi = NULL;
-	return 0;
+	//return 0;
 
 }
 extern void mt_spi_enable_master_clk(struct spi_device *spidev);
@@ -213,7 +213,7 @@ int gf_parse_dts(struct gf_device *gf_dev)
 	gpio_direction_output(gf_dev->reset_gpio, 0);
 
 err_avdd:
-	devm_gpio_free(dev, gf_dev->reset_gpio);
+	gpio_free(gf_dev->reset_gpio);
 
 err_reset:
 	return rc;
@@ -1166,11 +1166,11 @@ static ssize_t gf_debug_store(struct device *dev,
 		gf_debug(INFO_LOG, "%s: parameter is -12, GPIO test===============\n", __func__);
 #ifdef CONFIG_OF
 		if (flag == 0) {
-			pinctrl_select_state(gf_dev->pinctrl_gpios, gf_dev->pins_miso_pulllow);
+			//pinctrl_select_state(gf_dev->pinctrl_gpios, gf_dev->pins_miso_pulllow);
 			gf_debug(INFO_LOG, "%s: set miso PIN to low\n", __func__);
 			flag = 1;
 		} else {
-			pinctrl_select_state(gf_dev->pinctrl_gpios, gf_dev->pins_miso_pullhigh);
+			//pinctrl_select_state(gf_dev->pinctrl_gpios, gf_dev->pins_miso_pullhigh);
 			gf_debug(INFO_LOG, "%s: set miso PIN to high\n", __func__);
 			flag = 0;
 		}
@@ -1300,7 +1300,8 @@ static int gf_platform_probe(struct platform_device *pldev)
 
 
 	/* create class */
-	gf_dev->class = class_create(THIS_MODULE, GF_CLASS_NAME);
+	//gf_dev->class = class_create(THIS_MODULE, GF_CLASS_NAME);
+	gf_dev->class = class_create(GF_CLASS_NAME);
 	if (IS_ERR(gf_dev->class)) {
 		gf_debug(ERR_LOG, "%s, Failed to create class.\n", __func__);
 		status = -ENODEV;

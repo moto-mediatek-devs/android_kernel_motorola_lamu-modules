@@ -1934,6 +1934,7 @@ def get_overlay_modules_list():
         mgk_64_device_modules.append("oem/touchscreen/nt36xxx/nt36xxx_tp.ko")
         mgk_64_device_modules.append("oem/touchscreen/ILITEK9883C/tp_ilitek.ko")
         mgk_64_device_modules.append("oem/fingerprint/fpc1560/fpc_fingerprint.ko")
+        mgk_64_device_modules.append("oem/fingerprint/goodix/gf_tee.ko")
         mgk_64_device_modules.append("drivers/gpu/drm/panel/panel-txd-ili9883c-vdo.ko")
         mgk_64_device_modules.append("drivers/gpu/drm/panel/panel-tm-td4376-vdo.ko")
         mgk_64_device_modules.append("drivers/gpu/drm/panel/panel-djn-nt36672s-vdo.ko")
