@@ -57,4 +57,14 @@
 	fpc,irq_gpio = <&pio 8 0>;
 	status = "okay";
 };
+
+&goodix_fp {
+    interrupt-parent = <&pio>;
+    interrupts = <8 IRQ_TYPE_EDGE_RISING 8 0>;
+    goodix_rst = <&pio 112 0x00>;
+    gf,gpio_irq = <&pio 8 0x00>;
+    //goodix_vdd = <&pio 22 0x0>;
+    //vdd-supply = <&mt_pmic_vio28_ldo_reg>;
+    status = "okay";
+};
 /*[TN.NJDC] fingerprint overlay file.end*/
