@@ -32,6 +32,9 @@ static long alsps_factory_unlocked_ioctl(struct file *file, unsigned int cmd,
 	long err = 0;
 	void __user *ptr = (void __user *)arg;
 	int data = 0;
+//TN modified by db/ 20240719  begin
+	int data_t[2] = {0, 0};
+//TN modified by db/ 20240719  end
 	uint32_t enable = 0;
 	int threshold_data[2] = {0, 0};
 	int als_cali = 0;
@@ -103,22 +106,24 @@ static long alsps_factory_unlocked_ioctl(struct file *file, unsigned int cmd,
 			return -EINVAL;
 		}
 		return 0;
+//TN modified by db/ 20240719  begin
 	case ALSPS_GET_ALS_RAW_DATA:
 		if (alsps_factory.fops != NULL &&
 		    alsps_factory.fops->als_get_raw_data != NULL) {
-			err = alsps_factory.fops->als_get_raw_data(&data);
+			err = alsps_factory.fops->als_get_raw_data(data_t);
 			if (err < 0) {
 				pr_err(
 					"ALSPS_GET_ALS_RAW_DATA read data fail!\n");
 				return -EINVAL;
 			}
-			if (copy_to_user(ptr, &data, sizeof(data)))
+			if (copy_to_user(ptr, data_t, sizeof(data_t)))
 				return -EFAULT;
 		} else {
 			pr_err("ALSPS_GET_ALS_RAW_DATA NULL\n");
 			return -EINVAL;
 		}
 		return 0;
+//TN modified by db/ 20240719  end
 	case ALSPS_ALS_ENABLE_CALI:
 		if (alsps_factory.fops != NULL &&
 		    alsps_factory.fops->als_enable_calibration != NULL) {

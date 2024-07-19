@@ -158,6 +158,13 @@ struct proximity_vec_t {
 	int32_t oneshot;
 };
 
+//TN modified by db/ 20240719  begin
+struct light_vec_t {
+	uint32_t als_raw_data;
+	uint32_t ir_data;
+};
+//TN modified by db/ 20240719  end
+
 struct relative_humidity_vec_t {
 	int32_t relative_humidity;
 	int32_t temperature;
@@ -234,6 +241,9 @@ struct data_unit_t {
 		struct sensor_vec_t pdr_event;
 
 		int32_t light;
+		//TN modified by db/ 20240719  begin
+		struct light_vec_t light_t;
+		//TN modified by db/ 20240719  end
 		struct proximity_vec_t proximity_t;
 		int32_t temperature;
 		struct pressure_vec_t pressure_t;

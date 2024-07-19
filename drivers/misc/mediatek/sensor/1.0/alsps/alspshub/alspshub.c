@@ -474,7 +474,8 @@ static int alshub_factory_enable_sensor(bool enable_disable,
 	mutex_unlock(&alspshub_mutex);
 	return 0;
 }
-static int alshub_factory_get_data(int32_t *data)
+//TN modified by db/ 20240719  begin
+static int alshub_factory_get_data(int *data)
 {
 	int err = 0;
 	struct data_unit_t data_t;
@@ -482,9 +483,12 @@ static int alshub_factory_get_data(int32_t *data)
 	err = sensor_get_data_from_hub(ID_LIGHT, &data_t);
 	if (err < 0)
 		return -1;
-	*data = data_t.light;
+    data[0] = data_t.light_t.als_raw_data;
+    data[1] = data_t.light_t.ir_data;
 	return 0;
 }
+//TN modified by db/ 20240719  end
+
 static int alshub_factory_get_raw_data(int32_t *data)
 {
 	return alshub_factory_get_data(data);

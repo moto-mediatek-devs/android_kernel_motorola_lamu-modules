@@ -1509,10 +1509,13 @@ int sensor_get_data_from_hub(uint8_t sensorType,
 		data->accelerometer_t.z = data_t->accelerometer_t.z;
 		data->accelerometer_t.status = data_t->accelerometer_t.status;
 		break;
+//TN modified by db/ 20240719  begin
 	case ID_LIGHT:
 		data->time_stamp = data_t->time_stamp;
-		data->light = data_t->light;
+		data->light_t.als_raw_data = data_t->light_t.als_raw_data;
+		data->light_t.ir_data = data_t->light_t.ir_data;
 		break;
+//TN modified by db/ 20240719  end
 	case ID_PROXIMITY:
 		data->time_stamp = data_t->time_stamp;
 		data->proximity_t.steps = data_t->proximity_t.steps;
