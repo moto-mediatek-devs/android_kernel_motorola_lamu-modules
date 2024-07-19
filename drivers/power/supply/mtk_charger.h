@@ -316,7 +316,7 @@ struct charger_data {
 /* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 
 /* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) //&& IS_ENABLED(CONFIG_FACTORY_BUILD)
 	int factory_input_current_limit;
 	int factory_charging_current_limit;
 #endif /* CONFIG_OEM_TINNO_CHARGER  && CONFIG_FACTORY_BUILD */
