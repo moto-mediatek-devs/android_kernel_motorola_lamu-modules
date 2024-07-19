@@ -1571,7 +1571,7 @@ static ssize_t BatteryNotify_store(struct device *dev,
 static DEVICE_ATTR_RW(BatteryNotify);
 
 /* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) //&& IS_ENABLED(CONFIG_FACTORY_BUILD)
 static ssize_t factory_input_charging_current_show(struct device *dev,
 				  struct device_attribute *attr, char *buf)
 {
@@ -1637,7 +1637,7 @@ static ssize_t factory_charging_current_store(struct device *dev,
 }
 
 static DEVICE_ATTR_RW(factory_charging_current);
-#endif /* CONFIG_FACTORY_BUILD */
+#endif /* CONFIG_OEM_TINNO_CHARGER && CONFIG_FACTORY_BUILD */
 
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 static ssize_t enable_hiz_show(struct device *dev,
@@ -4074,7 +4074,7 @@ static int mtk_charger_setup_files(struct platform_device *pdev)
 		goto _out;
 
 /* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) //&& IS_ENABLED(CONFIG_FACTORY_BUILD)
 	ret = device_create_file(&(pdev->dev), &dev_attr_factory_input_charging_current);
 	if (ret)
 		goto _out;
@@ -4659,7 +4659,7 @@ static int mtk_charger_probe(struct platform_device *pdev)
 		info->chg_data[i].thermal_input_current_limit = -1;
 		info->chg_data[i].input_current_limit_by_aicl = -1;
 /* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) //&& IS_ENABLED(CONFIG_FACTORY_BUILD)
 		info->chg_data[i].factory_input_current_limit = -1;
 		info->chg_data[i].factory_charging_current_limit = -1;
 #endif /* CONFIG_OEM_TINNO_CHARGER && CONFIG_FACTORY_BUILD */
