@@ -269,7 +269,14 @@ struct charger_custom_data {
 	int temp_t0_thres;
 	int temp_t0_thres_plus_x_degree;
 	int temp_neg_10_thres;
-
+/* TN Begin modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
+	int jeita_temp_above_t4_icurrent;
+	int jeita_temp_t3_to_t4_icurrent;
+	int jeita_temp_t2_to_t3_icurrent;
+	int jeita_temp_t1_to_t2_icurrent;
+	int jeita_temp_t0_to_t1_icurrent;
+	int jeita_temp_below_t0_icurrent;
+/* TN End modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
 /* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
 	int hvdcp_temp_above_t4_icurrent;
@@ -309,6 +316,9 @@ struct charger_data {
 	int input_current_limit_by_aicl;
 	int junction_temp_min;
 	int junction_temp_max;
+/* TN Begin modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
+	int temp_charging_current_limit;
+/* TN End modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
 /* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
 	int hvdcp_temp_charging_current_limit;

@@ -4,7 +4,7 @@
 #include <dt-bindings/pinctrl/mt6768-pinfunc.h>
 
 &charger {
-	battery_cv = <4530000>;
+	battery_cv = <4500000>;
 	max_charger_voltage = <11000000>;
 	hvdcp_temp_above_t4_icurrent = <0>;
 	hvdcp_temp_t3_to_t4_icurrent = <3600000>;
@@ -14,6 +14,42 @@
 	hvdcp_temp_below_t0_icurrent = <0>;
 	hvdcp_input_current_limit = <3200000>;
 	hvdcp_charging_current_limit = <3600000>;
+	/* battery temperature protection */
+	enable_min_charge_temp;
+	min_charge_temp = <(-20)>;
+	min_charge_temp_plus_x_degree = <(-17)>;
+	max_charge_temp = <60>;
+	max_charge_temp_minus_x_degree = <57>;
+	/* charging current */
+	usb_charger_current = <500000>;
+	ac_charger_current = <1500000>;
+	ac_charger_input_current = <3200000>;
+	charging_host_charger_current = <1500000>;
+	/* sw jeita */
+	enable_sw_jeita;
+	jeita_temp_above_t4_cv = <4200000>;
+	jeita_temp_t3_to_t4_cv = <4200000>;
+	jeita_temp_t2_to_t3_cv = <4500000>;
+	jeita_temp_t1_to_t2_cv = <4500000>;
+	jeita_temp_t0_to_t1_cv = <4200000>;
+	jeita_temp_below_t0_cv = <4040000>;
+	jeita_temp_above_t4_icurrent = <0>;
+	jeita_temp_t3_to_t4_icurrent = <4000000>;
+	jeita_temp_t2_to_t3_icurrent = <4000000>;
+	jeita_temp_t1_to_t2_icurrent = <3000000>;
+	jeita_temp_t0_to_t1_icurrent = <1000000>;
+	jeita_temp_below_t0_icurrent = <0>;
+	temp_t4_thres = <60>;
+	temp_t4_thres_minus_x_degree = <57>;
+	temp_t3_thres = <45>;
+	temp_t3_thres_minus_x_degree = <42>;
+	temp_t2_thres = <15>;
+	temp_t2_thres_plus_x_degree = <18>;
+	temp_t1_thres = <0>;
+	temp_t1_thres_plus_x_degree = <3>;
+	temp_t0_thres = <(-20)>;
+	temp_t0_thres_plus_x_degree = <(-17)>;
+	temp_neg_10_thres = <(-22)>;
 };
 
 &pdc {
@@ -41,10 +77,10 @@
 	not-rerun-aicl;
 	temp-zones-num = <6>;
 	turbo-chrg-temp-zones = <0  4200 1000 0    0    0    0   >,
-				<15 4250 3000 4500 1500 0    0   >,
-				<25 4300 5800 4400 5200 4530 4000>,
-				<35 4300 5800 4400 5200 4530 4000>,
-				<45 4300 5800 4400 5200 4530 4000>,
+				<10 4250 3000 4500 1000 0    0   >,
+				<15 4500 3000 0    0    0    0   >,
+				<35 4300 6000 4400 5200 4500 4000>,
+				<45 4300 5800 4400 5200 4500 4000>,
 				<60 4200 3000 0    0    0    0   >;
 	thermal-min-level = <1500000>; /*uA*/
 	sw-charging-curr-limited = <500000>; /*uA*/
