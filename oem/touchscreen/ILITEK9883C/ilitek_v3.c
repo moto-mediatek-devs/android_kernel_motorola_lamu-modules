@@ -22,6 +22,10 @@
 #include "firmware/ilitek_v3_fw.h"
 #include "ilitek_v3.h"
 
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include "../../devinfo/dev_info.h"
+#endif
+
 /* Debug level */
 bool debug_en = DEBUG_OUTPUT;
 EXPORT_SYMBOL(debug_en);
@@ -1461,6 +1465,22 @@ static void ili_update_tp_module_info(void)
 	ilits->tp_module = module;
 }
 
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+	static int ili_get_tp_info(char *buf, void *arg0)
+	{
+		if ((ilits->chip->fw_ver & 0xFF) == 0) {
+		return sprintf(buf, "%s-%s-%s-0X%02x\n",
+				"TXD", "P329A", "ILI9883C",
+				(ilits->chip->fw_ver >> 8) & 0xFF);
+		} else {
+		return sprintf(buf, "%s-%s-%s-0X%02x.%x\n",
+				"TXD", "P325A", "ILI9883C",
+				(ilits->chip->fw_ver >> 8) &
+				0xFF, ilits->chip->fw_ver & 0xFF);
+		}
+	}
+#endif
+
 int ili_tddi_init(void)
 {
 #if (BOOT_FW_UPDATE | HOST_DOWN_LOAD)
@@ -1580,6 +1600,10 @@ int ili_tddi_init(void)
 		ILI_ERR("wakeup source request failed\n");
 
 	ili_ic_edge_palm_para_init();
+
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+ 		FULL_PRODUCT_DEVICE_CB(ID_TP, ili_get_tp_info, NULL);
+#endif
 
 	return 0;
 }
