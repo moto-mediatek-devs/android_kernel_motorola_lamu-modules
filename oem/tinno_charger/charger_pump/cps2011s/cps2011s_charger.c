@@ -2086,6 +2086,13 @@ static int cps2011s_i2c_probe(struct i2c_client *client,
 	u8 chip_rev;
 	enum cps2011s_type type;
 
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+	if (oem_pcba_charge_power() != CHARGE_POWER_33W) {
+		pr_err("found 18W device, not init cps2011s\n");
+		return -ENODEV;
+	}
+#endif
+
 	dev_info(&client->dev, "%s(%s)\n", __func__, cps2011s_DRV_VERSION);//	"1.0.8_MTK"
 
 	ret = cps2011s_check_devinfo(client, &chip_rev, &type);

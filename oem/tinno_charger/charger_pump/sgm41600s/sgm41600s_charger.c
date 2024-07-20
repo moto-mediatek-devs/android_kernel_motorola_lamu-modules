@@ -1620,6 +1620,13 @@ static int sgm41600_charger_probe(struct i2c_client *client,
 	struct device_node *node = client->dev.of_node;
 	int ret, i;
 
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+	if (oem_pcba_charge_power() != CHARGE_POWER_33W) {
+		pr_err("found 18W device, not init sgm41600s\n");
+		return -ENODEV;
+	}
+#endif
+
 	SGM_INFO("sgm driver version:(%s)\n", SGM41600S_DRV_VERSION);
 
 	sgm = devm_kzalloc(&client->dev, sizeof(struct sgm41600_chip), GFP_KERNEL);

@@ -1188,14 +1188,12 @@ static int z350_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	struct device_node *np = client->dev.of_node;
 	int ret, irq;
 
-#ifdef OEM_FIXED_ME //need define oem_pcba_chg_15w_exist() in dev_info driver
-	ret = oem_pcba_chg_15w_exist();
-	if (ret > 0) {
-		dev_err(cdev, "%s: only support 15W basic charger, set probe failed\n", __func__);
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+	if (oem_pcba_charge_power() != CHARGE_POWER_33W) {
+		pr_err("found 18W device, not init z350\n");
 		return -ENODEV;
 	}
 #endif
-
 	if (!i2c_check_functionality(client->adapter,
 				I2C_FUNC_SMBUS_BYTE_DATA |
 				I2C_FUNC_SMBUS_WORD_DATA)) {

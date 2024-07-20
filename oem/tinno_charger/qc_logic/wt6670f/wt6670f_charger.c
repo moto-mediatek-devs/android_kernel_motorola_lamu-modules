@@ -1529,6 +1529,12 @@ static int wt6670f_charger_probe(struct i2c_client *client,
 	struct wt6670f_charger *chip = NULL;
 	struct device_node *np = NULL;
 
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+	if (oem_pcba_charge_power() != CHARGE_POWER_33W) {
+		pr_err("found 18W device, not init wt6670f\n");
+		return -ENODEV;
+	}
+#endif
 	pr_info("start!\n");
 	chip = devm_kzalloc(&client->dev, sizeof(*chip), GFP_KERNEL);
 	if (IS_ERR_OR_NULL(chip)) {
