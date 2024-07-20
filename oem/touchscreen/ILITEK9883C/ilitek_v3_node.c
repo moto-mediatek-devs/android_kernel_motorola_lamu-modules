@@ -2011,6 +2011,78 @@ static ssize_t ilitek_proc_sram_test_info(struct file *filp, char __user *buff, 
 	return len;
 }
 
+static ssize_t tp_selftest_result_read(struct file *filp, char __user *buff, size_t size, loff_t *pos)
+{
+	int ret = 0, len = 2;
+	bool esd_en = ilits->wq_esd_ctrl, bat_en = ilits->wq_bat_ctrl;
+
+	if (ilits->tp_suspend) {
+		ILI_ERR("In suspend, can't echo, return now");
+		return -EINVAL;
+	}
+
+	if (atomic_read(&ilits->tp_reset) == START) {
+		ILI_ERR("ignore request! tp reset atomic is START.\n");
+		return -EINVAL;
+	}
+
+	if (*pos != 0)
+		return 0;
+
+	ILI_INFO("Run MP test with LCM on\n");
+
+	mutex_lock(&ilits->touch_mutex);
+
+	/* Create the directory for mp_test result */
+	if ((dev_mkdir(CSV_LCM_ON_PATH, S_IRUGO | S_IWUSR)) != 0)
+		ILI_ERR("Failed to create directory for mp_test\n");
+
+	if (esd_en)
+		ili_wq_ctrl(WQ_ESD, DISABLE);
+	if (bat_en)
+		ili_wq_ctrl(WQ_BAT, DISABLE);
+
+	memset(g_user_buf, 0, USER_STR_BUFF * sizeof(unsigned char));
+	ilits->mp_ret_len = 0;
+
+	ret = ili_mp_test_handler(g_user_buf, ON);
+	ILI_INFO("MP TEST %s, Error code = %d\n", (ret < 0) ? "FAIL" : "PASS", ret);
+
+	g_user_buf[0] = 3;
+	g_user_buf[1] = (ret < 0) ? -ret : ret;
+	len += ilits->mp_ret_len;
+
+	len += snprintf(g_user_buf + len, USER_STR_BUFF - len, "MP TEST %s\n", (ret < 0) ? "FAIL" : "PASS");
+	if (g_user_buf[1] == EMP_MODE) {
+		len += snprintf(g_user_buf + len, USER_STR_BUFF - len, "%s\n", "Failed to switch MP mode, abort!");
+	} else if (g_user_buf[1] == EMP_FW_PROC) {
+		len += snprintf(g_user_buf + len, USER_STR_BUFF - len, "%s\n", "FW still upgrading, abort!");
+	} else if (g_user_buf[1] == EMP_FORMUL_NULL) {
+		len += snprintf(g_user_buf + len, USER_STR_BUFF - len, "%s\n", "MP formula is null, abort!");
+	} else if (g_user_buf[1] == EMP_INI) {
+		len += snprintf(g_user_buf + len, USER_STR_BUFF - len, "%s\n", "Not found ini file, abort!");
+	} else if (g_user_buf[1] == EMP_NOMEM) {
+		len += snprintf(g_user_buf + len, USER_STR_BUFF - len, "%s\n", "Failed to allocated memory, abort!");
+	} else if (g_user_buf[1] == EMP_PROTOCOL) {
+		len += snprintf(g_user_buf + len, USER_STR_BUFF - len, "%s\n", "Protocol version isn't matched, abort!");
+	} else if (g_user_buf[1] == EMP_TIMING_INFO) {
+		len += snprintf(g_user_buf + len, USER_STR_BUFF - len, "%s\n", "Failed to get timing info, abort!");
+	} else if (g_user_buf[1] == EMP_PARA_NULL) {
+		len += snprintf(g_user_buf + len, USER_STR_BUFF - len, "%s\n", "Failed to get mp parameter, abort!");
+	}
+
+	if (copy_to_user((char *)buff, g_user_buf, len))
+		ILI_ERR("Failed to copy data to user space\n");
+
+	if (esd_en)
+		ili_wq_ctrl(WQ_ESD, ENABLE);
+	if (bat_en)
+		ili_wq_ctrl(WQ_BAT, ENABLE);
+
+	*pos += len;
+	mutex_unlock(&ilits->touch_mutex);
+	return len;
+}
 int ili_get_tp_recore_ctrl(int data)
 {
 	int ret = 0;
@@ -3575,6 +3647,9 @@ out:
 
 static struct proc_dir_entry *proc_dir_ilitek;
 
+
+static struct proc_dir_entry *proc_dir_ilitek_tp_info;
+
 #if LINUX_VERSION_CODE > KERNEL_VERSION(5, 6, 0)
 typedef struct {
 	char *name;
@@ -3904,6 +3979,19 @@ static struct file_operations proc_fw_cmd_fops = {
 };
 #endif
 
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 6, 0)
+static struct proc_ops proc_show_selftest_result_fops = {
+	.proc_read = tp_selftest_result_read,
+	.proc_lseek = default_llseek,
+};
+#else
+static struct file_operations proc_show_selftest_result_fops = {
+	.read = tp_selftest_result_read,
+	.llseek = default_llseek,
+};
+#endif
+
 proc_node iliproc[] = {
 	{"ioctl", NULL, &proc_ioctl_fops, false},
 	{"fw_process", NULL, &proc_fw_process_fops, false},
@@ -3928,6 +4016,29 @@ proc_node iliproc[] = {
 	{"show_mp_test_result", NULL, &proc_show_mp_test_result_fops, false},
 #endif
 };
+
+
+proc_node tp_info_proc[] = {
+	{"tp_selftest_result", NULL, &proc_show_selftest_result_fops, false},
+};
+
+void touch_info_node_init(void)
+{
+	int i = 0;
+	ILI_INFO("touch_info_node_init\n");
+	proc_dir_ilitek_tp_info = proc_mkdir("touch_info", NULL);
+	for (; i < ARRAY_SIZE(tp_info_proc); i++) {
+		tp_info_proc[i].node = proc_create(tp_info_proc[i].name, 0644,
+					proc_dir_ilitek_tp_info, tp_info_proc[i].fops);
+		if (tp_info_proc[i].node == NULL) {
+			tp_info_proc[i].isCreated = false;
+			ILI_ERR("Failed to create %s under /proc\n", tp_info_proc[i].name);
+		} else {
+			tp_info_proc[i].isCreated = true;
+			ILI_INFO("Succeed to create %s under /proc\n", tp_info_proc[i].name);
+		}
+	}
+}
 
 void ili_node_init(void)
 {
