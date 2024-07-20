@@ -1708,6 +1708,39 @@ static ssize_t enable_charger_store(struct device *dev,
 
 static DEVICE_ATTR_RW(enable_charger);
 
+/* TN Begin modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
+static ssize_t disable_thermal_current_limit_show(struct device *dev,
+				      struct device_attribute *attr, char *buf)
+{
+	struct mtk_charger *pinfo = dev->driver_data;
+
+	chr_err("%s: %d\n", __func__, pinfo->disable_thermal_current_limit);
+	return sprintf(buf, "%d\n", pinfo->disable_thermal_current_limit);
+}
+
+static ssize_t disable_thermal_current_limit_store(struct device *dev,
+				       struct device_attribute *attr,
+				       const char *buf, size_t size)
+{
+	struct mtk_charger *pinfo = dev->driver_data;
+	int temp;
+
+	if (kstrtoint(buf, 10, &temp) == 0) {
+		if (temp < 0) {
+			chr_err("%s: val is invalid: %d\n", __func__, temp);
+			temp = 0;
+		}
+		pinfo->disable_thermal_current_limit = temp;
+		chr_err("%s: %d\n", __func__, pinfo->disable_thermal_current_limit);
+	} else {
+		chr_err("%s: format error!\n", __func__);
+	}
+	return size;
+}
+
+static DEVICE_ATTR_RW(disable_thermal_current_limit);
+/* TN End modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
+
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 
@@ -4042,7 +4075,6 @@ static int mtk_charger_setup_files(struct platform_device *pdev)
 	ret = device_create_file(&(pdev->dev), &dev_attr_charger_log_level);
 	if (ret)
 		goto _out;
-
 	/* Battery warning */
 	ret = device_create_file(&(pdev->dev), &dev_attr_BatteryNotify);
 	if (ret)
@@ -4090,6 +4122,9 @@ static int mtk_charger_setup_files(struct platform_device *pdev)
 		goto _out;
 
 	ret = device_create_file(&(pdev->dev), &dev_attr_enable_charger);
+	if (ret)
+		goto _out;
+	ret = device_create_file(&(pdev->dev), &dev_attr_disable_thermal_current_limit);
 	if (ret)
 		goto _out;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
@@ -4430,10 +4465,22 @@ static int psy_charger_set_property(struct power_supply *psy,
 /*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 		info->chg_data[idx].thermal_charging_current_limit =
 			val->intval;
+/* TN Begin modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+		if (info->disable_thermal_current_limit)
+			info->chg_data[idx].thermal_charging_current_limit = -1;
+#endif
+/* TN End modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
 		break;
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
 		info->chg_data[idx].thermal_input_current_limit =
 			val->intval;
+/* TN Begin modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+		if (info->disable_thermal_current_limit)
+			info->chg_data[idx].thermal_input_current_limit = -1;
+#endif
+/* TN End modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT:
 		if (val->intval > 0)
@@ -4837,6 +4884,7 @@ static int mtk_charger_probe(struct platform_device *pdev)
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	info->enable_hiz = false;
 	info->enable_charger = true;
+	info->disable_thermal_current_limit = 0;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 

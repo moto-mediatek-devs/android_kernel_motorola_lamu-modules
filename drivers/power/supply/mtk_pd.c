@@ -72,8 +72,16 @@ static int pd_dbg_level = PD_DEBUG_LEVEL;
 static bool algo_waiver_test;
 module_param(algo_waiver_test, bool, 0644);
 
+/* TN Begin modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
+module_param(pd_dbg_level, int, 0644);
+/* TN End modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
+
 int pd_get_debug_level(void)
 {
+	/* TN Begin modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
+	if (pd_dbg_level <= 0)
+		pd_dbg_level = 1;
+	/* TN End modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
 	return pd_dbg_level;
 }
 
