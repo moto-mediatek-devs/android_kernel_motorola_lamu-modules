@@ -564,6 +564,7 @@ struct mtk_charger {
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	bool enable_hiz;
 	bool enable_charger;
+	int disable_thermal_current_limit;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 
