@@ -113,6 +113,7 @@ struct cts_oem_data {
     struct proc_dir_entry *manual_proc_entry;
     struct proc_dir_entry *diffdata_proc_entry;
     struct proc_dir_entry *rawdata_proc_entry;
+    struct proc_dir_entry *chipone_selftest_proc_entry;
 
     bool test_config_from_dt_has_parsed;
 
@@ -930,8 +931,8 @@ const struct seq_operations selftest_seq_ops = {
 
 static int32_t selftest_proc_open(struct inode *inode, struct file *file)
 {
-    //struct chipone_ts_data *cts_data = PDE_DATA(inode);
-	struct chipone_ts_data *cts_data = NULL;
+    struct chipone_ts_data *cts_data = pde_data(inode);
+    // struct chipone_ts_data *cts_data = NULL;
     struct cts_oem_data *oem_data = NULL;
     int ret;
 
@@ -1040,7 +1041,7 @@ static int cts_rawdata_show(struct seq_file *m, void *v)
 static int cts_rawdata_open(struct inode *inode, struct file *file)
 {
     return single_open(file, cts_rawdata_show, pde_data(inode));
-	return 0;
+    return 0;
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 6, 0)
@@ -1092,7 +1093,7 @@ static int cts_diffdata_show(struct seq_file *m, void *v)
 static int cts_diffdata_open(struct inode *inode, struct file *file)
 {
     return single_open(file, cts_diffdata_show, pde_data(inode));
-	return 0;
+    return 0;
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 6, 0)
@@ -1144,7 +1145,7 @@ static int cts_manual_show(struct seq_file *m, void *v)
 static int cts_manual_open(struct inode *inode, struct file *file)
 {
     return single_open(file, cts_manual_show, pde_data(inode));
-	return 0;
+    return 0;
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 6, 0)
@@ -1230,7 +1231,7 @@ static int cts_limit_show(struct seq_file *m, void *v)
 static int cts_limit_open(struct inode *inode, struct file *file)
 {
     return single_open(file, cts_limit_show, pde_data(inode));
-	return 0;
+    return 0;
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 6, 0)
@@ -1555,7 +1556,7 @@ static int cts_factory_test_show(struct seq_file *m, void *v)
 static int cts_factory_test_open(struct inode *inode, struct file *file)
 {
     return single_open(file, cts_factory_test_show, pde_data(inode));
-	return 0;
+    return 0;
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 6, 0)
@@ -1571,10 +1572,89 @@ static const struct proc_ops cts_factory_test_ops = {
 };
 #endif
 
+struct proc_dir_entry *touch_info_dir;
+
+static int32_t chipone_selftest_open(struct inode *inode, struct file *file)
+{
+    struct chipone_ts_data *cts_data = pde_data(inode);
+    // struct chipone_ts_data *cts_data = NULL;
+    struct cts_oem_data *oem_data = NULL;
+    int ret;
+
+    if (cts_data == NULL) {
+        cts_err("Open selftest proc with cts_data = NULL");
+        return -EFAULT;
+    }
+
+    oem_data = cts_data->oem_data;
+    if (oem_data == NULL) {
+        cts_err("Open selftest proc with oem_data = NULL");
+        return -EFAULT;
+    }
+
+    cts_info("Open '/proc/" OEM_SELFTEST_PROC_FILENAME "'");
+
+    if (!oem_data->test_config_from_dt_has_parsed) {
+#ifndef CONFIG_CTS_I2C_HOST
+        ret = parse_selftest_dt(oem_data, cts_data->pdata->spi_client->dev.of_node);
+#else
+        ret = parse_selftest_dt(oem_data, cts_data->device->of_node);
+#endif
+        if (ret) {
+            cts_err("Parse selftest dt failed %d", ret);
+            return ret;
+        }
+    }
+
+    print_selftest_config(oem_data);
+
+    ret = alloc_sleftest_data_mem(oem_data,
+        cts_data->cts_dev.hwdata->num_row * cts_data->cts_dev.hwdata->num_col);
+    if (ret) {
+        cts_err("Alloc test data mem failed");
+        return ret;
+    }
+
+    do_selftest(oem_data);
+
+    ret = save_selftest_data_to_file(oem_data);
+    if (ret) {
+        cts_err("Save selftest data to file failed %d", ret);
+    }
+
+    ret = seq_open(file, &selftest_seq_ops);
+    if (ret) {
+        cts_err("Open selftest seq file failed %d", ret);
+        return ret;
+    }
+
+    ((struct seq_file *)file->private_data)->private = cts_data;
+
+    return 0;
+}
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 6, 0)
+static const struct proc_ops chipone_selftest_fops = {
+	.proc_open = chipone_selftest_open,
+	.proc_read = seq_read,
+	.proc_lseek = seq_lseek,
+	.proc_release = seq_release,
+};
+#else
+static const struct file_operations chipone_selftest_fops = {
+	.owner = THIS_MODULE,
+	.open = chipone_selftest_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release,
+};
+#endif
+
 
 int cts_oem_init(struct chipone_ts_data *cts_data)
 {
     struct cts_oem_data *oem_data = NULL;
+
     int ret;
 
     if (cts_data == NULL) {
@@ -1644,6 +1724,18 @@ int cts_oem_init(struct chipone_ts_data *cts_data)
         goto free_oem_data;
     }
 
+    touch_info_dir = proc_mkdir("touch_info", NULL);
+    if (!touch_info_dir) {
+        cts_err("Can not create touch_info_dir\n");
+        return -ENOMEM;
+    }
+	cts_info("create /proc/touch_info Succeeded!\n");
+	oem_data->chipone_selftest_proc_entry = proc_create_data("tp_selftest_result", 0444, touch_info_dir, &chipone_selftest_fops, cts_data);
+	if (oem_data->chipone_selftest_proc_entry == NULL) {
+		cts_err("create /proc/touch_info/tp_selftest_result Failed!\n");
+		return -1;
+	}
+
     cts_data->oem_data = oem_data;
     oem_data->cts_data = cts_data;
     return 0;
@@ -1699,6 +1791,16 @@ int cts_oem_deinit(struct chipone_ts_data *cts_data)
         cts_info("  Remove '/proc/"OEM_DIFFDATA_PROC_FILENAME"'");
         remove_proc_entry(OEM_DIFFDATA_PROC_FILENAME, NULL);
     }
+    if (oem_data->chipone_selftest_proc_entry) {
+        cts_info("  Remove /proc/touch_info/tp_selftest_result");
+        remove_proc_entry("tp_selftest_result", touch_info_dir);
+        oem_data->chipone_selftest_proc_entry = NULL;
+    }
+	if (touch_info_dir != NULL) {
+		remove_proc_entry("touch_info", NULL);
+		touch_info_dir = NULL;
+		cts_info("Removed /proc/touch_info\n");
+ 	}
 
     free_selftest_data_mem(oem_data);
 

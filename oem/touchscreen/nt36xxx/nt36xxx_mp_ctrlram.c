@@ -31,13 +31,13 @@
 #define FREQ_HOP_DISABLE 0x66
 #define FREQ_HOP_ENABLE 0x65
 
-#define SHORT_TEST_CSV_FILE "/data/local/tmp/ShortTest.csv"
-#define OPEN_TEST_CSV_FILE "/data/local/tmp/OpenTest.csv"
-#define FW_RAWDATA_CSV_FILE "/data/local/tmp/FWRawdataTest.csv"
-#define FW_CC_CSV_FILE "/data/local/tmp/FWCCTest.csv"
-#define NOISE_TEST_CSV_FILE "/data/local/tmp/NoiseTest.csv"
-#define PEN_FW_RAW_TEST_CSV_FILE "/data/local/tmp/PenFWRawTest.csv"
-#define PEN_NOISE_TEST_CSV_FILE "/data/local/tmp/PenNoiseTest.csv"
+#define SHORT_TEST_CSV_FILE "/sdcard/ShortTest.csv"
+#define OPEN_TEST_CSV_FILE "/sdcard/OpenTest.csv"
+#define FW_RAWDATA_CSV_FILE "/sdcard/FWRawdataTest.csv"
+#define FW_CC_CSV_FILE "/sdcard/FWCCTest.csv"
+#define NOISE_TEST_CSV_FILE "/sdcard/NoiseTest.csv"
+#define PEN_FW_RAW_TEST_CSV_FILE "/sdcard/PenFWRawTest.csv"
+#define PEN_NOISE_TEST_CSV_FILE "/sdcard/PenNoiseTest.csv"
 
 #define nvt_mp_seq_printf(m, fmt, args...) do {	\
 	seq_printf(m, fmt, ##args);	\
@@ -106,6 +106,7 @@ static int32_t *RawData_PenRingX_DiffMax = NULL;
 static int32_t *RawData_PenRingY_DiffMin = NULL;
 static int32_t *RawData_PenRingY_DiffMax = NULL;
 
+static struct proc_dir_entry *touch_info_dir;
 static struct proc_dir_entry *NVT_proc_selftest_entry = NULL;
 static int8_t nvt_mp_test_result_printed = 0;
 static uint8_t fw_ver = 0;
@@ -2497,9 +2498,17 @@ return:
 *******************************************************/
 int32_t nvt_mp_proc_init(void)
 {
-	NVT_proc_selftest_entry = proc_create("nvt_selftest", 0444, NULL, &nvt_selftest_fops);
+	// NVT_proc_selftest_entry = proc_create("nvt_selftest", 0444, NULL, &nvt_selftest_fops);
+	struct proc_dir_entry *touch_info_dir;
+	touch_info_dir = proc_mkdir("touch_info", NULL);
+	if (!touch_info_dir) {
+		NVT_ERR("Can not create touch_info_dir\n");
+		return -ENOMEM;
+	}
+	NVT_LOG("create /proc/touch_info Succeeded!\n");
+	NVT_proc_selftest_entry = proc_create("tp_selftest_result", 0444, touch_info_dir, &nvt_selftest_fops);
 	if (NVT_proc_selftest_entry == NULL) {
-		NVT_ERR("create /proc/nvt_selftest Failed!\n");
+		NVT_ERR("create /proc/touch_info/tp_selftest_result Failed!\n");
 		return -1;
 	} else {
 		if(nvt_mp_buffer_init()) {
@@ -2507,7 +2516,7 @@ int32_t nvt_mp_proc_init(void)
 			return -1;
 		}
 		else {
-			NVT_LOG("create /proc/nvt_selftest Succeeded!\n");
+			NVT_LOG("create /proc/touch_info/tp_selftest_result Succeeded!\n");
 		}
 		return 0;
 	}
@@ -2526,9 +2535,14 @@ void nvt_mp_proc_deinit(void)
 	nvt_mp_buffer_deinit();
 
 	if (NVT_proc_selftest_entry != NULL) {
-		remove_proc_entry("nvt_selftest", NULL);
+		remove_proc_entry("tp_selftest_result", touch_info_dir);
 		NVT_proc_selftest_entry = NULL;
-		NVT_LOG("Removed /proc/%s\n", "nvt_selftest");
+		NVT_LOG("Removed /proc/touch_info/tp_selftest_result\n");
 	}
+	if (touch_info_dir != NULL) {
+		remove_proc_entry("touch_info", NULL);
+		touch_info_dir = NULL;
+		NVT_LOG("Removed /proc/touch_info\n");
+ 	}
 }
 #endif /* #if NVT_TOUCH_MP */

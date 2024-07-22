@@ -25,9 +25,9 @@
 
 /* define names and paths for the variety of tp modules */
 #define DEF_INI_NAME_PATH		"/sdcard/mp.ini"
-#define DEF_FW_FILP_PATH		"/sdcard/ILITEK_FW"
+#define DEF_FW_FILP_PATH		"/sdcard/ILITEK_FW.hex"
 #define DEF_INI_REQUEST_PATH		"mp.ini"
-#define DEF_FW_REQUEST_PATH		"ILITEK_FW"
+#define DEF_FW_REQUEST_PATH		"ILITEK_FW.hex"
 static unsigned char CTPM_FW_DEF[] = {
 	#include "FW_TDDI_TRUNK_FB.ili"
 };

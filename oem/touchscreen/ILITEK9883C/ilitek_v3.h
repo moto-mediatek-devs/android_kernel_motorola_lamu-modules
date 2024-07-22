@@ -1560,6 +1560,8 @@ extern int ili_ice_mode_ctrl_by_mode_i2c(bool enable, bool mcu, int mode);
 extern void ili_spi_ice_mode_read(u32 addr, u32 *data, int len, u8 msmode);
 extern int ili_ice_slave_write_register(u32 addr, u32 data, int len);
 
+extern void touch_info_node_init(void);
+
 static inline void ipio_kfree(void **mem)
 {
 	if (*mem != NULL) {

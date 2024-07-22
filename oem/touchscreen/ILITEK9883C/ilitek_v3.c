@@ -1474,7 +1474,7 @@ static void ili_update_tp_module_info(void)
 				(ilits->chip->fw_ver >> 8) & 0xFF);
 		} else {
 		return sprintf(buf, "%s-%s-%s-0X%02x.%x\n",
-				"TXD", "P325A", "ILI9883C",
+				"TXD", "P329A", "ILI9883C",
 				(ilits->chip->fw_ver >> 8) &
 				0xFF, ilits->chip->fw_ver & 0xFF);
 		}
@@ -1550,6 +1550,10 @@ int ili_tddi_init(void)
 	ili_update_tp_module_info();
 
 	ili_node_init();
+
+
+	touch_info_node_init();
+
 
 	ili_fw_read_flash_info(OFF);
 
