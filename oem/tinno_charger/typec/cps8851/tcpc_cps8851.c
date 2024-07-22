@@ -43,6 +43,10 @@
 #define CPS_8851_VID		0x315c
 #define CPS_8851_PID		0x8851
 
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include <dev_info.h>
+#endif /* CONFIG_OEM_DEVINFO */
+
 struct rt1711_chip {
 	struct i2c_client *client;
 	struct device *dev;
@@ -1690,6 +1694,10 @@ static int rt1711_i2c_probe(struct i2c_client *client)
 		pr_err("rt1711 init alert fail\n");
 		goto err_irq_init;
 	}
+
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+	FULL_PRODUCT_DEVICE_INFO(ID_CC_LOGIC, "CPS8851");
+#endif
 
 	pr_info("%s probe OK!\n", __func__);
 	return 0;
