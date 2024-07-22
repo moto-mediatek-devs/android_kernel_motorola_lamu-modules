@@ -10,7 +10,11 @@
 #include <SCP_sensorHub.h>
 #include <accel.h>
 #include <hwmsensor.h>
-
+//TN modified by db 20240720 BEGIN
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include "../../../../../../../oem/devinfo/dev_info.h"
+#endif
+//TN modified by db 20230720 END
 #define DEBUG 1
 #define SW_CALIBRATION
 #define ACCELHUB_AXIS_X 0
@@ -401,7 +405,18 @@ static void scp_init_work_done(struct work_struct *work)
 #ifndef MTK_OLD_FACTORY_CALIBRATION
 	int32_t cfg_data[6] = {0};
 #endif
-
+   //TN modified by db 20240720 BEGIN
+	{
+		struct sensorInfo_t acc_info;
+		int ret = sensor_set_cmd_to_hub(ID_ACCELEROMETER,
+			CUST_ACTION_GET_SENSOR_INFO, &acc_info);
+		if (ret < 0)
+			pr_err("get acc info failed.\n");
+		else
+			FULL_PRODUCT_DEVICE_INFO(ID_GSENSOR, acc_info.name);
+	}
+	//TN modified by db 20240720 END
+	
 	if (atomic_read(&obj->scp_init_done) == 0) {
 		pr_debug("scp is not ready to send cmd\n");
 		return;

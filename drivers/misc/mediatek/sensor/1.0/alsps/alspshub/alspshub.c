@@ -11,7 +11,11 @@
 #include <SCP_sensorHub.h>
 #include "SCP_power_monitor.h"
 #include <linux/pm_wakeup.h>
-
+//TN modified by db 20240720 BEGIN
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include "../../../../../../../oem/devinfo/dev_info.h"
+#endif
+//TN modified by db 20230720 END
 
 #define ALSPSHUB_DEV_NAME     "alsps_hub_pl"
 
@@ -350,6 +354,27 @@ static void alspshub_init_done_work(struct work_struct *work)
 #ifndef MTK_OLD_FACTORY_CALIBRATION
 	int32_t cfg_data[2] = {0};
 #endif
+    //TN modified by db 20240720 BEGIN
+	{
+		struct sensorInfo_t als_info;
+		int ret = sensor_set_cmd_to_hub(ID_LIGHT,
+			CUST_ACTION_GET_SENSOR_INFO, &als_info);
+		if (ret < 0)
+			pr_err("get als info failed.\n");
+		else
+			FULL_PRODUCT_DEVICE_INFO(ID_LSENSOR, als_info.name);
+	}
+
+		{
+		struct sensorInfo_t ps_info;
+		int ret = sensor_set_cmd_to_hub(ID_PROXIMITY,
+			CUST_ACTION_GET_SENSOR_INFO, &ps_info);
+		if (ret < 0)
+			pr_err("get ps info failed.\n");
+		else
+			FULL_PRODUCT_DEVICE_INFO(ID_PSENSOR, ps_info.name);
+	}
+	//TN modified by db 20230720 END
 
 	if (atomic_read(&obj->scp_init_done) == 0) {
 		pr_err("wait for nvram to set calibration\n");

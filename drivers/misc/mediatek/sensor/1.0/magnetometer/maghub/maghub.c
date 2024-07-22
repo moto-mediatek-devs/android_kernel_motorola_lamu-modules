@@ -10,6 +10,11 @@
 #include "mag.h"
 #include <SCP_sensorHub.h>
 #include "SCP_power_monitor.h"
+//TN modified by db 20240720 BEGIN
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include "../../../../../../../oem/devinfo/dev_info.h"
+#endif
+//TN modified by db 20230720 END
 
 #define MAGHUB_DEV_NAME         "mag_hub"
 #define DRIVER_VERSION          "1.0.1"
@@ -257,6 +262,18 @@ static void scp_init_work_done(struct work_struct *work)
 	struct maghub_ipi_data *obj = mag_ipi_data;
 	int err = 0;
 	struct mag_libinfo_t mag_libinfo;
+
+    //TN modified by db 20240720 BEGIN
+	{
+		struct sensorInfo_t mag_info;
+		int ret = sensor_set_cmd_to_hub(ID_MAGNETIC,
+			CUST_ACTION_GET_SENSOR_INFO, &mag_info);
+		if (ret < 0)
+			pr_err("get mag info failed.\n");
+		else
+			FULL_PRODUCT_DEVICE_INFO(ID_MSENSOR, mag_info.name);
+	}
+	//TN modified by db 20230720 END
 
 	if (atomic_read(&obj->scp_init_done) == 0) {
 		pr_err("scp is not ready to send cmd\n");
