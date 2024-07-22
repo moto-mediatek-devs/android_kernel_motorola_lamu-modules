@@ -59,7 +59,7 @@
 #include <dev_info.h>
 #endif
 
-static bool allow_set_dp_dm_vol = false;
+//static bool allow_set_dp_dm_vol = false;
 
 static int cx2589x_set_boost_current_limit(struct charger_device *chg_dev, u32 uA);
 static int cx2589x_enable_otg(struct charger_device *chg_dev, bool en);
@@ -449,16 +449,18 @@ static int charger_detect_init(struct cx2589x_device *cx)
 {
 	struct phy *phy;
 	int ret;
-	dev_err(cx->dev, " entry %s\n", __func__);
+
+	pr_info("enter\n");
 	phy = phy_get(cx->dev, "usb2-phy");
 	if (IS_ERR_OR_NULL(phy)) {
-		dev_err(cx->dev, "failed to get usb2-phy\n");
+		pr_err("failed to get usb2-phy\n");
 		return -ENODEV;
 	}
+
 	ret = phy_set_mode_ext(phy, PHY_MODE_USB_DEVICE, PHY_MODE_BC11_SET);
-	dev_err(cx->dev, "%s\n", __func__);
 	if (ret)
-		dev_err(cx->dev, "failed to set phy ext mode\n");
+		pr_err("failed to set phy ext mode\n");
+
 	phy_put(cx->dev, phy);
 	return ret;
 }
@@ -467,15 +469,18 @@ static int charger_detect_release(struct cx2589x_device *cx)
 {
 	struct phy *phy;
 	int ret;
+
+	pr_info("enter\n");
 	phy = phy_get(cx->dev, "usb2-phy");
 	if (IS_ERR_OR_NULL(phy)) {
-		dev_err(cx->dev, "failed to get usb2-phy\n");
+		pr_err("failed to get usb2-phy\n");
 		return -ENODEV;
 	}
+
 	ret = phy_set_mode_ext(phy, PHY_MODE_USB_DEVICE, PHY_MODE_BC11_CLR);
-	dev_err(cx->dev, "%s\n", __func__);
 	if (ret)
-		dev_err(cx->dev, "failed to set phy ext mode\n");
+		pr_err("failed to set phy ext mode\n");
+
 	phy_put(cx->dev, phy);
 	return ret;
 }
@@ -487,7 +492,7 @@ static int cx2589x_force_vindpm(struct cx2589x_device *cx, bool en)
 			CX2589x_FORCE_VINDPM_MASK, (u8)en << 7);
 }
 
-static int cx2589x_force_dpdm(struct cx2589x_device *cx)
+__maybe_unused static int cx2589x_force_dpdm(struct cx2589x_device *cx)
 {
 	int ret;
 
@@ -601,7 +606,7 @@ static int cx2589x_get_state(struct cx2589x_device *cx, struct cx2589x_state *st
 	if (ret) {
 		ret = cx2589x_read_reg(cx, CX2589x_REG_0B, &chrg_stat);
 		if (ret) {
-			pr_err("%s read CX2589x_REG_0B fail\n", __func__);
+			pr_err("read CX2589x_REG_0B fail\n");
 			return ret;
 		}
 	}
@@ -613,17 +618,17 @@ static int cx2589x_get_state(struct cx2589x_device *cx, struct cx2589x_state *st
 
 	ret = cx2589x_read_reg(cx, CX2589x_REG_0E, &therm_stat);
 	if (ret) {
-		pr_err("%s read CX2589x_REG_0E fail\n", __func__);
+		pr_err("read CX2589x_REG_0E fail\n");
 		return ret;
 	}
 	state->therm_stat = !!(therm_stat & CX2589x_THERM_STAT);
 
-	pr_err("%s chrg_type =%d, chrg_stat =%d online = %d\n", __func__,
+	pr_info("chrg_type=%d, chrg_stat=%d online=%d\n",
 		state->chrg_type>>5, state->chrg_stat>>3, state->online);
 
 	ret = cx2589x_read_reg(cx, CX2589x_REG_0C, &fault);
 	if (ret) {
-		pr_err("%s read CX2589x_REG_0C fail\n", __func__);
+		pr_err("read CX2589x_REG_0C fail\n");
 		return ret;
 	}
 
@@ -632,21 +637,21 @@ static int cx2589x_get_state(struct cx2589x_device *cx, struct cx2589x_state *st
 	state->health = state->ntc_fault;
 	ret = cx2589x_read_reg(cx, CX2589x_REG_00, &chrg_param_0);
 	if (ret) {
-		pr_err("%s read CX2589x_REG_00 fail\n", __func__);
+		pr_err("read CX2589x_REG_00 fail\n");
 		return ret;
 	}
 	state->hiz_en = !!(chrg_param_0 & CX2589x_HIZ_EN);
 
 	ret = cx2589x_read_reg(cx, CX2589x_REG_07, &chrg_param_1);
 	if (ret) {
-		pr_err("%s read CX2589x_REG_07 fail\n", __func__);
+		pr_err("read CX2589x_REG_07 fail\n");
 		return ret;
 	}
 	state->term_en = !!(chrg_param_1 & CX2589x_TERM_EN);
 
 	ret = cx2589x_read_reg(cx, CX2589x_REG_11, &chrg_param_2);
 	if (ret) {
-		pr_err("%s read CX2589x_REG_11 fail\n", __func__);
+		pr_err("read CX2589x_REG_11 fail\n");
 		return ret;
 	}
 	state->vbus_gd = !!(chrg_param_2 & CX2589x_VBUS_GOOD);
@@ -707,7 +712,7 @@ static int cx2589x_is_charging(struct charger_device *chg_dev,bool *en)
 
 	ret = cx2589x_read_reg(cx, CX2589x_REG_03, &val);
 	if (ret) {
-		pr_err("%s read CX2589x_REG_03 fail\n", __func__);
+		pr_err("read CX2589x_REG_03 fail\n");
 		return ret;
 	}
 	*en = (val & CX2589x_CHRG_EN) ? 1 : 0;
@@ -768,15 +773,15 @@ static int cx2589x_dump_register(struct charger_device *chg_dev)
 		for (i = 0; i < CX2589x_REG_NUM + 1; i++) {
 			ret = cx2589x_read_reg(cx, i, &cx2589x_reg[i]);
 			if (ret != 0) {
-				dev_info(cx->dev, "%s, [cx2589x] i2c transfor error\n", __func__);
+				pr_err("i2c transfor error\n");
 				return ret;
 			}
 			snprintf(temp_buff, SINGLE_DUMP_LEN, "reg[0x%02x]=0x%02x ", i, cx2589x_reg[i]);
 			strcat(reg_buff, temp_buff);
 		}
-		dev_info(cx->dev, "%s: %s", __func__, reg_buff);
+		pr_info("%s", reg_buff);
 	} else {
-		dev_err(cx->dev, "%s, dump register has been disabled\n", __func__);
+		pr_err("dump register has been disabled\n");
 	}
 
 	return 0;
@@ -794,12 +799,12 @@ static int cx2589x_hw_chipid_detect(struct cx2589x_device *cx)
 
 	ret = cx2589x_read_reg(cx,CX2589x_REG_14, &val);
 	if (ret < 0) {
-		pr_info("[%s] read CX2589x_REG_14 fail\n", __func__);
+		pr_info("read CX2589x_REG_14 fail\n");
 		return ret;
 	}
 
 	val = val & CX2589x_PN_MASK;
-	pr_info("[%s] Reg[0x14]=0x%x\n", __func__, val);
+	pr_info("Reg[0x14]=0x%x\n", val);
 
 	return val;
 }
@@ -809,7 +814,7 @@ static int cx2589x_reset_watch_dog_timer(struct charger_device *chg_dev)
 	int ret;
 	struct cx2589x_device *cx = charger_get_data(chg_dev);
 
-	pr_info("[%s] charging_reset_watch_dog_timer\n", __func__);
+	pr_info("+++\n");
 
 	ret = cx2589x_set_wdt_rst(cx, true);	/* RST watchdog */
 
@@ -870,7 +875,7 @@ static int cx2589x_get_is_safetytimer_enable(struct charger_device *chg_dev, boo
 
 	ret = cx2589x_read_reg(cx, CX2589x_REG_07, &val);
 	if (ret < 0) {
-		pr_info("[%s] read CX2589x_REG_07 fail\n", __func__);
+		pr_info("read CX2589x_REG_07 fail\n");
 		return ret;
 	}
 
@@ -887,7 +892,7 @@ static int cx2589x_en_pe_current_partern(struct charger_device *chg_dev, bool is
 
 	ret = cx2589x_update_bits(cx, CX2589x_REG_04, CX2589x_EN_PUMPX, CX2589x_EN_PUMPX);
 	if (ret < 0) {
-		pr_info("[%s] read CX2589x_REG_04 fail\n", __func__);
+		pr_info("read CX2589x_REG_04 fail\n");
 		return ret;
 	}
 
@@ -904,11 +909,29 @@ static int cx2589x_set_dpdm_hiz(struct cx2589x_device *cx)
 
 	ret = cx2589x_update_bits(cx, CX2589x_REG_15, CX2589x_DP_VSEL_MASK, 0);
 	if (ret < 0)
-		dev_err(cx->dev, "%s set dp hiz failed, ret(%d)\n", __func__, ret);
+		pr_err("set dp hiz failed, ret(%d)\n", ret);
 
 	ret = cx2589x_update_bits(cx, CX2589x_REG_15, CX2589x_DM_VSEL_MASK, 0);
 	if (ret < 0)
-		dev_err(cx->dev, "%s set dm hiz failed, ret(%d)\n", __func__, ret);
+		pr_err("set dm hiz failed, ret(%d)\n", ret);
+
+	return ret;
+}
+
+static int cx2589x_get_vbus(struct cx2589x_device *cx, int *vbus_volt)
+{
+	int ret;
+	int value;
+
+	ret = iio_read_channel_processed(cx->vbus, &value);
+	if (ret < 0) {
+		pr_info("get vbus voltage failed");
+		return ret;
+	}
+
+	*vbus_volt = value + R_VBUS_CHARGER_1 * value / R_VBUS_CHARGER_2;
+
+	pr_info("vbus voltage: %d", *vbus_volt);
 
 	return ret;
 }
@@ -955,10 +978,10 @@ static int cx2589x_charger_set_property(struct power_supply *psy,
 	switch (prop) {
 	case POWER_SUPPLY_PROP_ONLINE:
 		if (val->intval == 2) {
-			dev_info(cx->dev, "%s: %d, start charger detection\n", __func__, val->intval);
-			schedule_delayed_work(&cx->charge_detect_delayed_work, msecs_to_jiffies(600));
+			pr_info("attach is %d, start charger detection\n", val->intval);
+			schedule_delayed_work(&cx->charge_detect_delayed_work, msecs_to_jiffies(1000));
 		} else if (val->intval == 0) {
-			dev_info(cx->dev, "%s: %d, vbus not online \n", __func__, val->intval);
+			pr_info("attach is %d, vbus not online\n", val->intval);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 			cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
 #endif
@@ -1080,13 +1103,8 @@ static int cx2589x_charger_get_property(struct power_supply *psy,
 		break;
 
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-		ret = iio_read_channel_processed(cx->vbus, &value);
-		if (ret < 0) {
-			dev_err(cx->dev, "get vbus voltage failed");
-			return -EINVAL;
-		}
-		val->intval = value + R_VBUS_CHARGER_1 * value / R_VBUS_CHARGER_2;
-		dev_info(cx->dev, "vbus voltage: %d", val->intval);
+		ret = cx2589x_get_vbus(cx, &value);
+		val->intval = value;
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 		//val->intval = state.ibus_adc;
@@ -1144,7 +1162,7 @@ static int update_battery_info_from_gauge(struct cx2589x_device *cx)
 	if (IS_ERR_OR_NULL(cx->battery)) {
 		cx->battery = power_supply_get_by_name("battery");
 		if (IS_ERR_OR_NULL(cx->battery)) {
-			dev_err(cx->dev, "%s failed to get battery supply\n", __func__);
+			pr_err("failed to get battery supply\n");
 		}
 		return -EINVAL;
 	}
@@ -1158,26 +1176,7 @@ static int update_battery_info_from_gauge(struct cx2589x_device *cx)
 			POWER_SUPPLY_PROP_CURRENT_NOW, &info);
 	cx->batt_curr = info.intval / 1000;
 
-	dev_info(cx->dev, "%s: Vbat = %d mV, Ibat = %d mA\n",
-			__func__, cx->batt_vol, cx->batt_curr);
-
-	return ret;
-}
-
-static int cx2589x_get_vbus(struct cx2589x_device *cx, int *vbus_volt)
-{
-	int ret;
-	int value;
-
-	ret = iio_read_channel_processed(cx->vbus, &value);
-	if (ret < 0) {
-		dev_err(cx->dev, "get vbus voltage failed");
-		return ret;
-	}
-
-	*vbus_volt = value + R_VBUS_CHARGER_1 * value / R_VBUS_CHARGER_2;
-
-	dev_info(cx->dev, "%s: vbus voltage: %d", __func__, *vbus_volt);
+	pr_info("Vbat = %d mV, Ibat = %d mA\n", cx->batt_vol, cx->batt_curr);
 
 	return ret;
 }
@@ -1193,19 +1192,21 @@ static void charger_monitor_work_func(struct work_struct *work)
 
 	charge_monitor_work = container_of(work, struct delayed_work, work);
 	if (charge_monitor_work == NULL) {
-		pr_err("[%s] Cann't get charge_monitor_work\n", __func__);
+		pr_err("Cann't get charge_monitor_work\n");
 		return;
 	}
 
 	cx = container_of(charge_monitor_work, struct cx2589x_device, charge_monitor_work);
 	if (cx == NULL) {
-		pr_err("[%s] Cann't get cx \n", __func__);
+		pr_err("Cann't get cx\n");
 		return;
 	}
 
+#if 0
 	if (cx->usb2_phy->otg->gadget){
 		pr_err("%s: gadget->state: %d\n", __func__, cx->usb2_phy->otg->gadget->state);
 	}
+#endif
 
 	ret = cx2589x_get_state(cx, &state);
 	mutex_lock(&cx->lock);
@@ -1214,22 +1215,22 @@ static void charger_monitor_work_func(struct work_struct *work)
 
 	ret = update_battery_info_from_gauge(cx);
 	if (ret) {
-		dev_err(cx->dev, "%s: failed to get batt vol and curr\n", __func__);
+		pr_err("failed to get batt vol and curr\n");
 	}
 
 	if (!cx->state.vbus_gd) {
-		dev_err(cx->dev, "Vbus not present\n");
+		pr_err("Vbus not present\n");
 		//cx2589x_disable_charger(cx);
 		goto out;
 	}
 
 	if (!state.online) {
-		dev_err(cx->dev, "Vbus not online\n");
+		pr_err("Vbus not online\n");
 		goto out;
 	}
 
 	cx2589x_dump_register(cx->chg_dev);
-	pr_err("%s\n", __func__);
+	pr_info("+++\n");
 
 	cx2589x_get_vbus(cx, &vbus_volt);
 	if (vbus_volt > 8500)
@@ -1273,7 +1274,7 @@ static void charger_detect_work_func(struct work_struct *work)
 	mutex_unlock(&cx->lock);
 
 	if (!cx->state.vbus_gd) {
-		dev_err(cx->dev, "Vbus not present\n");
+		pr_err("Vbus not present\n");
 		//cx2589x_disable_charger(cx);
 		cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
 		cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
@@ -1281,7 +1282,7 @@ static void charger_detect_work_func(struct work_struct *work)
 	}
 
 	if (!state.online) {
-		dev_err(cx->dev, "Vbus not online\n");
+		pr_err("Vbus not online\n");
 		cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
 		cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
 		goto err;
@@ -1289,43 +1290,49 @@ static void charger_detect_work_func(struct work_struct *work)
 
 	switch(cx->state.chrg_type) {
 	case CX2589x_USB_SDP:
+#if 0
 		if (!usb_detect_flag)
 			schedule_delayed_work(&cx->charge_usb_detect_work, 5 * HZ);
 		if (no_usb_flag == 0){
-			pr_info("[%s] CX2589x charger type: SDP\n", __func__);
+			pr_info("CX2589x charger type: SDP\n");
 			cx->chg_type = POWER_SUPPLY_TYPE_USB;
 			cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_SDP;
 		} else {
-			pr_info("[%s] CX2589x charger type: UNKNOWN/FLOAT\n", __func__);
+			pr_info("CX2589x charger type: UNKNOWN/FLOAT\n");
 			cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
 			cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
 		}
+#else
+		pr_info("CX2589x charger type: SDP\n");
+		cx->chg_type = POWER_SUPPLY_TYPE_USB;
+		cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_SDP;
+#endif
 		cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB;
 		break;
 
 	case CX2589x_USB_CDP:
-		pr_info("[%s] CX2589x charger type: CDP\n", __func__);
+		pr_info("CX2589x charger type: CDP\n");
 		cx->chg_type = POWER_SUPPLY_TYPE_USB_CDP;
 		cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_CDP;
 		cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB_CDP;
 		break;
 
 	case CX2589x_USB_DCP:
-		pr_info("[%s] CX2589x charger type: DCP\n", __func__);
+		pr_info("CX2589x charger type: DCP\n");
 		cx->chg_type = POWER_SUPPLY_TYPE_USB_DCP;
 		cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_DCP;
 		cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB_DCP;
 		break;
 
 	case CX2589x_UNKNOWN:
-		pr_info("[%s] CX2589x charger type: UNKNOWN\n", __func__);
+		pr_info("CX2589x charger type: UNKNOWN\n");
 		cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
 		cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
 		cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB;
 		break;
 
 	default:
-		pr_info("[%s] CX2589x charger type: default\n", __func__);
+		pr_info("CX2589x charger type: default\n");
 		cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
 		cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
 		cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB;
@@ -1343,22 +1350,22 @@ static void charger_detect_work_func(struct work_struct *work)
 		cx2589x_update_bits(cx, CX2589x_REG_02, CX2589x_AUTO_DPDM_MASK, 0);
 	}
 
-	dev_info(cx->dev, "Update: chg_type = %d, psy_usb_type = %d\n", cx->chg_type, cx->psy_usb_type);
+	pr_info("Update: chg_type = %d, psy_usb_type = %d\n", cx->chg_type, cx->psy_usb_type);
 
 	//otg retry
 	ret = cx2589x_read_reg(cx, CX2589x_REG_0C, &fault);
 	if (ret)
-		dev_err(cx->dev, "read reg0c fail\n");
+		pr_err("read reg0c fail\n");
 
-	dev_err(cx->dev, "reg0c fault = %02x\n", fault);
+	pr_info("reg0c fault = %02x\n", fault);
 	if (fault & CX2589x_BOOST_FAULT_MASK) {
 		do {
-			dev_err(cx->dev, "otg ocp in irq\n");
+			pr_err("otg ocp in irq\n");
 			ret = cx2589x_enable_otg(s_chg_dev_otg, true);
 			msleep(2);
 			ret = cx2589x_read_reg(cx, CX2589x_REG_0B, &status);
 			if (ret)
-				dev_err(cx->dev, "read reg0B fail\n");
+				pr_err("read reg0B fail\n");
 			val = (status & CX2589x_VBUS_STAT_MASK);
 		} while (retry_otg-- && val != CX2589x_OTG_MODE);
 	}
@@ -1374,7 +1381,7 @@ static void charger_detect_work_func(struct work_struct *work)
 err:
 	//release wakelock
 	power_supply_changed(cx->charger);
-	dev_err(cx->dev, "Relax wakelock\n");
+	pr_err("Relax wakelock\n");
 	__pm_relax(cx->charger_wakelock);
 
 	return;
@@ -1384,7 +1391,7 @@ static void charger_usb_detect_work_func(struct work_struct *work)
 {
 	struct delayed_work *charge_usb_detect_work = NULL;
 	struct cx2589x_device *cx = NULL;
-	struct cx2589x_state state;
+	//struct cx2589x_state state;
 
 	//int ret;
 
@@ -1401,13 +1408,14 @@ static void charger_usb_detect_work_func(struct work_struct *work)
 	}
 
 	usb_detect_flag = true;
-	pr_err("%s: enter\n", __func__);
+	pr_info("enter\n");
+#if 0
 	if (cx->usb2_phy->otg->gadget){
 		//ret = usb_gadget_connect(cx->usb2_phy->otg->gadget);
-		pr_err("%s: gadget->state: %d\n", __func__, cx->usb2_phy->otg->gadget->state);
+		pr_err("gadget->state: %d\n", cx->usb2_phy->otg->gadget->state);
 		if (cx->usb2_phy->otg->gadget->state == 0) {
 			do {
-				pr_err("%s: SDP retry:%d\n", __func__, force_dpdm_count);
+				pr_err("SDP retry:%d\n", force_dpdm_count);
 				cx2589x_force_dpdm(cx);
 				msleep(1000);
 				cx2589x_get_state(cx, &state);
@@ -1421,10 +1429,10 @@ static void charger_usb_detect_work_func(struct work_struct *work)
 			no_usb_flag = 0;
 		}
 
-		pr_err("%s: exit\n", __func__);
+		pr_err("exit\n");
 		schedule_delayed_work(&cx->charge_detect_delayed_work, 0);
 	}
-
+#endif
 	return;
 }
 
@@ -1435,11 +1443,11 @@ static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
 	bool prev_vbus_gd;
 	int ret = 0;
 
-	pr_info("[%s] entry\n", __func__);
+	pr_info("enter\n");
 #if 1
 	ret = cx2589x_get_state(cx, &state);
 	if (ret) {
-		pr_err("%s: Failed to get state:%d\n", __func__, ret);
+		pr_err("Failed to get state:%d\n", ret);
 		return IRQ_HANDLED;
 	}
 
@@ -1449,6 +1457,7 @@ static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
 	mutex_unlock(&cx->lock);
 
 	if (!prev_vbus_gd && cx->state.vbus_gd) {
+#if 0
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 		charger_detect_init(cx);
 #else
@@ -1456,22 +1465,24 @@ static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
 #endif
 		cx->force_detect_count = 0;
 		allow_set_dp_dm_vol = true;
-		dev_info(cx->dev, "%s: adapter/usb inserted\n", __func__);
+#endif
+		pr_info("adapter/usb inserted\n");
 	} else if (prev_vbus_gd && !cx->state.vbus_gd) {
-		dev_info(cx->dev, "%s: adapter/usb removed\n", __func__);
+		pr_info("adapter/usb removed\n");
+#if 0
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 		charger_detect_release(cx);
 #else
 		Charger_Detect_Release();
 #endif
-		cx2589x_set_dpdm_hiz(cx);
+		//cx2589x_set_dpdm_hiz(cx);
 		allow_set_dp_dm_vol = false;
+#endif
 	}
 #else
 	schedule_delayed_work(&cx->charge_detect_delayed_work, 100);
 #endif
 	//power_supply_changed(sgm->charger);
-
 	return IRQ_HANDLED;
 }
 
@@ -1554,9 +1565,9 @@ static int cx2589x_init_charge(struct cx2589x_device *cx)
 	ret = cx2589x_write_reg_retry(cx, 0x44, 0x18);
 	ret = cx2589x_read_reg_retry(cx, 0x41, &data);
 	if (data != 0x08)
-		dev_err(cx->dev, "%s: Failed to write: reg41 = %02x\n", __func__, data);
+		pr_err("Failed to write: reg41 = %02x\n", data);
 	else
-		dev_err(cx->dev, "%s: write reg41 ok\n", __func__);
+		pr_info("write reg41 ok\n");
 
 	ret = cx2589x_write_reg40(cx, false);
 
@@ -1586,7 +1597,7 @@ static int cx2589x_hw_init(struct cx2589x_device *cx)
 	cx->init_data.max_vreg =
 			CX2589x_VREG_V_MAX_uV;
 
-	pr_err("%s: init device enter\n", __func__);
+	pr_info("init device enter\n");
 	cx2589x_reset_chip(cx);
 	cx2589x_enable_charger(cx);
 	cx2589x_init_charge(cx);
@@ -1629,7 +1640,7 @@ static int cx2589x_hw_init(struct cx2589x_device *cx)
 	if (ret)
 		goto err_out;
 
-	dev_notice(cx->dev, "ichrg_curr:%d prechrg_curr:%d chrg_vol:%d term_curr:%d input_curr_lim:%d",
+	pr_info("ichrg_curr:%d prechrg_curr:%d chrg_vol:%d term_curr:%d input_curr_lim:%d",
 		bat_info.constant_charge_current_max_ua,
 		256000,
 		4448000,
@@ -1655,7 +1666,7 @@ static int cx2589x_parse_dt(struct cx2589x_device *cx)
 
 	if (cx->init_data.vlim > CX2589x_VINDPM_V_MAX_uV ||
 		cx->init_data.vlim < CX2589x_VINDPM_V_MIN_uV) {
-		dev_err(cx->dev, "%s: VIN DPM out of range\n", __func__);
+		pr_err("VIN DPM out of range\n");
 		return -EINVAL;
 	}
 
@@ -1667,26 +1678,26 @@ static int cx2589x_parse_dt(struct cx2589x_device *cx)
 
 	if (cx->init_data.ilim > CX2589x_IINDPM_I_MAX_uA ||
 		cx->init_data.ilim < CX2589x_IINDPM_I_MIN_uA) {
-		dev_err(cx->dev, "%s: IIN DPM out of range\n", __func__);
+		pr_err("IIN DPM out of range\n");
 		return -EINVAL;
 	}
 
 	irq_gpio = of_get_named_gpio(cx->dev->of_node, "cx,irq-gpio", 0);
 	if (!gpio_is_valid(irq_gpio)) {
-		dev_err(cx->dev, "%s: %d gpio get failed\n", __func__, irq_gpio);
+		pr_err("%d gpio get failed\n", irq_gpio);
 		return -EINVAL;
 	}
 
 	ret = gpio_request(irq_gpio, "cx2589x irq pin");
 	if (ret) {
-		dev_err(cx->dev, "%s: %d gpio request failed\n", __func__, irq_gpio);
+		pr_err("%d gpio request failed\n", irq_gpio);
 		return ret;
 	}
 
 	gpio_direction_input(irq_gpio);
 	irqn = gpio_to_irq(irq_gpio);
 	if (irqn < 0) {
-		dev_err(cx->dev, "%s:%d gpio_to_irq failed\n", __func__, irqn);
+		pr_err("%d gpio_to_irq failed\n", irqn);
 		return irqn;
 	}
 
@@ -1694,13 +1705,13 @@ static int cx2589x_parse_dt(struct cx2589x_device *cx)
 
 	chg_en_gpio = of_get_named_gpio(cx->dev->of_node, "cx,chg-en-gpio", 0);
 	if (!gpio_is_valid(chg_en_gpio)) {
-		dev_err(cx->dev, "%s: %d gpio get failed\n", __func__, chg_en_gpio);
+		pr_err("%d gpio get failed\n", chg_en_gpio);
 		return -EINVAL;
 	}
 
 	ret = gpio_request(chg_en_gpio, "cx chg en pin");
 	if (ret) {
-		dev_err(cx->dev, "%s: %d gpio request failed\n", __func__, chg_en_gpio);
+		pr_err("%d gpio request failed\n", chg_en_gpio);
 		return ret;
 	}
 
@@ -1789,7 +1800,7 @@ static int cx2589x_set_dp(struct charger_device *chg_dev, u32 volt)
 	reg_val = cx2589x_set_volt_to_reg(volt);
 
 	reg_val = reg_val << 5;
-	dev_info(cx->dev, "%s: set_dp = %duV\n", __func__, volt);
+	pr_info("set_dp = %duV\n", volt);
 	return cx2589x_update_bits(cx, CX2589x_REG_15, CX2589x_DP_VSEL_MASK, reg_val);
 }
 
@@ -1800,7 +1811,7 @@ static int cx2589x_set_dm(struct charger_device *chg_dev, u32 volt)
 	reg_val = cx2589x_set_volt_to_reg(volt);
 
 	reg_val = reg_val << 2;
-	dev_info(cx->dev, "%s: set_dm = %duV\n", __func__, volt);
+	pr_info("set_dm = %duV\n", volt);
 	return cx2589x_update_bits(cx, CX2589x_REG_15, CX2589x_DM_VSEL_MASK, reg_val);
 }
 
@@ -1808,7 +1819,7 @@ static int cx2589x_enable_otg(struct charger_device *chg_dev, bool en)
 {
 	int ret = 0;
 
-	pr_info("%s en = %d\n", __func__, en);
+	pr_info("en = %d\n", en);
 	if (en) {
 		ret = cx2589x_enable_vbus(NULL);
 	} else {
@@ -1897,7 +1908,7 @@ static int cx2589x_vbus_regulator_register(struct cx2589x_device *cx)
 	cx->otg_rdev->constraints->valid_ops_mask |= REGULATOR_CHANGE_STATUS;
 	if (IS_ERR(cx->otg_rdev)) {
 		ret = PTR_ERR(cx->otg_rdev);
-		pr_info("%s: register otg regulator failed (%d)\n", __func__, ret);
+		pr_info("register otg regulator failed (%d)\n", ret);
 	}
 
 	return ret;
@@ -1911,9 +1922,9 @@ static int cx2589x_enable_dpdm_hiz(struct charger_device *chg_dev)
 
 	ret = cx2589x_set_dpdm_hiz(cx);
 	if (ret < 0)
-		dev_err(cx->dev, "%s set dpdm hiz failed ret(%d)\n", __func__, ret);
+		pr_err("set dpdm hiz failed ret(%d)\n", ret);
 	else
-		dev_info(cx->dev, "%s set dpdm hiz successfully\n", __func__);
+		pr_info("set dpdm hiz successfully\n");
 
 	return ret;
 }
@@ -1924,19 +1935,19 @@ static int cx2589x_plug_in(struct charger_device *chg_dev)
 	int ret = 0;
 	struct cx2589x_device *cx = dev_get_drvdata(&chg_dev->dev);
 
-	dev_info(cx->dev, "%s\n", __func__);
+	pr_info("enter\n");
 
 	/* Enable charging */
-	ret = cx2589x_charging_switch(chg_dev, true);
+	ret = cx2589x_enable_charger(cx);
 	if (ret) {
-		dev_err(cx->dev, "Failed to enable charging:%d\n", ret);
+		pr_err("Failed to enable charging:%d\n", ret);
 	}
-
+#if 0
 	if (cx->usb2_phy->otg->gadget){
 		ret = usb_gadget_connect(cx->usb2_phy->otg->gadget);
-		pr_err("%s: gadget->state: %d\n", __func__,cx->usb2_phy->otg->gadget->state);
+		pr_err("gadget->state: %d\n",cx->usb2_phy->otg->gadget->state);
 	}
-
+#endif
 	force_dpdm_count = 3;
 	no_usb_flag = 0;
 	usb_detect_flag = false;
@@ -1949,14 +1960,14 @@ static int cx2589x_plug_out(struct charger_device *chg_dev)
 	int ret = 0;
 	struct cx2589x_device *cx = dev_get_drvdata(&chg_dev->dev);
 
-	dev_info(cx->dev, "%s\n", __func__);
+	pr_info("enter\n");
 	ret = cx2589x_set_dpdm_hiz(cx);
-	ret = cx2589x_charging_switch(chg_dev, false);
+	ret = cx2589x_disable_charger(cx);
 	if (ret) {
-		dev_err(cx->dev, "Failed to disable charging:%d\n", ret);
+		pr_err("Failed to disable charging:%d\n", ret);
 	}
 
-	cancel_delayed_work(&cx->charge_usb_detect_work);
+	//cancel_delayed_work(&cx->charge_usb_detect_work);
 	no_usb_flag = 0;
 	return ret;
 }
@@ -2037,24 +2048,24 @@ static ssize_t dump_reg_ctrl_write(struct file *filp,
 	int ret = 0;
 
 	if (cnt >= sizeof(buf)) {
-		pr_err( "%s cnt is invalid\n", __func__);
+		pr_err("cnt is invalid\n");
 		return -EINVAL;
 	}
 
 	if (copy_from_user(&buf, ubuf, cnt)) {
-		pr_err("%s cnt is invalid\n", __func__);
+		pr_err("copy failed\n");
 		return -EFAULT;
 	}
 
 	buf[cnt] = 0;
 	ret = kstrtoul(buf, 10, (unsigned long *)&val);
 	if (ret < 0) {
-		pr_err("%s cnt is invalid\n", __func__);
+		pr_err("val is invalid\n");
 		return ret;
 	}
 
 	dump_reg_enable = val;
-	pr_info("%s dump_reg_enable is %s\n", __func__, dump_reg_enable ? "enable" : "disable");
+	pr_info("dump_reg_enable is %s\n", dump_reg_enable ? "enable" : "disable");
 
 	return cnt;
 }
@@ -2128,7 +2139,7 @@ static int cx2589x_create_device_node(struct device *dev)
 
 	ret = device_create_file(dev, &dev_attr_registers);
 	if (ret < 0) {
-		pr_err("[%s] failed to create register attr\n", __func__);
+		pr_err("failed to create register attr\n");
 		return -ENODEV;
 	}
 
@@ -2153,11 +2164,11 @@ static int cx2589x_driver_probe(struct i2c_client *client,
 
 	char *name = NULL;
 
-	pr_info("[%s]\n", __func__);
+	pr_info("enter\n");
 
 	cx = devm_kzalloc(dev, sizeof(*cx), GFP_KERNEL);
 	if (!cx) {
-		pr_err("[%s] alloc memory failed\n", __func__);
+		pr_err("alloc memory failed\n");
 		return -ENOMEM;
 	}
 
@@ -2171,19 +2182,19 @@ static int cx2589x_driver_probe(struct i2c_client *client,
 
 	cx->vbus = devm_iio_channel_get(cx->dev, "pmic_vbus");
 	if (IS_ERR_OR_NULL(cx->vbus)) {
-		dev_err(dev, "[%s] cx25890h get vbus failed\n", __func__);
+		pr_err("cx25890h get vbus failed\n");
 		return -EPROBE_DEFER;
 	}
 
 	ret = cx2589x_hw_chipid_detect(cx);
 	if (ret != CX2589x_PN_ID) {
-		dev_err(dev, "[%s] device not found !!!\n", __func__);
+		pr_err("device not found !!!\n");
 		return ret;
 	}
 
 	ret = cx2589x_parse_dt(cx);
 	if (ret) {
-		dev_err(dev, "[%s] parse dts resource failed\n", __func__);
+		pr_err("parse dts resource failed\n");
 		return ret;
 	}
 
@@ -2197,7 +2208,7 @@ static int cx2589x_driver_probe(struct i2c_client *client,
 				&cx2589x_chg_props);
 
 	if (IS_ERR_OR_NULL(cx->chg_dev)) {
-		dev_err(dev, "[%s] register charger device failed\n", __func__);
+		pr_err("register charger device failed\n");
 		ret = PTR_ERR(cx->chg_dev);
 		return ret;
 	}
@@ -2215,7 +2226,7 @@ static int cx2589x_driver_probe(struct i2c_client *client,
 				IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
 				dev_name(&client->dev), cx);
 		if (ret) {
-			dev_err(dev, "[%s] request irq failed\n", __func__);
+			pr_err("request irq failed\n");
 			return ret;
 		}
 		enable_irq_wake(client->irq);
@@ -2223,20 +2234,20 @@ static int cx2589x_driver_probe(struct i2c_client *client,
 
 	ret = cx2589x_power_supply_init(cx, dev);
 	if (ret) {
-		dev_err(dev, "[%s] Failed to register power supply\n", __func__);
+		pr_err("Failed to register power supply\n");
 		return ret;
 	}
 
 	ret = cx2589x_hw_init(cx);
 	if (ret) {
-		dev_err(dev, "[%s] Can't initialize the chip\n", __func__);
+		pr_err("Can't initialize the chip\n");
 		return ret;
 	}
 
 	dump_reg_enable = true;
 	entry = proc_create("dump_reg_ctrl", 0664, NULL, &dump_reg_ctrl_fops);
 	if (!entry) {
-		dev_err(dev, "[%s] Create proc directory failed\n", __func__);
+		pr_err("Create proc directory failed\n");
 	}
 
 	ret = cx2589x_create_device_node(&(client->dev));
@@ -2247,28 +2258,29 @@ static int cx2589x_driver_probe(struct i2c_client *client,
 
 	ret = cx2589x_vbus_regulator_register(cx);
 
-	dev_info(dev, "[%s] run charge_detect_delayed_work\n", __func__);
+	//pr_info("run charge_detect_delayed_work\n");
 
-	schedule_delayed_work(&cx->charge_detect_delayed_work, 1000);
-	schedule_delayed_work(&cx->charge_monitor_work, 100);
+	//schedule_delayed_work(&cx->charge_detect_delayed_work, 1000);
+	//schedule_delayed_work(&cx->charge_monitor_work, 100);
 
 	//usb device
+#if 0
 	cx->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
 
 	if (IS_ERR_OR_NULL(cx->usb2_phy)) {
-		dev_err(dev, "[%s] usb_get_phy failed\n", __func__);
+		pr_err("usb_get_phy failed\n");
 		return ret;
 	} else {
-		dev_err(dev, "[%s] usb_get_phy success\n", __func__);
+		pr_info("usb_get_phy success\n");
 	}
-
-	schedule_delayed_work(&cx->charge_usb_detect_work, 5 * HZ);
+#endif
+	//schedule_delayed_work(&cx->charge_usb_detect_work, 5 * HZ);
 
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
 	FULL_PRODUCT_DEVICE_INFO(ID_SWITCH_CHARGER, "CX25890H");
 #endif
 
-	dev_info(dev, "[%s] successfully\n", __func__);
+	pr_info("successfully\n");
 
 	return ret;
 }
@@ -2301,9 +2313,9 @@ static void cx2589x_charger_shutdown(struct i2c_client *client)
 
 	ret = cx2589x_disable_charger(cx);
 	if (ret) {
-		pr_err("[%s] Failed to disable charger, ret = %d\n", __func__, ret);
+		pr_err("Failed to disable charger, ret = %d\n", ret);
 	}
-	pr_info("[%s] cx2589x_charger_shutdown\n", __func__);
+	pr_info("cx2589x_charger_shutdown\n");
 	*/
 	return;
 }
