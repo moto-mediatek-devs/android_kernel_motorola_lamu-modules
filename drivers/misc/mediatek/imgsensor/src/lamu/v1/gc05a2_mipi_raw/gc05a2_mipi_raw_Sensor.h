@@ -25,10 +25,10 @@
 #endif
 
 /* SENSOR MIRROR FLIP INFO */
-#define GC05A2_MIRROR_NORMAL    1
+#define GC05A2_MIRROR_NORMAL    0
 #define GC05A2_MIRROR_H         0
 #define GC05A2_MIRROR_V         0
-#define GC05A2_MIRROR_HV        0
+#define GC05A2_MIRROR_HV        1
 
 #if GC05A2_MIRROR_NORMAL
 #define GC05A2_MIRROR	        0x00

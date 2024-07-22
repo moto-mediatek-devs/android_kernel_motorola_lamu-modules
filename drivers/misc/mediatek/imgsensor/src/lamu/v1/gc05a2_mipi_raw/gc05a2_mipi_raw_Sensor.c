@@ -51,14 +51,14 @@ static struct imgsensor_info_struct imgsensor_info = {
 	.checksum_value = 0xe5d32119,
 	.pre = {
 		.pclk = 224000000,
-		.linelength = 3616,
-		.framelength = 2064,
+		.linelength = 3664,
+		.framelength = 2032,
 		.startx = 0,
 		.starty = 0,
-		.grabwindow_width = 1296,
-		.grabwindow_height = 972,
+		.grabwindow_width = 2592,
+		.grabwindow_height = 1944,
 		.mipi_data_lp2hs_settle_dc = 85,
-		.mipi_pixel_rate = 89600000,
+		.mipi_pixel_rate = 179200000,
 		.max_framerate = 300,
 	},
 	.cap = {
@@ -75,38 +75,38 @@ static struct imgsensor_info_struct imgsensor_info = {
 	},
 	.normal_video = {
 		.pclk = 224000000,
-		.linelength = 3616,
-		.framelength = 2064,
+		.linelength = 3664,
+		.framelength = 2032,
 		.startx = 0,
 		.starty = 0,
-		.grabwindow_width = 1296,
-		.grabwindow_height = 972,
+		.grabwindow_width = 2592,
+		.grabwindow_height = 1944,
 		.mipi_data_lp2hs_settle_dc = 85,
-		.mipi_pixel_rate = 89600000,
+		.mipi_pixel_rate = 179200000,
 		.max_framerate = 300,
 	},
 	.hs_video = {
 		.pclk = 224000000,
-		.linelength = 3616,
-		.framelength = 2064,
+		.linelength = 3664,
+		.framelength = 2032,
 		.startx = 0,
 		.starty = 0,
-		.grabwindow_width = 1296,
-		.grabwindow_height = 972,
+		.grabwindow_width = 2592,
+		.grabwindow_height = 1944,
 		.mipi_data_lp2hs_settle_dc = 85,
-		.mipi_pixel_rate = 89600000,
+		.mipi_pixel_rate = 179200000,
 		.max_framerate = 300,
 	},
 	.slim_video = {
 		.pclk = 224000000,
-		.linelength = 3616,
-		.framelength = 2064,
+		.linelength = 3664,
+		.framelength = 2032,
 		.startx = 0,
 		.starty = 0,
-		.grabwindow_width = 1280,
-		.grabwindow_height = 720,
+		.grabwindow_width = 2592,
+		.grabwindow_height = 1944,
 		.mipi_data_lp2hs_settle_dc = 85,
-		.mipi_pixel_rate = 89600000,
+		.mipi_pixel_rate = 179200000,
 		.max_framerate = 300,
 	},
 
@@ -137,7 +137,7 @@ static struct imgsensor_info_struct imgsensor_info = {
 //#elif GC05A2_MIRROR_V
 //	.sensor_output_dataformat = SENSOR_OUTPUT_FORMAT_RAW_B,
 //#elif GC05A2_MIRROR_HV
-//	.sensor_output_dataformat = SENSOR_OUTPUT_FORMAT_RAW_Gb,
+	/* .sensor_output_dataformat = SENSOR_OUTPUT_FORMAT_RAW_Gb, */
 //#else
 //	.sensor_output_dataformat = SENSOR_OUTPUT_FORMAT_RAW_Gr,
 //#endif
@@ -164,11 +164,11 @@ static struct imgsensor_struct imgsensor = {
 
 /* Sensor output window information */
 static struct SENSOR_WINSIZE_INFO_STRUCT imgsensor_winsize_info[5] = {
-	{ 2592, 1944, 0, 0, 2592, 1944, 1296, 972, 0, 0, 1296, 972, 0, 0, 1296, 972}, /* Preview */
 	{ 2592, 1944, 0, 0, 2592, 1944, 2592, 1944, 0, 0, 2592, 1944, 0, 0, 2592, 1944}, /* capture */
-	{ 2592, 1944, 0, 0, 2592, 1944, 1296, 972, 0, 0, 1296, 972, 0, 0, 1296, 972}, /* video */
-	{ 2592, 1944, 0, 0, 2592, 1944, 1296, 972, 0, 0, 1296, 972, 0, 0, 1296, 972}, /* hs video */
-	{ 2592, 1944, 0, 0, 2592, 1944, 1296, 972, 8, 126, 1280, 720, 0, 0, 1280, 720}  /* slim video */
+	{ 2592, 1944, 0, 0, 2592, 1944, 2592, 1944, 0, 0, 2592, 1944, 0, 0, 2592, 1944}, /* capture */
+	{ 2592, 1944, 0, 0, 2592, 1944, 2592, 1944, 0, 0, 2592, 1944, 0, 0, 2592, 1944}, /* capture */
+	{ 2592, 1944, 0, 0, 2592, 1944, 2592, 1944, 0, 0, 2592, 1944, 0, 0, 2592, 1944}, /* capture */
+	{ 2592, 1944, 0, 0, 2592, 1944, 2592, 1944, 0, 0, 2592, 1944, 0, 0, 2592, 1944}, /* capture */
 };
 
 static kal_uint16 read_cmos_sensor(kal_uint32 addr)
@@ -704,7 +704,7 @@ kal_uint16 gc05a2_init_addr_data[] = {
 	0x0d17, 0x00,
 	0x031c, 0x93,
 };
-
+#if 0
 static kal_uint16 gc05a2_1296x972_addr_data[] = {
 /*system*/
 	0x0315, 0xd4,
@@ -807,7 +807,7 @@ static kal_uint16 gc05a2_1296x972_addr_data[] = {
 /*OUT*/
 	0x0110, 0x01,
 };
-
+#endif
 static kal_uint16 gc05a2_2592x1944_addr_data[] = {
 /*system*/
 	0x0315, 0xd4,
@@ -910,7 +910,7 @@ static kal_uint16 gc05a2_2592x1944_addr_data[] = {
 /*OUT*/
 	0x0110, 0x01,
 };
-
+#if 0
 static kal_uint16 gc05a2_1280x720_addr_data[] = {
 /*system*/
 	0x0315, 0xd4,
@@ -1013,7 +1013,7 @@ static kal_uint16 gc05a2_1280x720_addr_data[] = {
 /*OUT*/
 	0x0110, 0x01,
 };
-
+#endif
 
 static void gc05a2_stream_on(void)
 {
@@ -1035,8 +1035,8 @@ static void sensor_init(void)
 static void preview_setting(void)
 {
 	gc05a2_stream_off();
-	table_write_cmos_sensor(gc05a2_1296x972_addr_data,
-		sizeof(gc05a2_1296x972_addr_data)/sizeof(kal_uint16));
+	table_write_cmos_sensor(gc05a2_2592x1944_addr_data,
+		sizeof(gc05a2_2592x1944_addr_data)/sizeof(kal_uint16));
 	gc05a2_stream_on();
 }
 
@@ -1051,24 +1051,24 @@ static void capture_setting(void)
 static void normal_video_setting(void)
 {
 	gc05a2_stream_off();
-	table_write_cmos_sensor(gc05a2_1296x972_addr_data,
-		sizeof(gc05a2_1296x972_addr_data)/sizeof(kal_uint16));
+	table_write_cmos_sensor(gc05a2_2592x1944_addr_data,
+		sizeof(gc05a2_2592x1944_addr_data)/sizeof(kal_uint16));
 	gc05a2_stream_on();
 }
 
 static void hs_video_setting(void)
 {
 	gc05a2_stream_off();
-	table_write_cmos_sensor(gc05a2_1296x972_addr_data,
-		sizeof(gc05a2_1296x972_addr_data)/sizeof(kal_uint16));
+	table_write_cmos_sensor(gc05a2_2592x1944_addr_data,
+		sizeof(gc05a2_2592x1944_addr_data)/sizeof(kal_uint16));
 	gc05a2_stream_on();
 }
 
 static void slim_video_setting(void)
 {
 	gc05a2_stream_off();
-	table_write_cmos_sensor(gc05a2_1280x720_addr_data,
-		sizeof(gc05a2_1280x720_addr_data)/sizeof(kal_uint16));
+	table_write_cmos_sensor(gc05a2_2592x1944_addr_data,
+		sizeof(gc05a2_2592x1944_addr_data)/sizeof(kal_uint16));
 	gc05a2_stream_on();
 }
 
