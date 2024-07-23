@@ -523,6 +523,7 @@ static int zeroflash_parse_fw_image(void)
 /*add by yating.zhu@tinno.com for select fw start*/
 extern int td4160_lcd_id;
 extern int td4376_lcd_id;
+int lcd_id = 0;
 
 char* omnivision_get_fw_image_name(int id) {
     static char name[50];
@@ -552,7 +553,7 @@ static int zeroflash_get_fw_image(void)
 /*add by yating.zhu@tinno.com for select fw start*/
 	char fw_image_name[50];
 
-	int lcd_id = td4160_lcd_id | td4376_lcd_id;
+	lcd_id = td4160_lcd_id | td4376_lcd_id;
 
 	strcpy(fw_image_name, omnivision_get_fw_image_name(lcd_id));
 /*add by yating.zhu@tinno.com for select fw end*/

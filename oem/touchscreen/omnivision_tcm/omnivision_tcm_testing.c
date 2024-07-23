@@ -167,6 +167,7 @@ struct testing_hcd {
 	unsigned int num_of_reports;
 	struct kobject *sysfs_dir;
 	struct proc_dir_entry *proc_csv;
+	struct proc_dir_entry *ovt_selftest_proc_entry;
 	struct ovt_tcm_buffer out;
 	struct ovt_tcm_buffer resp;
 	struct ovt_tcm_buffer report;
@@ -194,8 +195,9 @@ DECLARE_COMPLETION(report_complete);
 
 DECLARE_COMPLETION(testing_remove_complete);
 
-static struct testing_hcd *testing_hcd;
+struct proc_dir_entry *touch_info_dir;
 
+static struct testing_hcd *testing_hcd;
 
 /* testing implementation */
 static int testing_device_id(void);
@@ -1605,6 +1607,8 @@ exit:
 	return (testing_hcd->result)? 0 : -1;
 }
 
+extern int lcd_id;
+
 static int testing_do_testing(void)
 {
 	int retval;
@@ -1666,60 +1670,78 @@ static int testing_do_testing(void)
 		error_count++;
 	}
 #else
-	retval = testing_do_test_item(TEST_PT7_DYNAMIC_RANGE, TEST_LIMIT_ROW_CNT, TEST_LIMIT_COL_CNT, pt7_low_limits_new, 
-		pt7_hi_limits_new, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
-	if (retval < 0) {
-		error_count++;
-	}
+	if(lcd_id == 0x000d){
+		retval = testing_do_test_item(TEST_PT7_DYNAMIC_RANGE, 32, 18, pt7_low_limits_new, 
+			pt7_hi_limits_new, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
+		if (retval < 0) {
+			error_count++;
+		}
 
-	retval = testing_do_test_item(TEST_PT10_DELTA_NOISE, TEST_LIMIT_ROW_CNT, TEST_LIMIT_COL_CNT, NULL, 
-		pt10_high_limits_new, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
-	if (retval < 0) {
-		error_count++;
+		retval = testing_do_test_item(TEST_PT10_DELTA_NOISE, 32, 18, NULL, 
+			pt10_high_limits_new, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
+		if (retval < 0) {
+			error_count++;
+		}
+		retval = testing_do_test_item(TEST_PT11_OPEN_DETECTION, 32, 18, pt11_low_limits_new, 
+			pt11_hi_limits_new, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
+		if (retval < 0) {
+			error_count++;
+		}
 	}
-	retval = testing_do_test_item(TEST_PT11_OPEN_DETECTION, TEST_LIMIT_ROW_CNT, TEST_LIMIT_COL_CNT, pt11_low_limits_new, 
-		pt11_hi_limits_new, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
-	if (retval < 0) {
-		error_count++;
-	}
-	retval = testing_do_test_item(TEST_PT17_ADC_RANGE, TEST_LIMIT_ROW_CNT, TEST_LIMIT_COL_CNT, NULL, 
-		pt17_hi_limits_new, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
-	if (retval < 0) {
-		error_count++;
-	}
-	retval = testing_do_test_item(TEST_PT18_HYBRID_ABS_RAW, TEST_LIMIT_ROW_CNT, TEST_LIMIT_COL_CNT, pt18_low_limits_new, 
-		pt18_hi_limits_new, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
-	if (retval < 0) {
-		error_count++;
+	else if(lcd_id == 0x0101){
+		retval = testing_do_test_item(TEST_PT7_DYNAMIC_RANGE, 36, 26, pt7_low_limits_new1, 
+			pt7_hi_limits_new1, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
+		if (retval < 0) {
+			error_count++;
+		}
+
+		retval = testing_do_test_item(TEST_PT10_DELTA_NOISE, 36, 26, NULL, 
+			pt10_high_limits_new1, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
+		if (retval < 0) {
+			error_count++;
+		}
+		retval = testing_do_test_item(TEST_PT17_ADC_RANGE, 36, 26, NULL, 
+			pt17_hi_limits_new, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
+		if (retval < 0) {
+			error_count++;
+		}
+		retval = testing_do_test_item(TEST_PT18_HYBRID_ABS_RAW, 36, 26, pt18_low_limits_new, 
+			pt18_hi_limits_new, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
+		if (retval < 0) {
+			error_count++;
+		}
 	}
 #endif
 #ifdef LIMIT_FROM_CSV_FILE
 	rtc_time_to_tm(get_seconds(), &rtc_now_time);
 	if (error_count) {
 		//test fail result
-		sprintf(file_path, "/data/tp_%s_test_data_%02d%02d%02d-%02d%02d%02d-fail.csv", tcm_hcd->id_info.part_number,
+		sprintf(file_path, "/sdcard/tp_%s_test_data_%02d%02d%02d-%02d%02d%02d-fail.csv", tcm_hcd->id_info.part_number,
             (rtc_now_time.tm_year + 1900) % 100, rtc_now_time.tm_mon + 1, rtc_now_time.tm_mday,
             rtc_now_time.tm_hour, rtc_now_time.tm_min, rtc_now_time.tm_sec);
 	} else {
 		//test pass result
-		sprintf(file_path, "/data/tp_%s_test_data_%02d%02d%02d-%02d%02d%02d-success.csv", tcm_hcd->id_info.part_number,
+		sprintf(file_path, "/sdcard/tp_%s_test_data_%02d%02d%02d-%02d%02d%02d-success.csv", tcm_hcd->id_info.part_number,
             (rtc_now_time.tm_year + 1900) % 100, rtc_now_time.tm_mon + 1, rtc_now_time.tm_mday,
             rtc_now_time.tm_hour, rtc_now_time.tm_min, rtc_now_time.tm_sec);
 	}
     
-    old_fs = get_fs();
-    set_fs(KERNEL_DS);
+    // old_fs = get_fs();
+    // set_fs(KERNEL_DS);
     fp = filp_open(file_path, O_WRONLY | O_CREAT | O_TRUNC, 0);
     if (IS_ERR_OR_NULL(fp)) {
         printk("ovt tcm Open log file '%s' failed.\n", file_path);
 
 		snprintf(g_testing_output_buf + strlen(g_testing_output_buf), OUTPUT_TO_CSV_STRING_LEN - strlen(g_testing_output_buf), 
 			"can not open file:%s\n", file_path);
-        set_fs(old_fs);
+        // set_fs(old_fs);
         goto sys_err;
     }
 
 	pos = 0;
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(4, 14, 0)
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
 	vfs_write(fp, g_testing_output_buf, strlen(g_testing_output_buf), &pos);
 	printk("g_testing_output_buf , strlen is %d\n", (int)strlen(g_testing_output_buf));
 	if (!IS_ERR_OR_NULL(fp)) {
@@ -1728,6 +1750,10 @@ static int testing_do_testing(void)
 		fp = NULL;
 	}
     set_fs(old_fs);
+#else
+	kernel_write(fp, g_testing_output_buf, strlen(g_testing_output_buf), &pos);
+	filp_close(fp, NULL);
+#endif
 #endif
 #ifdef LIMIT_FROM_CSV_FILE
 sys_err:
@@ -1993,6 +2019,74 @@ static void testing_report(void)
 	return;
 }
 
+static void *ovt_selftest_seq_start(struct seq_file *m, loff_t *pos)
+{
+    return *pos < 1 ? (void *)1 : NULL;
+}
+
+static void *ovt_selftest_seq_next(struct seq_file *m, void *v, loff_t *pos)
+{
+    ++*pos;
+    return NULL;
+}
+
+static int ovt_selftest_seq_show(struct seq_file *m, void *v)
+{
+	int retval;
+	int test_result;
+	char *buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+
+    if (!buf) {
+        return -ENOMEM;
+    }
+	//struct ovt_tcm_hcd *tcm_hcd = testing_hcd->tcm_hcd;
+
+	//mutex_lock(&tcm_hcd->extif_mutex);
+
+	test_result = testing_do_testing();
+
+	if (test_result) {
+		retval = snprintf(buf, PAGE_SIZE, "%s\n","fail");
+	} else {
+		retval = snprintf(buf, PAGE_SIZE, "%s\n","pass");
+	}
+	seq_puts(m, buf);
+	kfree(buf);
+	return 0;
+}
+static void ovt_selftest_seq_stop(struct seq_file *m, void *v)
+{
+    return;
+}
+
+static const struct seq_operations ovt_selftest_seq_ops = {
+    .start = ovt_selftest_seq_start,
+	.next = ovt_selftest_seq_next,
+    .show = ovt_selftest_seq_show,
+    .stop = ovt_selftest_seq_stop,
+};
+
+static int ovt_selftest_open(struct inode *inode, struct file *file)
+{
+    return seq_open(file, &ovt_selftest_seq_ops);
+}
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 6, 0)
+static const struct proc_ops ovt_selftest_fops = {
+	.proc_open = ovt_selftest_open,
+	.proc_read = seq_read,
+	.proc_lseek = seq_lseek,
+	.proc_release = seq_release,
+};
+#else
+static const struct file_operations ovt_selftest_fops = {
+	.owner = THIS_MODULE,
+	.open = ovt_selftest_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release,
+};
+#endif
 
 static int testing_init(struct ovt_tcm_hcd *tcm_hcd)
 {
@@ -2043,6 +2137,18 @@ static int testing_init(struct ovt_tcm_hcd *tcm_hcd)
 		goto err_sysfs_create_bin_file;
 	}
 
+	touch_info_dir = proc_mkdir("touch_info", NULL);
+	if (!touch_info_dir) {
+		LOGE(tcm_hcd->pdev->dev.parent, "Can not create touch_info_dir\n");
+		return -ENOMEM;
+	}
+
+	testing_hcd->ovt_selftest_proc_entry = proc_create("tp_selftest_result", 0644, touch_info_dir, &ovt_selftest_fops);
+	if (testing_hcd->ovt_selftest_proc_entry == NULL) {
+		LOGE(tcm_hcd->pdev->dev.parent, "create /proc/touch_info/tp_selftest_result Failed!\n");
+		return -1;
+	}
+
 	testing_hcd->proc_csv = proc_create_data("ovt_test_csv", 0777, NULL, &ovt_proccsv_fops, NULL);
 	if (NULL == testing_hcd->proc_csv) {
 		LOGE(tcm_hcd->pdev->dev.parent, "create proc_csv entry fail");
@@ -2081,6 +2187,16 @@ static int testing_remove(struct ovt_tcm_hcd *tcm_hcd)
 	for (idx = 0; idx < ARRAY_SIZE(attrs); idx++)
 		sysfs_remove_file(testing_hcd->sysfs_dir, &(*attrs[idx]).attr);
 
+	if (testing_hcd->ovt_selftest_proc_entry != NULL) {
+		remove_proc_entry("tp_selftest_result", touch_info_dir);
+		testing_hcd->ovt_selftest_proc_entry = NULL;
+		LOGN(tcm_hcd->pdev->dev.parent,"Removed /proc/touch_info/tp_selftest_result\n");
+	}
+	if (touch_info_dir != NULL) {
+		remove_proc_entry("touch_info", NULL);
+		touch_info_dir = NULL;
+		LOGE(tcm_hcd->pdev->dev.parent,"Removed /proc/touch_info\n");
+	}
 	kobject_put(testing_hcd->sysfs_dir);
 
 	RELEASE_BUFFER(testing_hcd->output);
@@ -2090,6 +2206,9 @@ static int testing_remove(struct ovt_tcm_hcd *tcm_hcd)
 	RELEASE_BUFFER(testing_hcd->out);
 	if (testing_hcd->proc_csv) {
 		proc_remove(testing_hcd->proc_csv);
+	}
+	if (testing_hcd->ovt_selftest_proc_entry) {
+		proc_remove(testing_hcd->ovt_selftest_proc_entry);
 	}
 	kfree(testing_hcd);
 	testing_hcd = NULL;
