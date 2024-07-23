@@ -677,6 +677,48 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 		info->curr_select_name = "NULL";
 	}
 
+/* TN Begin modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
+	if (of_property_read_u32(np, "jeita_temp_above_t4_icurrent", &val) >= 0)
+		info->data.jeita_temp_above_t4_icurrent = val;
+	else {
+		chr_err("use default jeita_temp_above_t4_icurrent:0\n");
+		info->data.jeita_temp_above_t4_icurrent = 0;
+	}
+	if (of_property_read_u32(np, "jeita_temp_t3_to_t4_icurrent", &val) >= 0)
+		info->data.jeita_temp_t3_to_t4_icurrent = val;
+	else {
+		chr_err("use default jeita_temp_t3_to_t4_icurrent:%d\n",
+			AC_CHARGER_CURRENT);
+		info->data.jeita_temp_t3_to_t4_icurrent = AC_CHARGER_CURRENT;
+	}
+	if (of_property_read_u32(np, "jeita_temp_t2_to_t3_icurrent", &val) >= 0)
+		info->data.jeita_temp_t2_to_t3_icurrent = val;
+	else {
+		chr_err("use default jeita_temp_t2_to_t3_icurrent:%d\n",
+			AC_CHARGER_CURRENT);
+		info->data.jeita_temp_t2_to_t3_icurrent = AC_CHARGER_CURRENT;
+	}
+	if (of_property_read_u32(np, "jeita_temp_t1_to_t2_icurrent", &val) >= 0)
+		info->data.jeita_temp_t1_to_t2_icurrent = val;
+	else {
+		chr_err("use default jeita_temp_t1_to_t2_icurrent:%d\n",
+			AC_CHARGER_CURRENT);
+		info->data.jeita_temp_t1_to_t2_icurrent = AC_CHARGER_CURRENT;
+	}
+	if (of_property_read_u32(np, "jeita_temp_t0_to_t1_icurrent", &val) >= 0)
+		info->data.jeita_temp_t0_to_t1_icurrent = val;
+	else {
+		chr_err("use default jeita_temp_t0_to_t1_icurrent:%d\n",
+			AC_CHARGER_CURRENT);
+		info->data.jeita_temp_t0_to_t1_icurrent = AC_CHARGER_CURRENT;
+	}
+	if (of_property_read_u32(np, "jeita_temp_below_t0_icurrent", &val) >= 0)
+		info->data.jeita_temp_below_t0_icurrent = val;
+	else {
+		chr_err("use default jeita_temp_below_t0_icurrent:0\n");
+		info->data.jeita_temp_below_t0_icurrent = 0;
+	}
+/* TN End modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
 /* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
 	if (of_property_read_u32(np, "hvdcp_temp_above_t4_icurrent", &val) >= 0)
@@ -956,6 +998,23 @@ void do_sw_jeita_state_machine(struct mtk_charger *info)
 		sw_jeita->cv = 0;
 	}
 
+/* TN Begin modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
+	if (sw_jeita->sm == TEMP_ABOVE_T4)
+		pdata->temp_charging_current_limit = info->data.jeita_temp_above_t4_icurrent;
+	else if (sw_jeita->sm == TEMP_T3_TO_T4)
+		pdata->temp_charging_current_limit = info->data.jeita_temp_t3_to_t4_icurrent;
+	else if (sw_jeita->sm == TEMP_T2_TO_T3)
+		pdata->temp_charging_current_limit = info->data.jeita_temp_t2_to_t3_icurrent;
+	else if (sw_jeita->sm == TEMP_T1_TO_T2)
+		pdata->temp_charging_current_limit = info->data.jeita_temp_t1_to_t2_icurrent;
+	else if (sw_jeita->sm == TEMP_T0_TO_T1)
+		pdata->temp_charging_current_limit = info->data.jeita_temp_t0_to_t1_icurrent;
+	else if (sw_jeita->sm == TEMP_BELOW_T0)
+		pdata->temp_charging_current_limit = info->data.jeita_temp_below_t0_icurrent;
+	else
+		pdata->temp_charging_current_limit = 0;
+	chr_err("[SW_JEITA] temp_curr:%d\n", pdata->temp_charging_current_limit);
+/* TN End modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
 /* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
 	if (sw_jeita->sm == TEMP_ABOVE_T4)

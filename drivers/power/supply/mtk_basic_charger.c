@@ -351,10 +351,14 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 #endif
 /* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 			{
-				if (info->sw_jeita.sm == TEMP_T0_TO_T1) {
-					pdata->input_current_limit = 500000;
-					pdata->charging_current_limit = 350000;
+/* TN Begin modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
+				chr_info("[%s] charging_current_limit:%d, temp_charging_current_limit:%d\n",
+						__func__, pdata->charging_current_limit, pdata->temp_charging_current_limit);
+				if (pdata->temp_charging_current_limit < pdata->charging_current_limit) {
+					pdata->charging_current_limit = pdata->temp_charging_current_limit;
+					pdata->input_current_limit = pdata->temp_charging_current_limit;
 				}
+/* TN End modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
 			}
 		}
 	}
