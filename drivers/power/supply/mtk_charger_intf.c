@@ -115,7 +115,13 @@ int get_battery_voltage(struct mtk_charger *info)
 
 	if (bat_psy == NULL || IS_ERR(bat_psy)) {
 		chr_err("%s retry to get bat_psy\n", __func__);
+/* TN Begin modified by hao.jia/809321 20240723 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+		bat_psy = power_supply_get_by_name("battery");
+#else
 		bat_psy = devm_power_supply_get_by_phandle(&info->pdev->dev, "gauge");
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by hao.jia/809321 20240723 CR/EKLAMU-202 */
 		info->bat_psy = bat_psy;
 	}
 
@@ -185,7 +191,13 @@ int get_battery_temperature(struct mtk_charger *info)
 
 	if (bat_psy == NULL || IS_ERR(bat_psy)) {
 		chr_err("%s retry to get bat_psy\n", __func__);
+/* TN Begin modified by hao.jia/809321 20240723 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+		bat_psy = power_supply_get_by_name("battery");
+#else
 		bat_psy = devm_power_supply_get_by_phandle(&info->pdev->dev, "gauge");
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by hao.jia/809321 20240723 CR/EKLAMU-202 */
 		info->bat_psy = bat_psy;
 	}
 
@@ -216,7 +228,13 @@ int get_battery_current(struct mtk_charger *info)
 
 	if (bat_psy == NULL || IS_ERR(bat_psy)) {
 		chr_err("%s retry to get bat_psy\n", __func__);
+/* TN Begin modified by hao.jia/809321 20240723 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+		bat_psy = power_supply_get_by_name("battery");
+#else
 		bat_psy = devm_power_supply_get_by_phandle(&info->pdev->dev, "gauge");
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by hao.jia/809321 20240723 CR/EKLAMU-202 */
 		info->bat_psy = bat_psy;
 	}
 
