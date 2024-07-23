@@ -250,13 +250,13 @@ unsigned int sc820cs_sunwin_read_region(struct i2c_client *client, unsigned int 
             memcpy(dataTmp, sc820cs_otp_info.module_param, sizeof(sc820cs_otp_info.module_param));
             dataTmp += sizeof(sc820cs_otp_info.module_param);
 
-            data[10] = sc820cs_otp_info.module_checksum;
+            data[39] = sc820cs_otp_info.module_checksum;
             dataTmp += sizeof(sc820cs_otp_info.module_checksum);
 
             memcpy(dataTmp, sc820cs_otp_info.awb_param, sizeof(sc820cs_otp_info.awb_param));
             dataTmp += sizeof(sc820cs_otp_info.awb_param);
 
-            data[39] = sc820cs_otp_info.awb_checksum;
+            data[68] = sc820cs_otp_info.awb_checksum;
             dataTmp += sizeof(sc820cs_otp_info.awb_checksum);
 
             memcpy(dataTmp, sc820cs_otp_info.lsc_param, sizeof(sc820cs_otp_info.lsc_param));
