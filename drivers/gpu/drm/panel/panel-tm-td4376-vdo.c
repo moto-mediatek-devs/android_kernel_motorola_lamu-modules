@@ -270,7 +270,7 @@ static void td4376_panel_init(struct td4376 *ctx)
 
 	td4376_dcs_write_seq_static(ctx, 0x51,0x00,0x00);
 	td4376_dcs_write_seq_static(ctx, 0x53,0x2C);
-	td4376_dcs_write_seq_static(ctx, 0x55,0x00);
+	td4376_dcs_write_seq_static(ctx, 0x55,0x01);
 	td4376_dcs_write_seq_static(ctx, 0x35,0x00,0x00);
 
 	td4376_dcs_write_seq_static(ctx, 0x11);

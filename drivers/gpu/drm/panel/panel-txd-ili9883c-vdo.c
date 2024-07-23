@@ -417,7 +417,7 @@ static void txd_panel_init(struct txd *ctx)
 	txd_dcs_write_seq_static(ctx, 0xFF,0x98,0x83,0x00);
 	txd_dcs_write_seq_static(ctx, 0x51,0x07,0xFF);
 	txd_dcs_write_seq_static(ctx, 0x53,0x2C);
-	txd_dcs_write_seq_static(ctx, 0x55,0x03);
+	txd_dcs_write_seq_static(ctx, 0x55,0x01);
 	txd_dcs_write_seq_static(ctx, 0xFF,0x98,0x83,0x00);
 	txd_dcs_write_seq_static(ctx, 0x35,0x00);
 	txd_dcs_write_seq_static(ctx, 0x11);
@@ -749,7 +749,7 @@ static int txd_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 	}
  */
 	//bl_lvl = ((level << 5) & 0xFF00) | (level & 0x0F);
-
+	level = level * 240 / 255;
 	bl_tb0[1] = (u8)((level >> 8) & 0x0F);
 	bl_tb0[2] = (u8)(level & 0xFF);
 
