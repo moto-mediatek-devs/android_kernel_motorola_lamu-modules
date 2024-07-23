@@ -7,6 +7,7 @@
 
 #define AW_SAR_I2C_NAME "awinic_sar"
 #define AW_SAR_DRIVER_VERSION "v0.4.0"
+#if 0
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 #ifdef CONFIG_AW96XX_MTK_KERNEL419_CHARGER_TYPE
 #define USB_POWER_SUPPLY_NAME "mtk_charger_type"
@@ -17,6 +18,7 @@
 #endif
 #else
 #define USB_POWER_SUPPLY_NAME "usb"
+#endif
 #endif
 
 #define AW_I2C_RW_RETRY_TIME_MIN (2000)
@@ -32,6 +34,7 @@
 #define AW_SAR_OFFSET_LEN (15)
 #define AW_SAR_VCC_MIN_UV (1700000)
 #define AW_SAR_VCC_MAX_UV (3600000)
+#define USB_POWER_SUPPLY_NAME			"primary_chg"
 
 static struct mutex aw_sar_lock;
 struct aw_sar *p_class;
@@ -2048,6 +2051,9 @@ static int aw_sar_ps_notify_init(struct aw_sar *p_sar)
 		return -AW_ERR;
 	}
 	psy = power_supply_get_by_name(USB_POWER_SUPPLY_NAME);
+	if (IS_ERR_OR_NULL(psy)) {
+  		AWLOGE(p_sar->dev,"get %s chg psy failed\n", USB_POWER_SUPPLY_NAME);
+  	}
 	if (psy) {
 		ret = aw_sar_ps_get_state(p_sar, psy, &p_sar->ps_is_present);
 		if (ret) {

@@ -2,7 +2,7 @@
 #ifndef __TYHX_LOG__
 #define __TYHX_LOG__
 
-static int tyhx_log_level = 3;
+static int tyhx_log_level = 0;
 
 #define filename(x) strrchr(x,'/')?strrchr(x,'/')+1:x
 #define ENTER \

@@ -32,6 +32,9 @@
 #define PROXACTIVE 1 //较近
 #define BODYACTIVE 2 //更近
 
+//以下四个确认一下实际是那个一个，然后删掉其余三个
+#define USB_POWER_SUPPLY_NAME   "primary_chg"
+
 //寄存器列表
 #define RW_00_GLOBAL_CTRL0 0x00
 #define RW_01_GLOBAL_CTRL1 0x01
@@ -250,6 +253,9 @@ struct hx9031as_channel_info {
 struct hx9031as_platform_data {
 	struct device *pdev;
 	struct delayed_work polling_work;
+	struct work_struct ps_notify_work;
+    struct notifier_block ps_notif;
+    bool ps_is_present;
 	struct input_dev *input_dev_key;
 	struct hx9031as_channel_info *chs_info;
 	uint32_t channel_used_flag;
