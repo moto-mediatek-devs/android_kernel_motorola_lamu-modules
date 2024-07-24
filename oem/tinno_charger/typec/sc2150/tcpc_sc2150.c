@@ -962,6 +962,16 @@ static int sc2150_set_msg_header(
 		tcpc, TCPC_V10_REG_MSG_HDR_INFO, msg_hdr);
 }
 
+__maybe_unused void sc2150_dump(struct tcpc_device *tcpc)
+{
+	struct sc2150 *sc = tcpc_get_dev_data(tcpc);
+	int i; int data;
+	for (i = 0; i <= 0xff; i++) {
+		data = sc2150_i2c_read8(tcpc, i);
+		dev_err(sc->dev, "%s reg[0x%02x] = 0x%02x\n", __func__, i, data);
+	}
+}
+
 static int sc2150_set_rx_enable(struct tcpc_device *tcpc, uint8_t enable)
 {
 	return sc2150_i2c_write8(tcpc, TCPC_V10_REG_RX_DETECT, enable);
@@ -1239,7 +1249,7 @@ static inline int sc2150_check_revision(struct i2c_client *client)
 	return did;
 }
 
-static int sc2150_private_init(struct i2c_client *client) {
+__maybe_unused static int sc2150_private_init(struct i2c_client *client) {
 	u8 pass_word[6] = {0x4C, 0x49, 0x54, 0x54, 0x4c, 0x45};
 	u8 i, data;
 	u8 ldo_trim = 0xBB;
@@ -1263,6 +1273,7 @@ static int sc2150_private_init(struct i2c_client *client) {
 	dev_err(&client->dev, "enter test mode\n");
 	return 0;
 }
+
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
 static int sc2150_i2c_probe(struct i2c_client *client)
@@ -1289,7 +1300,7 @@ static int sc2150_i2c_probe(struct i2c_client *client,
 	sc->dev = &client->dev;
 	sc->client = client;
 	i2c_set_clientdata(client, sc);
-	sc2150_private_init(client);
+//	sc2150_private_init(client);
 	chip_id = sc2150_check_revision(client);
 	if (chip_id < 0)
 		return chip_id;
@@ -1325,7 +1336,7 @@ static int sc2150_i2c_probe(struct i2c_client *client,
 		goto err_irq_init;
 	}
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
-	FULL_PRODUCT_DEVICE_INFO(ID_CC_LOGIC, "SC2150A");
+	FULL_PRODUCT_DEVICE_INFO(ID_CC_LOGIC, "SC2150P");
 #endif
 	pr_info("%s probe OK!\n", __func__);
 	return 0;
