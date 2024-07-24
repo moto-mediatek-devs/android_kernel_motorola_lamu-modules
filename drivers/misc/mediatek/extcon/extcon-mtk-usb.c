@@ -37,6 +37,12 @@ static struct charger_device *primary_dvchg = NULL;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240712 CR/EKLAMU-202 */
 
+/* TN Begin modified by jirui.li/860702 20240724 CR/EKLAMU-834 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+#define BOOST_VOLTAGE_LIMIT		5200000
+#define BOOST_CURRENT_LIMIT		2000000
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by jirui.li/860702 20240724 CR/EKLAMU-834 */
 #if IS_ENABLED(CONFIG_TCPC_CLASS)
 #include "tcpm.h"
 #endif
@@ -291,6 +297,10 @@ static int mtk_usb_extcon_set_vbus_v1(struct mtk_extcon_info *extcon, bool is_on
 
 	if (is_on) {
 		charger_dev_enable_otg(primary_chg, true);
+/* TN Begin modified by jirui.li/860702 20240724 CR/EKLAMU-834 */
+		charger_dev_set_boost_voltage_limit(primary_chg, BOOST_VOLTAGE_LIMIT);
+		charger_dev_set_boost_current_limit(primary_chg, BOOST_CURRENT_LIMIT);
+/* TN End modified by jirui.li/860702 20240724 CR/EKLAMU-834 */
 #if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP) && IS_ENABLED(CONFIG_OEM_DEVINFO)
 		if (oem_pcba_charge_power() == CHARGE_POWER_33W) {
 			charger_dev_enable_ovpgate(primary_dvchg, true);

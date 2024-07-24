@@ -2122,6 +2122,9 @@ __maybe_unused static int sgm4154x_set_boost_voltage_limit(
 		if (uV == BOOST_VOLT_LIMIT[i]) {
 			reg_val = i;
 			break;
+		} else if (uV < BOOST_VOLT_LIMIT[i]) {
+			reg_val = i - 1;
+			break;
 		}
 		i++;
 	}
@@ -2286,6 +2289,7 @@ static struct charger_ops sgm4154x_chg_ops = {
 	/* OTG */
 	.enable_otg = sgm4154x_enable_otg,
 	.set_boost_current_limit = sgm4154x_set_boost_current_limit,
+	.set_boost_voltage_limit = sgm4154x_set_boost_voltage_limit,
 	.enable_hz = sgm4154x_set_hiz_en,
 
 	/* DPDM */

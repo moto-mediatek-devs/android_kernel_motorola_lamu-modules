@@ -202,6 +202,11 @@ struct charger_ops {
 	/* OTG */
 	int (*enable_otg)(struct charger_device *dev, bool en);
 	int (*enable_discharge)(struct charger_device *dev, bool en);
+/* TN Begin modified by jirui.li/860702 20240724 CR/EKLAMU-834 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	int (*set_boost_voltage_limit)(struct charger_device *dev, u32 uV);
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by jirui.li/860702 20240724 CR/EKLAMU-834 */
 	int (*set_boost_current_limit)(struct charger_device *dev, u32 uA);
 
 	/* charger type detection */
@@ -366,6 +371,12 @@ extern int charger_dev_enable_otg(
 	struct charger_device *charger_dev, bool en);
 extern int charger_dev_enable_discharge(
 	struct charger_device *charger_dev, bool en);
+/* TN Begin modified by jirui.li/860702 20240724 CR/EKLAMU-834 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+extern int charger_dev_set_boost_voltage_limit(
+	struct charger_device *charger_dev, u32 uV);
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by jirui.li/860702 20240724 CR/EKLAMU-834 */
 extern int charger_dev_set_boost_current_limit(
 	struct charger_device *charger_dev, u32 uA);
 extern int charger_dev_get_zcv(

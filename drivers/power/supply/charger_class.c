@@ -857,6 +857,20 @@ int charger_dev_enable_discharge(struct charger_device *chg_dev, bool en)
 }
 EXPORT_SYMBOL(charger_dev_enable_discharge);
 
+/* TN Begin modified by jirui.li/860702 20240724 CR/EKLAMU-834 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+int charger_dev_set_boost_voltage_limit(struct charger_device *chg_dev, u32 uV)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL &&
+	    chg_dev->ops->set_boost_voltage_limit)
+		return chg_dev->ops->set_boost_voltage_limit(chg_dev, uV);
+
+	return -EOPNOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_set_boost_voltage_limit);
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by jirui.li/860702 20240724 CR/EKLAMU-834 */
+
 int charger_dev_set_boost_current_limit(struct charger_device *chg_dev, u32 uA)
 {
 	if (chg_dev != NULL && chg_dev->ops != NULL &&

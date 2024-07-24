@@ -2030,6 +2030,7 @@ static struct charger_ops cx2589x_chg_ops = {
 	/* OTG */
 	.enable_otg = cx2589x_enable_otg,
 	.set_boost_current_limit = cx2589x_set_boost_current_limit,
+	.set_boost_voltage_limit = cx2589x_set_boost_voltage_limit,
 	.enable_hz = cx2589x_set_hiz_en,
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
 	.enable_dpdm_hz = cx2589x_enable_dpdm_hiz,
