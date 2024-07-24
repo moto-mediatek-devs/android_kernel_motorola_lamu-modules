@@ -34,7 +34,7 @@
 #endif
 
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
-//#include <dev_info.h>
+#include "../../../../oem/devinfo/dev_info.h"
 #endif
 
 //#define TINNO_LCM_OEM_CONFIG
@@ -1029,7 +1029,7 @@ static int dijin_probe(struct mipi_dsi_device *dsi)
 #endif
 
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
-	//FULL_PRODUCT_DEVICE_INFO(ID_LCD, "dijin-td4160-VDO");
+	FULL_PRODUCT_DEVICE_INFO(ID_LCD, "DIJIN-TD4160-VDO");
 #endif
 
 	ptx = ctx;
