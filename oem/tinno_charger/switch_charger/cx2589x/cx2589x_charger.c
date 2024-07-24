@@ -445,7 +445,7 @@ static int cx2589x_get_chrg_volt(struct charger_device *chg_dev,unsigned int *vo
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-static int charger_detect_init(struct cx2589x_device *cx)
+__maybe_unused static int charger_detect_init(struct cx2589x_device *cx)
 {
 	struct phy *phy;
 	int ret;
@@ -465,7 +465,7 @@ static int charger_detect_init(struct cx2589x_device *cx)
 	return ret;
 }
 
-static int charger_detect_release(struct cx2589x_device *cx)
+__maybe_unused static int charger_detect_release(struct cx2589x_device *cx)
 {
 	struct phy *phy;
 	int ret;
@@ -1246,10 +1246,8 @@ static int cx2589x_set_dp(struct charger_device *chg_dev, u32 volt);
 static void charger_detect_work_func(struct work_struct *work)
 {
 	struct cx2589x_device *cx = NULL;
-	//static int charge_type_old = 0;
 	struct cx2589x_state state;
 	int ret;
-	int vbus_volt;
 	u8 fault, status, val;
 	u8 retry_otg = 10;
 
@@ -1261,12 +1259,6 @@ static void charger_detect_work_func(struct work_struct *work)
 
 	if (!cx->charger_wakelock->active)
 		__pm_stay_awake(cx->charger_wakelock);
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-	charger_detect_init(cx);
-#else
-	Charger_Detect_Init();
-#endif
 
 	ret = cx2589x_get_state(cx, &state);
 	mutex_lock(&cx->lock);
@@ -1350,7 +1342,7 @@ static void charger_detect_work_func(struct work_struct *work)
 		cx2589x_update_bits(cx, CX2589x_REG_02, CX2589x_AUTO_DPDM_MASK, 0);
 	}
 
-	pr_info("Update: chg_type = %d, psy_usb_type = %d\n", cx->chg_type, cx->psy_usb_type);
+	pr_info("Update: chg_type = 0x%x, psy_usb_type = 0x%x\n", cx->chg_type, cx->psy_usb_type);
 
 	//otg retry
 	ret = cx2589x_read_reg(cx, CX2589x_REG_0C, &fault);
@@ -1371,13 +1363,6 @@ static void charger_detect_work_func(struct work_struct *work)
 	}
 
 	cx2589x_dump_register(cx->chg_dev);
-
-	cx2589x_get_vbus(cx, &vbus_volt);
-	if (vbus_volt > 8500)
-		cx2589x_set_input_volt_lim(s_chg_dev_otg, 8400000);
-	else
-		cx2589x_set_input_volt_lim(s_chg_dev_otg, 4500000);
-
 err:
 	//release wakelock
 	power_supply_changed(cx->charger);
@@ -1934,6 +1919,7 @@ static int cx2589x_plug_in(struct charger_device *chg_dev)
 {
 	int ret = 0;
 	struct cx2589x_device *cx = dev_get_drvdata(&chg_dev->dev);
+	struct cx2589x_state state;
 
 	pr_info("enter\n");
 
@@ -1951,6 +1937,11 @@ static int cx2589x_plug_in(struct charger_device *chg_dev)
 	force_dpdm_count = 3;
 	no_usb_flag = 0;
 	usb_detect_flag = false;
+
+	ret = cx2589x_get_state(cx, &state);
+	mutex_lock(&cx->lock);
+	cx->state = state;
+	mutex_unlock(&cx->lock);
 
 	return ret;
 }
