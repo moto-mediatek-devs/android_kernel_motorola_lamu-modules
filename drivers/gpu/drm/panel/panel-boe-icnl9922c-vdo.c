@@ -35,7 +35,7 @@
 #endif
 
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
-//#include <dev_info.h>
+#include "../../../../oem/devinfo/dev_info.h"
 #endif
 
 //#define TINNO_LCM_OEM_CONFIG
@@ -1038,7 +1038,7 @@ static int boe_probe(struct mipi_dsi_device *dsi)
 #endif
 
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
-	//FULL_PRODUCT_DEVICE_INFO(ID_LCD, "boe-icnl9922c-VDO");
+	FULL_PRODUCT_DEVICE_INFO(ID_LCD, "BOE-ICNL9922C-VDO");
 #endif
 
 	ptx = ctx;

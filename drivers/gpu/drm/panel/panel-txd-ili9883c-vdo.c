@@ -34,7 +34,7 @@
 #endif
 
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
-//#include <dev_info.h>
+#include "../../../../oem/devinfo/dev_info.h"
 #endif
 
 //#define TINNO_LCM_OEM_CONFIG
@@ -1206,7 +1206,7 @@ static int txd_probe(struct mipi_dsi_device *dsi)
 #endif
 
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
-	//FULL_PRODUCT_DEVICE_INFO(ID_LCD, "txd-ili9883c-VDO");
+	FULL_PRODUCT_DEVICE_INFO(ID_LCD, "TXD-ILI9883C-VDO");
 #endif
 
 	ptx = ctx;
