@@ -17,6 +17,10 @@
 #endif
 //TN modified by db 20230720 END
 
+//TN modified by db 20240723 BEGIN
+#define MAX_CALI_VALUE (10000)
+//TN modified by db 20240723 END
+
 #define ALSPSHUB_DEV_NAME     "alsps_hub_pl"
 
 struct alspshub_ipi_data {
@@ -648,8 +652,10 @@ static int pshub_factory_set_threshold(int32_t threshold[2])
 	}
 
 	spin_lock(&calibration_lock);
-	atomic_set(&obj->ps_thd_val_high, (threshold[0] + obj->ps_cali));
-	atomic_set(&obj->ps_thd_val_low, (threshold[1] + obj->ps_cali));
+	//TN Begin modified by db 202023  begin
+	atomic_set(&obj->ps_thd_val_high, (threshold[0]));
+	atomic_set(&obj->ps_thd_val_low, (threshold[1]));
+	//TN Begin modified by db 202023  end
 	spin_unlock(&calibration_lock);
 #ifdef MTK_OLD_FACTORY_CALIBRATION
 	err = sensor_set_cmd_to_hub(ID_PROXIMITY,
@@ -677,8 +683,10 @@ static int pshub_factory_get_threshold(int32_t threshold[2])
 	struct alspshub_ipi_data *obj = obj_ipi_data;
 
 	spin_lock(&calibration_lock);
-	threshold[0] = atomic_read(&obj->ps_thd_val_high) - obj->ps_cali;
-	threshold[1] = atomic_read(&obj->ps_thd_val_low) - obj->ps_cali;
+	//TN Begin modified by db 202023  begin
+	threshold[0] = atomic_read(&obj->ps_thd_val_high);
+	threshold[1] = atomic_read(&obj->ps_thd_val_low);
+	//TN Begin modified by db 202023  end
 	spin_unlock(&calibration_lock);
 	return 0;
 }
@@ -928,6 +936,14 @@ static int ps_set_cali(uint8_t *data, uint8_t count)
 {
 	int32_t *buf = (int32_t *)data;
 	struct alspshub_ipi_data *obj = obj_ipi_data;
+
+//TN Begin modified by db 202023  begin
+	if(buf[0] >= MAX_CALI_VALUE)
+	{
+		buf[0] = 0;
+		buf[1] = 0;
+	}
+//TN Begin modified by db 202023  end
 
 	spin_lock(&calibration_lock);
 	atomic_set(&obj->ps_thd_val_high, buf[0]);

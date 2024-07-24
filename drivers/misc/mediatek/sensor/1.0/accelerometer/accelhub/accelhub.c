@@ -578,12 +578,15 @@ static int gsensor_factory_get_cali(int32_t data[3])
 		return -1;
 	}
 #else
+//TN Begin modified by db 202023  begin
 	err = wait_for_completion_timeout(&obj->calibration_done,
-					  msecs_to_jiffies(3000));
+					  msecs_to_jiffies(1000));
 	if (!err) {
-		pr_err("%s fail!\n", __func__);
-		return -1;
+		pr_err("%s always get cali data!\n", __func__);
+		// return -1;
 	}
+//TN Begin modified by db 202023  end
+
 	spin_lock(&calibration_lock);
 	data[ACCELHUB_AXIS_X] = obj->static_cali[ACCELHUB_AXIS_X];
 	data[ACCELHUB_AXIS_Y] = obj->static_cali[ACCELHUB_AXIS_Y];
