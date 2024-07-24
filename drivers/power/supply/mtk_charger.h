@@ -552,6 +552,11 @@ struct mtk_charger {
 	int ta_capability;
 	int wait_times;
 
+/* TN Begin modified by jirui.li/860702 20240724 CR/EKLAMU-620 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) //&& IS_ENABLED(CONFIG_FACTORY_BUILD)
+	int factory_charging_limit_soc;
+#endif /* CONFIG_OEM_TINNO_CHARGER && CONFIG_FACTORY_BUILD */
+/* TN Begin modified by jirui.li/860702 20240724 CR/EKLAMU-620 */
 /* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
 	struct delayed_work hvdcp_work;

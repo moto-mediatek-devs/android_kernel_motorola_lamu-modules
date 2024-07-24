@@ -1696,6 +1696,34 @@ static ssize_t factory_charging_current_store(struct device *dev,
 }
 
 static DEVICE_ATTR_RW(factory_charging_current);
+
+/* TN Begin modified by jirui.li/860702 20240724 CR/EKLAMU-620 */
+#define FACTORY_CHARGING_LIMIT_SOC_DEFAULT 100
+static ssize_t factory_charging_limit_soc_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	struct mtk_charger *pinfo = dev->driver_data;
+	chr_err("%s: %d\n", __func__, pinfo->factory_charging_limit_soc);
+	return sprintf(buf, "%d\n", pinfo->factory_charging_limit_soc);
+}
+static ssize_t factory_charging_limit_soc_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t size)
+{
+	struct mtk_charger *pinfo = dev->driver_data;
+	signed int temp;
+	if (kstrtoint(buf, 10, &temp) == 0) {
+		if (temp <= 100 && temp >= 0)
+			pinfo->factory_charging_limit_soc = temp;
+		else
+			pinfo->factory_charging_limit_soc = FACTORY_CHARGING_LIMIT_SOC_DEFAULT;
+		chr_err("%s: %d\n", __func__, temp);
+	} else
+		chr_err("%s: format error!\n", __func__);
+	return size;
+}
+static DEVICE_ATTR_RW(factory_charging_limit_soc);
+/* TN Begin modified by jirui.li/860702 20240724 CR/EKLAMU-620 */
 #endif /* CONFIG_OEM_TINNO_CHARGER && CONFIG_FACTORY_BUILD */
 
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
@@ -2878,6 +2906,16 @@ static void charger_check_status(struct mtk_charger *info)
 	temperature = info->battery_temp;
 	thermal = &info->thermal;
 	uisoc = get_uisoc(info);
+
+/* TN Begin modified by jirui.li/860702 20240722 CR/EKLAMU-620 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) //&& IS_ENABLED(CONFIG_FACTORY_BUILD)
+	if (uisoc >= info->factory_charging_limit_soc) {
+		chr_err("TINNO_FACTORY_SUPPORT,soc >= %d stop charging!!\n", info->factory_charging_limit_soc);
+		charging = false;
+		goto stop_charging;
+	}
+#endif /* CONFIG_OEM_TINNO_CHARGER && CONFIG_FACTORY_BUILD */
+/* TN End modified by jirui.li/860702 20240722 CR/EKLAMU-620 */
 
 	info->setting.vbat_mon_en = true;
 	if (info->enable_sw_jeita == true || info->enable_vbat_mon != true ||
@@ -4173,6 +4211,11 @@ static int mtk_charger_setup_files(struct platform_device *pdev)
 	ret = device_create_file(&(pdev->dev), &dev_attr_factory_charging_current);
 	if (ret)
 		goto _out;
+/* TN Begin modified by jirui.li/860702 20240722 CR/EKLAMU-620 */
+	ret = device_create_file(&(pdev->dev), &dev_attr_factory_charging_limit_soc);
+	if (ret)
+		goto _out;
+/* TN End modified by jirui.li/860702 20240722 CR/EKLAMU-620 */
 #endif /* CONFIG_OEM_TINNO_CHARGER && CONFIG_FACTORY_BUILD */
 
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
@@ -4773,6 +4816,11 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	}
 	info->enable_hv_charging = true;
 
+/* TN Begin modified by jirui.li/860702 20240724 CR/EKLAMU-620 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) //&& IS_ENABLED(CONFIG_FACTORY_BUILD)
+	info->factory_charging_limit_soc = FACTORY_CHARGING_LIMIT_SOC_DEFAULT;
+#endif /* CONFIG_OEM_TINNO_CHARGER && CONFIG_FACTORY_BUILD */
+/* TN Begin modified by jirui.li/860702 20240724 CR/EKLAMU-620 */
 	info->psy_desc1.name = "mtk-master-charger";
 	info->psy_desc1.type = POWER_SUPPLY_TYPE_UNKNOWN;
 	info->psy_desc1.usb_types = charger_psy_usb_types;
