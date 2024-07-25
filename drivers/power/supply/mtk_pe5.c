@@ -927,7 +927,13 @@ static int pe50_set_dvchg_charging(struct pe50_algo_info *info, bool en)
 	PE50_INFO("en = %d\n", en);
 
 	if (en) {
+/* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 		ret = pe50_hal_enable_hz(info->alg, CHG1, true);
+#else
+		ret = pe50_hal_enable_charging(info->alg, CHG1, false);
+#endif
+/* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 		if (ret < 0) {
 			PE50_ERR("set swchg hz fail(%d)\n", ret);
 			return ret;
@@ -937,7 +943,13 @@ static int pe50_set_dvchg_charging(struct pe50_algo_info *info, bool en)
 	if (ret < 0)
 		return ret;
 	if (!en) {
+/* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 		ret = pe50_hal_enable_hz(info->alg, CHG1, false);
+#else
+		ret = pe50_hal_enable_charging(info->alg, CHG1, true);
+#endif
+/* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 		if (ret < 0) {
 			PE50_ERR("disable swchg hz fail(%d)\n", ret);
 			return ret;
@@ -964,17 +976,25 @@ static int pe50_enable_swchg_charging(struct pe50_algo_info *info, bool en)
 			PE50_ERR("en swchg fail(%d)\n", ret);
 			return ret;
 		}
+/* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 		ret = pe50_hal_enable_hz(info->alg, CHG1, false);
 		if (ret < 0) {
 			PE50_ERR("disable swchg hz fail(%d)\n", ret);
 			return ret;
 		}
+#endif
+/* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 	} else {
+/* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 		ret = pe50_hal_enable_hz(info->alg, CHG1, true);
 		if (ret < 0) {
 			PE50_ERR("set swchg hz fail(%d)\n", ret);
 			return ret;
 		}
+#endif
+/* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 		ret = pe50_hal_enable_charging(info->alg, CHG1, false);
 		if (ret < 0) {
 			PE50_ERR("en swchg fail(%d)\n", ret);
@@ -1109,11 +1129,16 @@ static int pe50_stop(struct pe50_algo_info *info, struct pe50_stop_info *sinfo)
 	atomic_set(&data->stop_algo, 0);
 	alarm_cancel(&data->timer);
 
+/* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	ret = pe50_enable_dvchg_charging(info, PE50_DVCHG_SLAVE, false);
 	if (ret < 0) {
 		PE50_ERR("disable slave dvchg fail(%d)\n", ret);
 		return ret;
 	}
+#endif
+/* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+
 	ret = pe50_set_dvchg_charging(info, false);
 	if (ret < 0) {
 		PE50_ERR("disable dvchg fail\n");
@@ -1132,6 +1157,14 @@ static int pe50_stop(struct pe50_algo_info *info, struct pe50_stop_info *sinfo)
 	pe50_enable_swchg_charging(info, true);
 	pe50_hal_enable_sw_vbusovp(info->alg, true);
 	pe50_send_notification(info, EVT_ALGO_STOP, &notify);
+/* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
+	ret = pe50_hal_enable_adc(info->alg, DVCHG1, false);
+	if (ret < 0) {
+		PE50_ERR("Disable DVCHG1 ADC fail(%d)\n", ret);
+	}
+#endif
+/* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 	return 0;
 }
 
@@ -1235,6 +1268,16 @@ static inline int pe50_start(struct pe50_algo_info *info)
 		PE50_ERR("disable charger fail\n");
 		return ret;
 	}
+
+/* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
+		ret = pe50_hal_enable_adc(info->alg, DVCHG1, true);
+		if (ret < 0) {
+			PE50_ERR("enable DVCHG1 ADC fail(%d)\n", ret);
+			return ret;
+		}
+#endif
+/* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 
 	/* Check DVCHG registers stat first */
 	for (i = PE50_DVCHG_MASTER; i < PE50_DVCHG_MAX; i++) {
@@ -1434,7 +1477,13 @@ static int pe50_algo_init_with_ta_cc(struct pe50_algo_info *info)
 		goto err;
 	}
 
+/* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	ret = pe50_hal_enable_hz(info->alg, CHG1, false);
+#else
+	ret = pe50_hal_enable_charging(info->alg, CHG1, true);
+#endif
+/* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 	if (ret < 0) {
 		PE50_ERR("disable swchg hz fail(%d)\n", ret);
 		goto err;
@@ -1564,10 +1613,15 @@ static int pe50_algo_init_with_ta_cv(struct pe50_algo_info *info)
 	struct pe50_algo_data *data = info->data;
 	struct pe50_algo_desc *desc = info->desc;
 	struct pe50_ta_auth_data *auth_data = &data->ta_auth_data;
+/* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	u32 rcable_retry_level = (data->is_dvchg_exist[PE50_DVCHG_SLAVE] &&
 				  !data->tried_dual_dvchg) ?
 				  desc->rcable_level_dual[PE50_RCABLE_NORMAL] :
 				  desc->rcable_level[PE50_RCABLE_NORMAL];
+#endif
+/* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+
 	struct pe50_stop_info sinfo = {
 		.reset_ta = true,
 		.hardreset_ta = false,
@@ -1583,7 +1637,13 @@ static int pe50_algo_init_with_ta_cv(struct pe50_algo_info *info)
 		goto err;
 	}
 
+/* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	ret = pe50_hal_enable_hz(info->alg, CHG1, false);
+#else
+	ret = pe50_hal_enable_charging(info->alg, CHG1, true);
+#endif
+/* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 	if (ret < 0) {
 		PE50_ERR("disable swchg hz fail(%d)\n", ret);
 		goto err;
@@ -1602,6 +1662,8 @@ static int pe50_algo_init_with_ta_cv(struct pe50_algo_info *info)
 	data->zcv = vbat_avg;
 	PE50_INFO("avg(vbat):(%d)\n", vbat_avg);
 
+/* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	ret = pe50_calculate_rcable_by_swchg(info);
 	if (ret < 0) {
 		PE50_ERR("calculate rcable by swchg fail(%d)\n", ret);
@@ -1613,6 +1675,8 @@ static int pe50_algo_init_with_ta_cv(struct pe50_algo_info *info)
 		if (data->err_retry_cnt < PE50_INIT_RETRY_MAX)
 			goto err;
 	}
+#endif
+/* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 
 	ret = pe50_get_adc(info, PE50_ADCCHAN_VBUS, &vbus);
 	if (ret < 0) {
@@ -2661,12 +2725,15 @@ static int pe50_algo_cc_cv_with_ta_cv(struct pe50_algo_info *info)
 		PE50_ERR("get vbat fail(%d)\n", ret);
 		goto out;
 	}
-
+/* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	ret = pe50_get_adc(info, PE50_ADCCHAN_VSYS, &vsys);
 	if (ret < 0) {
 		PE50_ERR("get vsys fail(%d)\n", ret);
 		goto out;
 	}
+#endif
+/* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 
 	if (vbat >= data->vbat_cv) {
 		PE50_INFO("--vbat >= vbat_cv, %d > %d\n", vbat, data->vbat_cv);
@@ -3713,7 +3780,6 @@ static int pe50_is_algo_ready(struct chg_alg_device *alg)
 		memset(auth_data, 0, sizeof(*auth_data));
 	}
 	mutex_unlock(&data->notify_lock);
-
 	ret = pe50_hal_get_soc(info->alg, &soc);
 	if (ret < 0) {
 		PE50_ERR("get SOC fail(%d)\n", ret);
