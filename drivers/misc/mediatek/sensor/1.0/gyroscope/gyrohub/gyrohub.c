@@ -633,12 +633,14 @@ static int gyrohub_factory_get_cali(int32_t data[3])
 		return -1;
 	}
 #else
-	err = wait_for_completion_timeout(&obj->calibration_done,
-		msecs_to_jiffies(3000));
-	if (!err) {
-		pr_err("%s fail!\n", __func__);
-		return -1;
-	}
+//TN Begin modified by db 202023  begin
+	// err = wait_for_completion_timeout(&obj->calibration_done,
+	// 	msecs_to_jiffies(3000));
+	// if (!err) {
+	// 	pr_err("%s fail!\n", __func__);
+	// 	return -1;
+	// }
+//TN Begin modified by db 202023  end
 	spin_lock(&calibration_lock);
 	data[GYROHUB_AXIS_X] = obj->static_cali[GYROHUB_AXIS_X];
 	data[GYROHUB_AXIS_Y] = obj->static_cali[GYROHUB_AXIS_Y];
