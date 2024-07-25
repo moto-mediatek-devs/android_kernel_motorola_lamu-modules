@@ -486,7 +486,7 @@ static int ili_spi_wrapper(u8 *txbuf, u32 wlen, u8 *rxbuf, u32 rlen, bool spi_ir
 		/* Won't break if it needs to read data following with writing. */
 		if (!rlen)
 			break;
-		#if 0 /* if warning: this statement may fall through modify 0 to 1 */
+		#if 1 /* if warning: this statement may fall through modify 0 to 1 */
 		else {
 			if (!ice && spi_irq) {
 				/* Check INT triggered by FW when sending cmds. */
@@ -510,7 +510,7 @@ static int ili_spi_wrapper(u8 *txbuf, u32 wlen, u8 *rxbuf, u32 rlen, bool spi_ir
 			break;
 		}
 		#endif
-			break;
+			//break;
 	case SPI_READ:
 		if (!ice && spi_irq) {
 			/* Check INT triggered by FW when sending cmds. */
