@@ -1636,7 +1636,7 @@ static ssize_t BatteryNotify_store(struct device *dev,
 static DEVICE_ATTR_RW(BatteryNotify);
 
 /* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) //&& IS_ENABLED(CONFIG_FACTORY_BUILD)
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
 static ssize_t factory_input_charging_current_show(struct device *dev,
 				  struct device_attribute *attr, char *buf)
 {
@@ -1704,7 +1704,7 @@ static ssize_t factory_charging_current_store(struct device *dev,
 static DEVICE_ATTR_RW(factory_charging_current);
 
 /* TN Begin modified by jirui.li/860702 20240724 CR/EKLAMU-620 */
-#define FACTORY_CHARGING_LIMIT_SOC_DEFAULT 100
+#define FACTORY_CHARGING_LIMIT_SOC_DEFAULT 65
 static ssize_t factory_charging_limit_soc_show(struct device *dev,
 				  struct device_attribute *attr, char *buf)
 {
@@ -2914,7 +2914,7 @@ static void charger_check_status(struct mtk_charger *info)
 	uisoc = get_uisoc(info);
 
 /* TN Begin modified by jirui.li/860702 20240722 CR/EKLAMU-620 */
-#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) //&& IS_ENABLED(CONFIG_FACTORY_BUILD)
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
 	if (uisoc >= info->factory_charging_limit_soc) {
 		chr_err("TINNO_FACTORY_SUPPORT,soc >= %d stop charging!!\n", info->factory_charging_limit_soc);
 		charging = false;
@@ -4209,7 +4209,7 @@ static int mtk_charger_setup_files(struct platform_device *pdev)
 		goto _out;
 
 /* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) //&& IS_ENABLED(CONFIG_FACTORY_BUILD)
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
 	ret = device_create_file(&(pdev->dev), &dev_attr_factory_input_charging_current);
 	if (ret)
 		goto _out;
@@ -4814,7 +4814,7 @@ static int mtk_charger_probe(struct platform_device *pdev)
 		info->chg_data[i].thermal_input_current_limit = -1;
 		info->chg_data[i].input_current_limit_by_aicl = -1;
 /* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) //&& IS_ENABLED(CONFIG_FACTORY_BUILD)
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
 		info->chg_data[i].factory_input_current_limit = -1;
 		info->chg_data[i].factory_charging_current_limit = -1;
 #endif /* CONFIG_OEM_TINNO_CHARGER && CONFIG_FACTORY_BUILD */
@@ -4823,7 +4823,7 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	info->enable_hv_charging = true;
 
 /* TN Begin modified by jirui.li/860702 20240724 CR/EKLAMU-620 */
-#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) //&& IS_ENABLED(CONFIG_FACTORY_BUILD)
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
 	info->factory_charging_limit_soc = FACTORY_CHARGING_LIMIT_SOC_DEFAULT;
 #endif /* CONFIG_OEM_TINNO_CHARGER && CONFIG_FACTORY_BUILD */
 /* TN Begin modified by jirui.li/860702 20240724 CR/EKLAMU-620 */
