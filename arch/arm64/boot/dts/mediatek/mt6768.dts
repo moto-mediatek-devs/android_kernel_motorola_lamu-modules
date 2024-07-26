@@ -5717,7 +5717,9 @@ transparent_hugepage=never";
 
 #include "mediatek/mt6358_6768.dtsi"
 #include "mediatek/cust_mt6768_msdc.dtsi"
-#include "mediatek/bat_setting/mt6768_battery_prop.dtsi"
+/* TN Begin modified by jirui.li/860702 20240726 CR/EKLAMU-834 */
+//#include "mediatek/bat_setting/mt6768_battery_prop.dtsi"
+/* TN End modified by jirui.li/860702 20240726 CR/EKLAMU-834 */
 #include "mediatek/mt6370.dtsi"
 #include "mediatek/trusty.dtsi"
 

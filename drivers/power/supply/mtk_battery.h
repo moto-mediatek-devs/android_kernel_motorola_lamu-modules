@@ -1604,7 +1604,23 @@ extern void mtk_irq_thread_init(struct mtk_battery *gm);
 #define AGING_4_EN				0
 #define AGING_5_EN				0
 #define AGING_6_EN				0
-
+/* TN Begin modified by jirui.li/860702 20240726 CR/EKLAMU-834 */
+#define BATTERY_SN_NUMBER			12
+static const char * const BatterySn[BATTERY_SN_NUMBER] = {
+	"SB18E45360",
+	"SB18E45361",
+	"SB18E45362",
+	"SB18E45363",
+	"SB18E47960",
+	"SB18E47961",
+	"SB18E47962",
+	"SB18E47963",
+	"SB18E47965",
+	"SB18E47966",
+	"SB18E47967",
+	"SB18E47968",
+};
+/* TN End modified by jirui.li/860702 20240726 CR/EKLAMU-834 */
 /* threshold */
 #define HWOCV_SWOCV_DIFF			300
 #define HWOCV_SWOCV_DIFF_LT			1500

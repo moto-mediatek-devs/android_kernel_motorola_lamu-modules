@@ -34,6 +34,11 @@
 #include <mt-plat/aee.h>
 #endif
 
+/* TN Begin modified by jirui.li/860702 20240726 CR/EKLAMU-834 */
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include "../../../oem/devinfo/dev_info.h"
+#endif /* CONFIG_OEM_DEVINFO */
+/* TN End modified by jirui.li/860702 20240726 CR/EKLAMU-834 */
 
 struct mtk_battery *gmb;
 
@@ -150,10 +155,62 @@ bool is_algo_active(struct mtk_battery *gm)
 	return gm->algo.active;
 }
 
+/* TN Begin modified by jirui.li/860702 20240726 CR/EKLAMU-834 */
+int find_battery_sn(const char *target)
+{
+	for (int i = 0; i < BATTERY_SN_NUMBER; i++) {
+		if (strcmp(BatterySn[i], target) == 0) {
+			return i;
+		}
+	}
+	return -1;
+}
+void fgauge_set_profile_id(struct mtk_battery *gm)
+{
+	const char *bat_sn = NULL;
+	int bat_sn_index;
+
+	bat_sn = oem_battery_sn();
+	bat_sn_index = find_battery_sn(bat_sn);
+	bm_err(gm, "battery profile name: %s\n", bat_sn);
+	switch(bat_sn_index) {
+		case 0:
+		case 4:
+			gm->battery_id = 0;
+			break;
+		case 1:
+		case 5:
+			gm->battery_id = 1;
+			break;
+		case 2:
+		case 6:
+			gm->battery_id = 2;
+			break;
+		case 3:
+		case 7:
+			gm->battery_id = 3;
+			break;
+		case 8:
+		case 9:
+			gm->battery_id = 4;
+			break;
+		case 10:
+		case 11:
+			gm->battery_id = 5;
+			break;
+		default:
+			gm->battery_id = 0;
+			break;
+	}
+	bm_err(gm, "battery profile id: %d, index: %d\n", gm->battery_id, bat_sn_index);
+}
 int fgauge_get_profile_id(struct mtk_battery *gm)
 {
+	fgauge_set_profile_id(gm);
+	bm_err(gm, "battery profile id: %d\n", gm->battery_id);
 	return gm->battery_id;
 }
+/* TN End modified by jirui.li/860702 20240726 CR/EKLAMU-834 */
 
 int get_iavg_gap(struct mtk_battery *gm)
 {
