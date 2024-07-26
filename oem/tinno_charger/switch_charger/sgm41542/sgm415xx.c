@@ -66,10 +66,6 @@
 #define R_VBUS_CHARGER_1   330
 #define R_VBUS_CHARGER_2   39
 
-#if IS_ENABLED(CONFIG_FACTORY_BUILD)
-extern int factory_charging_limit;
-#endif
-
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 static struct proc_dir_entry *entry;
 #endif
@@ -787,46 +783,9 @@ __maybe_unused static int sgm4154x_set_hiz_en(struct charger_device *chg_dev, bo
 static int sgm4154x_enable_charger(struct sgm4154x_device *sgm)
 {
 	int ret;
-	/* TN Begin modified by rongxing.li/860655 20231125 CR/EKFOGO4G-5119 */
-#if IS_ENABLED(CONFIG_FACTORY_BUILD)
-	int uisoc = -1;
-	int bat_vol = 3450;
-	struct power_supply *bat_psy = NULL;
-	union power_supply_propval prop;
-
-	if (bat_psy == NULL) {
-		bat_psy = power_supply_get_by_name("battery");
-		if (bat_psy == NULL) {
-			dev_err(sgm->dev, "[%s]psy is not rdy\n", __func__);
-			uisoc = -1;
-			bat_vol = 4001;
-		}
-	}
-
-	if (bat_psy) {
-		ret = power_supply_get_property(bat_psy,
-				POWER_SUPPLY_PROP_VOLTAGE_NOW, &prop);
-		bat_vol = prop.intval / 1000;
-
-		ret = power_supply_get_property(bat_psy,
-				POWER_SUPPLY_PROP_CAPACITY, &prop);
-		uisoc = prop.intval;
-	}
-
-	if ((uisoc >= 70 || (uisoc == -1 && bat_vol > 4000)) && (factory_charging_limit == 1))
-		ret = sgm4154x_update_bits(sgm, SGM4154x_CHRG_CTRL_1,
-				SGM4154x_CHRG_EN, 0);
-	else
-		ret = sgm4154x_update_bits(sgm, SGM4154x_CHRG_CTRL_1,
-				SGM4154x_CHRG_EN, SGM4154x_CHRG_EN);
-	dev_info(sgm->dev, "[Factory Test][%s] uisoc:%d battery_voltage:%d\n",
-			__func__, uisoc, bat_vol);
-#else
-	/* TN End modified by rongxing.li/860655 20231125 CR/EKFOGO4G-5119 */
 
 	ret = sgm4154x_update_bits(sgm, SGM4154x_CHRG_CTRL_1,
 			SGM4154x_CHRG_EN, SGM4154x_CHRG_EN);
-#endif
 
 	return ret;
 }

@@ -67,12 +67,6 @@ static struct proc_dir_entry *entry;
 static bool dump_reg_enable;
 
 static bool allow_set_dp_dm_vol = false;
-/* TN Begin modified by rongxing.li/860655 20231125 CR/EKFOGO4G-5119 */
-#if IS_ENABLED(CONFIG_FACTORY_BUILD)
-static bool boot_init = false;
-extern int factory_charging_limit;
-#endif
-/* TN End modified by rongxing.li/860655 20231125 CR/EKFOGO4G-5119 */
 
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
 extern bool turbo_charger_active;
@@ -656,43 +650,6 @@ __maybe_unused static int sc8989x_reset_wdt(struct sc8989x_chip *sc)
 static int sc8989x_set_chg_enable(struct sc8989x_chip *sc, bool enable)
 {
 	int reg_val = enable ? 1 : 0;
-	/* TN Begin modified by rongxing.li/860655 20231125 CR/EKFOGO4G-5119 */
-#if IS_ENABLED(CONFIG_FACTORY_BUILD)
-	int ret;
-	int uisoc = -1;
-	int bat_vol = 3450;
-	struct power_supply *bat_psy = NULL;
-	union power_supply_propval prop;
-
-	if (bat_psy == NULL) {
-		bat_psy = power_supply_get_by_name("battery");
-		if (bat_psy == NULL) {
-			dev_err(sc->dev, "[%s]psy is not rdy\n", __func__);
-			uisoc = -1;
-			bat_vol = 4001;
-		}
-	}
-
-	if (bat_psy) {
-		ret = power_supply_get_property(bat_psy,
-				POWER_SUPPLY_PROP_VOLTAGE_NOW, &prop);
-		bat_vol = prop.intval / 1000;
-
-		ret = power_supply_get_property(bat_psy,
-				POWER_SUPPLY_PROP_CAPACITY, &prop);
-		uisoc = prop.intval;
-	}
-
-	if ((uisoc >= 70 || (uisoc == -1 && bat_vol > 4000)) && (factory_charging_limit == 1))
-		reg_val = 0;
-	if (boot_init) {
-		reg_val = 0;
-		boot_init = false;
-	}
-	dev_info(sc->dev, "[Factory Test][%s] uisoc:%d battery_voltage:%d reg_val:%d\n",
-			__func__, uisoc, bat_vol, reg_val);
-#endif
-	/* TN End modified by rongxing.li/860655 20231125 CR/EKFOGO4G-5119 */
 
 	return sc8989x_field_write(sc, CHG_CFG, reg_val);
 }
