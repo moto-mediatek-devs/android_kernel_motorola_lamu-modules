@@ -1276,6 +1276,7 @@ static inline int pe50_start(struct pe50_algo_info *info)
 			PE50_ERR("enable DVCHG1 ADC fail(%d)\n", ret);
 			return ret;
 		}
+		msleep(20);
 #endif
 /* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 
@@ -3801,10 +3802,14 @@ static int pe50_is_algo_ready(struct chg_alg_device *alg)
 		}
 	}
 
+/* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
 	if (!pe50_algo_safety_check(info)) {
 		ret = ALG_NOT_READY;
 		goto out;
 	}
+#endif
+/* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 
 	if (!pe50_is_ta_rdy(info)) {
 		ret = pe50_hal_is_adapter_ready(alg);
