@@ -284,7 +284,13 @@ int pe50_hal_init_hardware(struct chg_alg_device *alg, const char **support_ta,
 		data->is_dvchg_exist[PE50_DVCHG_SLAVE] = true;
 	chg_alg_dev_set_drv_hal_data(alg, hal);
 	hal->dev = info->dev;
+/* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	hal->bat_psy = devm_power_supply_get_by_phandle(hal->dev, "gauge");
+#else
+	hal->bat_psy = power_supply_get_by_name("battery");
+#endif
+/* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 	if (IS_ERR_OR_NULL(hal->bat_psy)) {
 		ret = IS_ERR(hal->bat_psy) ? PTR_ERR(hal->bat_psy) : -ENODEV;
 		PE50_ERR("get bat_psy fail(%d)\n", ret);
@@ -463,6 +469,20 @@ out:
 	PE50_DBG("%d\n", ret);
 	return ret;
 }
+
+/* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
+int pe50_hal_enable_adc(struct chg_alg_device *alg, enum chg_idx chgidx, bool en)
+{
+	int chgtyp = to_chgtyp(chgidx);
+	struct pe50_hal *hal = chg_alg_dev_get_drv_hal_data(alg);
+
+	if (chgtyp < 0)
+		return chgtyp;
+	return charger_dev_enable_adc(hal->chgdevs[chgtyp], en);
+}
+#endif
+/* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 
 int pe50_hal_get_adc(struct chg_alg_device *alg, enum chg_idx chgidx,
 		     enum pe50_adc_channel chan, int *val)

@@ -304,6 +304,11 @@ extern int pe50_hal_set_vbusovp_alarm(struct chg_alg_device *alg,
 				      enum chg_idx chgidx, u32 mV);
 extern int pe50_hal_reset_vbusovp_alarm(struct chg_alg_device *alg,
 					enum chg_idx chgidx);
+/* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+extern int pe50_hal_enable_adc(struct chg_alg_device *alg, enum chg_idx chgidx, bool en);
+#endif
+/* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 extern int pe50_hal_get_adc(struct chg_alg_device *alg, enum chg_idx chgidx,
 			    enum pe50_adc_channel chan, int *val);
 extern int pe50_hal_get_soc(struct chg_alg_device *alg, u32 *soc);

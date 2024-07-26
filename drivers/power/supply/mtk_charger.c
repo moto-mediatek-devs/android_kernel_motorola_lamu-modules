@@ -282,6 +282,12 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 			SINGLE_CHARGER);
 		info->config = SINGLE_CHARGER;
 	}
+/* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_OEM_DEVINFO)
+	if (oem_pcba_charge_power() == CHARGE_POWER_33W)
+		info->config = DIVIDER_CHARGER;
+#endif
+/* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 
 	if (of_property_read_u32(np, "battery_cv", &val) >= 0)
 		info->data.battery_cv = val;
@@ -4972,9 +4978,11 @@ static int mtk_charger_probe(struct platform_device *pdev)
 
 	sc_init(&info->sc);
 	info->chg_alg_nb.notifier_call = chg_alg_event;
-/* TN Begin modified by xinjun.lu/860715 20240717 CR/EKLAMU-202 */
-	info->fast_charging_indicator = PDC_ID;
-/* TN End modified by xinjun.lu/860715 20240717 CR/EKLAMU-202 */
+/* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	info->fast_charging_indicator = PDC_ID | PE5_ID;
+#endif
+/* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 	info->enable_meta_current_limit = 1;
 
 	if (strcmp(info->curr_select_name,"NULL")) {
