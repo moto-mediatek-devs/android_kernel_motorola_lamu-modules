@@ -392,12 +392,6 @@ struct mtk_charger {
 	struct power_supply_config psy_hvdvchg_cfg2;
 	struct power_supply *psy_hvdvchg2;
 
-/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
-	struct power_supply *hvdcp_logic_psy;
-#endif
-/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
-
 	struct power_supply  *chg_psy;
 	struct power_supply  *bc12_psy;
 	struct power_supply  *bat_psy;
@@ -580,6 +574,8 @@ struct mtk_charger {
 	bool enable_hiz;
 	bool enable_charger;
 	int disable_thermal_current_limit;
+	struct power_supply  *qc_phy_psy;
+	int ext_chr_type;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 

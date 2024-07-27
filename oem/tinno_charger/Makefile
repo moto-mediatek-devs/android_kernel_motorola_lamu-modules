@@ -6,6 +6,7 @@ subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/pmic/include
 subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/usb20
 subdir-ccflags-y += -Werror -I$(srctree)/drivers/power/supply
 subdir-ccflags-y += -Werror -I$(srctree)/$(DEVICE_MODULES_REL_DIR)/oem/devinfo
+subdir-ccflags-y += -Werror -I$(srctree)/$(DEVICE_MODULES_REL_DIR)/oem/tinno_charger
 subdir-ccflags-y += -Werror -I$(srctree)/$(DEVICE_MODULES_REL_DIR)/drivers/misc/mediatek/typec/tcpc
 subdir-ccflags-y += -Werror -I$(srctree)/$(DEVICE_MODULES_REL_DIR)/drivers/power/supply
 subdir-ccflags-y += -Werror -I$(srctree)/$(DEVICE_MODULES_REL_DIR)/drivers/misc/mediatek/usb/usb20

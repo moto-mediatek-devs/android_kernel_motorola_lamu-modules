@@ -31,6 +31,10 @@
 #include <linux/firmware.h>
 #include <linux/version.h>
 
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+#include <tinno_charger.h>
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 #include "charger_class.h"
 #include "mtk_charger.h"
@@ -118,18 +122,9 @@ extern int qc3p_charger_ready;
 #define WT6670F_ADDR                    0x34
 #define SOFT_RESET_VAL                  0xff
 
-#define TINNO_POWER_SUPPLY_TYPE_USB_HVDCP       20
-#define TINNO_POWER_SUPPLY_TYPE_USB_HVDCP_3     21
-#define TINNO_POWER_SUPPLY_TYPE_USB_HVDCP_3P5   22
-#define TINNO_POWER_SUPPLY_TYPE_USB_FLOAT       23
-
-enum QC3P_POWER_TYPE {
-	QC3P_POWER_NONE = 0,
-	QC3P_POWER_15W,
-	QC3P_POWER_18W,
-	QC3P_POWER_27W,
-	QC3P_POWER_40W
-};
+#define QC3_VOLT_STEP                    200 /* mV */
+#define QC3_BASE_VOLT                   5000 /* mV */
+#define QC3_TARGE_VOLT                  6400 /* mV */
 
 static int m_chg_type = 0;
 
@@ -453,6 +448,9 @@ int wt6670f_reset_charger_type(void)
 	} else {
 		pr_info("clear total_count\n");
 		_chip->qc3p_type = QC3P_POWER_NONE;
+		_chip->charger_type = POWER_SUPPLY_TYPE_UNKNOWN;
+		_chip->usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
+		_chip->first_detect_dcp = true;
 		_chip->count = 0;
 		gpio_direction_output(_chip->rst_gpio, 1);
 		return 0;
@@ -609,7 +607,37 @@ static void wt6670f_get_charger_type_func_work(struct work_struct *work)
 	m_chg_type = wt6670f_charger_type(chip);
 
 	switch (m_chg_type) {
-	case 0x5:
+	case 0x1: // Floating
+	chip->charger_type = POWER_SUPPLY_TYPE_USB_OTHER;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
+	chip->usb_type = POWER_SUPPLY_USB_TYPE_SDP;
+#endif
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+	chip->qc3p_type = QC3P_POWER_NONE;
+#endif
+	break;
+
+	case 0x2: // SDP
+	chip->charger_type = POWER_SUPPLY_TYPE_USB;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
+	chip->usb_type = POWER_SUPPLY_USB_TYPE_SDP;
+#endif
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+	chip->qc3p_type = QC3P_POWER_NONE;
+#endif
+	break;
+
+	case 0x3: // CDP
+	chip->charger_type = POWER_SUPPLY_TYPE_USB_CDP;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
+	chip->usb_type = POWER_SUPPLY_USB_TYPE_CDP;
+#endif
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+	chip->qc3p_type = QC3P_POWER_NONE;
+#endif
+	break;
+
+	case 0x4: // DCP
 	chip->charger_type = POWER_SUPPLY_TYPE_USB_DCP;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 	chip->usb_type = POWER_SUPPLY_USB_TYPE_DCP;
@@ -618,8 +646,9 @@ static void wt6670f_get_charger_type_func_work(struct work_struct *work)
 	chip->qc3p_type = QC3P_POWER_NONE;
 #endif
 	break;
-	case 0x6:
-	chip->charger_type = POWER_SUPPLY_TYPE_USB_DCP;
+
+	case 0x5: // QC2.0
+	chip->charger_type = POWER_SUPPLY_TYPE_USB_QC2;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 	chip->usb_type = POWER_SUPPLY_USB_TYPE_DCP;
 #endif
@@ -627,8 +656,19 @@ static void wt6670f_get_charger_type_func_work(struct work_struct *work)
 	chip->qc3p_type = QC3P_POWER_NONE;
 #endif
 	break;
-	case 0x8:
-	chip->charger_type = POWER_SUPPLY_TYPE_USB_DCP;
+
+	case 0x6: // QC3.0
+	chip->charger_type = POWER_SUPPLY_TYPE_USB_QC3;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
+	chip->usb_type = POWER_SUPPLY_USB_TYPE_DCP;
+#endif
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+	chip->qc3p_type = QC3P_POWER_15W;
+#endif
+	break;
+
+	case 0x8: // QC3+ 18W
+	chip->charger_type = POWER_SUPPLY_TYPE_USB_QC3P;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 	chip->usb_type = POWER_SUPPLY_USB_TYPE_DCP;
 #endif
@@ -636,8 +676,9 @@ static void wt6670f_get_charger_type_func_work(struct work_struct *work)
 	chip->qc3p_type = QC3P_POWER_18W;
 #endif
 	break;
-	case 0x9:
-	chip->charger_type = POWER_SUPPLY_TYPE_USB_DCP;
+
+	case 0x9: // QC3+ 27W
+	chip->charger_type = POWER_SUPPLY_TYPE_USB_QC3P;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 	chip->usb_type = POWER_SUPPLY_USB_TYPE_DCP;
 #endif
@@ -652,10 +693,6 @@ static void wt6670f_get_charger_type_func_work(struct work_struct *work)
 #else
 	Charger_Detect_Release();
 #endif
-
-	/* set curr default after BC1.2*/
-	charger_dev_set_charging_current(chip->charger_dev, -1);
-	charger_dev_set_input_current(chip->charger_dev, -1);
 
 	power_supply_changed(chip->qc_phy_psy);
 }
@@ -1354,21 +1391,21 @@ static int wt6670f_psy_notifier_cb(struct notifier_block *nb,
 		} else {
 			if (val.intval == POWER_SUPPLY_USB_TYPE_DCP) {
 				if (chip->qc3p_type == QC3P_POWER_NONE && chip->first_detect_dcp == true) {
-					pr_info("detect DCP and qc3+ not detected, try to qc3+ detection\n");
+					pr_info("detect DCP and QC3P not detected, try to QC3P detection\n");
 					schedule_delayed_work(&chip->get_charger_type_work, 0);
-
+					msleep(4000);
 					if (chip->qc3p_type == QC3P_POWER_15W) {
-						pr_info("detect qc3.0 type, reset vbus to default\n");
-						gpio_direction_output(chip->rst_gpio, 1);
+						pr_info("detect QC3 type, set vbus to %d mV\n", QC3_TARGE_VOLT);
+						wt6670f_set_qc3_volt_count((QC3_TARGE_VOLT - QC3_BASE_VOLT) / QC3_VOLT_STEP);
 					} else if (chip->qc3p_type == QC3P_POWER_18W
 						|| chip->qc3p_type == QC3P_POWER_27W
 						|| chip->qc3p_type == QC3P_POWER_40W) {
-						pr_info("detect qc3+ type\n");
+						pr_info("detect QC3P type\n");
 						qc3p_charger_ready = true;
-					} else if (chip->charger_type == TINNO_POWER_SUPPLY_TYPE_USB_HVDCP
+					} else if (chip->charger_type == POWER_SUPPLY_TYPE_USB_QC2
 								&& chip->qc3p_type == QC3P_POWER_NONE) {
 						gpio_direction_output(chip->rst_gpio, 1);
-						pr_info("get HVDCP reset to DCP\n");
+						pr_info("get QC2 reset to DCP\n");
 					} else if (chip->charger_type == POWER_SUPPLY_TYPE_USB_DCP
 								&& chip->qc3p_type == QC3P_POWER_NONE) {
 						pr_info("only support DCP adapter, Ignore next detection\n");
@@ -1377,14 +1414,14 @@ static int wt6670f_psy_notifier_cb(struct notifier_block *nb,
 					}
 					power_supply_changed(chip->qc_phy_psy);
 				} else {
-					pr_info("qc3+ or qc3.0 already detected done, Ignore detection\n");
+					pr_info("QC3P or QC3 already detected done, Ignore detection\n");
 				}
 			} else if (val.intval != POWER_SUPPLY_USB_TYPE_UNKNOWN) {
-				pr_info("Non-DCP, Ignore qc3+ detection\n");
+				pr_info("Non-DCP, Ignore QC3P detection\n");
+				power_supply_changed(chip->qc_phy_psy);
 			} else {
-				pr_info("removed charger, reset qc3p_type\n");
-				chip->qc3p_type = QC3P_POWER_NONE;
-				chip->first_detect_dcp = true;
+				pr_info("removed charger, reset all type\n");
+				wt6670f_reset_charger_type();
 			}
 		}
 	}
@@ -1461,7 +1498,7 @@ static int wt6670f_get_property(struct power_supply *psy,
 }
 
 static char *wt6670f_usb_supplied_to[] = {
-	"usb",
+	"battery",
 };
 
 static enum power_supply_property wt6670f_props[] = {

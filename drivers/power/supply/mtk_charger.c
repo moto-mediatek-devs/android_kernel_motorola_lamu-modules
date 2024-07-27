@@ -66,6 +66,12 @@
 #include "mtk_charger.h"
 #include "mtk_battery.h"
 
+/* TN Begin modified by hao.jia/809321 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+#include "../../../oem/tinno_charger/tinno_charger.h"
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by hao.jia/809321 20240729 CR/EKLAMU-202 */
+
 /* TN Begin modified by hao.jia/809321 20240717 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
 #include "../../../oem/devinfo/dev_info.h"
@@ -106,7 +112,6 @@ struct tag_bootmode {
 #if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
 #define HVDCP_TARGE_VOLT  6000 //mV
 #define HVDCP_MAX_VOLT    (HVDCP_TARGE_VOLT + 200) //mV
-int hvdcp_charging_mode = 0;
 static bool first_insert = true;
 bool is_hvdcp_charger_ready = false;
 EXPORT_SYMBOL(is_hvdcp_charger_ready);
@@ -3360,7 +3365,7 @@ static int hvdcp_charging(struct mtk_charger *info)
 
 		if (vbus_volt_new >= HVDCP_TARGE_VOLT) {
 			chr_err("%s vbus new >= %d, vbus voltage: %d\n", __func__, HVDCP_TARGE_VOLT, vbus_volt_new);
-			hvdcp_charging_mode = 1;
+			info->ext_chr_type = POWER_SUPPLY_TYPE_USB_QC3;
 			break;
 		}
 	}
@@ -3401,23 +3406,9 @@ static int hvdcp_charger_detect_notifier_cb(struct notifier_block *nb,
 		return NOTIFY_DONE;
 	}
 
-
-	if (oem_pcba_charge_power() == CHARGE_POWER_33W) {
-		if (IS_ERR_OR_NULL(info->hvdcp_logic_psy)) {
-			info->hvdcp_logic_psy = power_supply_get_by_name("qc_phy_z350");
-			if (IS_ERR_OR_NULL(info->hvdcp_logic_psy)) {
-				info->hvdcp_logic_psy = power_supply_get_by_name("qc_phy_wt6670f");
-				if (IS_ERR_OR_NULL(info->hvdcp_logic_psy)) {
-					chr_err("%s: failed to get qc phy device\n", __func__);
-					return NOTIFY_DONE;
-				}
-			}
-		}
-	}
-
-	if (psy == info->chg_psy || psy == info->hvdcp_logic_psy) {
+	if (psy == info->chg_psy) {
 		chr_err("%s: %s first insert cable\n", __func__, first_insert ? "is" : "not");
-		if (first_insert) {
+		if (info->ext_chr_type != POWER_SUPPLY_TYPE_USB_QC3 && first_insert) {
 			ret = power_supply_get_property(info->chg_psy,
 							POWER_SUPPLY_PROP_USB_TYPE, &val);
 			if (ret < 0) {
@@ -3425,16 +3416,8 @@ static int hvdcp_charger_detect_notifier_cb(struct notifier_block *nb,
 			} else {
 				chr_type = val.intval;
 				if (chr_type == POWER_SUPPLY_USB_TYPE_DCP) {
-					if (oem_pcba_charge_power() == CHARGE_POWER_33W) {
-						chr_err("%s: found 33W device, is_hvdcp_charger_ready:%d\n", __func__, is_hvdcp_charger_ready);
-						if (is_hvdcp_charger_ready) {
-							chr_err("%s: detect hvdcp charger, try to tuning voltage\n", __func__);
-							charger_dev_set_dp_voltage(info->chg1_dev, 600000);
-							schedule_delayed_work(&info->hvdcp_work, msecs_to_jiffies(1500));
-							first_insert = false;
-						}
-					} else {
-						chr_err("%s: found 18W device, try to detect hvdcp charger\n", __func__);
+					if (oem_pcba_charge_power() == CHARGE_POWER_18W) {
+						chr_err("%s: found 18W device, try to detect QC3 charger\n", __func__);
 						charger_dev_set_dp_voltage(info->chg1_dev, 600000);
 						schedule_delayed_work(&info->hvdcp_work, msecs_to_jiffies(1500));
 						first_insert = false;
@@ -3501,10 +3484,15 @@ static int mtk_charger_plug_out(struct mtk_charger *info)
 	charger_dev_set_input_current(info->chg1_dev, 100000);
 	charger_dev_set_mivr(info->chg1_dev, info->data.min_charger_voltage);
 	charger_dev_plug_out(info->chg1_dev);
+/*TN Begin modified by hao.jia/809321 20240729 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	info->ext_chr_type = POWER_SUPPLY_TYPE_UNKNOWN;
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/*TN End modified by hao.jia/809321 20240729 CR/EKLAMU-202*/
+
 /* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
 	first_insert = true;
-	hvdcp_charging_mode = 0;
 	is_hvdcp_charger_ready = false;
 	cancel_delayed_work(&info->hvdcp_work);
 	chr_err("%s: cancel hvdcp work\n", __func__);
@@ -3878,6 +3866,16 @@ static char *dump_charger_type(int chg_type, int usb_type)
 		return "usb-h";
 	case POWER_SUPPLY_TYPE_USB_DCP:
 		return "std";
+/* TN Begin modified by hao.jia/809321 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	case POWER_SUPPLY_TYPE_USB_QC2:
+		return "QC2.0";
+	case POWER_SUPPLY_TYPE_USB_QC3:
+		return "QC3.0";
+	case POWER_SUPPLY_TYPE_USB_QC3P:
+		return "QC3+";
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by hao.jia/809321 20240729 CR/EKLAMU-202 */
 	//case POWER_SUPPLY_TYPE_USB_FLOAT:
 	//	return "nonstd";
 	default:

@@ -7,11 +7,12 @@
 #include <linux/slab.h>
 #include <linux/wait.h>
 #include <linux/reboot.h>
-#include "../../drivers/power/supply/mtk_charger_algorithm_class.h"
+#include "mtk_charger_algorithm_class.h"
 #include "turbo_charger.h"
-#include "../../drivers/power/supply/charger_class.h"
+#include "charger_class.h"
 #include <linux/version.h>
 
+#include "tinno_charger.h"
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
 #include <dev_info.h>
 #endif

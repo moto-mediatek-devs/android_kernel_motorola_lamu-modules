@@ -59,11 +59,11 @@
 
 #include "mtk_charger.h"
 
-/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
-extern int hvdcp_charging_mode;
-#endif
-/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+/* TN Begin modified by hao.jia/809321 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+#include "../../../oem/tinno_charger/tinno_charger.h"
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by hao.jia/809321 20240729 CR/EKLAMU-202 */
 
 /*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
@@ -267,18 +267,6 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		}
 #endif /* CONFIG_OEM_TURBO_CHARGER */
 /*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
-
-/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
-		if (hvdcp_charging_mode) {
-			chr_info("[%s]: for HVDCP mode, set charge current:%d, input current:%d\n",
-						__func__, info->data.hvdcp_charging_current_limit, info->data.hvdcp_input_current_limit);
-			pdata->charging_current_limit = info->data.hvdcp_charging_current_limit;
-			pdata->input_current_limit = info->data.hvdcp_input_current_limit;
-		}
-#endif
-/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
-
 	} else if (info->chr_type == POWER_SUPPLY_TYPE_USB &&
 	    info->usb_type == POWER_SUPPLY_USB_TYPE_DCP) {
 		/* NONSTANDARD_CHARGER */
@@ -287,6 +275,19 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		pdata->charging_current_limit =
 			info->data.usb_charger_current;
 		is_basic = true;
+/* TN Begin modified by hao.jia/809321 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	} else if (info->chr_type == POWER_SUPPLY_TYPE_USB_QC3) {
+		/* QC3.0 Charger */
+		chr_info("[%s]: for QC3 mode, set charge current:%d, input current:%d\n",
+						__func__, info->data.hvdcp_charging_current_limit, info->data.hvdcp_input_current_limit);
+		pdata->input_current_limit =
+			info->data.hvdcp_input_current_limit;
+		pdata->charging_current_limit =
+			info->data.hvdcp_charging_current_limit;
+		is_basic = true;
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by hao.jia/809321 20240729 CR/EKLAMU-202 */
 	} else {
 		/*chr_type && usb_type cannot match above, set 500mA*/
 		pdata->input_current_limit =
@@ -338,9 +339,9 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 			&& info->chr_type == POWER_SUPPLY_TYPE_USB)
 			chr_debug("USBIF & STAND_HOST skip current check\n");
 		else {
-/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
-			if (hvdcp_charging_mode) {
+/* TN Begin modified by hao.jia/809321 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+			if (info->chr_type == POWER_SUPPLY_TYPE_USB_QC3) {
 				chr_info("[%s] charging_current_limit:%d, hvdcp_temp_charging_current_limit:%d\n",
 						__func__, pdata->charging_current_limit, pdata->hvdcp_temp_charging_current_limit);
 				if (pdata->hvdcp_temp_charging_current_limit < pdata->charging_current_limit) {
@@ -349,7 +350,7 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 				}
 			} else
 #endif
-/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+/* TN End modified by hao.jia/860715 20240729 CR/EKLAMU-202 */
 			{
 /* TN Begin modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
 				chr_info("[%s] charging_current_limit:%d, temp_charging_current_limit:%d\n",

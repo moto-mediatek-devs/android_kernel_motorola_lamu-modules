@@ -62,6 +62,16 @@
 
 #include "mtk_charger.h"
 
+/* TN Begin modified by hao.jia/809321 20240727 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include "../../../oem/devinfo/dev_info.h"
+#endif /* CONFIG_OEM_DEVINFO */
+
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+#include "../../../oem/tinno_charger/tinno_charger.h"
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by hao.jia/809321 20240727 CR/EKLAMU-202 */
+
 int get_uisoc(struct mtk_charger *info)
 {
 	union power_supply_propval prop = {0};
@@ -422,6 +432,53 @@ bool is_charger_exist(struct mtk_charger *info)
 	return ret;
 }
 
+/* TN Begin modified by hao.jia/809321 20240727 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+int get_ext_charger_type(struct mtk_charger *info)
+{
+	union power_supply_propval prop = {0};
+	union power_supply_propval prop2 = {0};
+	static struct power_supply *qc_phy_psy;
+	int ret = 0;
+
+	qc_phy_psy = info->qc_phy_psy;
+
+	if (IS_ERR_OR_NULL(qc_phy_psy)) {
+		chr_err("%s retry to get qc_phy_psy\n", __func__);
+		qc_phy_psy = power_supply_get_by_name("qc_phy_z350");
+		if (IS_ERR_OR_NULL(qc_phy_psy)) {
+			qc_phy_psy = power_supply_get_by_name("qc_phy_wt6670f");
+			if (IS_ERR_OR_NULL(qc_phy_psy)) {
+				chr_err("%s failed to get qc_phy_psy\n", __func__);
+				return POWER_SUPPLY_TYPE_UNKNOWN;
+			} else {
+				info->qc_phy_psy = qc_phy_psy;
+			}
+		} else {
+			info->qc_phy_psy = qc_phy_psy;
+		}
+	}
+
+	ret = power_supply_get_property(qc_phy_psy,
+				POWER_SUPPLY_PROP_CHARGE_TYPE, &prop);
+	if (ret < 0) {
+		chr_err("%s: %d\n", __func__, ret);
+	}
+
+	ret = power_supply_get_property(qc_phy_psy,
+				POWER_SUPPLY_PROP_USB_TYPE, &prop2);
+	if (ret < 0) {
+		chr_err("%s: %d\n", __func__, ret);
+	}
+
+	chr_info("%s ext charger type:%d usb type:%d\n", __func__, prop.intval, prop2.intval);
+	info->ext_chr_type = prop.intval;
+
+	return info->ext_chr_type;
+}
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by hao.jia/809321 20240727 CR/EKLAMU-202 */
+
 int get_charger_type(struct mtk_charger *info)
 {
 	union power_supply_propval prop = {0};
@@ -466,6 +523,27 @@ int get_charger_type(struct mtk_charger *info)
 		prop.intval,
 		prop2.intval,
 		prop3.intval);
+
+/* TN Begin modified by hao.jia/809321 20240727 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_OEM_DEVINFO)
+	chr_err("%s chr_type:%d ext_chr_type:%d\n", __func__, prop2.intval, info->ext_chr_type);
+	if (oem_pcba_charge_power() == CHARGE_POWER_33W) {
+		get_ext_charger_type(info);
+		if (info->ext_chr_type != POWER_SUPPLY_TYPE_UNKNOWN)
+			return info->ext_chr_type;
+		else
+			return prop2.intval;
+	} else {
+		if (info->ext_chr_type == POWER_SUPPLY_TYPE_USB_QC3) {
+			if (prop2.intval == POWER_SUPPLY_TYPE_UNKNOWN) {
+				return POWER_SUPPLY_TYPE_UNKNOWN;
+			} else {
+				return POWER_SUPPLY_TYPE_USB_QC3;
+			}
+		}
+	}
+#endif /* CONFIG_OEM_TINNO_CHARGER && CONFIG_OEM_DEVINFO */
+/* TN End modified by hao.jia/809321 20240727 CR/EKLAMU-202 */
 
 	return prop2.intval;
 }

@@ -1336,10 +1336,14 @@ static void charger_detect_work_func(struct work_struct *work)
 		charger_detect_release(cx);
 	/*
 	 * due to the cx25890h will pull up the DP voltage to 0.6V after the DCP detected.
-	 * we should set Auto DPDM enable func to disable to pull down the DP voltage.
+	 * we should set Auto DPDM enable func to disable to pull down the DP voltage for QC3+ detection.
 	 */
 	} else if (cx->state.chrg_type == CX2589x_USB_DCP) {
-		cx2589x_update_bits(cx, CX2589x_REG_02, CX2589x_AUTO_DPDM_MASK, 0);
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+		if (oem_pcba_charge_power() == CHARGE_POWER_33W) {
+			cx2589x_update_bits(cx, CX2589x_REG_02, CX2589x_AUTO_DPDM_MASK, 0);
+		}
+#endif
 	}
 
 	pr_info("Update: chg_type = 0x%x, psy_usb_type = 0x%x\n", cx->chg_type, cx->psy_usb_type);

@@ -89,19 +89,6 @@ extern int turbo_charger_get_log_level(void);
 			pr_info("[TURBO_CHARGER]%s " fmt, __func__, ##__VA_ARGS__); \
 	} while (0)
 
-#define TINNO_POWER_SUPPLY_TYPE_USB_HVDCP		20
-#define TINNO_POWER_SUPPLY_TYPE_USB_HVDCP_3		21
-#define TINNO_POWER_SUPPLY_TYPE_USB_HVDCP_3P5		22
-#define TINNO_POWER_SUPPLY_TYPE_USB_FLOAT		23
-
-enum QC3P_POWER_TYPE {
-	QC3P_POWER_NONE = 0,
-	QC3P_POWER_15W,
-	QC3P_POWER_18W,
-	QC3P_POWER_27W,
-	QC3P_POWER_40W
-};
-
 struct turbo_charger_config {
 	int	bat_volt_lp_lmt;	/*bat volt loop limit*/
 	int	bat_curr_lp_lmt;
