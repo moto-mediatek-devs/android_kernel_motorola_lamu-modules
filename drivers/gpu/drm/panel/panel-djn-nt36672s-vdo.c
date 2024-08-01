@@ -943,6 +943,8 @@ static int djn_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 	if (!cb)
 		return -1;
 
+	pr_info("%s: level=%d\n", __func__,level);
+
 /* 	if (is_hbm & (level > 0x6b8)) {
 		pr_info("%s: Enter hbm mode,return 0! level=%x\n", __func__, level);
 		return 0;
