@@ -50,7 +50,6 @@ obj-$(CONFIG_DRM_PANEL_NT37801_CMD_FHD) += panel-nt37801-cmd-fhd.o
 obj-$(CONFIG_DRM_PANEL_NT37801_CMD_SPR) += panel-nt37801-cmd-spr.o
 obj-$(CONFIG_DRM_PANEL_NT37801_CMD_FHD_PLUS) += panel-nt37801-cmd-fhd-plus.o
 obj-$(CONFIG_DRM_PANEL_ALPHA_NT37706_VDO_120HZ) += panel-alpha-nt37706-vdo-120hz.o
-obj-$(CONFIG_DRM_PANEL_BOE_TS127QFMLL1DKP0) += rt4831a.o
 obj-$(CONFIG_DRM_PANEL_BOE_TS127QFMLL1DKP0) += panel-boe-ts127qfmll1dkp0.o
 obj-$(CONFIG_DRM_PANEL_HX83112B_AUO_CMD_RT5081) += panel-hx83112b-auo-cmd-60hz-rt5081.o
 obj-$(CONFIG_DRM_PANEL_HX83112B_AUO_VDO_RT5081) += panel-hx83112b-auo-vdo-60hz-rt5081.o
@@ -80,6 +79,8 @@ obj-$(CONFIG_DRM_PANEL_NT37707_BOE_FHDPLUS_CMD) += k6991v1_64_alpha/panel-nt3770
 obj-$(CONFIG_DRM_PANEL_RM692K0_VISIONOX_FHDPLUS_CMD) += k6991v1_64_alpha/panel-rm692k0-visionox-fhdplus-cmd.o
 obj-$(CONFIG_DRM_PANEL_NT37707_BOE_FHDPLUS_CMD_LTPS) += k6991v1_64_alpha/panel-nt37707-boe-fhdplus-cmd-ltps.o
 obj-$(CONFIG_DRM_PANEL_RM692K0_VSN_FHDPLUS_CMD_LTPS) += k6991v1_64_alpha/panel-rm692k0-vsn-fhdplus-cmd-ltps.o
+obj-$(CONFIG_DRM_PANEL_NT37707_BOE_FHDPLUS_CMD_LTPO) += k6991v1_64_alpha/panel-nt37707-boe-fhdplus-cmd-ltpo.o
+obj-$(CONFIG_DRM_PANEL_RM692J0_TM_FHDPLUS_CMD_LTPO) += k6991v1_64_alpha/panel-rm692j0-tm-fhdplus-cmd-ltpo.o
 endif
 
 obj-$(CONFIG_DRM_PANEL_DJIN_FT8057S_VDO) += panel-djin-ft8057s-vdo.o

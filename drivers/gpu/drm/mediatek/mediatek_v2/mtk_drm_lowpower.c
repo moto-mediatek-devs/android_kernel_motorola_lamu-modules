@@ -379,7 +379,7 @@ void mtk_drm_idlemgr_cpu_control(struct drm_crtc *crtc, int cmd, unsigned int da
 
 	DDPMSG("%s,crtc:%u mask:0x%x, freq:%uMhz, latency:%dus\n", __func__,
 		crtc_id, idlemgr_ctx->priv.cpu_mask,
-		(unsigned int)(idlemgr_ctx->priv.cpu_freq / 1000),
+		(unsigned int)(idlemgr_ctx->priv.cpu_freq / 1000U),
 		idlemgr_ctx->priv.cpu_dma_latency);
 	DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
 }
@@ -904,10 +904,12 @@ static void mtk_drm_vdo_mode_enter_idle(struct drm_crtc *crtc)
 	struct mtk_drm_private *priv = crtc->dev->dev_private;
 	struct mtk_crtc_state *state = to_mtk_crtc_state(crtc->state);
 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-	int i, j;
+	int i, j, avail_hrt = 0;
 	struct cmdq_pkt *handle;
 	struct cmdq_client *client = mtk_crtc->gce_obj.client[CLIENT_CFG];
 	struct mtk_ddp_comp *comp;
+	unsigned int avail_bw = 0, bw_base = 0;
+	unsigned int req_bw = avail_bw + 1;
 
 	mtk_crtc_pkt_create(&handle, crtc, client);
 
@@ -924,7 +926,19 @@ static void mtk_drm_vdo_mode_enter_idle(struct drm_crtc *crtc)
 		    !mtk_drm_dal_enable() &&
 		    !msync_is_on(priv, mtk_crtc->panel_ext->params,
 				 drm_crtc_index(crtc), state, state)) {
-			mtk_drm_idlemgr_wb_enter(mtk_crtc, NULL);
+			avail_hrt = layering_rule_get_available_hrt(crtc);
+			if (avail_hrt > 0) {
+				bw_base = mtk_drm_primary_frame_bw(crtc);
+				avail_bw = avail_hrt * bw_base / 100;
+				req_bw = mtk_crtc->qos_ctx->last_hrt_req + bw_base * 120 / 100;
+			}
+
+			if (req_bw < avail_bw)
+				mtk_drm_idlemgr_wb_enter(mtk_crtc, NULL);
+			else
+				DDPMSG("%s:[IWB cancel] avail_bw:%u(%d),req_bw:%u(%u+%u)\n",
+					__func__, avail_bw, avail_hrt, req_bw,
+					mtk_crtc->qos_ctx->last_hrt_req, bw_base);
 		}
 	}
 
@@ -1807,7 +1821,7 @@ int mtk_drm_idlemgr_init(struct drm_crtc *crtc, int index)
 			__func__, __LINE__, drm_crtc_index(crtc), mode,
 			idlemgr_ctx->priv.hw_async, idlemgr_ctx->priv.vblank_async,
 			idlemgr_ctx->priv.cpu_mask,
-			(unsigned int)(idlemgr_ctx->priv.cpu_freq / 1000),
+			(unsigned int)(idlemgr_ctx->priv.cpu_freq / 1000U),
 			idlemgr_ctx->priv.sram_sleep);
 		mtk_drm_idlemgr_bind_cpu(idlemgr->idlemgr_task, crtc, true);
 		mtk_drm_idlemgr_bind_cpu(idlemgr->kick_task, crtc, true);
@@ -2077,7 +2091,7 @@ static void mtk_drm_idlemgr_disable_crtc(struct drm_crtc *crtc)
 					"%s:async:%d,cpu:(0x%x,%uMhz,%dus),sram:%d,total:%lluus,detail:%s\n",
 					__func__, atomic_read(&idlemgr->async_enabled),
 					idlemgr_ctx->priv.cpu_mask,
-					(unsigned int)(idlemgr_ctx->priv.cpu_freq / 1000),
+					(unsigned int)(idlemgr_ctx->priv.cpu_freq / 1000U),
 					idlemgr_ctx->priv.cpu_dma_latency,
 					idlemgr_ctx->priv.sram_sleep,
 					cost, perf_string);
@@ -2231,7 +2245,8 @@ static void mtk_drm_idlemgr_enable_crtc(struct drm_crtc *crtc)
 		mtk_crtc_hw_block_ready(crtc);
 	}
 	if (mtk_drm_helper_get_opt(priv->helper_opt, MTK_DRM_OPT_OVL_BW_MONITOR) &&
-		priv->data->mmsys_id == MMSYS_MT6991 && crtc_id == 0)
+		(priv->data->mmsys_id == MMSYS_MT6991 ||
+		priv->data->mmsys_id == MMSYS_MT6899) && crtc_id == 0)
 		mtk_crtc_start_bwm_ratio_loop(crtc);
 
 	mtk_drm_idlemgr_perf_detail_check(perf_detail, crtc,
@@ -2350,7 +2365,7 @@ static void mtk_drm_idlemgr_enable_crtc(struct drm_crtc *crtc)
 					"%s:async:%d,cpu:(0x%x,%uMhz,%dus),sram:%d,total:%lluus,detail:%s\n",
 					__func__, atomic_read(&idlemgr->async_enabled),
 					idlemgr_ctx->priv.cpu_mask,
-					(unsigned int)(idlemgr_ctx->priv.cpu_freq / 1000),
+					(unsigned int)(idlemgr_ctx->priv.cpu_freq / 1000U),
 					idlemgr_ctx->priv.cpu_dma_latency,
 					idlemgr_ctx->priv.sram_sleep,
 					cost, perf_string);
@@ -2358,8 +2373,8 @@ static void mtk_drm_idlemgr_enable_crtc(struct drm_crtc *crtc)
 		}
 
 		if (perf_aee_timeout > 0 && cost > (unsigned long long)perf_aee_timeout * 1000) {
-			DDPAEE("[IDLE] perf drop:%lluus, timeout:%uus\n",
-				cost, (unsigned int)(perf_aee_timeout * 1000));
+			DDPAEE("[IDLE] perf drop:%lluus, timeout:%lluus\n",
+				cost, (unsigned long long)(perf_aee_timeout * 1000U));
 			perf_aee_timeout = 0;
 		}
 	}
@@ -2450,10 +2465,11 @@ static void mtk_drm_idlemgr_update_wb_bw(struct mtk_iwb_cb_data *cb_data)
 	unsigned int channel_hrt[BW_CHANNEL_NR] = {0};
 
 	/*clear ovl port BW*/
-	if (priv->data->mmsys_id == MMSYS_MT6989) {
+	if (priv->data->mmsys_id == MMSYS_MT6989 ||
+		priv->data->mmsys_id == MMSYS_MT6899) {
 		for_each_comp_in_crtc_target_path(comp, mtk_crtc, i, DDP_FIRST_PATH) {
 			if (cb_data->ovl && comp->id == cb_data->ovl->id) {
-				total_bw += bw_base * 125 / 100; //consider eff
+				total_bw += bw_base * 120 / 100; //consider eff
 				continue;
 			}
 

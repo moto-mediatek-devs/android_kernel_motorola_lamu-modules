@@ -77,10 +77,8 @@ mtk-mml-objs += mtk-mml-dpc.o
 # mml call sspm support
 mtk-mml-objs += mtk-mml-scmi.o
 
-ifeq ($(strip $(CONFIG_MTK_MML_DEBUG)),y)
 ifneq (,$(strip $(CONFIG_MMPROFILE)))
 mtk-mml-objs += mtk-mml-mmp.o
-endif
 endif
 
 ifneq ($(wildcard $(srctree)/$(src)/mtk-mml-tp-mt6983.c),)
@@ -140,4 +138,10 @@ endif
 ifeq ($(strip $(MGK_INTERNAL)),true)
 ccflags-y += -DMML_STASH_SUPPORT
 endif
+
+ifeq ($(strip $(MGK_INTERNAL)),true)
+ccflags-y += -DMML_IR_SUPPORT
+endif
+
+
 

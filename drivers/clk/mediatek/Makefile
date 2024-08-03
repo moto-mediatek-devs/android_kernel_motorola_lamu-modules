@@ -12,6 +12,7 @@ ifneq ($(wildcard $(srctree)/$(src)/clk-mt6781.c),)
 obj-$(CONFIG_COMMON_CLK_MT6781) += clk-mt6781.o
 obj-$(CONFIG_COMMON_CLK_MT6781) += clk-bringup.o
 obj-$(CONFIG_COMMON_CLK_MT6781) += clkdbg-mt6781.o
+obj-$(CONFIG_COMMON_CLK_MT6781) += clk-fmeter-mt6781.o
 obj-$(CONFIG_COMMON_CLK_MT6781) += clk-chk-mt6781.o
 clk-chk-mt6781-$(CONFIG_COMMON_CLK_MT6781) += clkchk-mt6781.o
 obj-$(CONFIG_COMMON_CLK_MT6781) += clk-mt6781-pg.o
@@ -259,6 +260,8 @@ endif
 ifneq ($(wildcard $(srctree)/$(src)/clk-mt6853.c),)
 obj-$(CONFIG_COMMON_CLK_MT6853) += clk-chk-mt6853.o
 clk-chk-mt6853-$(CONFIG_COMMON_CLK_MT6853) += clkchk-mt6853.o
+obj-$(CONFIG_COMMON_CLK_MT6853) += clk-mt6853-pg.o
+obj-$(CONFIG_COMMON_CLK_MT6853) += clk-fmeter-mt6853.o
 ifeq ($(CONFIG_DEBUG_FS), y)
 obj-$(CONFIG_COMMON_CLK_MT6853) += clk-dbg-mt6853.o
 clk-dbg-mt6853-$(CONFIG_COMMON_CLK_MT6853) += clkdbg-mt6853.o

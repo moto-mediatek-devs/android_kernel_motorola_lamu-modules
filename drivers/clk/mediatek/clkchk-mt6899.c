@@ -7,6 +7,7 @@
 #include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/io.h>
+#include <linux/mfd/syscon.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/seq_file.h>
@@ -31,15 +32,19 @@
 #include "clk-fmeter.h"
 #include "clk-mt6899-fmeter.h"
 
+#if IS_ENABLED(CONFIG_MTK_TINYSYS_VCP_SUPPORT)
+#include "vcp_status.h"
+#endif
+
 #define BUG_ON_CHK_ENABLE		0
 #define CHECK_VCORE_FREQ		0
 #define CG_CHK_PWRON_ENABLE		0
 
-#define HWV_INT_PLL_TRIGGER		0x0004
-#define HWV_INT_CG_TRIGGER		0x10001
+#define HWV_INT_PLL_TRIGGER		0x40000
+#define HWV_INT_CG_TRIGGER		0x10000
 
 #define HWV_DOMAIN_KEY			0x055C
-#define HWV_IRQ_STATUS			0x0500
+#define HWV_IRQ_STATUS			0x1500
 #define HWV_CG_SET(xpu, id)		((0x0200 * (xpu)) + (id * 0x8))
 #define HWV_CG_STA(id)			(0x1800 + (id * 0x4))
 #define HWV_CG_EN(id)			(0x1900 + (id * 0x4))
@@ -62,6 +67,8 @@
 static DEFINE_SPINLOCK(clk_trace_lock);
 static unsigned int clk_event[EVT_LEN];
 static unsigned int evt_cnt, suspend_cnt;
+static struct regmap *mm_hwv_regmap;
+static bool clkchk_bug_on_flag = true;
 
 /* xpu*/
 enum {
@@ -384,152 +391,141 @@ enum {
 	CLK_MM_SMI_SUB_COMM0_CG = 298,
 	CLK_MM_DISP_RSZ0_MOUT_RELAY_CG = 299,
 	CLK_MM_DISP_RSZ1_MOUT_RELAY_CG = 300,
-	CLK_MMINFRA_AO_GCE_D_CG = 301,
-	CLK_MMINFRA_AO_GCE_M_CG = 302,
-	CLK_MMINFRA_AO_GCE_26M_CG = 303,
-	CLK_OVLSYS_CONFIG_CG = 304,
-	CLK_OVL_DISP_FAKE_ENG0_CG = 305,
-	CLK_OVL_DISP_FAKE_ENG1_CG = 306,
-	CLK_OVL_DISP_MUTEX0_CG = 307,
-	CLK_OVL_DISP_OVL0_2L_CG = 308,
-	CLK_OVL_DISP_OVL1_2L_CG = 309,
-	CLK_OVL_DISP_OVL2_2L_CG = 310,
-	CLK_OVL_DISP_OVL3_2L_CG = 311,
-	CLK_OVL_DISP_RSZ1_CG = 312,
-	CLK_OVL_MDP_RSZ0_CG = 313,
-	CLK_OVL_DISP_WDMA0_CG = 314,
-	CLK_OVL_DISP_UFBC_WDMA0_CG = 315,
-	CLK_OVL_DISP_WDMA2_CG = 316,
-	CLK_OVL_DISP_DLI_ASYNC0_CG = 317,
-	CLK_OVL_DISP_DLI_ASYNC1_CG = 318,
-	CLK_OVL_DISP_DLI_ASYNC2_CG = 319,
-	CLK_OVL_DISP_DL0_ASYNC0_CG = 320,
-	CLK_OVL_DISP_DL0_ASYNC1_CG = 321,
-	CLK_OVL_DISP_DL0_ASYNC2_CG = 322,
-	CLK_OVL_DISP_DL0_ASYNC3_CG = 323,
-	CLK_OVL_DISP_DL0_ASYNC4_CG = 324,
-	CLK_OVL_DISP_DL0_ASYNC5_CG = 325,
-	CLK_OVL_DISP_DL0_ASYNC6_CG = 326,
-	CLK_OVL_INLINEROT0_CG = 327,
-	CLK_OVL_SMI_SUB_COMM0_CG = 328,
-	CLK_OVL_DISP_Y2R0_CG = 329,
-	CLK_OVL_DISP_Y2R1_CG = 330,
-	CLK_OVL_DISP_OVL4_2L_CG = 331,
-	CLK_IMPC_I2C10_CG = 332,
-	CLK_IMPC_I2C11_CG = 333,
-	CLK_IMPC_I2C12_CG = 334,
-	CLK_IMPC_I2C13_CG = 335,
-	CLK_IMPE_I3C4_CG = 336,
-	CLK_IMPE_I3C8_CG = 337,
-	CLK_IMPEN_I3C2_CG = 338,
-	CLK_IMPES_I3C9_CG = 339,
-	CLK_IMPN_I2C3_CG = 340,
-	CLK_IMPN_I2C5_CG = 341,
-	CLK_IMPS_I3C0_CG = 342,
-	CLK_IMPS_I3C1_CG = 343,
-	CLK_IMPS_I3C7_CG = 344,
-	CLK_IMPW_I2C6_CG = 345,
-	CLK_PERAOP_UART0_CG = 346,
-	CLK_PERAOP_UART1_CG = 347,
-	CLK_PERAOP_UART2_CG = 348,
-	CLK_PERAOP_UART3_CG = 349,
-	CLK_PERAOP_PWM_H_CG = 350,
-	CLK_PERAOP_PWM_B_CG = 351,
-	CLK_PERAOP_PWM_FB1_CG = 352,
-	CLK_PERAOP_PWM_FB2_CG = 353,
-	CLK_PERAOP_PWM_FB3_CG = 354,
-	CLK_PERAOP_PWM_FB4_CG = 355,
-	CLK_PERAOP_SPI0_B_CG = 356,
-	CLK_PERAOP_SPI1_B_CG = 357,
-	CLK_PERAOP_SPI2_B_CG = 358,
-	CLK_PERAOP_SPI3_B_CG = 359,
-	CLK_PERAOP_SPI4_B_CG = 360,
-	CLK_PERAOP_SPI5_B_CG = 361,
-	CLK_PERAOP_SPI6_B_CG = 362,
-	CLK_PERAOP_SPI7_B_CG = 363,
-	CLK_PERAOP_DMA_B_CG = 364,
-	CLK_PERAOP_SSUSB0_FRMCNT_CG = 365,
-	CLK_PERAOP_MSDC1_CG = 366,
-	CLK_PERAOP_MSDC1_F_CG = 367,
-	CLK_PERAOP_MSDC1_H_CG = 368,
-	CLK_PERAOP_MSDC2_CG = 369,
-	CLK_PERAOP_MSDC2_F_CG = 370,
-	CLK_PERAOP_MSDC2_H_CG = 371,
-	CLK_PERAOP_AUDIO_SLV_CG = 372,
-	CLK_PERAOP_AUDIO_MST_CG = 373,
-	CLK_PERAOP_AUDIO_INTBUS_CG = 374,
-	CLK_UFSAO_UNIPRO_SYS_CG = 375,
-	CLK_UFSAO_U_PHY_SAP_CG = 376,
-	CLK_UFSAO_U_PHY_TOP_AHB_S_BUSCK_CG = 377,
-	CLK_UFSAO_U_AO_FREE_26M_CG = 378,
-	CLK_UFSPDN_UFSHCI_UFS_CG = 379,
-	CLK_UFSPDN_UFSHCI_AES_CG = 380,
-	CLK_UFSPDN_UFSHCI_U_AHB_CG = 381,
-	CLK_UFSPDN_UFSHCI_U_AXI_CG = 382,
-	CLK_UFSPDN_U_FREE_26M_CG = 383,
-	CLK_MDP1_MDP_MUTEX0_CG = 384,
-	CLK_MDP1_APB_BUS_CG = 385,
-	CLK_MDP1_SMI0_CG = 386,
-	CLK_MDP1_MDP_RDMA0_CG = 387,
-	CLK_MDP1_MDP_RDMA2_CG = 388,
-	CLK_MDP1_MDP_HDR0_CG = 389,
-	CLK_MDP1_MDP_AAL0_CG = 390,
-	CLK_MDP1_MDP_RSZ0_CG = 391,
-	CLK_MDP1_MDP_TDSHP0_CG = 392,
-	CLK_MDP1_MDP_COLOR0_CG = 393,
-	CLK_MDP1_MDP_WROT0_CG = 394,
-	CLK_MDP1_MDP_FAKE_ENG0_CG = 395,
-	CLK_MDP1_MDP_DLI_ASYNC0_CG = 396,
-	CLK_MDP1_APB_DB_CG = 397,
-	CLK_MDP1_MDP_RSZ2_CG = 398,
-	CLK_MDP1_MDP_WROT2_CG = 399,
-	CLK_MDP1_MDP_DLO_ASYNC0_CG = 400,
-	CLK_MDP1_MDP_BIRSZ0_CG = 401,
-	CLK_MDP1_MDP_C3D0_CG = 402,
-	CLK_MDP1_MDP_FG0_CG = 403,
-	CLK_MDP_MUTEX0_CG = 404,
-	CLK_MDP_APB_BUS_CG = 405,
-	CLK_MDP_SMI0_CG = 406,
-	CLK_MDP_RDMA0_CG = 407,
-	CLK_MDP_RDMA2_CG = 408,
-	CLK_MDP_HDR0_CG = 409,
-	CLK_MDP_AAL0_CG = 410,
-	CLK_MDP_RSZ0_CG = 411,
-	CLK_MDP_TDSHP0_CG = 412,
-	CLK_MDP_COLOR0_CG = 413,
-	CLK_MDP_WROT0_CG = 414,
-	CLK_MDP_FAKE_ENG0_CG = 415,
-	CLK_MDP_APB_DB_CG = 416,
-	CLK_MDP_BIRSZ0_CG = 417,
-	CLK_MDP_C3D0_CG = 418,
-	CLK_VDE2_VDEC_CKEN_CG = 419,
-	CLK_VDE2_VDEC_ACTIVE_CG = 420,
-	CLK_VDE2_VDEC_CKEN_ENG_CG = 421,
-	CLK_VDE2_LAT_CKEN_CG = 422,
-	CLK_VDE2_LAT_ACTIVE_CG = 423,
-	CLK_VDE2_LAT_CKEN_ENG_CG = 424,
-	CLK_VDE2_LARB1_CKEN_CG = 425,
-	CLK_VDE1_VDEC_CKEN_CG = 426,
-	CLK_VDE1_VDEC_ACTIVE_CG = 427,
-	CLK_VDE1_VDEC_CKEN_ENG_CG = 428,
-	CLK_VDE1_LAT_CKEN_CG = 429,
-	CLK_VDE1_LAT_ACTIVE_CG = 430,
-	CLK_VDE1_LAT_CKEN_ENG_CG = 431,
-	CLK_VDE1_LARB1_CKEN_CG = 432,
-	CLK_VEN1_CKE0_LARB_CG = 433,
-	CLK_VEN1_CKE1_VENC_CG = 434,
-	CLK_VEN1_CKE2_JPGENC_CG = 435,
-	CLK_VEN1_CKE3_JPGDEC_CG = 436,
-	CLK_VEN1_CKE4_JPGDEC_C1_CG = 437,
-	CLK_VEN1_CKE5_GALS_CG = 438,
-	CLK_VEN1_CKE6_GALS_SRAM_CG = 439,
-	CLK_VEN2_CKE0_LARB_CG = 440,
-	CLK_VEN2_CKE1_VENC_CG = 441,
-	CLK_VEN2_CKE2_JPGENC_CG = 442,
-	CLK_VEN2_CKE3_JPGDEC_CG = 443,
-	CLK_VEN2_CKE5_GALS_CG = 444,
-	CLK_VEN2_CKE6_GALS_SRAM_CG = 445,
-	TRACE_CLK_NUM = 446,
+	CLK_OVLSYS_CONFIG_CG = 301,
+	CLK_OVL_DISP_FAKE_ENG0_CG = 302,
+	CLK_OVL_DISP_FAKE_ENG1_CG = 303,
+	CLK_OVL_DISP_MUTEX0_CG = 304,
+	CLK_OVL_DISP_OVL0_2L_CG = 305,
+	CLK_OVL_DISP_OVL1_2L_CG = 306,
+	CLK_OVL_DISP_OVL2_2L_CG = 307,
+	CLK_OVL_DISP_OVL3_2L_CG = 308,
+	CLK_OVL_DISP_RSZ1_CG = 309,
+	CLK_OVL_MDP_RSZ0_CG = 310,
+	CLK_OVL_DISP_WDMA0_CG = 311,
+	CLK_OVL_DISP_UFBC_WDMA0_CG = 312,
+	CLK_OVL_DISP_WDMA2_CG = 313,
+	CLK_OVL_DISP_DLI_ASYNC0_CG = 314,
+	CLK_OVL_DISP_DLI_ASYNC1_CG = 315,
+	CLK_OVL_DISP_DLI_ASYNC2_CG = 316,
+	CLK_OVL_DISP_DL0_ASYNC0_CG = 317,
+	CLK_OVL_DISP_DL0_ASYNC1_CG = 318,
+	CLK_OVL_DISP_DL0_ASYNC2_CG = 319,
+	CLK_OVL_DISP_DL0_ASYNC3_CG = 320,
+	CLK_OVL_DISP_DL0_ASYNC4_CG = 321,
+	CLK_OVL_DISP_DL0_ASYNC5_CG = 322,
+	CLK_OVL_DISP_DL0_ASYNC6_CG = 323,
+	CLK_OVL_INLINEROT0_CG = 324,
+	CLK_OVL_SMI_SUB_COMM0_CG = 325,
+	CLK_OVL_DISP_Y2R0_CG = 326,
+	CLK_OVL_DISP_Y2R1_CG = 327,
+	CLK_OVL_DISP_OVL4_2L_CG = 328,
+	CLK_IMPC_I2C10_CG = 329,
+	CLK_IMPC_I2C11_CG = 330,
+	CLK_IMPC_I2C12_CG = 331,
+	CLK_IMPC_I2C13_CG = 332,
+	CLK_IMPE_I3C4_CG = 333,
+	CLK_IMPE_I3C8_CG = 334,
+	CLK_IMPEN_I3C2_CG = 335,
+	CLK_IMPES_I3C9_CG = 336,
+	CLK_IMPN_I2C3_CG = 337,
+	CLK_IMPN_I2C5_CG = 338,
+	CLK_IMPS_I3C0_CG = 339,
+	CLK_IMPS_I3C1_CG = 340,
+	CLK_IMPS_I3C7_CG = 341,
+	CLK_IMPW_I2C6_CG = 342,
+	CLK_PERAOP_UART0_CG = 343,
+	CLK_PERAOP_UART1_CG = 344,
+	CLK_PERAOP_UART2_CG = 345,
+	CLK_PERAOP_UART3_CG = 346,
+	CLK_PERAOP_PWM_H_CG = 347,
+	CLK_PERAOP_PWM_B_CG = 348,
+	CLK_PERAOP_PWM_FB1_CG = 349,
+	CLK_PERAOP_PWM_FB2_CG = 350,
+	CLK_PERAOP_PWM_FB3_CG = 351,
+	CLK_PERAOP_PWM_FB4_CG = 352,
+	CLK_PERAOP_SPI0_B_CG = 353,
+	CLK_PERAOP_SPI1_B_CG = 354,
+	CLK_PERAOP_SPI2_B_CG = 355,
+	CLK_PERAOP_SPI3_B_CG = 356,
+	CLK_PERAOP_SPI4_B_CG = 357,
+	CLK_PERAOP_SPI5_B_CG = 358,
+	CLK_PERAOP_SPI6_B_CG = 359,
+	CLK_PERAOP_SPI7_B_CG = 360,
+	CLK_PERAOP_DMA_B_CG = 361,
+	CLK_PERAOP_SSUSB0_FRMCNT_CG = 362,
+	CLK_PERAOP_MSDC1_CG = 363,
+	CLK_PERAOP_MSDC1_F_CG = 364,
+	CLK_PERAOP_MSDC1_H_CG = 365,
+	CLK_PERAOP_MSDC2_CG = 366,
+	CLK_PERAOP_MSDC2_F_CG = 367,
+	CLK_PERAOP_MSDC2_H_CG = 368,
+	CLK_PERAOP_AUDIO_SLV_CG = 369,
+	CLK_PERAOP_AUDIO_MST_CG = 370,
+	CLK_PERAOP_AUDIO_INTBUS_CG = 371,
+	CLK_UFSAO_UNIPRO_SYS_CG = 372,
+	CLK_UFSAO_U_PHY_SAP_CG = 373,
+	CLK_UFSAO_U_PHY_TOP_AHB_S_BUSCK_CG = 374,
+	CLK_UFSPDN_UFSHCI_UFS_CG = 375,
+	CLK_UFSPDN_UFSHCI_AES_CG = 376,
+	CLK_UFSPDN_UFSHCI_U_AHB_CG = 377,
+	CLK_MDP1_MDP_MUTEX0_CG = 378,
+	CLK_MDP1_APB_BUS_CG = 379,
+	CLK_MDP1_SMI0_CG = 380,
+	CLK_MDP1_MDP_RDMA0_CG = 381,
+	CLK_MDP1_MDP_RDMA2_CG = 382,
+	CLK_MDP1_MDP_HDR0_CG = 383,
+	CLK_MDP1_MDP_AAL0_CG = 384,
+	CLK_MDP1_MDP_RSZ0_CG = 385,
+	CLK_MDP1_MDP_TDSHP0_CG = 386,
+	CLK_MDP1_MDP_COLOR0_CG = 387,
+	CLK_MDP1_MDP_WROT0_CG = 388,
+	CLK_MDP1_MDP_FAKE_ENG0_CG = 389,
+	CLK_MDP1_MDP_DLI_ASYNC0_CG = 390,
+	CLK_MDP1_APB_DB_CG = 391,
+	CLK_MDP1_MDP_RSZ2_CG = 392,
+	CLK_MDP1_MDP_WROT2_CG = 393,
+	CLK_MDP1_MDP_DLO_ASYNC0_CG = 394,
+	CLK_MDP1_MDP_BIRSZ0_CG = 395,
+	CLK_MDP1_MDP_C3D0_CG = 396,
+	CLK_MDP1_MDP_FG0_CG = 397,
+	CLK_MDP1_F26M_SLOW_CG = 398,
+	CLK_MDP_MUTEX0_CG = 399,
+	CLK_MDP_APB_BUS_CG = 400,
+	CLK_MDP_SMI0_CG = 401,
+	CLK_MDP_RDMA0_CG = 402,
+	CLK_MDP_RDMA2_CG = 403,
+	CLK_MDP_HDR0_CG = 404,
+	CLK_MDP_AAL0_CG = 405,
+	CLK_MDP_RSZ0_CG = 406,
+	CLK_MDP_TDSHP0_CG = 407,
+	CLK_MDP_COLOR0_CG = 408,
+	CLK_MDP_WROT0_CG = 409,
+	CLK_MDP_FAKE_ENG0_CG = 410,
+	CLK_MDP_APB_DB_CG = 411,
+	CLK_MDP_BIRSZ0_CG = 412,
+	CLK_MDP_C3D0_CG = 413,
+	CLK_MDP_F26M_SLOW_CG = 414,
+	CLK_VDE2_VDEC_CKEN_CG = 415,
+	CLK_VDE2_VDEC_ACTIVE_CG = 416,
+	CLK_VDE2_LAT_CKEN_CG = 417,
+	CLK_VDE1_VDEC_CKEN_CG = 418,
+	CLK_VDE1_VDEC_ACTIVE_CG = 419,
+	CLK_VDE1_LAT_CKEN_CG = 420,
+	CLK_VDE1_LAT_ACTIVE_CG = 421,
+	CLK_VEN1_CKE0_LARB_CG = 422,
+	CLK_VEN1_CKE1_VENC_CG = 423,
+	CLK_VEN1_CKE2_JPGENC_CG = 424,
+	CLK_VEN1_CKE3_JPGDEC_CG = 425,
+	CLK_VEN1_CKE4_JPGDEC_C1_CG = 426,
+	CLK_VEN1_CKE5_GALS_CG = 427,
+	CLK_VEN1_CKE6_GALS_SRAM_CG = 428,
+	CLK_VEN2_CKE0_LARB_CG = 429,
+	CLK_VEN2_CKE1_VENC_CG = 430,
+	CLK_VEN2_CKE2_JPGENC_CG = 431,
+	CLK_VEN2_CKE3_JPGDEC_CG = 432,
+	CLK_VEN2_CKE5_GALS_CG = 433,
+	CLK_VEN2_CKE6_GALS_SRAM_CG = 434,
+	TRACE_CLK_NUM = 435,
 };
 
 const char *trace_subsys_cgs[] = {
@@ -834,9 +830,6 @@ const char *trace_subsys_cgs[] = {
 	[CLK_MM_SMI_SUB_COMM0_CG] = "mm_ssc",
 	[CLK_MM_DISP_RSZ0_MOUT_RELAY_CG] = "mm_disp_rsz0_mout_relay",
 	[CLK_MM_DISP_RSZ1_MOUT_RELAY_CG] = "mm_disp_rsz1_mout_relay",
-	[CLK_MMINFRA_AO_GCE_D_CG] = "mminfra_ao_gce_d",
-	[CLK_MMINFRA_AO_GCE_M_CG] = "mminfra_ao_gce_m",
-	[CLK_MMINFRA_AO_GCE_26M_CG] = "mminfra_ao_gce_26m",
 	[CLK_OVLSYS_CONFIG_CG] = "ovlsys_config",
 	[CLK_OVL_DISP_FAKE_ENG0_CG] = "ovl_disp_fake_eng0",
 	[CLK_OVL_DISP_FAKE_ENG1_CG] = "ovl_disp_fake_eng1",
@@ -911,12 +904,9 @@ const char *trace_subsys_cgs[] = {
 	[CLK_UFSAO_UNIPRO_SYS_CG] = "ufsao_unipro_sys",
 	[CLK_UFSAO_U_PHY_SAP_CG] = "ufsao_u_phy_sap",
 	[CLK_UFSAO_U_PHY_TOP_AHB_S_BUSCK_CG] = "ufsao_u_phy_ahb_s_busck",
-	[CLK_UFSAO_U_AO_FREE_26M_CG] = "ufsao_u_ao_26m_ck",
 	[CLK_UFSPDN_UFSHCI_UFS_CG] = "ufspdn_ufshci_ufs",
 	[CLK_UFSPDN_UFSHCI_AES_CG] = "ufspdn_ufshci_aes",
 	[CLK_UFSPDN_UFSHCI_U_AHB_CG] = "ufspdn_ufshci_u_ahb",
-	[CLK_UFSPDN_UFSHCI_U_AXI_CG] = "ufspdn_ufshci_u_axi",
-	[CLK_UFSPDN_U_FREE_26M_CG] = "ufspdn_u_26m_ck",
 	[CLK_MDP1_MDP_MUTEX0_CG] = "mdp1_mdp_mutex0",
 	[CLK_MDP1_APB_BUS_CG] = "mdp1_apb_bus",
 	[CLK_MDP1_SMI0_CG] = "mdp1_smi0",
@@ -937,6 +927,7 @@ const char *trace_subsys_cgs[] = {
 	[CLK_MDP1_MDP_BIRSZ0_CG] = "mdp1_mdp_birsz0",
 	[CLK_MDP1_MDP_C3D0_CG] = "mdp1_mdp_c3d0",
 	[CLK_MDP1_MDP_FG0_CG] = "mdp1_mdp_fg0",
+	[CLK_MDP1_F26M_SLOW_CG] = "mdp1_f26m_slow_ck",
 	[CLK_MDP_MUTEX0_CG] = "mdp_mutex0",
 	[CLK_MDP_APB_BUS_CG] = "mdp_apb_bus",
 	[CLK_MDP_SMI0_CG] = "mdp_smi0",
@@ -952,20 +943,14 @@ const char *trace_subsys_cgs[] = {
 	[CLK_MDP_APB_DB_CG] = "mdp_apb_db",
 	[CLK_MDP_BIRSZ0_CG] = "mdp_birsz0",
 	[CLK_MDP_C3D0_CG] = "mdp_c3d0",
+	[CLK_MDP_F26M_SLOW_CG] = "mdp_f26m_slow_ck",
 	[CLK_VDE2_VDEC_CKEN_CG] = "vde2_vdec_cken",
 	[CLK_VDE2_VDEC_ACTIVE_CG] = "vde2_vdec_active",
-	[CLK_VDE2_VDEC_CKEN_ENG_CG] = "vde2_vdec_cken_eng",
 	[CLK_VDE2_LAT_CKEN_CG] = "vde2_lat_cken",
-	[CLK_VDE2_LAT_ACTIVE_CG] = "vde2_lat_active",
-	[CLK_VDE2_LAT_CKEN_ENG_CG] = "vde2_lat_cken_eng",
-	[CLK_VDE2_LARB1_CKEN_CG] = "vde2_larb1_cken",
 	[CLK_VDE1_VDEC_CKEN_CG] = "vde1_vdec_cken",
 	[CLK_VDE1_VDEC_ACTIVE_CG] = "vde1_vdec_active",
-	[CLK_VDE1_VDEC_CKEN_ENG_CG] = "vde1_vdec_cken_eng",
 	[CLK_VDE1_LAT_CKEN_CG] = "vde1_lat_cken",
 	[CLK_VDE1_LAT_ACTIVE_CG] = "vde1_lat_active",
-	[CLK_VDE1_LAT_CKEN_ENG_CG] = "vde1_lat_cken_eng",
-	[CLK_VDE1_LARB1_CKEN_CG] = "vde1_larb1_cken",
 	[CLK_VEN1_CKE0_LARB_CG] = "ven1_larb",
 	[CLK_VEN1_CKE1_VENC_CG] = "ven1_venc",
 	[CLK_VEN1_CKE2_JPGENC_CG] = "ven1_jpgenc",
@@ -1065,7 +1050,7 @@ static struct regbase rb[] = {
 	[ufscfg_ao_bus] = REGBASE_V(0x112B8000, ufscfg_ao_bus, PD_NULL, CLK_NULL),
 	[ufsao] = REGBASE_V(0x112b8000, ufsao, PD_NULL, CLK_NULL),
 	[ufspdn] = REGBASE_V(0x112bb000, ufspdn, PD_NULL, CLK_NULL),
-	[impen] = REGBASE_V(0x11B71000, impen, PD_NULL, CLK_NULL),
+	[impen] = REGBASE_V(0x11B71000, impen, PD_NULL, "i2c_sel"),
 	[impe] = REGBASE_V(0x11CB2000, impe, PD_NULL, "i2c_sel"),
 	[imps] = REGBASE_V(0x11D03000, imps, PD_NULL, "i2c_sel"),
 	[impes] = REGBASE_V(0x11D11000, impes, PD_NULL, "i2c_sel"),
@@ -1107,7 +1092,6 @@ static struct regbase rb[] = {
 	[cam_yc] = REGBASE_V(0x1aae0000, cam_yc, MT6899_CHK_PD_CAM_MAIN, CLK_NULL),
 	[ccu] = REGBASE_V(0x1b800000, ccu, MT6899_CHK_PD_CAM_VCORE, CLK_NULL),
 	[camv] = REGBASE_V(0x1b805000, camv, MT6899_CHK_PD_CAM_MAIN, CLK_NULL),
-	[mminfra_ao_config] = REGBASE_V(0x1e8ff000, mminfra_ao_config, MT6899_CHK_PD_MM_INFRA, CLK_NULL),
 	[mdp] = REGBASE_V(0x1f000000, mdp, MT6899_CHK_PD_MML0, CLK_NULL),
 	[mdp1] = REGBASE_V(0x1f800000, mdp1, MT6899_CHK_PD_MML1, CLK_NULL),
 	[cci] = REGBASE_V(0xc030000, cci, PD_NULL, CLK_NULL),
@@ -1116,9 +1100,11 @@ static struct regbase rb[] = {
 	[cpu_b] = REGBASE_V(0xc030c00, cpu_b, PD_NULL, CLK_NULL),
 	[ptp] = REGBASE_V(0xc034000, ptp, PD_NULL, CLK_NULL),
 	[hwv] = REGBASE_V(0x10320000, hwv, PD_NULL, CLK_NULL),
-	[mm_hwv] = REGBASE_V(0x1ec3a000, mm_hwv, PD_NULL, CLK_NULL),
+	[mm_hwv] = REGBASE_V(0x1163a000, mm_hwv, PD_NULL, CLK_NULL),
 	[hfrp] = REGBASE_V(0x1163E000, hfrp, PD_NULL, CLK_NULL),
 	[hfrp_bus] = REGBASE_V(0x116A5000, hfrp_bus, PD_NULL, CLK_NULL),
+	[vlp_ao] = REGBASE_V(0x1C000000, vlp_ao, PD_NULL, CLK_NULL),
+	[mminfra_hwvote] = REGBASE_V(0x11645000, mminfra_hwvote, PD_NULL, CLK_NULL),
 	{},
 };
 
@@ -1213,6 +1199,8 @@ static struct regname rn[] = {
 	REGNAME(apmixed, 0x384, ADSPPLL_CON1),
 	REGNAME(apmixed, 0x388, ADSPPLL_CON2),
 	REGNAME(apmixed, 0x38c, ADSPPLL_CON3),
+	REGNAME(apmixed, 0x914, PLLEN_ALL),
+	REGNAME(apmixed, 0x920, PLL_DIV_RSTB_ALL),
 	/* INFRA_IFRBUS_AO_REG_BUS register */
 	REGNAME(infra_ifrbus_ao_reg_bus, 0x020, INFRASYS_PROTECT_EN_1),
 	REGNAME(infra_ifrbus_ao_reg_bus, 0x02c, INFRASYS_PROTECT_RDY_STA_1),
@@ -1456,15 +1444,14 @@ static struct regname rn[] = {
 	/* CAM_VCORE_R1A register */
 	REGNAME(camv, 0xA0, CAM_VCORE_CG_0),
 	REGNAME(camv, 0x2C, CAM_VCORE_SUBCOMM_DCM_DIS),
-	/* MMINFRA_AO_CONFIG register */
-	REGNAME(mminfra_ao_config, 0x100, MMINFRA_CG_0),
-	REGNAME(mminfra_ao_config, 0x110, MMINFRA_CG_1),
 	/* MDPSYS_CONFIG register */
 	REGNAME(mdp, 0x100, MDPSYS_CG_0),
 	REGNAME(mdp, 0x110, MDPSYS_CG_1),
+	REGNAME(mdp, 0x120, MDPSYS_CG_2),
 	/* MDPSYS1_CONFIG register */
 	REGNAME(mdp1, 0x100, MDPSYS_CG_0),
 	REGNAME(mdp1, 0x110, MDPSYS_CG_1),
+	REGNAME(mdp1, 0x120, MDPSYS_CG_2),
 	/* CCIPLL_PLL_CTRL register */
 	REGNAME(cci, 0x8, CCIPLL_CON0),
 	REGNAME(cci, 0xc, CCIPLL_CON1),
@@ -1930,6 +1917,20 @@ static struct regname rn[] = {
 	REGNAME(mm_hwv, 0x0990, HW_CCF_SSPM_PLL_SET),
 	REGNAME(mm_hwv, 0x0398, HW_CCF_TEE_MTCMOS_SET),
 	REGNAME(mm_hwv, 0x0390, HW_CCF_TEE_PLL_SET),
+	REGNAME(mm_hwv, 0x1f98, HWV_SW_RECORD),
+	/* VLP_AO register */
+	REGNAME(vlp_ao, 0x400, VLP_MMINFRA_VOTE),
+	REGNAME(vlp_ao, 0x410, VLP_DISP_VOTE),
+	REGNAME(vlp_ao, 0x420, HFRP_VLP_CTRL),
+	REGNAME(vlp_ao, 0x91C, VLP_VOTE_DONE),
+	/* MMInfra HWV register */
+	REGNAME(mminfra_hwvote, 0x100, SW_VOTE),
+	REGNAME(mminfra_hwvote, 0x110, HW_VOTE_INTEN),
+	REGNAME(mminfra_hwvote, 0x114, HW_VOTE_INTSTA),
+	REGNAME(mminfra_hwvote, 0x118, IRQ_STATUS),
+	REGNAME(mminfra_hwvote, 0x120, POWER_ON_OFF_MASK_0),
+	REGNAME(mminfra_hwvote, 0X124, POWER_ON_OFF_MASK_1),
+	REGNAME(mminfra_hwvote, 0x140, ALL_VOTE_STATUS),
 	{},
 };
 
@@ -1978,20 +1979,20 @@ struct pwr_data {
  */
 static struct pwr_data pvd_pwr_data[] = {
 	{"audiosys", afe, spm, 0x0E14},
-	{"camsys_ipe", camsys_ipe, spm, 0x0E68},
-	{"camsys_mraw", cam_mr, spm, 0x0E68},
-	{"camsys_rawa", cam_ra, spm, 0x0E68},
-	{"camsys_rawb", cam_rb, spm, 0x0E68},
-	{"camsys_rawc", cam_rc, spm, 0x0E68},
-	{"camsys_rmsa", camsys_rmsa, spm, 0x0E68},
-	{"camsys_rmsb", camsys_rmsb, spm, 0x0E68},
-	{"camsys_rmsc", camsys_rmsc, spm, 0x0E68},
-	{"camsys_yuva", cam_ya, spm, 0x0E68},
-	{"camsys_yuvb", cam_yb, spm, 0x0E68},
-	{"camsys_yuvc", cam_yc, spm, 0x0E68},
-	{"cam_main_r1a", cam_m, spm, 0x0E6C},
-	{"cam_vcore_r1a", camv, spm, 0x0E68},
-	{"ccu", ccu, spm, 0x0E6C},
+	{"camsys_ipe", camsys_ipe, spm, 0x0E58},
+	{"camsys_mraw", cam_mr, spm, 0x0E58},
+	{"camsys_rawa", cam_ra, spm, 0x0E5C},
+	{"camsys_rawb", cam_rb, spm, 0x0E60},
+	{"camsys_rawc", cam_rc, spm, 0x0E64},
+	{"camsys_rmsa", camsys_rmsa, spm, 0x0E5C},
+	{"camsys_rmsb", camsys_rmsb, spm, 0x0E60},
+	{"camsys_rmsc", camsys_rmsc, spm, 0x0E64},
+	{"camsys_yuva", cam_ya, spm, 0x0E5C},
+	{"camsys_yuvb", cam_yb, spm, 0x0E60},
+	{"camsys_yuvc", cam_yc, spm, 0x0E64},
+	{"cam_main_r1a", cam_m, spm, 0x0E68},
+	{"cam_vcore_r1a", camv, spm, 0x0E6C},
+	{"ccu", ccu, spm, 0x0E70},
 	{"dip_nr1_dip1", dip_nr1_dip1, spm, 0x0E3C},
 	{"dip_nr2_dip1", dip_nr2_dip1, spm, 0x0E3C},
 	{"dip_top_dip1", dip_top_dip1, spm, 0x0E3C},
@@ -2001,12 +2002,11 @@ static struct pwr_data pvd_pwr_data[] = {
 	{"img_vcore_d1a", img_v, spm, 0x0E40},
 	{"mdpsys1", mdp1, spm, 0x0E80},
 	{"mdpsys", mdp, spm, 0x0E7C},
-	{"mminfra_ao_config", mminfra_ao_config, spm, 0x0E90},
 	{"ovlsys_config", ovl, spm, 0x0E8C},
 	{"traw_cap_dip1", traw_cap_dip1, spm, 0x0E38},
 	{"traw_dip1", traw_dip1, spm, 0x0E38},
-	{"vdecsys", vde2, spm, 0x0E48},
-	{"vdecsys_soc", vde1, spm, 0x0E4C},
+	{"vdecsys", vde2, spm, 0x0E4C},
+	{"vdecsys_soc", vde1, spm, 0x0E48},
 	{"vencsys", ven1, spm, 0x0E50},
 	{"vencsys_c1", ven2, spm, 0x0E54},
 	{"wpe1_dip1", wpe1_dip1, spm, 0x0E3C},
@@ -2298,36 +2298,60 @@ void print_subsys_reg_mt6899(enum chk_sys_id id)
 }
 EXPORT_SYMBOL_GPL(print_subsys_reg_mt6899);
 
+void clkchk_debug_dump_mt6899(enum chk_sys_id id[],
+		char *exception_name, bool trigger_vcp_dump, bool trigger_bugon)
+{
+	const struct fmeter_clk *fclks;
+
+	fclks = mt_get_fmeter_clks();
+
+	dump_clk_event();
+	pdchk_dump_trace_evt();
+
+	for (; fclks != NULL && fclks->type != FT_NULL; fclks++) {
+		if (fclks->type != SUBSYS)
+			pr_notice("[%s] %d khz\n", fclks->name,
+				mt_get_fmeter_freq(fclks->id, fclks->type));
+	}
+
+	set_subsys_reg_dump_mt6899(id);
+	get_subsys_reg_dump_mt6899();
+
+	/* flag set false when trigger by adb cmd to avoid system abnormal */
+	if (clkchk_bug_on_flag) {
+		if (trigger_vcp_dump) {
+#if IS_ENABLED(CONFIG_MTK_TINYSYS_VCP_SUPPORT)
+			vcp_cmd_ex(HWCCF_FEATURE_ID, VCP_DUMP, exception_name);
+#endif
+			mdelay(10);
+		}
+
+		if (trigger_bugon)
+			BUG_ON(1);
+	}
+}
+EXPORT_SYMBOL_GPL(clkchk_debug_dump_mt6899);
+
 #if IS_ENABLED(CONFIG_DEVICE_MODULES_MTK_DEVAPC)
 static enum chk_sys_id devapc_dump_id[] = {
 	spm,
-	hfrp,
 	emi_nemicfg_ao_mem_prot_reg_bus,
 	emi_semicfg_ao_mem_prot_reg_bus,
 	infra_ifrbus_ao_reg_bus,
 	top,
 	apmixed,
 	vlp_ck,
+	vlp_ao,
 	hwv,
+	hfrp,
+	hfrp_bus,
+	mm_hwv,
 	chk_sys_num,
 };
 
 static void devapc_dump(void)
 {
-	const struct fmeter_clk *fclks;
-
-	fclks = mt_get_fmeter_clks();
-	set_subsys_reg_dump_mt6899(devapc_dump_id);
-	get_subsys_reg_dump_mt6899();
-
-	dump_clk_event();
-	pdchk_dump_trace_evt();
-
-	for (; fclks != NULL && fclks->type != FT_NULL; fclks++) {
-		if (fclks->type != VLPCK && fclks->type != SUBSYS)
-			pr_notice("[%s] %d khz\n", fclks->name,
-				mt_get_fmeter_freq(fclks->id, fclks->type));
-	}
+	clkchk_debug_dump_mt6899(devapc_dump_id, "clk_devapc", true, false);
 }
 
 static struct devapc_vio_callbacks devapc_vio_handle = {
@@ -2340,21 +2364,7 @@ static struct devapc_vio_callbacks devapc_vio_handle = {
 #ifdef CONFIG_MTK_SERROR_HOOK
 static void serror_dump(void)
 {
-	const struct fmeter_clk *fclks;
-
-	fclks = mt_get_fmeter_clks();
-
-	set_subsys_reg_dump_mt6899(devapc_dump_id);
-	get_subsys_reg_dump_mt6899();
-
-	dump_clk_event();
-	pdchk_dump_trace_evt();
-
-	for (; fclks != NULL && fclks->type != FT_NULL; fclks++) {
-		if (fclks->type != VLPCK && fclks->type != SUBSYS)
-			pr_notice("[%s] %d khz\n", fclks->name,
-				mt_get_fmeter_freq(fclks->id, fclks->type));
-	}
+	clkchk_debug_dump_mt6899(devapc_dump_id, "clk_serror", true, false);
 }
 
 static void clkchk_arm64_serror_panic_hook(void *data,
@@ -2365,20 +2375,16 @@ static void clkchk_arm64_serror_panic_hook(void *data,
 #endif
 
 static const char * const off_pll_names[] = {
+	"mmpll",
+	"msdcpll",
+	"imgpll",
+	"tvdpll",
+	"mfgpll",
+	"mfgscpll",
 	NULL
 };
 
 static const char * const notice_pll_names[] = {
-	"mainpll",
-	"mmpll",
-	"emipll",
-	"msdcpll",
-	"emipll2",
-	"imgpll",
-	"tvdpll",
-	"adsppll",
-	"mfgpll",
-	"mfgscpll",
 	"adsppll",
 	"apll1",
 	"apll2",
@@ -2433,6 +2439,7 @@ static enum chk_sys_id history_dump_id[] = {
 	top,
 	apmixed,
 	hwv,
+	mm_hwv,
 	chk_sys_num,
 };
 
@@ -2466,7 +2473,18 @@ static void dump_hwv_history(struct regmap *regmap, u32 id)
 
 static enum chk_sys_id bus_dump_id[] = {
 	top,
+	spm,
 	apmixed,
+	vlp_ck,
+	vlp_ao,
+	vlpcfg,
+	emi_nemicfg_ao_mem_prot_reg_bus,
+	emi_semicfg_ao_mem_prot_reg_bus,
+	infra_ifrbus_ao_reg_bus,
+	hwv,
+	hfrp,
+	hfrp_bus,
+	mm_hwv,
 	chk_sys_num,
 };
 
@@ -2477,38 +2495,36 @@ static void get_bus_reg(void)
 
 static void dump_bus_reg(struct regmap *regmap, u32 ofs)
 {
-	const struct fmeter_clk *fclks;
+	clkchk_debug_dump_mt6899(bus_dump_id, "hwv_cg_timeout", true, true);
+}
 
-	fclks = mt_get_fmeter_clks();
-	set_subsys_reg_dump_mt6899(bus_dump_id);
-	get_subsys_reg_dump_mt6899();
-	for (; fclks != NULL && fclks->type != FT_NULL; fclks++) {
-		if (fclks->type != VLPCK && fclks->type != SUBSYS)
-			pr_notice("[%s] %d khz\n", fclks->name,
-				mt_get_fmeter_freq(fclks->id, fclks->type));
-	}
+static enum chk_sys_id vlp_dump_id[] = {
+	top,
+	spm,
+	apmixed,
+	infra_ifrbus_ao_reg_bus,
+	vlp_ck,
+	vlpcfg,
+	vlp_ao,
+	chk_sys_num,
+};
 
-	/* sspm need some time to run isr */
-	mdelay(1000);
-	BUG_ON(1);
+static void dump_vlp_reg(struct regmap *regmap, u32 shift)
+{
+	clkchk_debug_dump_mt6899(vlp_dump_id, "vcp_ready_timeout", true, true);
 }
 
 static enum chk_sys_id pll_dump_id[] = {
 	apmixed,
 	top,
 	hwv,
+	mm_hwv,
 	chk_sys_num,
 };
 
 static void dump_pll_reg(bool bug_on)
 {
-	set_subsys_reg_dump_mt6899(pll_dump_id);
-	get_subsys_reg_dump_mt6899();
-
-	if (bug_on) {
-		mdelay(100);
-		BUG_ON(1);
-	}
+	clkchk_debug_dump_mt6899(pll_dump_id, "pll_abnormal", true, bug_on);
 }
 
 static void check_hwv_irq_sta(void)
@@ -2523,6 +2539,89 @@ static void check_hwv_irq_sta(void)
 	}
 	if ((irq_sta & HWV_INT_PLL_TRIGGER) == HWV_INT_PLL_TRIGGER)
 		dump_pll_reg(true);
+}
+
+static void check_mm_hwv_irq_sta(void)
+{
+	u32 irq_sta;
+
+	irq_sta = get_mt6899_reg_value(mm_hwv, HWV_IRQ_STATUS);
+
+	if ((irq_sta & HWV_INT_CG_TRIGGER) == HWV_INT_CG_TRIGGER) {
+		dump_hwv_history(NULL, 0);
+		dump_bus_reg(NULL, 0);
+	}
+	if ((irq_sta & HWV_INT_PLL_TRIGGER) == HWV_INT_PLL_TRIGGER)
+		dump_pll_reg(true);
+}
+
+static enum chk_sys_id extern_dump_id[] = {
+	top,
+	spm,
+	apmixed,
+	vlp_ck,
+	vlp_ao,
+	vlpcfg,
+	emi_nemicfg_ao_mem_prot_reg_bus,
+	emi_semicfg_ao_mem_prot_reg_bus,
+	infra_ifrbus_ao_reg_bus,
+	hwv,
+	hfrp,
+	hfrp_bus,
+	mm_hwv,
+	chk_sys_num,
+};
+
+static void external_dump(void)
+{
+	clkchk_debug_dump_mt6899(extern_dump_id, NULL, false, false);
+
+	/* OPT: due to vcp may not probe yet, use vcp mtcmos pwr ack */
+	/* condition to determine mminfra voter dump or not */
+	if ((get_mt6899_reg_value(spm, 0xE94) & 0xC0000000) == 0xC0000000)
+		print_subsys_reg_mt6899(mm_hwv);
+}
+
+#define HWV_CG_TIMEOUT_VOTE_RETRY 0
+static void cg_timeout_handle(struct regmap *regmap, u32 id, u32 shift)
+{
+	dump_hwv_history(regmap, id);
+
+#if HWV_CG_TIMEOUT_VOTE_RETRY
+	int i;
+	u32 val;
+
+	if (!IS_ERR_OR_NULL(regmap)) {
+		for (i = 0; i < 10; i++) {
+			regmap_write(regmap, HWV_CG_SET(xpu_id[0], id), 1 << shift);
+			regmap_read(regmap, HWV_CG_SET(xpu_id[0], id), &val);
+			if ((val & (1 << shift)) == (1 << shift)) {
+				pr_notice("cg vote retry: %d us\n", i * 10);
+				break;
+			}
+			udelay(10);
+		}
+	}
+#endif
+
+	dump_bus_reg(NULL, 0);
+}
+
+static void verify_debug_flow(void)
+{
+	clkchk_bug_on_flag = false;
+	devapc_dump();
+#ifdef CONFIG_MTK_SERROR_HOOK
+	serror_dump();
+#endif
+	dump_hwv_history(mm_hwv_regmap, 0);
+	dump_bus_reg(NULL, 0);
+	dump_pll_reg(false);
+	check_hwv_irq_sta();
+	check_mm_hwv_irq_sta();
+	external_dump();
+	dump_vlp_reg(NULL, 0);
+	clkchk_bug_on_flag = true;
 }
 
 /*
@@ -2546,10 +2645,15 @@ static struct clkchk_ops clkchk_mt6899_ops = {
 	.dump_hwv_history = dump_hwv_history,
 	.get_bus_reg = get_bus_reg,
 	.dump_bus_reg = dump_bus_reg,
+	.dump_vlp_reg = dump_vlp_reg,
 	.dump_pll_reg = dump_pll_reg,
 	.trace_clk_event = trace_clk_event,
 	.check_hwv_irq_sta = check_hwv_irq_sta,
+	.check_mm_hwv_irq_sta = check_mm_hwv_irq_sta,
 	.is_suspend_retry_stop = is_suspend_retry_stop,
+	.external_dump = external_dump,
+	.cg_timeout_handle = cg_timeout_handle,
+	.verify_debug_flow = verify_debug_flow,
 };
 
 static int clk_chk_mt6899_probe(struct platform_device *pdev)
@@ -2557,6 +2661,8 @@ static int clk_chk_mt6899_probe(struct platform_device *pdev)
 	suspend_cnt = 0;
 
 	init_regbase();
+
+	mm_hwv_regmap = syscon_regmap_lookup_by_phandle(pdev->dev.of_node, "mm-hwv-regmap");
 
 	set_clkchk_notify();
 

@@ -787,12 +787,10 @@ void cmdq_mdp_enable_clock(bool enable, u32 engine)
 	switch (engine) {
 	case CMDQ_ENG_MDP_CAMIN:
 		cmdq_mdp_enable_clock_IMG_DL_ASYNC0(enable);
-		cmdq_mdp_enable_clock_IMG0_IMG_DL_ASYNC0(enable);
 		cmdq_mdp_enable_clock_IMG0_IMG_DL_RELAY0_ASYNC0(enable);
 		break;
 	case CMDQ_ENG_MDP_CAMIN2:
 		cmdq_mdp_enable_clock_IMG_DL_ASYNC1(enable);
-		cmdq_mdp_enable_clock_IMG0_IMG_DL_ASYNC1(enable);
 		cmdq_mdp_enable_clock_IMG0_IMG_DL_RELAY1_ASYNC1(enable);
 		break;
 	case CMDQ_ENG_MDP_RDMA0:
@@ -2125,6 +2123,11 @@ static void mdp_readback_aal_by_engine(struct cmdqRecStruct *handle,
 		return;
 	}
 
+#ifdef CMDQ_SECURE_PATH_SUPPORT
+	if (handle->secData.is_secure)
+		engine = engine - CMDQ_ENG_MDP_AAL0 + CMDQ_SEC_MDP_AAL0;
+#endif
+
 	cmdq_mdp_get_func()->mdpReadbackAal(handle, engine, base, pa, param, pipe);
 }
 
@@ -2142,6 +2145,11 @@ static void mdp_readback_hdr_by_engine(struct cmdqRecStruct *handle,
 		CMDQ_ERR("%s not support\n", __func__);
 		return;
 	}
+
+#ifdef CMDQ_SECURE_PATH_SUPPORT
+	if (handle->secData.is_secure)
+		engine = engine - CMDQ_ENG_MDP_HDR0 + CMDQ_SEC_MDP_HDR0;
+#endif
 
 	cmdq_mdp_get_func()->mdpReadbackHdr(handle, engine, base, pa, param, pipe);
 }

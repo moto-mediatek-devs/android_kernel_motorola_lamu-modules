@@ -18,7 +18,7 @@
 #define USB2_PORT 2
 #define USB3_PORT 3
 
-#define SSUSB_SUSPEND_RESUME_TIMEOUT (HZ/5) /* 200ms */
+#define SSUSB_SUSPEND_RESUME_TIMEOUT (HZ) /* 1s */
 
 static inline struct ssusb_mtk *otg_sx_to_ssusb(struct otg_switch_mtk *otg_sx)
 {
@@ -227,6 +227,7 @@ static void ssusb_mode_sw_work_v2(struct work_struct *work)
 	enum usb_role desired_role;
 	enum usb_role current_role;
 	unsigned long flags;
+	unsigned long timeout;
 
 	desired_role = work_data->desired_role;
 	current_role = otg_sx->current_role;
@@ -239,7 +240,9 @@ static void ssusb_mode_sw_work_v2(struct work_struct *work)
 
 	mtu3_dbg_trace(ssusb->dev, "set role : %s", usb_role_string(desired_role));
 
-	while (time_before(jiffies, jiffies + SSUSB_SUSPEND_RESUME_TIMEOUT)) {
+	timeout = jiffies + SSUSB_SUSPEND_RESUME_TIMEOUT;
+
+	while (time_before(jiffies, timeout)) {
 		if (!ssusb->is_suspended)
 			break;
 		dev_info(ssusb->dev, "wait for suspend/resume complete\n");
@@ -564,6 +567,14 @@ static int ssusb_role_sw_register(struct otg_switch_mtk *otg_sx)
 	return 0;
 }
 
+static void u3_lpm_capable_update(struct device *dev)
+{
+	struct ssusb_mtk *ssusb = dev_get_drvdata(dev);
+	struct mtu3 *mtu = ssusb->u3d;
+
+	mtu->g.lpm_capable = mtu->u3_lpm && (mtu->max_speed > USB_SPEED_HIGH);
+}
+
 static ssize_t mode_store(struct device *dev,
 				 struct device_attribute *attr,
 				 const char *buf, size_t count)
@@ -655,6 +666,8 @@ static ssize_t max_speed_store(struct device *dev,
 	mtu->max_speed = speed;
 	mtu->g.max_speed = speed;
 
+	u3_lpm_capable_update(dev);
+
 	return count;
 }
 
@@ -716,6 +729,8 @@ static ssize_t u3_lpm_store(struct device *dev,
 		return -EINVAL;
 
 	mtu->u3_lpm = enable ? 1 : 0;
+
+	u3_lpm_capable_update(dev);
 
 	return count;
 }

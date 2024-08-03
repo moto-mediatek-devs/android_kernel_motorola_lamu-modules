@@ -81,8 +81,7 @@ static const uint32_t kReadVowDumpSize_Big = 0x1F40 * 2; // 320(10ms) x 25 x 2ch
 
 /* for vow sub feature option */
 static bool dual_ch_transfer;
-static unsigned int delay_wakeup_time;
-static unsigned int payloaddump_cb_type = PAYLOADDUMP_OFF;
+
 /*****************************************************************************
  * Function  Declaration
  ****************************************************************************/
@@ -177,6 +176,9 @@ static struct
 	unsigned long        custom_model_size;
 	unsigned int         scp_recover_data;
 	unsigned long        scp_recover_user_return_size_addr;
+	unsigned int         delay_wakeup_time;
+	unsigned int         payloaddump_cb_type;
+	unsigned int         chre_status;
 } vowserv;
 
 struct vow_dump_info_t {
@@ -461,6 +463,14 @@ static void vow_ipi_rx_handle_data_msg(void *msg_data)
 void vow_ipi_rx_internal(unsigned int msg_id,
 			 void *msg_data)
 {
+#ifdef DEBUG_IPI_RX
+	unsigned long long   ipi_rx_begin_cycle;
+	unsigned long long   ipi_rx_end_cycle;
+	unsigned int   ipi_rx_diff_time;
+
+	ipi_rx_begin_cycle = get_cycles();
+#endif
+
 	switch (msg_id) {
 	case IPIMSG_VOW_COMBINED_INFO: {
 		struct vow_ipi_combined_info_t *ipi_ptr;
@@ -525,8 +535,8 @@ void vow_ipi_rx_internal(unsigned int msg_id,
 		break;
 	}
 	case IPIMSG_VOW_ALEXA_ENGINE_VER: {
-		VOWDRV_DEBUG("%s(), IPIMSG_VOW_ALEXA_ENGINE_VER %s\r",
-			__func__, (char *)msg_data);
+		//VOWDRV_DEBUG("%s(), IPIMSG_VOW_ALEXA_ENGINE_VER %s\r",
+		//	__func__, (char *)msg_data);
 		memcpy(vowserv.alexa_engine_version, msg_data,
 				 sizeof(vowserv.alexa_engine_version));
 		}
@@ -534,14 +544,14 @@ void vow_ipi_rx_internal(unsigned int msg_id,
 	case IPIMSG_VOW_GOOGLE_ENGINE_VER: {
 		unsigned int *temp = (unsigned int *)msg_data;
 
-		VOWDRV_DEBUG("%s(), IPIMSG_VOW_GOOGLE_ENGINE_VER 0x%x\r",
-			__func__, temp[0]);
+		//VOWDRV_DEBUG("%s(), IPIMSG_VOW_GOOGLE_ENGINE_VER 0x%x\r",
+		//	__func__, temp[0]);
 		vowserv.google_engine_version = temp[0];
 		}
 		break;
 	case IPIMSG_VOW_GOOGLE_ARCH: {
-		VOWDRV_DEBUG("%s(), IPIMSG_VOW_GOOGLE_ARCH %s\r",
-			__func__, (char *)msg_data);
+		//VOWDRV_DEBUG("%s(), IPIMSG_VOW_GOOGLE_ARCH %s\r",
+		//	__func__, (char *)msg_data);
 		memcpy(vowserv.google_engine_arch, msg_data,
 				 sizeof(vowserv.google_engine_arch));
 		}
@@ -549,6 +559,18 @@ void vow_ipi_rx_internal(unsigned int msg_id,
 	default:
 		break;
 	}
+
+#ifdef DEBUG_IPI_RX
+	ipi_rx_end_cycle = get_cycles();
+	ipi_rx_diff_time =
+				(unsigned int)CYCLE_TO_NS *
+				(unsigned int)(ipi_rx_end_cycle
+				- ipi_rx_begin_cycle);
+	if (ipi_rx_diff_time > 5000000) {
+		VOWDRV_DEBUG("IPI RX handler timeout, msg_id = %d, cost %d(ns)\n",
+			     msg_id, ipi_rx_diff_time);
+	}
+#endif
 }
 
 bool vow_ipi_rceive_ack(unsigned int msg_id,
@@ -789,6 +811,8 @@ static void vow_service_Init(void)
 		vowserv.bargein_enable = false;
 		vowserv.scp_recover_data = VOW_SCP_EVENT_NONE;
 		vowserv.scp_recover_user_return_size_addr = 0;
+		vowserv.delay_wakeup_time = 0;
+		vowserv.payloaddump_cb_type = PAYLOADDUMP_OFF;
 		/* set meaningless default value to platform identifier and version */
 		memset(vowserv.google_engine_arch, 0, VOW_ENGINE_INFO_LENGTH_BYTE);
 		if (sprintf(vowserv.google_engine_arch, "12345678-1234-1234-1234-123456789012") < 0)
@@ -1616,8 +1640,7 @@ static bool vow_service_SetDelayWakeupTime(unsigned int arg)
 		VOWDRV_DEBUG("delay wakeup time setting error, %d", arg);
 		return false;
 	}
-	delay_wakeup_time = arg;
-	VowDrv_SetFlag(VOW_FLAG_WAKEUP_DELAY_TIME, delay_wakeup_time);
+	VowDrv_SetFlag(VOW_FLAG_WAKEUP_DELAY_TIME, arg);
 	return true;
 }
 
@@ -1627,8 +1650,7 @@ static bool vow_service_SetPayloaddump_callback(unsigned int arg)
 		VOWDRV_DEBUG("payload dump callback setting error, %d", arg);
 		return false;
 	}
-	payloaddump_cb_type = arg;
-	VowDrv_SetFlag(VOW_FLAG_PAYLOADDUMP_CB_TYPE, payloaddump_cb_type);
+	VowDrv_SetFlag(VOW_FLAG_PAYLOADDUMP_CB_TYPE, arg);
 	return true;
 }
 
@@ -2391,7 +2413,7 @@ static bool VowDrv_SetFlag(int type, unsigned int set)
 	int ipi_ret;
 	unsigned int vow_ipi_buf[2];
 
-	VOWDRV_DEBUG("%s(), type:%x, set:%x\n", __func__, type, set);
+	VOWDRV_DEBUG("%s(), type:%x, set:0x%x\n", __func__, type, set);
 	vow_ipi_buf[0] = type;
 	vow_ipi_buf[1] = set;
 
@@ -2885,19 +2907,18 @@ DEVICE_ATTR(vow_SetPatternInput,
 
 static bool vow_service_NotifyCHREStatus(unsigned int status)
 {
-	bool ret = 0;
+	bool ret = true;
 	unsigned int isCHREOpen = status & 0xF;
 
+	VOWDRV_DEBUG("%s(),isCHREOpen=%d\n", __func__, isCHREOpen);
 	if (status == 0) {
 		//do nothing discard msg
-		//never go here
 		return ret;
 	}
-	//check CHRE audio is open or close
 	if (isCHREOpen > CHRE_OPEN) {
-		//never go here
-		VOWDRV_DEBUG("%s(),isCHREOpen=%d\n", __func__, isCHREOpen);
-		ret = 1;
+		//variable overflow
+		ret = false;
+		return ret;
 	}
 	VowDrv_SetFlag(VOW_FLAG_CHRE_STATUS, status);
 	return ret;
@@ -3301,16 +3322,19 @@ static long VowDrv_ioctl(struct file *fp, unsigned int cmd, unsigned long arg_da
 		break;
 	case VOW_NOTIFY_CHRE_STATUS:
 		VOWDRV_DEBUG("VOW_NOTIFY_CHRE_STATUS(%lu)", arg);
-		if (vow_service_NotifyCHREStatus((unsigned int)arg))
+		vowserv.chre_status = (unsigned int)arg;
+		if (vow_service_NotifyCHREStatus((unsigned int)arg) == false)
 			ret = -EFAULT;
 		break;
 	case VOW_SET_VOW_DELAY_WAKEUP:
 		VOWDRV_DEBUG("VOW_SET_VOW_DELAY_WAKEUP(%lu)", arg);
+		vowserv.delay_wakeup_time = (unsigned int)arg;
 		if (vow_service_SetDelayWakeupTime((unsigned int)arg) == false)
 			ret = -EFAULT;
 		break;
 	case VOW_SET_VOW_PAYLOAD_CALLBACK:
 		VOWDRV_DEBUG("VOW_SET_VOW_PAYLOAD_CALLBACK(%lu)", arg);
+		vowserv.payloaddump_cb_type = (unsigned int)arg;
 		if (vow_service_SetPayloaddump_callback((unsigned int)arg) == false)
 			ret = -EFAULT;
 		break;
@@ -3764,6 +3788,12 @@ static int vow_scp_recover_event(struct notifier_block *this,
 			}
 		}
 
+		/* vow setting */
+		if (vow_service_SetDelayWakeupTime(vowserv.delay_wakeup_time) == false)
+			VOWDRV_DEBUG("fail: vow_SetDelayWakeupTime\n");
+		if (vow_service_SetPayloaddump_callback(vowserv.payloaddump_cb_type) == false)
+			VOWDRV_DEBUG("fail: vow_SetPayloaddump\n");
+
 		/* if vow is not enable, then return */
 		if (VowDrv_GetHWStatus() != VOW_PWR_ON) {
 			vowserv.vow_recovering = false;
@@ -3790,6 +3820,8 @@ static int vow_scp_recover_event(struct notifier_block *this,
 			VOWDRV_DEBUG("fail: vow recover4\n");
 			break;
 		}
+		if (vow_service_NotifyCHREStatus(vowserv.chre_status) == false)
+			VOWDRV_DEBUG("fail: vow_NotifyCHREStatus\n");
 
 		if (!VowDrv_SetProviderType(vowserv.provider_type))
 			VOWDRV_DEBUG("fail: vow_SetMtkifType\n");

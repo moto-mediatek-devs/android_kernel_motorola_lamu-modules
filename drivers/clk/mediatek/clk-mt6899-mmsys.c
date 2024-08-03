@@ -26,6 +26,12 @@ static const struct mtk_gate_regs mm10_cg_regs = {
 	.sta_ofs = 0x100,
 };
 
+static const struct mtk_gate_regs mm10_hwv_regs = {
+	.set_ofs = 0x0008,
+	.clr_ofs = 0x000C,
+	.sta_ofs = 0x1C04,
+};
+
 static const struct mtk_gate_regs mm11_cg_regs = {
 	.set_ofs = 0x114,
 	.clr_ofs = 0x118,
@@ -45,6 +51,19 @@ static const struct mtk_gate_regs mm11_cg_regs = {
 		.id = _id,			\
 		.name = _name,			\
 		.parent_name = _parent,		\
+	}
+
+#define GATE_HWV_MM10(_id, _name, _parent, _shift) {	\
+		.id = _id,						\
+		.name = _name,						\
+		.parent_name = _parent,					\
+		.hwv_comp = "mm-hw-ccf-regmap",				\
+		.regs = &mm10_cg_regs,			\
+		.hwv_regs = &mm10_hwv_regs,		\
+		.shift = _shift,					\
+		.ops = &mtk_clk_gate_ops_hwv,				\
+		.dma_ops = &mtk_clk_gate_ops_setclr,			\
+		.flags = CLK_USE_HW_VOTER | HWV_CHK_VCP_READY,	\
 	}
 
 #define GATE_MM11(_id, _name, _parent, _shift) {	\
@@ -140,7 +159,7 @@ static const struct mtk_gate mm1_clks[] = {
 			"disp_ck"/* parent */, 18),
 	GATE_MM10_V(CLK_MM1_DISP_WDMA0_DISP, "mm1_disp_wdma0_disp",
 			"mm1_disp_wdma0"/* parent */),
-	GATE_MM10(CLK_MM1_SMI_SUB_COMM0, "mm1_ssc",
+	GATE_HWV_MM10(CLK_MM1_SMI_SUB_COMM0, "mm1_ssc",
 			"disp_ck"/* parent */, 19),
 	GATE_MM10_V(CLK_MM1_SMI_SUB_COMM0_DISP, "mm1_ssc_disp",
 			"mm1_ssc"/* parent */),
@@ -480,70 +499,6 @@ static const struct mtk_clk_desc mm_mcd = {
 	.num_clks = CLK_MM_NR_CLK,
 };
 
-static const struct mtk_gate_regs mminfra_ao_config0_cg_regs = {
-	.set_ofs = 0x104,
-	.clr_ofs = 0x108,
-	.sta_ofs = 0x100,
-};
-
-static const struct mtk_gate_regs mminfra_ao_config1_cg_regs = {
-	.set_ofs = 0x114,
-	.clr_ofs = 0x118,
-	.sta_ofs = 0x110,
-};
-
-#define GATE_MMINFRA_AO_CONFIG0(_id, _name, _parent, _shift) {	\
-		.id = _id,				\
-		.name = _name,				\
-		.parent_name = _parent,			\
-		.regs = &mminfra_ao_config0_cg_regs,			\
-		.shift = _shift,			\
-		.ops = &mtk_clk_gate_ops_setclr,	\
-	}
-
-#define GATE_MMINFRA_AO_CONFIG0_V(_id, _name, _parent) {	\
-		.id = _id,			\
-		.name = _name,			\
-		.parent_name = _parent,		\
-	}
-
-#define GATE_MMINFRA_AO_CONFIG1(_id, _name, _parent, _shift) {	\
-		.id = _id,				\
-		.name = _name,				\
-		.parent_name = _parent,			\
-		.regs = &mminfra_ao_config1_cg_regs,			\
-		.shift = _shift,			\
-		.ops = &mtk_clk_gate_ops_setclr,	\
-	}
-
-#define GATE_MMINFRA_AO_CONFIG1_V(_id, _name, _parent) {	\
-		.id = _id,			\
-		.name = _name,			\
-		.parent_name = _parent,		\
-	}
-
-static const struct mtk_gate mminfra_ao_config_clks[] = {
-	/* MMINFRA_AO_CONFIG0 */
-	GATE_MMINFRA_AO_CONFIG0(CLK_MMINFRA_AO_GCE_D, "mminfra_ao_gce_d",
-			"mminfra_ck"/* parent */, 0),
-	GATE_MMINFRA_AO_CONFIG0_V(CLK_MMINFRA_AO_GCE_D_CMDQ, "mminfra_ao_gce_d_cmdq",
-			"mminfra_ao_gce_d"/* parent */),
-	GATE_MMINFRA_AO_CONFIG0(CLK_MMINFRA_AO_GCE_M, "mminfra_ao_gce_m",
-			"mminfra_ck"/* parent */, 1),
-	GATE_MMINFRA_AO_CONFIG0_V(CLK_MMINFRA_AO_GCE_M_CMDQ, "mminfra_ao_gce_m_cmdq",
-			"mminfra_ao_gce_m"/* parent */),
-	/* MMINFRA_AO_CONFIG1 */
-	GATE_MMINFRA_AO_CONFIG1(CLK_MMINFRA_AO_GCE_26M, "mminfra_ao_gce_26m",
-			"mminfra_ck"/* parent */, 17),
-	GATE_MMINFRA_AO_CONFIG1_V(CLK_MMINFRA_AO_GCE_26M_CMDQ, "mminfra_ao_gce_26m_cmdq",
-			"mminfra_ao_gce_26m"/* parent */),
-};
-
-static const struct mtk_clk_desc mminfra_ao_config_mcd = {
-	.clks = mminfra_ao_config_clks,
-	.num_clks = CLK_MMINFRA_AO_CONFIG_NR_CLK,
-};
-
 static const struct mtk_gate_regs ovl_cg_regs = {
 	.set_ofs = 0x104,
 	.clr_ofs = 0x108,
@@ -696,9 +651,6 @@ static const struct of_device_id of_match_clk_mt6899_mmsys[] = {
 	}, {
 		.compatible = "mediatek,mt6899-mmsys0",
 		.data = &mm_mcd,
-	}, {
-		.compatible = "mediatek,mt6899-mminfra_ao_config",
-		.data = &mminfra_ao_config_mcd,
 	}, {
 		.compatible = "mediatek,mt6899-ovlsys_config",
 		.data = &ovl_mcd,

@@ -3,6 +3,16 @@
  * Copyright (C) 2022 MediaTek Inc.
  */
 
+&disp_pwm {
+	status = "okay";
+};
+&mtk_leds {
+	status = "disabled";
+};
+&pwmleds {
+	status = "okay";
+};
+
 &pio {
 	edp_gpio_def_cfg: edp-gpio-def-cfg{
 		pins1 {
@@ -71,7 +81,7 @@
 
 	mtkfb_pins_lcm_led_en1: lcm-led-en1-gpio {
 		pins-cmd-dat {
-			pinmux = <PINMUX_GPIO103__FUNC_GPIO103>;
+			pinmux = <PINMUX_GPIO79__FUNC_GPIO79>;
 			slew-rate = <1>;
 			output-high;
 		};
@@ -79,7 +89,7 @@
 
 	mtkfb_pins_lcm_led_en0: lcm-led-en0-gpio {
 		pins-cmd-dat {
-			pinmux = <PINMUX_GPIO103__FUNC_GPIO103>;
+			pinmux = <PINMUX_GPIO79__FUNC_GPIO79>;
 			slew-rate = <1>;
 			output-low;
 		};
@@ -233,7 +243,7 @@
 	panel2@1 {
 		compatible = "boe,jd9365da";
 		reg = <1>;
-		power-gpios = <&pio 103 0>;
+		power-gpios = <&pio 79 0>;
 		reset-gpios = <&pio 90 0>;
 		pinctrl-names = "default";
 		port {
@@ -379,12 +389,13 @@
 		pinctrl-names = "default";
 		reset-gpios = <&pio 70 0>;
 
-		panel-name = "YW-1080";
+		panel-name = "HuaYang";
+		use-default-setting = <1>;
 		ser-support-hotplug = <1>;
 		ser-super-frame = <0>;
 		ser-dual-link = <0>;
 		ser-dp-mst = <1>;
-		support-touch = <0>;
+		support-touch = <1>;
 
 		feature{
 			feature-handle-num = <2>;
@@ -973,6 +984,24 @@
 				>;
 				dp-mst-touch-i2c-addr = <>;
 				dp-mst-touch-init-cmd = <
+					2 0x0044 0x42 0	/* remap 0x14 to 0x21 */
+					2 0x0045 0x28 0
+					3 0x0044 0x44 0	/* remap 0x14 to 0x22 */
+					3 0x0045 0x28 0
+					0 0x0258 0x00 0	/*96851 INT linka  GPIO11 */
+					0 0x0259 0xab 0
+					0 0x025b 0x4b 0
+					0 0x025b 0x22 0
+					0 0x0260 0x00 0	/*96851 INT  linkb  GPIO12 */
+					0 0x0261 0xac 0
+					0 0x0262 0x4c 0
+					0 0x0263 0x28 0
+					2 0x020c 0x03 0	/* 96752 INT linka GPIO 4*/
+					2 0x020d 0xab 0
+					2 0x020e 0x4b 0
+					3 0x020c 0x03 0	/* 96752 INT linkb GPIO 4*/
+					3 0x020d 0xac 0
+					3 0x020e 0x4c 0
 				>;
 				bl-i2c-addr = <0x1a>;
 				bl-on-cmd = <
@@ -1314,12 +1343,13 @@
 		pinctrl-names = "default";
 		reset-gpios = <&pio 73 0>;
 
-		panel-name = "BoTai";
+		panel-name = "HuaYang";
+		use-default-setting = <1>;
 		ser-support-hotplug = <1>;
 		ser-super-frame = <0>;
 		ser-dual-link = <0>;
 		ser-dp-mst = <0>;
-		support-touch = <0>;
+		support-touch = <1>;
 
 		feature{
 			feature-handle-num = <2>;
@@ -1568,6 +1598,17 @@
 					1 0x06ff 0x22 0
 				>;
 				touch-init-cmd =<
+					0 0x0258 0x00 0   /*96851 INT linka  GPIO11 */
+					0 0x0259 0xab 0
+					0 0x025b 0x4b 0
+					0 0x025b 0x22 0
+					0 0x0260 0x00 0	  /*96851 INT  linkb  GPIO12 */
+					0 0x0261 0xac 0
+					0 0x0262 0x4c 0
+					0 0x0263 0x28 0
+					1 0x020c 0x03 0   /* 96752 INT linka GPIO 4*/
+					1 0x020d 0xab 0
+					1 0x020e 0x4b 0
 				>;
 				bl-i2c-addr = <0x1a>;
 				bl-on-cmd = <
@@ -1978,6 +2019,9 @@
 			0x02dd 0x1e 0x0
 			0x02de 0x5e 0x0
 		>;
+		des-link-status-cmd = <
+			0x001f 0x18 0x0
+		>;
 		desdef {
 			des-i2c-addr = <0x4a>;
 			des-init-cmd = <
@@ -2037,7 +2081,6 @@
 		ser-super-frame = <0>;
 
 		ser-init-cmd = <
-			0x0010 0x80 0x64
 			0x0001 0x08 0x00
 			0x0203 0x00 0x00
 			0x1404 0x29 0x00
@@ -2053,10 +2096,10 @@
 			0x0333 0xe4 0x00
 			0x0308 0x7c 0x00
 			0x0053 0x10 0x00
-			0x005b 0x12 0x14
+			0x005b 0x12 0x0a
 			0x0140 0x20 0x00
-			0x0002 0x53 0x05
-			0x0010 0x31 0xc8
+			0x0002 0x53 0x00
+			0x0010 0x31 0x40
 		>;
 		ser-deinit-cmd = <
 			0x0010 0x80 0x20
@@ -2070,7 +2113,7 @@
 			bl-dummy-i2c-addr = <0x1f>;
 			des-init-cmd = <
 				0x06ff 0x11 0x0
-				0x01ce 0x5e 2
+				0x01ce 0x5e 0x0
 			>;
 			link-indicate-cmd = <
 				0x06ff 0x11 0x0
@@ -2101,7 +2144,6 @@
 		ser-super-frame = <0>;
 
 		ser-init-cmd = <
-			0x0010 0x80 0x64
 			0x0001 0x08 0x00
 			0x0203 0x00 0x00
 			0x1404 0x29 0x00
@@ -2117,10 +2159,10 @@
 			0x0333 0xe4 0x00
 			0x0308 0x7c 0x00
 			0x0053 0x10 0x00
-			0x005b 0x12 0x14
+			0x005b 0x12 0x0a
 			0x0140 0x20 0x00
-			0x0002 0x53 0x05
-			0x0010 0x31 0xc8
+			0x0002 0x53 0x00
+			0x0010 0x31 0x40
 			0x02dc 0x04 0x00    /* 96789 huayang tp ser int GPIO10 */
 			0x02dd 0xaa 0x00    /* 96789 huayang tp ser int GPIO10 */
 			0x02de 0x6a 0x00    /* 96789 huayang tp ser int GPIO10 */
@@ -2137,7 +2179,7 @@
 			bl-dummy-i2c-addr = <0x1f>;
 			des-init-cmd = <
 				0x06ff 0x11 0x0
-				0x01ce 0x4e 2
+				0x01ce 0x4e 0x0
 				0x020c 0x03 0  /* 96752 huayang tp des int GPIO4 */
 				0x020d 0xaa 0  /* 96752 huayang tp des int GPIO4 */
 				0x020e 0x4a 0  /* 96752 huayang tp des int GPIO4 */
@@ -2171,7 +2213,6 @@
 		ser-super-frame = <1>;
 
 		ser-init-cmd = <
-			0x0010 0x80 0x64
 			0x0002 0x73 0x0
 			0x0053 0x10 0x0
 			0x0057 0x21 0x0
@@ -2210,17 +2251,17 @@
 			0x3ae 0x0f 0x0
 		>;
 		serdes-dual-setting-cmd = <
-			0 0x0010 0x21 255
+			0 0x0010 0x21 100
 			1 0x0000 0x90 0
 			2 0x0073 0x31 0
 			2 0x0042 0x36 0
 			2 0x0043 0x34 0
-			0 0x0010 0x22 255
+			0 0x0010 0x22 100
 			1 0x0000 0x94 0
 			3 0x0073 0x32 0
 			3 0x0042 0x38 0
 			3 0x0043 0x34 0
-			0 0x0010 0x23 255
+			0 0x0010 0x23 100
 			3 0x0050 0x01 0
 		>;
 		ser-lut-cmd = <
@@ -2237,7 +2278,7 @@
 			des-i2c-addr = <0x48>;
 			bl-i2c-addr = <0x1b>;
 			des-init-cmd = <
-				0x01ce 0x4c 2
+				0x01ce 0x4c 0x0
 				0x06ff 0x11 0x0
 			>;
 			link-indicate-cmd = <
@@ -2268,7 +2309,7 @@
 			des-i2c-addr = <0x4a>;
 			bl-i2c-addr = <0x1c>;
 			des-init-cmd = <
-				0x01ce 0x4c 2
+				0x01ce 0x4c 0x0
 				0x06ff 0x22 0x0
 			>;
 			link-indicate-cmd = <
@@ -2314,10 +2355,10 @@
 	panel_edp: panel@1 {
 		compatible = "panel-edp";
 		status = "disabled";
-		panel-name = "YW-720";
+		panel-name = "HuaYang";
 		panel-mode = "signal-setting";
 
-		use-default-setting = <0>;
+		use-default-setting = <1>;
 
 		BoTai{
 			signal-setting{
@@ -2461,10 +2502,10 @@
 	panel_dp: panel@2 {
 		compatible = "panel-serdes-dp";
 		status = "disabled";
-		panel-name = "YW-1080";
+		panel-name = "HuaYang";
 		panel-mode = "signal-setting";
 
-		use-default-setting = <0>;
+		use-default-setting = <1>;
 
 		BoTai{
 			signal-setting{

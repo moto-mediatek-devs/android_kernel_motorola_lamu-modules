@@ -680,21 +680,13 @@ static int get_panel_feature_info_from_dts(struct max96851_bridge *max_bridge)
 {
 	struct device_node *np = max_bridge->dev->of_node;
 	struct device_node *feature_np = NULL;
-	const char *panel_name;
-	u32 feature_handle_num = 0;
+	u32 feature_handle_num = 0, read_value;
 	int ret = 0;
 
-	panel_name = of_get_property(np, PANEL_NAME, NULL);
-	if (!panel_name) {
-		pr_info("[MAX96851] Panel name is not provided\n");
-		return -EINVAL;
-	}
-
-	max_bridge->panel_name = devm_kzalloc(max_bridge->dev, PANEL_NAME_SIZE, GFP_KERNEL);
-	if (!max_bridge->panel_name)
-		return -ENOMEM;
-
-	strscpy(max_bridge->panel_name, panel_name, PANEL_NAME_SIZE);
+	ret = of_property_read_u32(max_bridge->dev->of_node, USE_DEFAULT_SETTING,
+							&read_value);
+	if (!!read_value)
+		return read_value;
 
 	/* Get child node feature */
 	feature_np = of_get_child_by_name(np, PANEL_FEATURE);
@@ -891,6 +883,19 @@ static int get_serdes_setting_from_dts(struct max96851_bridge *max_bridge)
 	int ret = 0;
 	struct device_node *np = max_bridge->dev->of_node;
 	struct device_node *panel_setting_np;
+	const char *panel_name;
+
+	panel_name = of_get_property(np, PANEL_NAME, NULL);
+	if (!panel_name) {
+		pr_info("[MAX96851] Panel name is not provided\n");
+		return -EINVAL;
+	}
+
+	max_bridge->panel_name = devm_kzalloc(max_bridge->dev, PANEL_NAME_SIZE, GFP_KERNEL);
+	if (!max_bridge->panel_name)
+		return -ENOMEM;
+
+	strscpy(max_bridge->panel_name, panel_name, PANEL_NAME_SIZE);
 
 	panel_setting_np = of_get_child_by_name(np, max_bridge->panel_name);
 	if (!panel_setting_np) {
@@ -966,22 +971,15 @@ static int max96851_dt_parse(struct max96851_bridge *max_bridge, struct device *
 	if (!np)
 		return -EINVAL;
 
-	pr_info("[MAX96851] %s+\n", __func__);
-
 	max_bridge->is_dp = of_device_is_compatible(np, "maxiam,max96851-dp") ? true : false;
 	pr_info("[MAX96851] Serdes for: %d [0: eDP, 1: DP]\n", max_bridge->is_dp);
 
 	get_general_info_from_dts(max_bridge);
 
-	ret = get_panel_feature_info_from_dts(max_bridge);
-	if (ret)
-		pr_info("[MAX96851] use default setting\n");
-
 	ret = get_serdes_setting_from_dts(max_bridge);
 	if (ret)
 		return ret;
 
-	pr_info("[MAX96851] %s-\n", __func__);
 	return 0;
 }
 
@@ -1295,6 +1293,7 @@ static void max96851_pre_enable(struct drm_bridge *bridge)
 	}
 
 	max_bridge->prepared = true;
+	max_bridge->suspend = false;
 	pr_info("[MAX96851] Serdes DP: %d %s-\n", max_bridge->is_dp, __func__);
 }
 
@@ -1330,6 +1329,9 @@ static void max96851_disable(struct drm_bridge *bridge)
 
 	pr_info("[MAX96851] Serdes DP: %d %s+\n", max_bridge->is_dp, __func__);
 
+	if (max_bridge->suspend || !max_bridge->enabled)
+		return;
+
 	/* turn off backlight */
 	if (max_bridge->superframe_support) {
 		turn_on_off_bl(max_bridge, false, 0x01);
@@ -1343,28 +1345,7 @@ static void max96851_disable(struct drm_bridge *bridge)
 		turn_on_off_bl(max_bridge, false, 0x0);
 
 	max_bridge->enabled = false;
-
-	pr_info("[MAX96851] Serdes DP: %d %s-\n", max_bridge->is_dp, __func__);
-}
-
-static void max96851_post_disbale(struct drm_bridge *bridge)
-{
-	struct max96851_bridge *max_bridge = bridge_to_max96851(bridge);
-
-	pr_info("[MAX96851] Serdes DP: %d %s+\n", max_bridge->is_dp, __func__);
-
-
-	if (max_bridge->is_support_hotplug) {
-		if (max_bridge->irq_num <= 0) {
-			atomic_set(&max_bridge->hotplug_event, 0);
-			wake_up_interruptible(&max_bridge->waitq);
-		}
-	}
-
-	gpiod_set_value(max_bridge->gpio_rst_n, 0);
-
 	max_bridge->prepared = false;
-
 	pr_info("[MAX96851] Serdes DP: %d %s-\n", max_bridge->is_dp, __func__);
 }
 
@@ -1372,12 +1353,41 @@ static int max96851_bridge_attach(struct drm_bridge *bridge,
 				enum drm_bridge_attach_flags flags)
 {
 	struct max96851_bridge *max_bridge = bridge_to_max96851(bridge);
+	struct drm_bridge *panel_bridge = NULL;
 	struct device *dev = NULL;
 	int ret;
 
 	pr_info("[MAX96851] Serdes DP: %d %s+\n", max_bridge->is_dp, __func__);
 
 	dev = &max_bridge->max96851_i2c->dev;
+
+	ret = drm_of_find_panel_or_bridge(dev->of_node, 1, 0, &max_bridge->panel1, NULL);
+	if (!max_bridge->panel1) {
+		pr_info("[MAX96851] Failed to find panel %d\n", ret);
+		return -EINVAL;
+	}
+
+	dev_info(dev, "[MAX96851] Found panel node: %pOF\n", max_bridge->panel1->dev->of_node);
+
+	panel_bridge = devm_drm_panel_bridge_add(dev, max_bridge->panel1);
+	if (IS_ERR(panel_bridge)) {
+		dev_info(dev, "[MAX96851] Failed to create panel bridge\n");
+		return PTR_ERR(panel_bridge);
+	}
+	max_bridge->panel_bridge = panel_bridge;
+
+	if (max_bridge->is_support_mst) {
+		ret = drm_of_find_panel_or_bridge(dev->of_node, 3, 0, &max_bridge->panel2, NULL);
+		if (!max_bridge->panel2) {
+			pr_info("[MAX96851] Failed to find panel2 %d\n", ret);
+			return -EINVAL;
+		}
+		dev_info(dev, "[MAX96851] Found panel2 node: %pOF\n", max_bridge->panel2->dev->of_node);
+	}
+
+	ret = get_panel_feature_info_from_dts(max_bridge);
+	if (ret)
+		pr_info("[MAX96851] use default setting\n");
 
 	ret = drm_bridge_attach(bridge->encoder, max_bridge->panel_bridge,
 					bridge, flags | DRM_BRIDGE_ATTACH_NO_CONNECTOR);
@@ -1440,7 +1450,6 @@ static const struct drm_bridge_funcs max96851_bridge_funcs = {
 	.pre_enable = max96851_pre_enable,
 	.enable = max96851_enable,
 	.disable = max96851_disable,
-	.post_disable = max96851_post_disbale,
 	.attach = max96851_bridge_attach,
 	.get_modes = max96851_bridge_get_modes,
 };
@@ -1448,7 +1457,6 @@ static const struct drm_bridge_funcs max96851_bridge_funcs = {
 static int max96851_probe(struct i2c_client *client)
 {
 	struct device *dev = &client->dev;
-	struct drm_bridge *panel_bridge = NULL;
 	struct max96851_bridge *max_bridge = NULL;
 	int ret;
 
@@ -1457,21 +1465,6 @@ static int max96851_probe(struct i2c_client *client)
 	max_bridge = devm_kzalloc(dev, sizeof(*max_bridge), GFP_KERNEL);
 	if (!max_bridge)
 		return -ENOMEM;
-
-	ret = drm_of_find_panel_or_bridge(dev->of_node, 1, 0, &max_bridge->panel1, NULL);
-	if (!max_bridge->panel1) {
-		pr_info("[MAX96851] Failed to find panel %d\n", ret);
-		return -EPROBE_DEFER;
-	}
-
-	dev_info(dev, "[MAX96851] Found panel node: %pOF\n", max_bridge->panel1->dev->of_node);
-
-	panel_bridge = devm_drm_panel_bridge_add(dev, max_bridge->panel1);
-	if (IS_ERR(panel_bridge)) {
-		dev_info(dev, "[MAX96851] Failed to create panel bridge\n");
-		return PTR_ERR(panel_bridge);
-	}
-	max_bridge->panel_bridge = panel_bridge;
 
 	max_bridge->gpio_rst_n = devm_gpiod_get(dev, "reset",
 							GPIOD_OUT_HIGH);
@@ -1482,6 +1475,7 @@ static int max96851_probe(struct i2c_client *client)
 	}
 
 	max_bridge->dev = dev;
+	max_bridge->dev->driver_data = max_bridge;
 	i2c_set_clientdata(client, max_bridge);
 	max_bridge->client = client;
 	max_bridge->max96851_i2c = client;
@@ -1490,17 +1484,6 @@ static int max96851_probe(struct i2c_client *client)
 	if (ret) {
 		dev_info(dev, "[MAX96851] DT parse failed\n");
 		return ret;
-	}
-
-	if (max_bridge->is_support_mst) {
-		ret = drm_of_find_panel_or_bridge(dev->of_node, 3, 0, &max_bridge->panel2, NULL);
-		if (!max_bridge->panel2) {
-			pr_info("[MAX96851] Failed to find panel2 %d\n", ret);
-			return -EPROBE_DEFER;
-		}
-		dev_info(dev, "[MAX96851] Found panel2 node: %pOF\n", max_bridge->panel2->dev->of_node);
-		max_bridge->serdes_enable_index = 0;
-		spin_lock_init(&max_bridge->enable_index_lock);
 	}
 
 	ret = max96851_create_i2c_client(max_bridge);
@@ -1551,6 +1534,60 @@ static void max96851_remove(struct i2c_client *client)
 	drm_bridge_remove(&max_bridge->bridge);
 }
 
+#ifdef CONFIG_PM_SLEEP
+static int maxiam_max96851_suspend(struct device *dev)
+{
+	struct max96851_bridge *max_bridge = dev->driver_data;
+
+	pr_info("[MAX96851] Serdes DP: %d %s+\n", max_bridge->is_dp, __func__);
+	if (max_bridge->suspend)
+		return 0;
+
+	/* turn off backlight */
+	if (max_bridge->enabled) {
+		if (max_bridge->superframe_support) {
+			turn_on_off_bl(max_bridge, false, 0x01);
+			turn_on_off_bl(max_bridge, false, 0x02);
+		} else if(max_bridge->dual_link_support) {
+			turn_on_off_bl(max_bridge, false, 0x0);
+		} else if (max_bridge->is_support_mst) {
+			turn_on_off_bl(max_bridge, false, 0x01);
+			turn_on_off_bl(max_bridge, false, 0x02);
+		} else
+			turn_on_off_bl(max_bridge, false, 0x0);
+	}
+
+	if (max_bridge->is_support_hotplug) {
+		if (max_bridge->irq_num <= 0) {
+			atomic_set(&max_bridge->hotplug_event, 0);
+			wake_up_interruptible(&max_bridge->waitq);
+		}
+	}
+
+	msleep(500);
+	gpiod_set_value(max_bridge->gpio_rst_n, 0);
+	max_bridge->suspend = true;
+	pr_info("[MAX96851] Serdes DP: %d %s-\n", max_bridge->is_dp, __func__);
+
+	return 0;
+}
+
+static int maxiam_max96851_resume(struct device *dev)
+{
+	struct max96851_bridge *max_bridge = dev->driver_data;
+
+	pr_info("[MAX96851] Serdes DP: %d %s+\n", max_bridge->is_dp, __func__);
+
+	reset_ser(max_bridge);
+	max_bridge->suspend = false;
+
+	pr_info("[MAX96851] Serdes DP: %d %s-\n", max_bridge->is_dp, __func__);
+	return 0;
+}
+#endif
+
+static SIMPLE_DEV_PM_OPS(maxiam_max96851_pm_ops, maxiam_max96851_suspend, maxiam_max96851_resume);
+
 static const struct i2c_device_id max96851_edp_i2c_table[] = {
 	{"max96851-dp", 0},
 	{"max96851-edp", 0},
@@ -1575,6 +1612,7 @@ static struct i2c_driver max96851_edp_driver = {
 		.owner = THIS_MODULE,
 		.name = "max96851-serdes",
 		.of_match_table = of_match_ptr(max96851_serdes_match),
+		.pm = &maxiam_max96851_pm_ops,
 	},
 
 };

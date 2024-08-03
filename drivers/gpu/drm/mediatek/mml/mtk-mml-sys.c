@@ -239,8 +239,6 @@ struct sys_frame_data {
 	u32 frame_pipe_conti_jump;
 
 	u32 tile_idx;
-
-	u16 label_vlp_sleep;
 };
 
 struct dl_frame_data {
@@ -295,12 +293,6 @@ static s32 sys_config_prepare(struct mml_comp *comp, struct mml_task *task,
 	return 0;
 }
 
-static u32 sys_get_label_count(struct mml_comp *comp, struct mml_task *task,
-	struct mml_comp_config *ccfg)
-{
-	return 1;
-}
-
 static s32 sys_setup_framedone_events(struct mml_comp *comp, struct mml_task *task,
 	struct mml_comp_config *ccfg)
 {
@@ -345,15 +337,9 @@ static s32 sys_init(struct mml_comp *comp, struct mml_task *task,
 	struct cmdq_pkt *pkt = task->pkts[ccfg->pipe];
 
 	if (cfg->dpc) {
-		if (mml_dl_dpc & MML_DPC_PKT_VOTE) {
-			struct sys_frame_data *sys_frm = sys_frm_data(ccfg);
-			struct mml_task_reuse *reuse = &task->reuse[ccfg->pipe];
-
-			mml_add_reuse_label(comp->id, &task->reuse[ccfg->pipe],
-				&sys_frm->label_vlp_sleep, 0);
+		if (mml_dl_dpc & MML_DPC_PKT_VOTE && cfg->info.mode != MML_MODE_DDP_ADDON)
 			mml_dpc_power_keep_gce(comp->sysid, pkt, sys->data->gpr[ccfg->pipe],
-				&reuse->labels[sys_frm->label_vlp_sleep]);
-		}
+				&task->dpc_reuse_sys);
 	}
 
 	if (mml_isdc(cfg->info.mode) && !mml_dev_get_couple_cnt(cfg->mml)) {
@@ -674,13 +660,13 @@ static void sys_insert_begin_loop(struct mml_task *task,
 		}
 	}
 
-	sys_frm->frame_loop_offset = pkt->cmd_buf_size;
-
 	lhs.reg = true;
 	lhs.idx = MML_CMDQ_ROUND_SPR;
 	rhs.reg = false;
 	rhs.value = 1;
 	cmdq_pkt_logic_command(pkt, CMDQ_LOGIC_ADD, MML_CMDQ_ROUND_SPR, &lhs, &rhs);
+
+	sys_frm->frame_loop_offset = cmdq_pkt_get_curr_offset(pkt);
 
 	if (ccfg->pipe == 0 && cfg->dual && cfg->disp_vdo && likely(mml_ir_loop)) {
 		cmdq_pkt_assign_command(pkt, CMDQ_THR_SPR_IDX0, 0);
@@ -1007,10 +993,12 @@ static s32 sys_done(struct mml_comp *comp, struct mml_task *task,
 		    struct mml_comp_config *ccfg)
 {
 	struct cmdq_pkt *pkt = task->pkts[ccfg->pipe];
+	struct mml_frame_config *cfg = task->config;
 
 	cmdq_pkt_write(pkt, NULL, comp->base_pa + SYS_MISC_REG, 0, GENMASK(21, 12));
 
-	if (task->config->dpc && (mml_dl_dpc & MML_DPC_PKT_VOTE)) {
+	if (task->config->dpc && (mml_dl_dpc & MML_DPC_PKT_VOTE) &&
+	    cfg->info.mode != MML_MODE_DDP_ADDON) {
 #ifndef MML_FPGA
 		mml_dpc_power_release_gce(comp->sysid, pkt);
 #endif
@@ -1039,7 +1027,6 @@ static s32 sys_repost(struct mml_comp *comp, struct mml_task *task,
 
 static const struct mml_comp_config_ops sys_config_ops = {
 	.prepare = sys_config_prepare,
-	.get_label_count = sys_get_label_count,
 	.init = sys_init,
 	.frame = sys_config_frame,
 	.tile = sys_config_tile,
@@ -1208,7 +1195,7 @@ s32 mml_mminfra_pw_enable(struct mml_comp *comp)
 	 * cause mminfra must power on before other mtcmos, and must off after it.
 	 */
 	mml_msg_dpc("%s mminfra pm_runtime_resume_and_get", __func__);
-	mml_mmp(dpc_pm_runtime_get, MMPROFILE_FLAG_PULSE, 0, 0);
+	mml_mmp(pw_get, MMPROFILE_FLAG_PULSE, 0, 0);
 	ret = pm_runtime_resume_and_get(sys->dev);
 	if (ret)
 		mml_err("%s enable pw-domain fail ret:%d", __func__, ret);
@@ -1239,7 +1226,7 @@ s32 mml_mminfra_pw_disable(struct mml_comp *comp)
 	}
 
 	mml_msg_dpc("%s mminfra pm_runtime_put_sync", __func__);
-	mml_mmp(dpc_pm_runtime_put, MMPROFILE_FLAG_PULSE, 0, 0);
+	mml_mmp(pw_put, MMPROFILE_FLAG_PULSE, 0, 0);
 	pm_runtime_put_sync(sys->dev);
 
 	return 0;
@@ -2694,12 +2681,35 @@ static const struct mml_data mt6899_mmlt_data = {
 	},
 	.aid_sel = sys_config_aid_sel_bits_sys,
 	.hw_ops = &sys_hw_ops_mminfra,
+	.debug_ops = &sys_debug_ops,
 	.gpr = {CMDQ_GPR_R12, CMDQ_GPR_R14},
 	.px_per_tick = 2,
 	.aidsel_mode = MML_AIDSEL_ENGINEBITS,
 	.sysid = mml_sys_tile,
 	.pw_mminfra = true,
-	.ddren = 0x42,
+	.ddren = 0x22,
+};
+
+static const struct mml_data mt6899_mmlf_data = {
+	.comp_inits = {
+		[MML_CT_SYS] = &sys_comp_init,
+		[MML_CT_DL_IN] = &dli_comp_init,
+		[MML_CT_DL_OUT] = &dlo_comp_init,
+	},
+	.ddp_comp_funcs = {
+		[MML_CT_SYS] = &sys_ddp_funcs,
+		[MML_CT_DL_IN] = &dl_ddp_funcs,
+		[MML_CT_DL_OUT] = &dl_ddp_funcs,
+	},
+	.aid_sel = sys_config_aid_sel_bits_sys,
+	.hw_ops = &sys_hw_ops_mminfra,
+	.debug_ops = &sys_debug_ops,
+	.gpr = {CMDQ_GPR_R08, CMDQ_GPR_R10},
+	.px_per_tick = 2,
+	.aidsel_mode = MML_AIDSEL_ENGINEBITS,
+	.sysid = mml_sys_frame,
+	.pw_mminfra = true,
+	.ddren = 0x22,
 };
 
 static const struct mml_data mt6989_mml_data = {
@@ -2796,7 +2806,7 @@ const struct of_device_id mtk_mml_of_ids[] = {
 	},
 	{
 		.compatible = "mediatek,mt6899-mml1",
-		.data = &mt6989_mml_data ,
+		.data = &mt6899_mmlf_data,
 	},
 	{
 		.compatible = "mediatek,mt6989-mml",

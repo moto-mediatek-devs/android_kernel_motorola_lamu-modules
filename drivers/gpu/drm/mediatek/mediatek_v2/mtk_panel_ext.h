@@ -377,6 +377,7 @@ struct dynamic_mipi_params {
 	unsigned int switch_en;
 	unsigned int pll_clk;
 	unsigned int data_rate;
+	unsigned int data_rate_khz;
 
 	unsigned int vsa;
 	unsigned int vbp;
@@ -400,6 +401,7 @@ struct dynamic_fps_params {
 	unsigned int switch_en;
 	unsigned int vact_timing_fps;
 	unsigned int data_rate;
+	unsigned int data_rate_khz;
 	struct dfps_switch_cmd dfps_cmd_table[MAX_DYN_CMD_NUM];
 };
 
@@ -505,7 +507,9 @@ enum DISPLAY_MODE {
 struct mtk_panel_params {
 	unsigned int pll_clk;
 	unsigned int data_rate;
+	unsigned int data_rate_khz;
 	unsigned int vdo_per_frame_lp_enable; /* Enable video mode per frame lp */
+	unsigned int change_fps_by_vfp_send_cmd;
 	struct mtk_dsi_phy_timcon phy_timcon;
 	unsigned int vfp_low_power;
 	struct dynamic_mipi_params dyn;
@@ -656,11 +660,10 @@ struct mtk_panel_funcs {
 			void *handle, unsigned int flag);
 	int (*get_virtual_heigh)(void);
 	int (*get_virtual_width)(void);
-#if IS_ENABLED(CONFIG_ENABLE_SERDES_HOTPLUG)
 	int (*get_link_status)(struct drm_panel *panel);
-#endif
 	void (*get_switch_mode_delay)(enum SWITCH_MODE_DELAY **switch_mode_delay,
 		unsigned int mode_num);
+	int (*get_real_vdo_timing)(struct drm_panel *panel, struct drm_display_mode *mode);
 	/**
 	 * @doze_enable_start:
 	 *

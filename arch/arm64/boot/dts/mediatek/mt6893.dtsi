@@ -702,14 +702,6 @@ cpus {
 			alloc-ranges = <0 0x80000000 0 0xc0000000>;
 		};
 
-		ssheap_cma_mem: ssheap-reserved-cma_memory {
-			compatible = "shared-dma-pool";
-			reusable;
-			size = <0 0x10000000>;
-			alignment = <0 0x200000>;
-			alloc-ranges = <0 0x80000000 0 0xc0000000>;
-		};
-
 		gps_mem: gps-reserve-memory {
 			compatible = "mediatek,gps-reserve-memory";
 			no-map;
@@ -749,7 +741,7 @@ cpus {
 		svp-region-based-size = <0 0x10000000>;
 		2d_fr-size = <0 0x8000000>;
 		tui-size = <0 0x4000000>;
-		wfd-size = <0 0x4000000>;
+		wfd-region-based-size = <0 0x4000000>;
 		prot-region-based-size = <0 0x8000000>;
 		ta-elf-size = <0 0x1000000>;
 		ta-stack-heap-size = <0 0x6000000>;
@@ -760,11 +752,6 @@ cpus {
 	ssmr {
 		compatible = "mediatek,trusted_mem";
 		memory-region = <&ssmr_cma_mem>;
-	};
-
-	ssheap {
-		compatible = "mediatek,trusted_mem_ssheap";
-		memory-region = <&ssheap_cma_mem>;
 	};
 
 	timer: timer {
@@ -3191,8 +3178,6 @@ cpus {
 
 			u2port0: usb2-phy0@11e40000 {
 				reg = <0 0x11e40000 0 0x700>;
-				clocks = <&clk26m>;
-				clock-names = "ref";
 				#phy-cells = <1>;
 				mediatek,eye-vrt = <6>; /* 0~7 */
 				mediatek,eye-term = <6>; /* 0~7 */
@@ -3204,15 +3189,12 @@ cpus {
 				nvmem-cells = <&u2_phy_data>;
 				nvmem-cell-names = "intr_cal";
 				nvmem-cell-masks = <0x1f>;
-				usb2jtag = <&infracfg_ao_clk 1>;
 				mediatek,set-efuse-v1;
 				status = "okay";
 			};
 
 			u3port0: usb3-phy0@11e40700 {
 				reg = <0 0x11e40700 0 0x900>;
-				clocks = <&clk26m>;
-				clock-names = "ref";
 				#phy-cells = <1>;
 				nvmem-cells = <&u3_phy_data>, <&u3_phy_data>,
 					<&u3_phy_data>;
@@ -4727,7 +4709,7 @@ cpus {
 			mediatek,clock-parents = <4 3>;
 			operating-points-v2 = <&opp_table_vdec>;
 			mmdvfs-dvfsrc-vcore-supply = <&dvfsrc_vcore>;
-
+			vdec-set-bw-in-min-freq = <1>;
 			throughput-op-rate-thresh = <120>;
 			throughput-min = <249000000>;
 			throughput-normal-max = <450000000>;
@@ -7315,6 +7297,12 @@ cpus {
 				&mdp_smi_subcom &mdp_smi_subcom1
 				&cam_smi_5x1_sub_comm &cam_smi_2x1_sub_comm0
 				&cam_smi_2x1_sub_comm1 &ipe_smi_2x1_sub_comm>;
+		};
+
+
+		smi-test {
+			compatible = "mediatek,smi-testcase";
+			mediatek,larbs = <&smi_larb2>;
 		};
 
 		smi_larb2: smi-larb2@1f003000 {

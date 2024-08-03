@@ -332,7 +332,8 @@ static u8 bw_to_level(const u32 total_bw);
 struct mtk_dpc {
 	struct platform_device *pdev;
 	struct device *dev;
-	struct device *pd_dev;
+	struct device *pd_dev;			/* mminfra mtcmos */
+	struct device *root_dev;		/* disp_vcore mtcmos */
 	struct notifier_block pm_nb;
 	struct notifier_block vcp_nb;
 	int disp_irq;
@@ -358,6 +359,7 @@ struct mtk_dpc {
 	u32 srt_emi_efficiency;			/* total srt * srt_emi_efficiency / 100 */
 	u32 hrt_emi_efficiency;			/* total hrt * 100 / hrt_emi_efficiency */
 	u32 ch_bw_urate;			/* channel bw * 100 / ch_bw_urate */
+	u32 dsi_ck_keep_mask;
 
 	void __iomem *vdisp_dvfsrc;
 	u32 vdisp_dvfsrc_idle_mask;

@@ -1218,14 +1218,14 @@
 				<&iommu0 M4U_PORT_L2_MDP_RDMA1>,
 				<&iommu0 M4U_PORT_L2_MDP_WROT0>,
 				<&iommu0 M4U_PORT_L2_MDP_WROT1>;
-			dma_mask_bit = <35>;
+			dma-mask-bit = <35>;
 		};
 
 		mdp: mdp@1f000000 {
 			compatible = "mediatek,mdp";
 			reg = <0 0x1f000000 0 0x1000>;
 			thread-count = <24>;
-			mboxes = <&gce 10 0 CMDQ_THR_PRIO_1>,
+			mboxes = <&gce_sec 10 0 CMDQ_THR_PRIO_1>,
 				<&gce 19 0 CMDQ_THR_PRIO_1>,
 				<&gce 20 0 CMDQ_THR_PRIO_1>,
 				<&gce 21 0 CMDQ_THR_PRIO_1>,
@@ -2283,6 +2283,7 @@
 						"path_vdec_ufo_c", "path_vdec_rg_ctrl_dma",
 						"path_larb4";
 			interconnect-num = <13>;
+			vdec-set-bw-in-min-freq = <1>;
 			throughput-op-rate-thresh = <120>;
 			throughput-min = <218000000>;
 			throughput-normal-max = <312000000>;
@@ -2301,8 +2302,8 @@
 
 			throughput-table =
 				<877088845 0 597 597>, /* MPEG4 FHD30 312MHz*/
-				<826757197 0 218 218>, /* MPEG1 */
-				<843534413 0 218 218>, /* MPEG2 */
+				<826757197 0 597 597>, /* MPEG1 */
+				<843534413 0 597 597>, /* MPEG2 */
 				<859189832 0 218 218>, /* H.263 */
 				<875967048 0 218 218>, /* H.264 1088p60 312MHz*/
 				<826496577 0 218 218>, /* H.264 */
@@ -2312,16 +2313,16 @@
 				<808996950 0 218 218>, /* VP8 */
 				<809062486 0 218 218>; /* VP9 */
 			bandwidth-table =
-				<4 2 232>,
+				<4 2 308>,
 				<4 0 0>,
-				<4 1 178>,
+				<4 1 236>,
 				<4 2 1>,
 				<4 2 1>,
 				<4 2 0>,
 				<4 2 0>,
-				<4 0 8>,
+				<4 0 11>,
 				<4 0 0>,
-				<4 0 16>,
+				<4 0 22>,
 				<4 2 0>,
 				<4 0 0>;
 			svp-mtee = <1>;
@@ -2779,10 +2780,6 @@
 				fh-id = <8>;
 				pll-id = <999>;
 				perms = <0x1C>;
-			};
-			mmpll {
-				fh-id = <9>;
-				pll-id = <CLK_APMIXED_MMPLL>;
 			};
 			mainpll {
 				fh-id = <10>;
@@ -3550,6 +3547,12 @@
 		compatible = "microtrust,tester-v1";
 	};
 
+
+	eas_info: eas-info {
+		compatible = "mediatek,eas-info";
+		legacy-api-support = <1>;
+	};
+
 	fpsgo: fpsgo {
 		compatible = "mediatek,fpsgo";
 		interconnects = <&dvfsrc MT6873_MASTER_MCUSYS &dvfsrc MT6873_SLAVE_DDR_EMI>;
@@ -3755,7 +3758,7 @@
 		mbox-count = <5>;
 		/* id, mbox, send_size*/
 		send-table =
-		< 0 0  9>, /* IPI_OUT_AUDIO_VOW_1 */
+		< 0 0  11>, /* IPI_OUT_AUDIO_VOW_1 */
 		< 3 1  2>, /* IPI_OUT_APCCCI_0 */
 		< 4 1  1>, /* IPI_OUT_DVFS_SET_FREQ_0 */
 		< 5 1  2>, /* IPI_OUT_C_SLEEP_0 */
@@ -3879,7 +3882,7 @@
 
 	scp_dvfs {
 		compatible = "mediatek,scp-dvfs";
-		scp-dvfs-disable;
+		scp-dvfs-disable = <0>;
 		clocks =
 			<&topckgen_clk CLK_TOP_SCP_SEL>,
 			<&topckgen_clk CLK_TOP_TCK_26M_MX9>,
@@ -3918,11 +3921,20 @@
 		dvfsrc-vscp-supply = <&dvfsrc_vscp>;
 
 		do-ulposc-cali;
-		fmeter_clksys = <&topckgen_clk>;
-		ulposc_clksys = <&apmixedsys_clk>;
-		scp_clk_ctrl = <&scp_clk_ctrl>;
+		fmeter-clksys = <&topckgen_clk>;
+		ulposc-clksys = <&apmixedsys_clk>;
+		scp-clk-ctrl = <&scp_clk_ctrl>;
 		scp-clk-hw-ver = "v1";
 		ulposc-cali-ver = "v1";
+		ulposc-cali-alg-ver = <0>;
+		fmeter-args-u2-cali =
+		/* fm_id	fm_type */
+		 < 36		1>; /* OSC2_SYNC_CK (i.e. D2) */
+		fmeter-args-u2-result =
+		/* fm_id	fm_type */
+		 < 36		1>; /* OSC2_CK */
+		fmeter-id-ulposc2 = <36>;
+		fmeter-id-26M = <25>;
 		ulposc-cali-num = <3>;
 		ulposc-cali-target = <250 330 400>;
 		ulposc-cali-config =
@@ -3932,9 +3944,11 @@
 			<0x5ea940	0x2900		0x41>;
 		clk-dbg-ver = "v1";
 		ccf-fmeter-support;
-		secure_access = "enable"; /* enable: need to secure access scp */
 		legacy-support-v1;
+		scp-dvfs-flag = "enable";
+
 	};
+
 
 	sspm@10400000 {
 		compatible = "mediatek,sspm";

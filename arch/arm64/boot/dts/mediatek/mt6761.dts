@@ -1854,7 +1854,7 @@ firmware_class.path=/vendor/firmware kvm-arm.mode=none";
 		iommus = <&iommu M4U_PORT_MDP_RDMA0>,
 			<&iommu M4U_PORT_MDP_WDMA0>,
 			<&iommu M4U_PORT_MDP_WROT0>;
-		dma_mask_bit = <35>;
+		dma-mask-bit = <35>;
 	};
 
 	emimpu@10226000 {
@@ -3450,6 +3450,11 @@ firmware_class.path=/vendor/firmware kvm-arm.mode=none";
 				"CG_MM_SMI_COMMON";
 	};
 
+	smi-test {
+		compatible = "mediatek,smi-testcase";
+		mediatek,larbs = <&smi_larb2>;
+	};
+
 	smi_larb2: smi_larb2@15001000 {
 		compatible = "mediatek,smi_larb2", "mediatek,smi-larb",
 			     "mediatek,mt6761-smi-larb";
@@ -4192,7 +4197,7 @@ firmware_class.path=/vendor/firmware kvm-arm.mode=none";
 		required-opps = <&dvfsrc_freq_opp0>;
 
 		gcc-enable = <0>;
-		fbt-cpu-mask = <15 15 15 15>;
+		fbt-cpu-mask = <15 15 15 15 15 15>;
 		sbe-resceue-enable = <1>;
 		boost-dram = <2>;
 	};

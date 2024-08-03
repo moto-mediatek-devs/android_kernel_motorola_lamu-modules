@@ -107,8 +107,10 @@ static struct device *get_dev_by_mem_type(struct venc_inst *inst, struct vcodec_
 			return vcp_get_io_device_ex(VCP_IOMMU_VCP);
 	} else if (mem->type == MEM_TYPE_FOR_SEC_SW)
 		return vcp_get_io_device_ex(VCP_IOMMU_SEC);
-	else if (mem->type == MEM_TYPE_FOR_HW || mem->type == MEM_TYPE_FOR_SEC_HW
-			|| mem->type == MEM_TYPE_FOR_SEC_WFD_HW)
+	else if (mem->type == MEM_TYPE_FOR_HW ||
+		 mem->type == MEM_TYPE_FOR_HW_CACHE ||
+		 mem->type == MEM_TYPE_FOR_SEC_HW ||
+		 mem->type == MEM_TYPE_FOR_SEC_WFD_HW)
 		return inst->vcu_inst.ctx->dev->smmu_dev;
 	else
 		return NULL;
@@ -1925,6 +1927,9 @@ static int venc_vcp_set_param(unsigned long handle,
 		inst->vsi->config.qpvbr_upper_enable = enc_prm->qpvbr_upper_enable;
 		inst->vsi->config.qpvbr_qp_upper_threshold = enc_prm->qpvbr_qp_upper_threshold;
 		inst->vsi->config.qpvbr_qp_max_brratio = enc_prm->qpvbr_qp_max_brratio;
+		inst->vsi->config.qpvbr_lower_enable = enc_prm->qpvbr_lower_enable;
+		inst->vsi->config.qpvbr_qp_lower_threshold = enc_prm->qpvbr_qp_lower_threshold;
+		inst->vsi->config.qpvbr_qp_min_brratio = enc_prm->qpvbr_qp_min_brratio;
 		inst->vsi->config.cb_qp_offset = enc_prm->cb_qp_offset;
 		inst->vsi->config.cr_qp_offset = enc_prm->cr_qp_offset;
 		inst->vsi->config.mbrc_tk_spd = enc_prm->mbrc_tk_spd;

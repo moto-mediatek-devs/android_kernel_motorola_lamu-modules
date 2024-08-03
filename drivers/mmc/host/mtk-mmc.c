@@ -64,6 +64,8 @@
 #define PAD_DS_DLY3		(0x1f << 0)	/* RW */
 #define PAD_DELAY_MAX	32 /* PAD delay cells */
 
+#define MSDC_RESET_HW_TIMEOUT 100000
+
 #define MSDC_GPIO_2 "msdc_gpio=2"
 
 static void msdc_request_done(struct msdc_host *host, struct mmc_request *mrq);
@@ -714,7 +716,9 @@ static const struct mtk_mmc_compatible mt6899_compat = {
 	.new_tx_ver = MSDC_NEW_TX_V2,
 	.new_rx_ver = MSDC_NEW_RX_V1,
 	.infra_check = {
-		.enable = false,
+		.enable = true,
+		.infra_ack_bit = BIT(14),
+		.infra_ack_paddr = 0x1c001104,
 	},
 };
 
@@ -787,12 +791,38 @@ static void sdr_get_field(void __iomem *reg, u32 field, u32 *val)
 static void msdc_reset_hw(struct msdc_host *host)
 {
 	u32 val;
+	int ret;
 
 	sdr_set_bits(host->base + MSDC_CFG, MSDC_CFG_RST);
-	readl_poll_timeout(host->base + MSDC_CFG, val, !(val & MSDC_CFG_RST), 0, 0);
+	ret = readl_poll_timeout_atomic(host->base + MSDC_CFG, val,
+			!(val & MSDC_CFG_RST), 1, MSDC_RESET_HW_TIMEOUT);
+	if (ret) {
+		dev_info(host->dev, "[%s %d]timeout dump\n", __func__, __LINE__);
+		msdc_dump_info(NULL, 0, NULL, host);
+	}
+
+	sdr_set_field(host->base + MSDC_DMA_CTRL, MSDC_DMA_CTRL_STOP, 1);
+	ret = readl_poll_timeout_atomic(host->base + MSDC_DMA_CTRL, val,
+			!(val & MSDC_DMA_CTRL_STOP), 1, MSDC_RESET_HW_TIMEOUT);
+	if (ret) {
+		dev_info(host->dev, "[%s %d]timeout dump\n", __func__, __LINE__);
+		msdc_dump_info(NULL, 0, NULL, host);
+	}
+
 	sdr_set_bits(host->base + MSDC_FIFOCS, MSDC_FIFOCS_CLR);
-	readl_poll_timeout(host->base + MSDC_FIFOCS, val,
-			   !(val & MSDC_FIFOCS_CLR), 0, 0);
+	ret = readl_poll_timeout_atomic(host->base + MSDC_FIFOCS, val,
+			!(val & MSDC_FIFOCS_CLR), 1, MSDC_RESET_HW_TIMEOUT);
+	if (ret) {
+		dev_info(host->dev, "[%s %d]timeout dump\n", __func__, __LINE__);
+		msdc_dump_info(NULL, 0, NULL, host);
+	}
+
+	ret = readl_poll_timeout_atomic(host->base + MSDC_DMA_CFG, val,
+			!(val & MSDC_DMA_CFG_STS), 1, MSDC_RESET_HW_TIMEOUT);
+	if (ret) {
+		dev_info(host->dev, "[%s %d]timeout dump\n", __func__, __LINE__);
+		msdc_dump_info(NULL, 0, NULL, host);
+	}
 
 	val = readl(host->base + MSDC_INT);
 	writel(val, host->base + MSDC_INT);
@@ -1739,7 +1769,8 @@ static void msdc_start_command(struct msdc_host *host,
 		return;
 
 	if ((readl(host->base + MSDC_FIFOCS) & MSDC_FIFOCS_TXCNT) >> 16 ||
-	    readl(host->base + MSDC_FIFOCS) & MSDC_FIFOCS_RXCNT) {
+	    readl(host->base + MSDC_FIFOCS) & MSDC_FIFOCS_RXCNT ||
+	    readl(host->base + MSDC_DMA_CFG) & MSDC_DMA_CFG_STS) {
 		dev_err(host->dev, "TX/RX FIFO non-empty before start of IO. Reset\n");
 		msdc_reset_hw(host);
 	}
@@ -2084,6 +2115,13 @@ static bool msdc_data_xfer_done(struct msdc_host *host, u32 events,
 			dev_info(host->dev, "DMA stop timed out\n");
 			return false;
 		}
+
+		sdr_set_bits(host->base + MSDC_FIFOCS, MSDC_FIFOCS_CLR);
+		readl_poll_timeout(host->base + MSDC_FIFOCS, val,
+				   !(val & MSDC_FIFOCS_CLR), 0, 0);
+
+		readl_poll_timeout(host->base + MSDC_DMA_CFG, val, !(val & MSDC_DMA_CFG_STS), 0, 0);
+
 		spin_lock_irqsave(&host->lock, flags);
 		sdr_clr_bits(host->base + MSDC_INTEN, data_ints_mask);
 		spin_unlock_irqrestore(&host->lock, flags);
@@ -2104,14 +2142,14 @@ static bool msdc_data_xfer_done(struct msdc_host *host, u32 events,
 				data->error = -ETIMEDOUT;
 				host->data_timeout_cont++;
 				bitmap_set(host->err_bag.err_bitmap,3,1);
-				host->err_bag.cmd_opcode = mrq->cmd->opcode;
+				host->err_bag.cmd_opcode = data->mrq->cmd->opcode;
 				host->err_bag.blocks = data->blocks;
 				host->err_bag.bytes_xfered = data->bytes_xfered;
 			} else if (events & MSDC_INT_DATCRCERR) {
 				host->data_timeout_cont = 0;
 				data->error = -EILSEQ;
 				bitmap_set(host->err_bag.err_bitmap,2,1);
-				host->err_bag.cmd_opcode = mrq->cmd->opcode;
+				host->err_bag.cmd_opcode = data->mrq->cmd->opcode;
 				host->err_bag.blocks = data->blocks;
 				host->err_bag.bytes_xfered = data->bytes_xfered;
 			}
@@ -2368,7 +2406,7 @@ static irqreturn_t msdc_irq(int irq, void *dev_id)
 		    (events & MSDC_INT_CMDQ)) {
 			msdc_cmdq_irq(host, events);
 			/* clear interrupts */
-			writel(events & event_mask, host->base + MSDC_INT);
+			writel(events, host->base + MSDC_INT);
 			return IRQ_HANDLED;
 		}
 #if !IS_ENABLED(CONFIG_DEVICE_MODULES_MMC_MTK_SW_CQHCI)
@@ -3736,6 +3774,10 @@ static int msdc_execute_hs400_tuning(struct mmc_host *mmc, struct mmc_card *card
 		host->dvfsrc_vcore_power ?
 		regulator_get_voltage(host->dvfsrc_vcore_power) : -1);
 
+#if IS_ENABLED(CONFIG_DEVICE_MODULES_MMC_CQHCI_DEBUG)
+	dump_stack();
+#endif
+
 	if (host->top_base) {
 		sdr_set_bits(host->top_base + EMMC50_PAD_DS_TUNE,
 			     PAD_DS_DLY_SEL);// 1:DS pass through
@@ -3794,11 +3836,12 @@ static int msdc_execute_hs400_tuning(struct mmc_host *mmc, struct mmc_card *card
 	dev_info(host->dev,"[%s]msdc tune pass,opcode=%d,vcore=%d",
 		__func__, MMC_SEND_EXT_CSD, host->autok_vcore);
 	host->is_skip_hs200_tune = 1;
-
+	msdc_reset_hw(host);
 	return 0;
 
 fail:
 	dev_err(host->dev, "Failed to tuning DS pin delay!\n");
+	msdc_reset_hw(host);
 	return -EIO;
 }
 
@@ -3962,14 +4005,9 @@ static void msdc_cqe_disable(struct mmc_host *mmc, bool recovery)
 	/* disable busy check */
 	sdr_clr_bits(host->base + MSDC_PATCH_BIT1, MSDC_PB1_BUSY_CHECK_SEL);
 
-	if (recovery) {
-		sdr_set_field(host->base + MSDC_DMA_CTRL,
-			      MSDC_DMA_CTRL_STOP, 1);
-		if (WARN_ON(readl_poll_timeout(host->base + MSDC_DMA_CFG, val,
-			!(val & MSDC_DMA_CFG_STS), 1, 3000)))
-			return;
+	if (recovery)
 		msdc_reset_hw(host);
-	}
+
 }
 
 static void msdc_cqe_pre_enable(struct mmc_host *mmc)
@@ -4012,11 +4050,25 @@ static const struct mmc_host_ops mt_msdc_ops = {
 	.init_card = msdc_ops_init_card,
 };
 
+#if IS_ENABLED(CONFIG_DEVICE_MODULES_MMC_CQHCI_DEBUG)
+extern void mt_irq_dump_status(unsigned int irq);
+void msdc_dumpregs(struct mmc_host *mmc)
+{
+	struct msdc_host *host = mmc_priv(mmc);
+
+	msdc_dump_info(NULL, 0, NULL, host);
+	mt_irq_dump_status(host->irq);
+}
+#endif
+
 static const struct cqhci_host_ops msdc_cmdq_ops = {
 	.enable         = msdc_cqe_enable,
 	.disable        = msdc_cqe_disable,
 	.pre_enable = msdc_cqe_pre_enable,
 	.post_disable = msdc_cqe_post_disable,
+#if IS_ENABLED(CONFIG_DEVICE_MODULES_MMC_CQHCI_DEBUG)
+	.dumpregs = msdc_dumpregs,
+#endif
 };
 
 static irqreturn_t sdio_eint_irq(int irq, void *dev_id)
@@ -4414,6 +4466,8 @@ static int msdc_drv_probe(struct platform_device *pdev)
 	ret = mmc_of_parse(mmc);
 	if (ret)
 		goto host_free;
+
+	mmc->cqe_recovery_reset_always = 1;
 
 	host->base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(host->base)) {

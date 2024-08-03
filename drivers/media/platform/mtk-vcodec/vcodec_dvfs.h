@@ -17,7 +17,7 @@
 #define BW_FACTOR_10BIT 125
 #define BW_FACTOR_NONAFBC 114
 
-#if 0//IS_ENABLED(CONFIG_MTK_SCHED_FAST_LOAD_TRACKING)
+#if IS_ENABLED(CONFIG_MTK_SCHED_FAST_LOAD_TRACKING)
 extern void set_top_grp_aware(int val, int force_ctrl);
 extern void set_grp_awr_min_opp_margin(int gear_id, int group_id, int val);
 extern void set_grp_awr_thr(int gear_id, int group_id, int opp);
@@ -101,6 +101,7 @@ struct dvfs_params {
 	u8 mmdvfs_in_adaptive; /* need send dvfs/mmqos request to vcp*/
 	u8 init_boost;
 	u32 last_boost_time;
+	u8 set_bw_in_min_freq; /* need set bw at min freq*/
 
 };
 

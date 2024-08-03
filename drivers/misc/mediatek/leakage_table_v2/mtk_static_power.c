@@ -498,7 +498,7 @@ int mt_spower_init(void)
 		err_flag = 1;
 		goto efuse_end;
 	}
-	pdev = of_device_alloc(node, NULL, NULL);
+	pdev = of_find_device_by_node(node);
 	if (pdev == NULL) {
 		pr_notice("%s fail to create pdev 1 (eem-fsm)\n", __func__);
 		node = of_find_node_by_name(NULL, "lkg");
@@ -507,7 +507,7 @@ int mt_spower_init(void)
 			err_flag = 1;
 			goto efuse_end;
 		}
-		pdev = of_device_alloc(node, NULL, NULL);
+		pdev = of_find_device_by_node(node);
 		if (pdev == NULL) {
 			pr_notice("%s fail to create pdev 1 (lkg)\n", __func__);
 			pdev = of_find_device_by_node(node);
@@ -606,8 +606,8 @@ efuse_end:
 
 init_end:
 	if (err_flag != 1 && pdev != NULL) {
-		of_platform_device_destroy(&pdev->dev, NULL);
-		put_device(&pdev->dev);
+		of_node_put(node);
+		platform_device_put(pdev);
 	}
 
 	return 0;

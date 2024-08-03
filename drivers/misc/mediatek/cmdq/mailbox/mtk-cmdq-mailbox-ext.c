@@ -27,6 +27,9 @@
 #include <linux/pm_domain.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h>
 #include <linux/arm-smccc.h>
+#if IS_ENABLED(CONFIG_VHOST_CMDQ)
+#include <linux/libnvdimm.h>
+#endif
 
 #include <iommu_debug.h>
 #include <mt-plat/mtk_irq_mon.h>
@@ -126,6 +129,11 @@ struct cmdq_util_controller_fp *cmdq_util_controller;
 
 #define CMDQ_MIN_AGE_VALUE              (5)	/* currently disable age */
 #define CMDQ_INIT_BUF_SIZE		8484
+
+#define CMDQ_MMINFRA_VOTER_OFS	0x120
+#define CMDQ_MMINFRA_VOTER_GCED_MASK	BIT(7)
+#define CMDQ_MMINFRA_VOTER_GCEM_MASK	BIT(8)
+
 
 #define CMDQ_DRIVER_NAME		"mtk_cmdq_mbox"
 
@@ -312,6 +320,7 @@ struct cmdq {
 	bool		err_irq;
 	void __iomem	*dram_pwr_base;
 	void __iomem	*mminfra_ao_base;
+	void __iomem	*mminfra_voter_base;
 	bool		error_irq_sw_req;
 	bool		gce_vm;
 	bool		spr3_timer;
@@ -319,7 +328,9 @@ struct cmdq {
 	struct device	*pd_mminfra_1;
 	struct device	*pd_mminfra_ao;
 	bool		gce_ddr_sel_wla;
+	bool		gce_mask_voter;
 	unsigned int	dbg3;
+	bool		gce_res_sw_mode;
 };
 
 struct gce_plat {
@@ -737,6 +748,8 @@ char *cmdq_dump_pkt_usage(u32 hwid, char *buf_start, char *buf_end)
 	uint i, j;
 
 	cmdq = g_cmdq[hwid];
+	if (!cmdq)
+		return buf_start;
 
 	for (i = 0; i < ARRAY_SIZE(cmdq->thread); i++) {
 		for (j = 0; j < CMDQ_THRD_PKT_ARR_MAX; j++) {
@@ -973,11 +986,18 @@ static void cmdq_task_connect_buffer(struct cmdq_task *task,
 		*task_base = (u64)CMDQ_JUMP_BY_OFFSET << 32 | 0x00000001;
 		cmdq_log("%s connect to null change last inst %#018llx to %#018llx connect 0x%p -> NULL",
 			__func__, inst, *task_base, task->pkt);
+#if IS_ENABLED(CONFIG_VHOST_CMDQ)
+		arch_wb_cache_pmem(task_base, CMDQ_INST_SIZE);
+#endif
 		return;
 	}
 
 	*task_base = (u64)CMDQ_JUMP_BY_PA << 32 |
 		CMDQ_REG_SHIFT_ADDR(next_task->pa_base);
+
+#if IS_ENABLED(CONFIG_VHOST_CMDQ)
+	arch_wb_cache_pmem(task_base, CMDQ_INST_SIZE);
+#endif
 
 	next_task->pkt->append.pre_last_inst = *task_base;
 	cmdq_log("change last inst %#018llx to %#018llx connect 0x%p -> 0x%p",
@@ -3049,7 +3069,9 @@ int cmdq_iommu_fault_callback(int port, dma_addr_t mva, void *cb_data)
 
 	if (cmdq->err_irq) {
 		cmdq_msg("%s error irq flag:%d", __func__, cmdq->err_irq);
+#if !IS_ENABLED(CONFIG_VHOST_CMDQ)
 		BUG_ON(1);
+#endif
 	}
 
 	return 0;
@@ -3146,7 +3168,7 @@ static int cmdq_probe(struct platform_device *pdev)
 #if !IS_ENABLED(CONFIG_VIRTIO_CMDQ)
 	int port;
 #endif
-	u32 dram_pwr_pa, mminfra_ao_pa;
+	u32 dram_pwr_pa, mminfra_ao_pa, mminfra_voter_pa;
 
 	plat_data = (struct gce_plat *)of_device_get_match_data(dev);
 	if (!plat_data) {
@@ -3309,6 +3331,8 @@ static int cmdq_probe(struct platform_device *pdev)
 		of_property_read_bool(dev->of_node, "prebuilt-enable");
 	cmdq->sw_ddr_urgent =
 		of_property_read_bool(dev->of_node, "ddr-urgent");
+	cmdq->gce_res_sw_mode =
+		of_property_read_bool(dev->of_node, "gce-res-sw-mode");
 
 	cmdq->mbox.dev = dev;
 	cmdq->share_dev = mtk_smmu_get_shared_device(dev);
@@ -3445,6 +3469,14 @@ static int cmdq_probe(struct platform_device *pdev)
 		if (!of_property_read_u32(dev->of_node, "mminfra-ao-base", &mminfra_ao_pa)) {
 			cmdq_msg("mminfra-ao-base:%#x", mminfra_ao_pa);
 			cmdq->mminfra_ao_base = ioremap(mminfra_ao_pa, 0x1000);
+		}
+	}
+
+	if (of_property_read_bool(dev->of_node, "gce-mask-voter")) {
+		cmdq->gce_mask_voter = true;
+		if (!of_property_read_u32(dev->of_node, "mminfra-voter-base", &mminfra_voter_pa)) {
+			cmdq_msg("mminfra-voter-base:%#x", mminfra_voter_pa);
+			cmdq->mminfra_voter_base = ioremap(mminfra_voter_pa, 0x1000);
 		}
 	}
 
@@ -3659,6 +3691,9 @@ void cmdq_mbox_enable(void *chan)
 		if (cmdq->sw_ddr_urgent)
 			writel(readl(cmdq->base + GCE_GCTL_VALUE) | CMDQ_DDR_URGENT,
 				cmdq->base + GCE_GCTL_VALUE);
+		if(cmdq->gce_res_sw_mode)
+			writel(readl(cmdq->base + GCE_GCTL_VALUE) | ((0x7 << 16) + 0x7),
+				cmdq->base + GCE_GCTL_VALUE);
 		if (cmdq->sw_ddr_en) {
 			writel((0x7 << 16) + 0x7, cmdq->base + GCE_GCTL_VALUE);
 			writel(0, cmdq->base + GCE_DEBUG_START_ADDR);
@@ -3682,6 +3717,14 @@ void cmdq_mbox_enable(void *chan)
 			cmdq_util_hw_trace_enable(cmdq->hwid,
 				cmdq_util_get_bit_feature() &
 				CMDQ_LOG_FEAT_PERF);
+
+		if (cmdq->gce_mask_voter) {
+			writel(readl(cmdq->mminfra_voter_base + CMDQ_MMINFRA_VOTER_OFS) &
+				~(CMDQ_MMINFRA_VOTER_GCED_MASK),
+				cmdq->mminfra_voter_base + CMDQ_MMINFRA_VOTER_OFS);
+			cmdq_log("%s hwid:%d voter:%#x", __func__, cmdq->hwid,
+				readl(cmdq->mminfra_voter_base + CMDQ_MMINFRA_VOTER_OFS));
+		}
 
 		cmdq_mtcmos_by_fast(cmdq, false);
 	}
@@ -3782,7 +3825,7 @@ void cmdq_mbox_disable(void *chan)
 		// core
 		spin_lock_irqsave(&cmdq->lock, flags);
 		writel(0, cmdq->base + CMDQ_TPR_MASK);
-		if (cmdq->sw_ddr_en)
+		if (cmdq->sw_ddr_en || cmdq->gce_res_sw_mode)
 			writel(0x7, cmdq->base + GCE_GCTL_VALUE);
 		spin_unlock_irqrestore(&cmdq->lock, flags);
 
@@ -3802,6 +3845,14 @@ void cmdq_mbox_disable(void *chan)
 			ret = pm_runtime_put_sync(cmdq->pd_mminfra_1);
 			if (ret != 0)
 				cmdq_err("pm_runtime_put_sync err:%d", ret);
+		}
+
+		if (cmdq->gce_mask_voter) {
+			writel(readl(cmdq->mminfra_voter_base + CMDQ_MMINFRA_VOTER_OFS) |
+				CMDQ_MMINFRA_VOTER_GCED_MASK | CMDQ_MMINFRA_VOTER_GCEM_MASK ,
+				cmdq->mminfra_voter_base + CMDQ_MMINFRA_VOTER_OFS);
+			cmdq_log("%s hwid:%d voter:%#x", __func__, cmdq->hwid,
+				readl(cmdq->mminfra_voter_base + CMDQ_MMINFRA_VOTER_OFS));
 		}
 
 		if (cmdq->fast_mtcmos)

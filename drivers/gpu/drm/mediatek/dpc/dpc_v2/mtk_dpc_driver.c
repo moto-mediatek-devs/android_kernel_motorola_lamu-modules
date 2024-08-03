@@ -69,6 +69,16 @@ module_param(debug_presz, uint, 0644);
 static void __iomem *dpc_base;
 static struct mtk_dpc *g_priv;
 
+static const char trace_buf_mml_on[] = "C|-65536|MML1_power|1\n";
+static const char trace_buf_mml_off[] = "C|-65536|MML1_power|0\n";
+static noinline int tracing_mark_write(const char buf[])
+{
+#ifdef CONFIG_TRACING
+	trace_puts(buf);
+#endif
+	return 0;
+}
+
 static struct mtk_dpc_mtcmos_cfg mt6989_mtcmos_cfg[DPC_SUBSYS_CNT] = {
 /*	cfg     set    clr    pa va */
 	{0x300, 0x320, 0x340, 0, 0, 0},
@@ -314,8 +324,8 @@ static inline int dpc_pm_ctrl(bool en)
 		}
 
 		/* read dummy register to make sure it's ready to use */
-		if (g_priv->mminfra_dummy)
-			(void)readl(g_priv->mminfra_dummy);
+		if (g_priv->mminfra_dummy && (readl(g_priv->mminfra_dummy) == 0))
+			DPCAEE("read mminfra dummy failed");
 
 		/* disable devapc power check false alarm, */
 		/* DPC address is bound by power of disp1 on 6989 */
@@ -550,10 +560,10 @@ static void dpc_enable(const u8 en)
 			}
 
 			if (debug_irq) {
-				writel(BIT(31) | BIT(18),
+				writel(BIT(31) | BIT(18) | BIT(9),
 				       dpc_base + DISP_REG_DPC_DISP_INTEN);
 
-				writel(BIT(12) | BIT(13) | BIT(16) | BIT(17) | BIT(31),
+				writel(BIT(13) | BIT(14) | BIT(17) | BIT(18) | BIT(31),
 				       dpc_base + DISP_REG_DPC_MML_INTEN);
 			}
 
@@ -574,10 +584,6 @@ static void dpc_enable(const u8 en)
 
 		writel(0, dpc_base + DISP_REG_DPC_MERGE_DISP_INT_CFG);
 		writel(0, dpc_base + DISP_REG_DPC_MERGE_MML_INT_CFG);
-		if (debug_irq) {
-			enable_irq(g_priv->disp_irq);
-			enable_irq(g_priv->mml_irq);
-		}
 
 		writel(0x1f, dpc_base + DISP_REG_DPC_DISP_EXT_INPUT_EN);
 		writel(0x3, dpc_base + DISP_REG_DPC_MML_EXT_INPUT_EN);
@@ -592,11 +598,6 @@ static void dpc_enable(const u8 en)
 		/* disable inten to avoid burst irq */
 		writel(0, dpc_base + DISP_REG_DPC_DISP_INTEN);
 		writel(0, dpc_base + DISP_REG_DPC_MML_INTEN);
-		if (debug_irq) {
-			disable_irq_nosync(g_priv->disp_irq);
-			disable_irq_nosync(g_priv->mml_irq);
-		}
-
 		writel(0, dpc_base + DISP_REG_DPC_EN);
 
 		/* reset dpc to clean counter start and value */
@@ -998,6 +999,23 @@ void dpc_mtcmos_auto(const enum mtk_dpc_subsys subsys, const enum mtk_dpc_mtcmos
 	spin_unlock_irqrestore(&g_priv->mtcmos_cfg_lock, flags);
 }
 
+static void dpc_dsi_pll_set(const u32 value)
+{
+	if (g_priv == NULL) {
+		DPCERR("g_priv null\n");
+		return;
+	}
+
+	/* if DSI_PLL_SEL is set, power ON disp1 and set DSI_CK_KEEP_EN */
+	if (g_priv->dsi_ck_keep_mask && (value & BIT(0))) {
+		mtk_disp_vlp_vote(VOTE_SET, DISP_VIDLE_USER_DISP_DPC_CFG);
+		/* will be cleared when ff enable */
+
+		mtk_disp_wait_pwr_ack(DPC_SUBSYS_DIS1);
+		writel(g_priv->dsi_ck_keep_mask, dpc_base + g_priv->mtcmos_cfg[DPC_SUBSYS_DIS1].cfg);
+	}
+}
+
 static void dpc_disp_group_enable(bool en)
 {
 	int ret = 0;
@@ -1125,8 +1143,8 @@ static void dpc_config(const enum mtk_dpc_subsys subsys, bool en)
 		mtk_dprec_logger_pr(DPREC_LOGGER_FENCE, "dpc put mminfra\n");
 	}
 
-	/* unvote after all hw mode config done */
-	mtk_disp_vlp_vote(VOTE_CLR, DISP_VIDLE_USER_DISP_DPC_CFG);
+	/* will be unvoted by atomic commit gce pkt, for suspend resuming protection */
+	/* mtk_disp_vlp_vote(VOTE_CLR, DISP_VIDLE_USER_DISP_DPC_CFG); */
 
 	dpc_mmp(config, MMPROFILE_FLAG_PULSE, subsys, en);
 }
@@ -1136,16 +1154,22 @@ irqreturn_t mt6991_irq_handler(int irq, void *dev_id)
 	struct mtk_dpc *priv = dev_id;
 	u32 disp_sta, mml_sta;
 	irqreturn_t ret = IRQ_NONE;
+	static DEFINE_RATELIMIT_STATE(err_rate, HZ, 1);
+	static bool mml_sof_has_begin;
+	static bool mml1_has_begin;
 
 	if (IS_ERR_OR_NULL(priv))
 		return ret;
 
-	if (!mminfra_is_power_on()) {
-		dpc_mmp(mminfra, MMPROFILE_FLAG_PULSE, U32_MAX, 0);
-		disable_irq_nosync(irq);
-		ret = IRQ_HANDLED;
-		goto out;
+	if (!debug_irq) /* avoid irq from being triggered unexpectedly */
+		return IRQ_HANDLED;
+
+	dpc_mmp(mminfra, MMPROFILE_FLAG_START, 0x77777777, 1);
+	if (dpc_pm_ctrl(true)) {
+		dpc_mmp(mminfra, MMPROFILE_FLAG_END, U32_MAX, U32_MAX);
+		return IRQ_NONE;
 	}
+	dpc_mmp(mminfra, MMPROFILE_FLAG_PULSE, 0x77777777, 2);
 
 	disp_sta = readl(dpc_base + DISP_REG_DPC_DISP_INTSTA);
 	mml_sta =  readl(dpc_base + DISP_REG_DPC_MML_INTSTA);
@@ -1153,23 +1177,24 @@ irqreturn_t mt6991_irq_handler(int irq, void *dev_id)
 		dpc_mmp(folder, MMPROFILE_FLAG_PULSE,
 			readl(priv->vdisp_ao_cg_con), readl(priv->mminfra_chk));
 
-		if (unlikely(irq_aee)) {
-			DPCAEE("irq err clksq(%u) ulposc(%u) vdisp_ao_cg(%#x) dpc_merge(%#x, %#x)",
-			       mt_get_fmeter_freq(47, VLPCK), /* clksq */
-			       mt_get_fmeter_freq(59, VLPCK), /* ulposc */
-			       readl(priv->vdisp_ao_cg_con),
-			       readl(dpc_base + DISP_REG_DPC_MERGE_DISP_INT_CFG),
-			       readl(dpc_base + DISP_REG_DPC_MERGE_MML_INT_CFG));
-		} else {
-			DPCERR("irq err clksq(%u) ulposc(%u) vdisp_ao_cg(%#x) dpc_merge(%#x, %#x)",
-			       mt_get_fmeter_freq(47, VLPCK), /* clksq */
-			       mt_get_fmeter_freq(59, VLPCK), /* ulposc */
-			       readl(priv->vdisp_ao_cg_con),
-			       readl(dpc_base + DISP_REG_DPC_MERGE_DISP_INT_CFG),
-			       readl(dpc_base + DISP_REG_DPC_MERGE_MML_INT_CFG));
+		if (__ratelimit(&err_rate)) {
+			if (unlikely(irq_aee)) {
+				DPCAEE("irq err clksq(%u) ulposc(%u) vdisp_ao_cg(%#x) dpc_merge(%#x, %#x)",
+				mt_get_fmeter_freq(47, VLPCK), /* clksq */
+				mt_get_fmeter_freq(59, VLPCK), /* ulposc */
+				readl(priv->vdisp_ao_cg_con),
+				readl(dpc_base + DISP_REG_DPC_MERGE_DISP_INT_CFG),
+				readl(dpc_base + DISP_REG_DPC_MERGE_MML_INT_CFG));
+			} else {
+				DPCERR("irq err clksq(%u) ulposc(%u) vdisp_ao_cg(%#x) dpc_merge(%#x, %#x)",
+				mt_get_fmeter_freq(47, VLPCK), /* clksq */
+				mt_get_fmeter_freq(59, VLPCK), /* ulposc */
+				readl(priv->vdisp_ao_cg_con),
+				readl(dpc_base + DISP_REG_DPC_MERGE_DISP_INT_CFG),
+				readl(dpc_base + DISP_REG_DPC_MERGE_MML_INT_CFG));
+			}
 		}
 
-		disable_irq_nosync(irq);
 		goto out;
 	}
 
@@ -1181,47 +1206,40 @@ irqreturn_t mt6991_irq_handler(int irq, void *dev_id)
 	if (disp_sta & BIT(31) || mml_sta & BIT(31)) {
 		u32 disp_err_sta = readl(dpc_base + 0x87c);
 		u32 mml_err_sta = readl(dpc_base + 0x880);
+		u32 debug_sta = readl(dpc_base + DISP_REG_DPC_DEBUG_STA);
 
-		dpc_mmp(folder, MMPROFILE_FLAG_PULSE,
-			readl(priv->vdisp_ao_cg_con), readl(priv->mminfra_chk));
+		dpc_mmp(folder, MMPROFILE_FLAG_PULSE, readl(priv->vdisp_ao_cg_con), debug_sta);
 		dpc_mmp(folder, MMPROFILE_FLAG_PULSE, disp_err_sta, mml_err_sta);
-		if (unlikely(irq_aee))
-			DPCAEE("config when mtcmos off disp(%#x) mml(%#x)", disp_err_sta, mml_err_sta);
-		else
-			DPCERR("config when mtcmos off disp(%#x) mml(%#x)", disp_err_sta, mml_err_sta);
 
-		disable_irq_nosync(irq);
+		if (__ratelimit(&err_rate)) {
+			if (unlikely(irq_aee))
+				DPCAEE("irq err disp(%#x) mml(%#x) debug(%#x)",
+					disp_err_sta, mml_err_sta, debug_sta);
+			else
+				DPCERR("irq err disp(%#x) mml(%#x) debug(%#x)",
+					disp_err_sta, mml_err_sta, debug_sta);
+		}
 	}
 
 	/* MML1 */
-	if (mml_sta & BIT(16))
-		dpc_mmp(mml_sof, MMPROFILE_FLAG_PULSE, 0, 0);
-	if (mml_sta & BIT(17))
-		dpc_mmp(mml_rrot_done, MMPROFILE_FLAG_PULSE, 0, 0);
-	if (mml_sta & BIT(14))
+	if (mml_sta & BIT(17) && !mml_sof_has_begin) {
+		dpc_mmp(mml_sof, MMPROFILE_FLAG_START, 0, 0);
+		mml_sof_has_begin = true;
+	}
+	if (mml_sta & BIT(18) && mml_sof_has_begin) {
+		dpc_mmp(mml_sof, MMPROFILE_FLAG_END, 0, 0);
+		mml_sof_has_begin = false;
+	}
+	if (mml_sta & BIT(14) && !mml1_has_begin) {
 		dpc_mmp(mtcmos_mml1, MMPROFILE_FLAG_START, 0, 0);
-	if (mml_sta & BIT(13))
+		tracing_mark_write(trace_buf_mml_on);
+		mml1_has_begin = true;
+	}
+	if (mml_sta & BIT(13) && mml1_has_begin) {
 		dpc_mmp(mtcmos_mml1, MMPROFILE_FLAG_END, 0, 0);
-	if (mml_sta & BIT(1))
-		dpc_mmp(mtcmos_mml1, MMPROFILE_FLAG_PULSE, 0x50F, 1);
-	if (mml_sta & BIT(3))
-		dpc_mmp(mtcmos_mml1, MMPROFILE_FLAG_PULSE, 0x50F, 0);
-
-	/* OVL/DIS0 */
-	if (disp_sta & BIT(0))
-		dpc_mmp(mtcmos_ovl0, MMPROFILE_FLAG_PULSE, 0xE0F, 0);
-	if (disp_sta & BIT(1))
-		dpc_mmp(mtcmos_ovl0, MMPROFILE_FLAG_PULSE, 0x50F, 1);
-	if (disp_sta & BIT(6))
-		dpc_mmp(mtcmos_ovl0, MMPROFILE_FLAG_PULSE, 0x50F, 0);
-
-	/* DIS1 */
-	if (disp_sta & BIT(7))
-		dpc_mmp(mtcmos_disp1, MMPROFILE_FLAG_PULSE, 0xE0F, 0);
-	if (disp_sta & BIT(8))
-		dpc_mmp(mtcmos_disp1, MMPROFILE_FLAG_PULSE, 0x50F, 1);
-	if (disp_sta & BIT(13))
-		dpc_mmp(mtcmos_disp1, MMPROFILE_FLAG_PULSE, 0x50F, 0);
+		tracing_mark_write(trace_buf_mml_off);
+		mml1_has_begin = false;
+	}
 
 	/* Panel TE */
 	if (disp_sta & BIT(18))
@@ -1236,6 +1254,8 @@ irqreturn_t mt6991_irq_handler(int irq, void *dev_id)
 
 	ret = IRQ_HANDLED;
 out:
+	dpc_pm_ctrl(false);
+	dpc_mmp(mminfra, MMPROFILE_FLAG_END, 0x77777777, 3);
 	return ret;
 }
 
@@ -1362,6 +1382,7 @@ static int dpc_res_init(struct mtk_dpc *priv)
 	get_addr_byname("disp_vcore_pwr_chk", &priv->dispvcore_chk, NULL);
 	get_addr_byname("mminfra_pwr_chk", &priv->mminfra_chk, NULL);
 	get_addr_byname("mminfra_voter", &priv->mminfra_voter, NULL);
+	get_addr_byname("mminfra_dummy", &priv->mminfra_dummy, NULL);
 	get_addr_byname("dis0_pwr_chk",
 			&priv->mtcmos_cfg[DPC_SUBSYS_DIS0].chk_va,
 			&priv->mtcmos_cfg[DPC_SUBSYS_DIS0].chk_pa);
@@ -1389,9 +1410,6 @@ static int dpc_res_init(struct mtk_dpc *priv)
 		/* use for gced, modify for access mmup inside mminfra */
 		priv->voter_set_pa -= 0x800000;
 		priv->voter_clr_pa -= 0x800000;
-
-		/* mminfra dummy register for checking mminfra power */
-		priv->mminfra_dummy = ioremap(0x30a0040c, 0x4);
 
 		/* power check by dpc, instead of subsys_pm */
 		for (subsys = 0; subsys < DPC_SUBSYS_CNT; subsys++)
@@ -1430,11 +1448,6 @@ static int dpc_irq_init(struct mtk_dpc *priv)
 			DPCERR("devm_request_irq %d fail: %d", priv->mml_irq, ret);
 	}
 	DPCFUNC("disp irq %d, mml irq %d, ret %d", priv->disp_irq, priv->mml_irq, ret);
-
-	if (!debug_irq) {
-		disable_irq_nosync(priv->disp_irq);
-		disable_irq_nosync(priv->mml_irq);
-	}
 
 	/* disable merge irq */
 	writel(0, dpc_base + DISP_REG_DPC_MERGE_DISP_INT_CFG);
@@ -1522,8 +1535,17 @@ static int dpc_vidle_power_keep(const enum mtk_vidle_voter_user _user)
 	case DISP_VIDLE_USER_MML0:
 		mtk_disp_wait_pwr_ack(DPC_SUBSYS_MML0);
 		break;
-	case DISP_VIDLE_USER_CRTC:
 	case DISP_VIDLE_USER_PQ:
+		if (g_priv->root_dev) {
+			/* can only be used by USER_PQ, as it will not be used within ISR */
+			pm_runtime_get_sync(g_priv->root_dev);
+			mtk_disp_wait_pwr_ack(DPC_SUBSYS_DIS1);
+			mtk_disp_wait_pwr_ack(DPC_SUBSYS_DIS0);
+			pm_runtime_put_sync(g_priv->root_dev);
+		} else
+			udelay(post_vlp_delay);
+		break;
+	case DISP_VIDLE_USER_CRTC:
 	case DISP_VIDLE_USER_DISP_DPC_CFG:
 	case DISP_VIDLE_USER_DPC_DUMP:
 	case DISP_VIDLE_USER_SMI_DUMP:
@@ -1565,7 +1587,7 @@ static void dpc_clear_wfe_event(struct cmdq_pkt *pkt, enum mtk_vidle_voter_user 
 }
 
 static void dpc_vidle_power_keep_by_gce(struct cmdq_pkt *pkt, const enum mtk_vidle_voter_user user,
-					const u16 gpr, struct cmdq_reuse *reuse)
+					const u16 gpr, struct cmdq_poll_reuse *reuse)
 {
 	cmdq_pkt_write(pkt, NULL, g_priv->voter_set_pa, BIT(user), U32_MAX);
 
@@ -1662,7 +1684,7 @@ static void dpc_analysis(void)
 		readl(dpc_base + DISP_REG_DPC_DISP_INFRA_PLL_OFF_CFG),
 		readl(dpc_base + DISP_REG_DPC_MML_DDRSRC_EMIREQ_CFG),
 		readl(dpc_base + DISP_REG_DPC_MML_INFRA_PLL_OFF_CFG));
-	mtk_dprec_logger_pr(DPREC_LOGGER_STATUS, "%s\n", msg);
+	mtk_dprec_logger_pr(DPREC_LOGGER_DUMP, "%s\n", msg);
 
 	if (g_priv->mmsys_id == MMSYS_MT6991) {
 		int i;
@@ -1682,7 +1704,7 @@ static void dpc_analysis(void)
 			if (g_priv->dpc2_dt_usage[i].en)
 				written += scnprintf(msg + written, 512 - written, "[%d]%u ",
 					i, g_priv->dpc2_dt_usage[i].val);
-		mtk_dprec_logger_pr(DPREC_LOGGER_STATUS, "%s\n", msg);
+		mtk_dprec_logger_pr(DPREC_LOGGER_DUMP, "%s\n", msg);
 	}
 
 	dpc_pm_ctrl(false);
@@ -1739,6 +1761,7 @@ static int dpc_pm_notifier(struct notifier_block *notifier, unsigned long pm_eve
 #if IS_ENABLED(CONFIG_MTK_TINYSYS_VCP_SUPPORT)
 static int dpc_vcp_notifier(struct notifier_block *nb, unsigned long vcp_event, void *unused)
 {
+	mtk_vdisp_avs_vcp_notifier(vcp_event, unused);
 	switch (vcp_event) {
 	case VCP_EVENT_READY:
 	case VCP_EVENT_STOP:
@@ -1781,7 +1804,6 @@ static void process_dbg_opt(const char *opt)
 	int ret = 0;
 	u32 v1 = 0, v2 = 0, v3 = 0;
 	u32 mminfra_hangfree_val = 0;
-	u32 handshake_val = 0;
 
 	if (strncmp(opt, "cap:", 4) == 0) {
 		ret = sscanf(opt, "cap:0x%x\n", &v1);
@@ -1792,42 +1814,8 @@ static void process_dbg_opt(const char *opt)
 		DPCDUMP("cap(0x%x->0x%x)", g_priv->vidle_mask, v1);
 		g_priv->vidle_mask = v1;
 	} else if (strncmp(opt, "avs:", 4) == 0) {
-		handshake_val = readl(VDISP_SHRMEM_BITWISE);
-		if (strncmp(opt + 4, "off:", 4) == 0) {
-			ret = sscanf(opt, "avs:off:%u,%u\n", &v1, &v2);
-			/* opp(v1): max 5 level; step(v2) max 32 level; v1(5) is used to toggle AVS */
-			if ((ret != 2)||(v1 > 5 || v2 >= 31)) {
-				DPCDUMP("[Waring] avs:off sscanf not match");
-				goto err;
-			}
-			/*Off avs*/
-			handshake_val |= BIT(VDISP_AVS_DISABLE_BIT);
-			writel(handshake_val, VDISP_SHRMEM_BITWISE);
-			/*Set opp and step*/
-			writel(v2, MEM_VDISP_AVS_STEP(v1));
-			mmdvfs_force_step_by_vcp(2, 4 - v1);
-		} else if (strncmp(opt + 4, "t_ag:", 5) == 0) {
-			ret = sscanf(opt, "avs:t_ag:%u\n", &v3);
-			if (ret != 1) {
-				DPCDUMP("[Waring]avs:t_ag sscanf not match");
-				goto err;
-			}
-			handshake_val &= ~BIT(VDISP_AVS_AGING_FAST_EN_BIT);
-			handshake_val |= (v3 << VDISP_AVS_AGING_FAST_EN_BIT);
-			writel(handshake_val, VDISP_SHRMEM_BITWISE);
-		} else if (strncmp(opt + 4, "on", 2) == 0) {
-			/*On avs*/
-			handshake_val &= ~BIT(VDISP_AVS_DISABLE_BIT);
-			writel(handshake_val, VDISP_SHRMEM_BITWISE);
-		} else if (strncmp(opt + 4, "dbg:on", 6) == 0) {
-			/*On avs debug mode */
-			handshake_val |= BIT(VDISP_AVS_DBG_MODE_BIT);
-			writel(handshake_val, VDISP_SHRMEM_BITWISE);
-		} else if (strncmp(opt + 4, "dbg:off", 7) == 0) {
-			/*Off avs debug mode*/
-			handshake_val &= ~BIT(VDISP_AVS_DBG_MODE_BIT);
-			writel(handshake_val, VDISP_SHRMEM_BITWISE);
-		}
+		if (mtk_vdisp_avs_dbg_opt(opt))
+			goto err;
 	} else if (strncmp(opt, "vote:", 5) == 0) {
 		ret = sscanf(opt, "vote:%u\n", &v1);
 		if (ret != 1) {
@@ -2002,6 +1990,7 @@ static const struct dpc_funcs funcs = {
 	.dpc_mtcmos_auto = dpc_mtcmos_auto,
 	.dpc_duration_update = dpc_duration_update,
 	.dpc_mtcmos_vote = dpc_mtcmos_vote,
+	.dpc_dsi_pll_set = dpc_dsi_pll_set,
 	.dpc_clear_wfe_event = dpc_clear_wfe_event,
 	.dpc_vidle_power_keep = dpc_vidle_power_keep,
 	.dpc_vidle_power_release = dpc_vidle_power_release,
@@ -2013,6 +2002,9 @@ static const struct dpc_funcs funcs = {
 	.dpc_dvfs_trigger = dpc_dvfs_trigger,
 	.dpc_channel_bw_set_by_idx = dpc_channel_bw_set_by_idx,
 	.dpc_analysis = dpc_analysis,
+#if IS_ENABLED(CONFIG_DEBUG_FS)
+	.dpc_debug_cmd = process_dbg_opt,
+#endif
 };
 
 static struct mtk_dpc mt6989_dpc_driver_data = {
@@ -2030,6 +2022,7 @@ static struct mtk_dpc mt6989_dpc_driver_data = {
 	.total_hrt_unit = 30,
 	.srt_emi_efficiency = 10000,			// CHECK ME
 	.hrt_emi_efficiency = 10000,			// CHECK ME
+	.dsi_ck_keep_mask = BIT(5),
 };
 
 static struct mtk_dpc mt6878_dpc_driver_data = {
@@ -2058,6 +2051,7 @@ static struct mtk_dpc mt6991_dpc_driver_data = {
 	.hrt_emi_efficiency = 8242,			// divide 0.85 * 33/32(TCU) = *100/82.4242
 	.ch_bw_urate = 70,				// divide 0.7
 	.vcp_is_alive = true,
+	.dsi_ck_keep_mask = BIT(2),
 };
 
 static const struct of_device_id mtk_dpc_driver_v2_dt_match[] = {
@@ -2105,6 +2099,16 @@ static int mtk_dpc_probe(struct platform_device *pdev)
 		if (!pm_runtime_enabled(priv->pd_dev))
 			pm_runtime_enable(priv->pd_dev);
 		pm_runtime_irq_safe(priv->pd_dev);
+	}
+
+	if (of_find_property(dev->of_node, "root-dev", NULL)) {
+		struct device_node *node = of_parse_phandle(dev->of_node, "root-dev", 0);
+		struct platform_device *pdev = NULL;
+
+		if (node)
+			pdev = of_find_device_by_node(node);
+		if (pdev)
+			priv->root_dev = &pdev->dev;
 	}
 
 #if defined(DISP_VIDLE_ENABLE)

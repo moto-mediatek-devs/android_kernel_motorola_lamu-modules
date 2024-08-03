@@ -2001,21 +2001,12 @@ static const struct mtk_gate_regs ipe_cg_regs = {
 		.ops = &mtk_clk_gate_ops_setclr,	\
 	}
 
-#define GATE_IPE_DUMMY(_id, _name, _parent, _shift) {	\
-		.id = _id,				\
-		.name = _name,				\
-		.parent_name = _parent,			\
-		.regs = &ipe_cg_regs,			\
-		.shift = _shift,			\
-		.ops = &mtk_clk_gate_ops_dummy,	\
-	}
-
 static const struct mtk_gate ipe_clks[] = {
-	GATE_IPE_DUMMY(CLK_IPE_LARB19, "ipe_larb19",
+	GATE_IPE(CLK_IPE_LARB19, "ipe_larb19",
 			"ipe_sel"/* parent */, 0),
-	GATE_IPE_DUMMY(CLK_IPE_LARB20, "ipe_larb20",
+	GATE_IPE(CLK_IPE_LARB20, "ipe_larb20",
 			"ipe_sel"/* parent */, 1),
-	GATE_IPE_DUMMY(CLK_IPE_SMI_SUBCOM, "ipe_smi_subcom",
+	GATE_IPE(CLK_IPE_SMI_SUBCOM, "ipe_smi_subcom",
 			"ipe_sel"/* parent */, 2),
 	GATE_IPE(CLK_IPE_FD, "ipe_fd",
 			"ipe_sel"/* parent */, 3),
@@ -2025,7 +2016,7 @@ static const struct mtk_gate ipe_clks[] = {
 			"ipe_sel"/* parent */, 5),
 	GATE_IPE(CLK_IPE_DPE, "ipe_dpe",
 			"ipe_sel"/* parent */, 6),
-	GATE_IPE_DUMMY(CLK_IPE_GALS, "ipe_gals",
+	GATE_IPE(CLK_IPE_GALS, "ipe_gals",
 			"img1_sel"/* parent */, 8),
 };
 
@@ -2102,7 +2093,7 @@ static const struct mtk_gate mm_clks[] = {
 			"disp_sel"/* parent */, 9),
 	GATE_MM0(CLK_MM_DISP_COLOR0, "mm_disp_color0",
 			"disp_sel"/* parent */, 10),
-	GATE_MM0_DUMMY(CLK_MM_SMI_INFRA, "mm_smi_infra",
+	GATE_MM0(CLK_MM_SMI_INFRA, "mm_smi_infra",
 			"disp_sel"/* parent */, 11),
 	GATE_MM0(CLK_MM_DISP_DSC_WRAP, "mm_disp_dsc_wrap",
 			"disp_sel"/* parent */, 12),
@@ -2114,7 +2105,7 @@ static const struct mtk_gate mm_clks[] = {
 			"disp_sel"/* parent */, 15),
 	GATE_MM0(CLK_MM_DISP_DITHER0, "mm_disp_dither0",
 			"disp_sel"/* parent */, 16),
-	GATE_MM0_DUMMY(CLK_MM_SMI_COMMON, "mm_smi_common",
+	GATE_MM0(CLK_MM_SMI_COMMON, "mm_smi_common",
 			"disp_sel"/* parent */, 17),
 	GATE_MM0(CLK_MM_DISP_CM0, "mm_disp_cm0",
 			"disp_sel"/* parent */, 18),
@@ -2124,9 +2115,9 @@ static const struct mtk_gate mm_clks[] = {
 			"disp_sel"/* parent */, 20),
 	GATE_MM0(CLK_MM_DISP_FAKE_ENG1, "mm_disp_fake_eng1",
 			"disp_sel"/* parent */, 21),
-	GATE_MM0_DUMMY(CLK_MM_SMI_GALS, "mm_smi_gals",
+	GATE_MM0(CLK_MM_SMI_GALS, "mm_smi_gals",
 			"disp_sel"/* parent */, 22),
-	GATE_MM0_DUMMY(CLK_MM_SMI_IOMMU, "mm_smi_iommu",
+	GATE_MM0(CLK_MM_SMI_IOMMU, "mm_smi_iommu",
 			"disp_sel"/* parent */, 24),
 	/* MM1 */
 	GATE_MM1(CLK_MM_DSI0_DSI_CK_DOMAIN, "mm_dsi0_dsi_domain",
@@ -2188,7 +2179,7 @@ static const struct mtk_gate mdp_clks[] = {
 			"mdp_sel"/* parent */, 4),
 	GATE_MDP0(CLK_MDP_TDSHP1, "mdp_tdshp1",
 			"mdp_sel"/* parent */, 5),
-	GATE_MDP0_DUMMY(CLK_MDP_SMI0, "mdp_smi0",
+	GATE_MDP0(CLK_MDP_SMI0, "mdp_smi0",
 			"mdp_sel"/* parent */, 6),
 	GATE_MDP0(CLK_MDP_APB_BUS, "mdp_apb_bus",
 			"mdp_sel"/* parent */, 7),

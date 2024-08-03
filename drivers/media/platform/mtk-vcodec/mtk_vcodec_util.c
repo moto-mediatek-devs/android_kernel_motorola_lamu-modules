@@ -34,6 +34,15 @@ char mtk_venc_tmp_log[LOG_PROPERTY_SIZE];
 char mtk_vdec_tmp_prop[LOG_PROPERTY_SIZE];
 char mtk_venc_tmp_prop[LOG_PROPERTY_SIZE];
 
+static struct mtk_vcodec_dev *dev_ptr[MTK_INST_MAX];
+
+
+void mtk_vcodec_set_dev(struct mtk_vcodec_dev *dev, enum mtk_instance_type type)
+{
+	if (dev && type < MTK_INST_MAX && type >= 0)
+		dev_ptr[type] = dev;
+}
+EXPORT_SYMBOL_GPL(mtk_vcodec_set_dev);
 
 void mtk_vcodec_check_alive(struct timer_list *t)
 {
@@ -490,6 +499,37 @@ void mtk_vcodec_dump_ctx_list(struct mtk_vcodec_dev *dev, unsigned int debug_lev
 }
 EXPORT_SYMBOL_GPL(mtk_vcodec_dump_ctx_list);
 
+int mtk_vcodec_get_op_by_pid(enum mtk_instance_type type, int pid)
+{
+	struct mtk_vcodec_dev *dev = NULL;
+	struct list_head *p, *q;
+	struct mtk_vcodec_ctx *ctx;
+	int fps = 0;
+
+	if (type < MTK_INST_MAX && type >= 0)
+		dev = dev_ptr[type];
+
+	if (dev == NULL)
+		return 0;
+
+	mutex_lock(&dev->ctx_mutex);
+	list_for_each_safe(p, q, &dev->ctx_list) {
+		ctx = list_entry(p, struct mtk_vcodec_ctx, list);
+		if (ctx != NULL && ctx->cpu_caller_pid == pid) {
+			fps = ctx->op_rate_adaptive;
+			mtk_v4l2_debug(2, "[%d] get fps %d by pid %d", ctx->id, fps, ctx->cpu_caller_pid);
+		} else if (ctx != NULL)
+			mtk_v4l2_debug(8, "[%d] pid %d, fps %d (not found pid %d)",
+				ctx->id, ctx->cpu_caller_pid, ctx->op_rate_adaptive, pid);
+		else
+			mtk_v4l2_err("get NULL ctx in ctx list");
+	}
+	mutex_unlock(&dev->ctx_mutex);
+
+	return fps;
+}
+EXPORT_SYMBOL_GPL(mtk_vcodec_get_op_by_pid);
+
 static void mtk_vcodec_set_uclamp(bool enable, int ctx_id, int pid)
 {
 	struct task_struct *p, *task_child;
@@ -542,7 +582,7 @@ void mtk_vcodec_set_cpu_hint(struct mtk_vcodec_dev *dev, bool enable,
 	if (enable) {
 		if (dev->cpu_hint_mode & (1 << MTK_GRP_AWARE_MODE)) { // cpu grp awr mode
 			if (dev->cpu_hint_ref_cnt == 0) {
-#if 0//IS_ENABLED(CONFIG_MTK_SCHED_FAST_LOAD_TRACKING)
+#if IS_ENABLED(CONFIG_MTK_SCHED_FAST_LOAD_TRACKING)
 				set_top_grp_aware(1, 0);
 				set_grp_awr_min_opp_margin(0, 0, 2560);
 				set_grp_awr_thr(0, 0, 1680000);
@@ -562,7 +602,7 @@ void mtk_vcodec_set_cpu_hint(struct mtk_vcodec_dev *dev, bool enable,
 		dev->cpu_hint_ref_cnt--;
 		if (dev->cpu_hint_mode & (1 << MTK_GRP_AWARE_MODE)) {
 			if (dev->cpu_hint_ref_cnt == 0) {
-#if 0//IS_ENABLED(CONFIG_MTK_SCHED_FAST_LOAD_TRACKING)
+#if IS_ENABLED(CONFIG_MTK_SCHED_FAST_LOAD_TRACKING)
 				set_top_grp_aware(0, 0);
 #endif
 			}
@@ -591,7 +631,7 @@ void mtk_vcodec_set_cgrp(struct mtk_vcodec_ctx *ctx, bool enable, const char *de
 		if (!ctx->cgrp_enable) {
 			ctx->cgrp_enable = true;
 			dev->cgrp_ref_cnt++;
-#if 0//IS_ENABLED(CONFIG_MTK_SCHED_FAST_LOAD_TRACKING)
+#if IS_ENABLED(CONFIG_MTK_SCHED_FAST_LOAD_TRACKING)
 			group_set_cgroup_colocate(1, 0); // enable
 			mtk_v4l2_debug(0, "[%s][%d] enable cgroup_colocate by %s (ref cnt %d)",
 				(ctx->type == MTK_INST_DECODER) ? "VDEC" : "VENC", ctx->id,
@@ -602,7 +642,7 @@ void mtk_vcodec_set_cgrp(struct mtk_vcodec_ctx *ctx, bool enable, const char *de
 		if (ctx->cgrp_enable) {
 			ctx->cgrp_enable = false;
 			dev->cgrp_ref_cnt--;
-#if 0//IS_ENABLED(CONFIG_MTK_SCHED_FAST_LOAD_TRACKING)
+#if IS_ENABLED(CONFIG_MTK_SCHED_FAST_LOAD_TRACKING)
 			mtk_v4l2_debug(dev->cgrp_ref_cnt == 0 ? 0 : 2,
 				"[%s][%d] disable cgroup_colocate by %s (ref cnt %d)",
 				(ctx->type == MTK_INST_DECODER) ? "VDEC" : "VENC", ctx->id,

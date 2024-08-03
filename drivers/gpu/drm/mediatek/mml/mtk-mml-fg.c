@@ -239,7 +239,6 @@ static const struct fg_data mt6899_mmlf_fg_data = {
 	.reg_table = fg_reg_table_mt6989, // fg reg table update ?
 	.tile_width = 3520,
 	.sram_pp = true,
-	.hw_ar = true,
 };
 
 static const struct fg_data mt6989_fg_data = {
@@ -345,10 +344,10 @@ static s32 fg_tile_prepare(struct mml_comp *comp, struct mml_task *task,
 			   struct tile_func_block *func,
 			   union mml_tile_data *data)
 {
-	struct fg_frame_data *fg_frm = fg_frm_data(ccfg);
-	struct mml_frame_config *cfg = task->config;
-	struct mml_frame_size *frame_in = &cfg->frame_in;
-	struct mml_crop *crop = &cfg->frame_in_crop[fg_frm->out_idx];
+	const struct fg_frame_data *fg_frm = fg_frm_data(ccfg);
+	const struct mml_frame_config *cfg = task->config;
+	const struct mml_frame_size *frame_in = &cfg->frame_in;
+	const struct mml_crop *crop = &cfg->frame_in_crop[fg_frm->out_idx];
 
 	func->enable_flag = true;
 

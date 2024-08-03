@@ -2869,7 +2869,8 @@ static int mtk_lye_get_comp_id(int disp_idx, int disp_list, struct drm_device *d
 			return DDP_COMPONENT_OVL0;
 		if (priv->data->mmsys_id == MMSYS_MT6985 ||
 			priv->data->mmsys_id == MMSYS_MT6897 ||
-			priv->data->mmsys_id == MMSYS_MT6989) {
+			priv->data->mmsys_id == MMSYS_MT6989 ||
+			priv->data->mmsys_id == MMSYS_MT6899) {
 			if (HRT_GET_FIRST_SET_BIT(ovl_mapping_tb -
 				HRT_GET_FIRST_SET_BIT(ovl_mapping_tb)) >=
 				layer_map_idx) {
@@ -2880,19 +2881,6 @@ static int mtk_lye_get_comp_id(int disp_idx, int disp_list, struct drm_device *d
 				HRT_GET_FIRST_SET_BIT(ovl_mapping_tb)) >=
 				layer_map_idx) {
 				return DDP_COMPONENT_OVL1_2L;
-			} else
-				return DDP_COMPONENT_OVL2_2L;
-		} else if (priv->data->mmsys_id == MMSYS_MT6899) {
-			if (HRT_GET_FIRST_SET_BIT(ovl_mapping_tb -
-				HRT_GET_FIRST_SET_BIT(ovl_mapping_tb)) >=
-				layer_map_idx) {
-				return DDP_COMPONENT_OVL0_2L;
-			} else if (HRT_GET_FIRST_SET_BIT(ovl_mapping_tb -
-				HRT_GET_FIRST_SET_BIT(ovl_mapping_tb -
-				HRT_GET_FIRST_SET_BIT(ovl_mapping_tb)) -
-				HRT_GET_FIRST_SET_BIT(ovl_mapping_tb)) >=
-				layer_map_idx) {
-				return DDP_COMPONENT_OVL2_2L;
 			} else
 				return DDP_COMPONENT_OVL2_2L;
 		} else if (priv->data->mmsys_id == MMSYS_MT6991) {
@@ -2940,6 +2928,8 @@ static int mtk_lye_get_comp_id(int disp_idx, int disp_list, struct drm_device *d
 			return DDP_COMPONENT_OVL2_2L;
 		else if (priv->data->mmsys_id == MMSYS_MT6989)
 			return DDP_COMPONENT_OVL4_2L;
+		else if (priv->data->mmsys_id == MMSYS_MT6899)
+			return DDP_COMPONENT_OVL3_2L;
 	} else if (disp_idx == 2) {
 		if (mtk_drm_helper_get_opt(priv->helper_opt,
 				MTK_DRM_OPT_VDS_PATH_SWITCH))
@@ -2968,6 +2958,7 @@ static int mtk_lye_get_comp_id(int disp_idx, int disp_list, struct drm_device *d
 			return DDP_COMPONENT_OVL3_2L;
 		else if (priv->data->mmsys_id == MMSYS_MT6895 ||
 			 priv->data->mmsys_id == MMSYS_MT6768 ||
+			 priv->data->mmsys_id == MMSYS_MT6765 ||
 			 priv->data->mmsys_id == MMSYS_MT6886)
 			return DDP_COMPONENT_OVL0_2L;
 		else if (priv->data->mmsys_id == MMSYS_MT6879)
@@ -3352,6 +3343,18 @@ static int _dispatch_lye_blob_idx(struct drm_mtk_layering_info *disp_info,
 		if (comp_state.comp_id > DDP_COMPONENT_ID_MAX) {
 			DDPPR_ERR("%s get invalid comp_id %d\n", __func__, comp_state.comp_id);
 			break;
+		}
+
+		if ((priv->data->mmsys_id == MMSYS_MT6768 ||
+			priv->data->mmsys_id == MMSYS_MT6765 ||
+			priv->data->mmsys_id == MMSYS_MT6761 ||
+			priv->data->mmsys_id == MMSYS_MT6877) &&
+			mtk_has_layer_cap(layer_info, MTK_DISP_RSZ_LAYER) &&
+			comp_state.comp_id != DDP_COMPONENT_OVL0_2L &&
+			comp_state.comp_id != DDP_COMPONENT_OVL1_2L) {
+			DDPMSG("RPO not use the OVL_2l, change layer_cap\n");
+			layer_info->layer_caps &= ~MTK_DISP_RSZ_LAYER;
+			mtk_gles_incl_layer(disp_info, idx, i);
 		}
 
 		if (is_extended_layer(layer_info)) {
@@ -4809,6 +4812,20 @@ static inline int get_scale_cnt(struct drm_mtk_layering_info *disp_info)
 	return scale_cnt;
 }
 
+int layering_rule_get_available_hrt(struct drm_crtc *crtc)
+{
+	if (IS_ERR_OR_NULL(crtc))
+		return -EINVAL;
+
+	if (l_rule_ops == NULL || l_rule_info == NULL) {
+		DDPPR_ERR("Layering rule has not been initialize:(%p,%p)\n",
+				l_rule_ops, l_rule_info);
+		return -EFAULT;
+	}
+
+	return l_rule_ops->layering_get_valid_hrt(crtc, &layering_info);
+}
+
 static int layering_rule_start(struct drm_mtk_layering_info *disp_info_user,
 			       int debug_mode, struct drm_device *dev)
 {
@@ -4919,6 +4936,7 @@ static int layering_rule_start(struct drm_mtk_layering_info *disp_info_user,
 	if (priv && priv->data && (priv->data->mmsys_id == MMSYS_MT6768 ||
 		priv->data->mmsys_id == MMSYS_MT6765 ||
 		priv->data->mmsys_id == MMSYS_MT6853 ||
+		priv->data->mmsys_id == MMSYS_MT6833 ||
 		priv->data->mmsys_id == MMSYS_MT6781 ||
 		priv->data->mmsys_id == MMSYS_MT6877 ||
 		priv->data->mmsys_id == MMSYS_MT6885))
@@ -5045,6 +5063,7 @@ static int layering_rule_start(struct drm_mtk_layering_info *disp_info_user,
 	if (priv && priv->data && (priv->data->mmsys_id == MMSYS_MT6768 ||
 		priv->data->mmsys_id == MMSYS_MT6765 ||
 		priv->data->mmsys_id == MMSYS_MT6853 ||
+		priv->data->mmsys_id == MMSYS_MT6833 ||
 		priv->data->mmsys_id == MMSYS_MT6781 ||
 		priv->data->mmsys_id == MMSYS_MT6877 ||
 		priv->data->mmsys_id == MMSYS_MT6885)) {
