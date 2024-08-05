@@ -3590,7 +3590,7 @@ static int ovt_tcm_disp_resume(struct device *dev)
 		return 0;
 
 #ifdef CONFIG_OVT_CHARGER_DETECT
-	ovt_start_charger_detect(tcm_hcd);
+	//ovt_start_charger_detect(tcm_hcd);
 #endif
 	mutex_lock(&tcm_hcd->suspend_resume_mutex);
 	if (tcm_hcd->in_hdl_mode) {
@@ -3690,7 +3690,7 @@ static int ovt_tcm_disp_suspend(struct device *dev)
 	if (tcm_hcd->in_suspend || tcm_hcd->ovt_tcm_driver_removing)
 		return 0;
 #ifdef CONFIG_OVT_CHARGER_DETECT
-	ovt_stop_charger_detect(tcm_hcd);
+	//ovt_stop_charger_detect(tcm_hcd);
 #endif
 	mutex_lock(&tcm_hcd->suspend_resume_mutex);
 	touch_suspend(tcm_hcd);
@@ -3789,7 +3789,7 @@ static int ovt_tcm_resume(struct device *dev)
 	if (!tcm_hcd->in_suspend  || tcm_hcd->ovt_tcm_driver_removing)
 		return 0;
 #ifdef CONFIG_OVT_CHARGER_DETECT
-	ovt_start_charger_detect(tcm_hcd);
+	//ovt_start_charger_detect(tcm_hcd);
 #endif
 	mutex_lock(&tcm_hcd->suspend_resume_mutex);
 	if (tcm_hcd->in_hdl_mode) {
@@ -3893,7 +3893,7 @@ static void speedup_resume(struct work_struct *work)
 	if (!tcm_hcd->in_suspend  || tcm_hcd->ovt_tcm_driver_removing)
 		return;
 #ifdef CONFIG_OVT_CHARGER_DETECT
-	ovt_start_charger_detect(tcm_hcd);
+	//ovt_start_charger_detect(tcm_hcd);
 #endif
 	mutex_lock(&tcm_hcd->suspend_resume_mutex);
 	pm_stay_awake(&tcm_hcd->pdev->dev);
@@ -3995,7 +3995,7 @@ static int ovt_tcm_suspend(struct device *dev)
 	if (tcm_hcd->in_suspend || tcm_hcd->ovt_tcm_driver_removing)
 		return 0;
 #ifdef CONFIG_OVT_CHARGER_DETECT
-	ovt_stop_charger_detect(tcm_hcd);
+	//ovt_stop_charger_detect(tcm_hcd);
 #endif
 	mutex_lock(&tcm_hcd->suspend_resume_mutex);
 	touch_suspend(tcm_hcd);
@@ -4402,6 +4402,49 @@ static int ovt_tcm_sensor_detection(struct ovt_tcm_hcd *tcm_hcd)
 
 	return 0;
 }
+#ifdef CONFIG_OVT_CHARGER_DETECT
+#if KERNEL_VERSION(4, 1, 0) <= LINUX_VERSION_CODE
+static int32_t ovt_charger_notifier_callback(struct notifier_block *nb, unsigned long val, void *v)
+{
+	int ret = 0;
+	struct power_supply *psy = NULL;
+	union power_supply_propval prop;
+
+	psy = power_supply_get_by_name("primary_chg");
+	if (!psy) {
+		LOGE(g_tcm_hcd->pdev->dev.parent,"Couldn't get usbpsy\n");
+		return -EINVAL;
+	}
+	if (!strcmp(psy->desc->name, "primary_chg")) {
+		if (psy && val == POWER_SUPPLY_PROP_STATUS) {
+			ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE, &prop);
+			if (ret < 0) {
+				LOGE(g_tcm_hcd->pdev->dev.parent,"Couldn't get POWER_SUPPLY_PROP_ONLINE rc=%d\n", ret);
+				return ret;
+			} else {
+				if (g_tcm_hcd->charger_plugin != prop.intval) {
+					LOGN(g_tcm_hcd->pdev->dev.parent,"g_tcm_hcd->charger_plugin=%d, prop.intval=%d\n",
+							g_tcm_hcd->charger_plugin, prop.intval);
+					ovt_tcm_set_func_charger_connected_en_state(prop.intval);
+					g_tcm_hcd->charger_plugin = prop.intval;
+				}
+			}
+		}
+	}
+	return 0;
+}
+int  charger_module_init(void)
+{
+	int ret = 0;
+	g_tcm_hcd->charger_plugin = 0;
+	g_tcm_hcd->notifier_charger.notifier_call = ovt_charger_notifier_callback;
+	ret = power_supply_reg_notifier(&g_tcm_hcd->notifier_charger);
+	if (ret < 0)
+		LOGE(g_tcm_hcd->pdev->dev.parent,"power_supply_reg_notifier failed\n");
+	return 0;
+}
+#endif
+#endif
 
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
 static int ovt_get_tp_info(char *buf, void *arg0)
@@ -4585,6 +4628,9 @@ static int ovt_tcm_probe(struct platform_device *pdev)
 	diag_module_init();
 	reflash_module_init();
 	//recovery_module_init(); no need
+#ifdef CONFIG_OVT_CHARGER_DETECT
+	charger_module_init();
+#endif
 
 	sysfs_dir = kobject_create_and_add(PLATFORM_DRIVER_NAME,
 			NULL); //&pdev->dev.kobj);  move to /sys

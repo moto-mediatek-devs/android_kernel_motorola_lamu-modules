@@ -880,6 +880,9 @@ int32_t nvt_update_firmware(char *firmware_name)
 		NVT_ERR("nvt_get_fw_info failed. (%d)\n", ret);
 	}
 
+	/* write back customized command */
+	nvt_charge_mode(ts->charger_plugin);
+
 download_fail:
 	if (!IS_ERR_OR_NULL(bin_map)) {
 		kfree(bin_map);

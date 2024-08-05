@@ -843,6 +843,114 @@ out:
 	return ret;
 }
 
+static int8_t nvt_cmd_store(uint8_t cmd)
+{
+	int32_t i, retry = 5;
+	uint8_t buf[4] = {0};
+
+	for (i = 0; i < retry; i++) {
+		if (buf[1] != cmd) {
+			//---set cmd status---
+			buf[0] = EVENT_MAP_HOST_CMD;
+			buf[1] = cmd;
+			CTP_SPI_WRITE(ts->client, buf, 2);
+		}
+
+		msleep(20);
+
+		//---read cmd status---
+		buf[0] = EVENT_MAP_HOST_CMD;
+		buf[1] = 0xFF;
+		CTP_SPI_READ(ts->client, buf, 2);
+
+		if (buf[1] == 0x00)
+			break;
+	}
+
+	if (i == retry) {
+		NVT_ERR("send Cmd 0x%02X failed, buf[1]=0x%02X\n", cmd, buf[1]);
+		return -1;
+	} else {
+		NVT_LOG("send Cmd 0x%02X success, tried %d times\n", cmd, i);
+	}
+
+	return 0;
+}
+
+int8_t nvt_charge_mode(bool plugin)
+{
+	int8_t ret = -1;
+
+	NVT_LOG("charger status = %d\n", plugin);
+
+	if (plugin) {
+		ret = nvt_cmd_store(CMD_ENTER_COMMON_USB_PLUGIN);
+	} else {
+		ret = nvt_cmd_store(CMD_ENTER_COMMON_USB_PLUGOUT);
+	}
+
+	return ret;
+}
+
+static void __maybe_unused nvt_update_charger(bool plugin)
+{
+	int ret = 0;
+
+	mutex_lock(&ts->lock);
+	NVT_LOG("plugin = %d\n", plugin);
+	ts->charger_plugin = plugin;
+	ret = nvt_charge_mode(ts->charger_plugin);
+	if (ret) {
+		NVT_ERR("update charger status failed!\n");
+	}
+	mutex_unlock(&ts->lock);
+
+	return;
+}
+
+#if NVT_CHARGER_NOTIFIER_CALLBACK
+#if KERNEL_VERSION(4, 1, 0) <= LINUX_VERSION_CODE
+static int32_t nvt_charger_notifier_callback(struct notifier_block *nb, unsigned long val, void *v)
+{
+	int ret = 0;
+	struct power_supply *psy = NULL;
+	union power_supply_propval prop;
+
+	psy = power_supply_get_by_name("primary_chg");
+	if (!psy) {
+		NVT_ERR("Couldn't get usbpsy\n");
+		return -EINVAL;
+	}
+	if (!strcmp(psy->desc->name, "primary_chg")) {
+		if (psy && val == POWER_SUPPLY_PROP_STATUS) {
+			ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE, &prop);
+			if (ret < 0) {
+				NVT_ERR("Couldn't get POWER_SUPPLY_PROP_ONLINE rc=%d\n", ret);
+				return ret;
+			} else {
+				if (ts->charger_plugin != prop.intval) {
+					NVT_LOG("ts->charger_plugin=%d, prop.intval=%d\n",
+							ts->charger_plugin, prop.intval);
+					nvt_update_charger(prop.intval);
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+void nvt_charger_init(void)
+{
+	int ret = 0;
+	ts->charger_plugin = 0;
+	ts->notifier_charger.notifier_call = nvt_charger_notifier_callback;
+	ret = power_supply_reg_notifier(&ts->notifier_charger);
+	if (ret < 0)
+		NVT_ERR("power_supply_reg_notifier failed\n");
+}
+#endif
+#endif
+
 /*******************************************************
   Create Device Node (Proc Entry)
 *******************************************************/
@@ -1163,6 +1271,66 @@ void nvt_ts_wakeup_gesture_report(uint8_t gesture_id, uint8_t *data)
 	}
 }
 #endif
+
+/*
+static ssize_t nvt_suspend_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct nvt_ts_data *nvt_ts_data = dev_get_drvdata(dev);
+
+	return snprintf(buf, PAGE_SIZE, "%s\n", nvt_ts_data->suspended ? "true" : "false");
+}
+
+static ssize_t nvt_suspend_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned int input;
+
+	if (kstrtouint(buf, 10, &input)) {
+		NVT_ERR("input buf transform err\n");
+		return -EINVAL;
+	}
+
+	if (input == 1)
+		nvt_ts_suspend(dev);
+	else if (input == 0)
+		nvt_ts_resume(dev);
+	else {
+		NVT_ERR("invalid input buf\n");
+		return -EINVAL;
+	}
+
+
+	return count;
+}
+*/
+static ssize_t ts_input_name_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%s\n", NVT_TS_NAME);
+}
+
+static ssize_t nvt_ts_firmware_version_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "0x%02X\n", ts->fw_ver);
+}
+
+
+//static DEVICE_ATTR(ts_suspend, 0664, nvt_suspend_show, nvt_suspend_store);
+static DEVICE_ATTR(input_name, 0664, ts_input_name_show, NULL);
+static DEVICE_ATTR(firmware_version, 0664, nvt_ts_firmware_version_show, NULL);
+
+static struct attribute *nvt_attrs[] = {
+	//&dev_attr_ts_suspend.attr,
+	&dev_attr_input_name.attr,
+	&dev_attr_firmware_version.attr,
+	NULL
+};
+static const struct attribute_group nvt_attr_group = {
+	.attrs = nvt_attrs,
+};
+
 
 /*******************************************************
 Description:
@@ -1658,6 +1826,31 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 
 	input_sync(ts->input_dev);
 
+#if FW_STATUS_REPORT
+	/* clear nvt fw debug info */
+	memset(&ts->fw_status_report, 0, sizeof(struct nvt_fw_status_report));
+
+	ts->fw_status_report.water = (point_data[61] >> 1) & 0x01;
+	ts->fw_status_report.palm = (point_data[61] >> 2) & 0x01;
+	ts->fw_status_report.hopping = (point_data[61] >> 3) & 0x01;
+	ts->fw_status_report.bending = (point_data[61] >> 4) & 0x01;
+	ts->fw_status_report.glove = (point_data[61] >> 5) & 0x01;
+	ts->fw_status_report.gnd_unstable = (point_data[61] >> 6) & 0x01;
+	ts->fw_status_report.charger = (point_data[61] >> 7) & 0x01;
+
+	ts->fw_status_report.re_calibration_type = point_data[62] & 0x07;
+
+	NVT_LOG("WATER:0x%02X, PALM:0x%02X, HOPPING:0x%02X, BENDING:0x%02X, GLOVE:0x%02X, GND:0x%02X, CHARGER:0x%02X, CAL:0x%02X\n",
+			ts->fw_status_report.water,
+			ts->fw_status_report.palm,
+			ts->fw_status_report.hopping,
+			ts->fw_status_report.bending,
+			ts->fw_status_report.glove,
+			ts->fw_status_report.gnd_unstable,
+			ts->fw_status_report.charger,
+			ts->fw_status_report.re_calibration_type);
+#endif
+
 	if (ts->pen_support) {
 /*
 		//--- dump pen buf ---
@@ -2009,6 +2202,8 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 	}
 	ts->client->bits_per_word = 8;
 	ts->client->mode = SPI_MODE_0;
+	ts->client->cs_setup.value = 200;
+	ts->client->cs_setup.unit = 1;
 
 	ret = spi_setup(ts->client);
 	if (ret < 0) {
@@ -2212,6 +2407,18 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 			msecs_to_jiffies(NVT_TOUCH_ESD_CHECK_PERIOD));
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
 
+	ret = sysfs_create_group(&client->dev.kobj, &nvt_attr_group);
+	if (ret < 0) {
+		printk("%s: Failed to crate sysfs attributes.\n", __func__);
+		goto err_sysfs;
+	}
+
+	ret = sysfs_create_link(NULL, &client->dev.kobj, "touchscreen");
+	if (ret < 0) {
+		NVT_ERR("%s Failed to create sysfs link!\n", __func__);
+		goto err_sysfs;
+	}
+
 	//---set device node---
 #if NVT_TOUCH_PROC
 	ret = nvt_flash_proc_init();
@@ -2291,6 +2498,17 @@ static int32_t nvt_ts_probe(struct spi_device *client)
     }
 #endif
 
+#if NVT_CHARGER_NOTIFIER_CALLBACK
+#if KERNEL_VERSION(4, 1, 0) <= LINUX_VERSION_CODE
+	nvt_charger_init();
+#endif
+#endif
+
+	
+#if FW_STATUS_REPORT
+	/* clear nvt fw debug info */
+	memset(&ts->fw_status_report, 0, sizeof(struct nvt_fw_status_report));
+#endif
 
 	bTouchIsAwake = 1;
 	NVT_LOG("end\n");
@@ -2334,6 +2552,8 @@ err_extra_proc_init_failed:
 	nvt_flash_proc_deinit();
 err_flash_proc_init_failed:
 #endif
+err_sysfs:
+	sysfs_remove_group(&client->dev.kobj, &nvt_attr_group);
 #if NVT_TOUCH_ESD_PROTECT
 	if (nvt_esd_check_wq) {
 		cancel_delayed_work_sync(&nvt_esd_check_work);
@@ -2444,6 +2664,9 @@ static int32_t nvt_ts_remove(struct spi_device *client)
 #if NVT_TOUCH_PROC
 	nvt_flash_proc_deinit();
 #endif
+
+	sysfs_remove_link(NULL, "touchscreen");
+	sysfs_remove_group(&client->dev.kobj, &nvt_attr_group);
 
 #if NVT_TOUCH_ESD_PROTECT
 	if (nvt_esd_check_wq) {

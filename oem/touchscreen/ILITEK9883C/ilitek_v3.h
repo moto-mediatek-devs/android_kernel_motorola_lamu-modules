@@ -140,7 +140,7 @@
 #define RESUME_BY_DDI				DISABLE
 #define MP_INT_LEVEL				DISABLE
 #define PLL_CLK_WAKEUP_TP_RESUME	DISABLE
-#define CHARGER_NOTIFIER_CALLBACK	DISABLE
+#define CHARGER_NOTIFIER_CALLBACK	ENABLE
 #define ENABLE_EDGE_PALM_PARA		DISABLE
 #define MULTI_REPORT_RATE			DISABLE
 #define ENGINEER_FLOW				ENABLE
@@ -1089,6 +1089,9 @@ struct ilitek_ts_data {
 	struct regulator *vdd;
 	struct regulator *vcc;
 	struct sram_test_para sram_para;
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_V2)
+	struct notifier_block disp_notifier;
+#endif
 
 #ifdef CONFIG_FB
 	struct notifier_block notifier_fb;

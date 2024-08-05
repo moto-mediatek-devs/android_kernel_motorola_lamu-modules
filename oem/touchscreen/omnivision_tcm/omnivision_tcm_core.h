@@ -53,7 +53,12 @@
 #define I2C_MODULE_NAME "omniVision_tcm_i2c"
 #define SPI_MODULE_NAME "omnivision_tcm_spi"
 
-//#define CONFIG_OVT_CHARGER_DETECT
+#define CONFIG_OVT_CHARGER_DETECT
+
+#ifdef CONFIG_OVT_CHARGER_DETECT
+#include <linux/power_supply.h>
+#endif
+
 struct ovt_tcm_board_data {
 	bool x_flip;
 	bool y_flip;
@@ -541,6 +546,10 @@ struct ovt_tcm_hcd {
 #if defined(CONFIG_DRMV) || defined(CONFIG_FBV)
 	struct notifier_block fb_notifier;
 #endif
+#ifdef CONFIG_OVT_CHARGER_DETECT
+	struct notifier_block notifier_charger;
+	bool charger_plugin;
+#endif
 	struct ovt_tcm_buffer in;
 	struct ovt_tcm_buffer out;
 	struct ovt_tcm_buffer resp;
@@ -816,8 +825,8 @@ extern int ovt_tcm_set_func_ear_phone_connected_en_state(unsigned short value);
 extern int ovt_tcm_set_func_roate_horizontal_level_en_state(unsigned short value);
 
 #ifdef CONFIG_OVT_CHARGER_DETECT
-extern int ovt_start_charger_detect(struct ovt_tcm_hcd *tcm_hcd);
-extern int ovt_stop_charger_detect(struct ovt_tcm_hcd *tcm_hcd);
+// extern int ovt_start_charger_detect(struct ovt_tcm_hcd *tcm_hcd);
+// extern int ovt_stop_charger_detect(struct ovt_tcm_hcd *tcm_hcd);
 int  charger_module_init(void);
 #endif
 

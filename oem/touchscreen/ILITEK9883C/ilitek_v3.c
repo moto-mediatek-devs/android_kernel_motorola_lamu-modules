@@ -47,14 +47,17 @@ static int ilitek_charger_notifier_callback(struct notifier_block *nb, unsigned 
 	if (ilits->fw_update_stat != 100)
 		return 0;
 
-	psy = power_supply_get_by_name("usb");
+	psy = power_supply_get_by_name("primary_chg");
+	if (IS_ERR_OR_NULL(psy)) {
+		ILI_ERR("get primary_chg psy failed\n");
+	}
 	if (!psy) {
 		ILI_ERR("Couldn't get usbpsy\n");
 		return -EINVAL;
 	}
-	if (!strcmp(psy->desc->name, "usb")) {
+	if (!strcmp(psy->desc->name, "primary_chg")) {
 		if (psy && val == POWER_SUPPLY_PROP_STATUS) {
-			ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_PRESENT, &prop);
+			ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE, &prop);
 			if (ret < 0) {
 				ILI_ERR("Couldn't get POWER_SUPPLY_PROP_ONLINE rc=%d\n", ret);
 				return ret;

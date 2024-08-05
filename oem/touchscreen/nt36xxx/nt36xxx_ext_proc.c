@@ -27,6 +27,7 @@
 #define NVT_BASELINE "nvt_baseline"
 #define NVT_RAW "nvt_raw"
 #define NVT_DIFF "nvt_diff"
+#define NVT_UPDATE "nvt_update"
 
 #define NORMAL_MODE 0x00
 #define TEST_MODE_2 0x22
@@ -41,6 +42,7 @@ static struct proc_dir_entry *NVT_proc_fw_version_entry;
 static struct proc_dir_entry *NVT_proc_baseline_entry;
 static struct proc_dir_entry *NVT_proc_raw_entry;
 static struct proc_dir_entry *NVT_proc_diff_entry;
+static struct proc_dir_entry *NVT_proc_fwupdate_entry;
 
 /*******************************************************
 Description:
@@ -635,6 +637,86 @@ static const struct file_operations nvt_diff_fops = {
 
 /*******************************************************
 Description:
+Description:
+	Novatek touchscreen /proc/nvt_update read function.
+return:
+	Executive outcomes. 0---succeed.
+*******************************************************/
+#define FWTYPE_MP     (0)
+#define FWTYPE_Normal (1)
+static ssize_t nvt_fwupdate_read(struct file *file, char __user *buff, size_t count, loff_t *offp)
+{
+	uint8_t *str = NULL;
+	uint8_t fwtype = FWTYPE_Normal;
+	int32_t ret = 0;
+
+	NVT_LOG("++\n");
+
+	if (mutex_lock_interruptible(&ts->lock)) {
+		return -ERESTARTSYS;
+	}
+
+	/* allocate buffer */
+	str = (uint8_t *)kzalloc((count), GFP_KERNEL);
+	if(str == NULL) {
+		NVT_ERR("kzalloc for buf failed!\n");
+		ret = -ENOMEM;
+		goto kzalloc_failed;
+	}
+
+	if (copy_from_user(str, buff, count)) {
+		NVT_ERR("copy from user error\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+#if NVT_TOUCH_ESD_PROTECT
+	/*
+	 * stop esd check work to avoid case that 0x77 report righ after here to enable esd check again
+	 * finally lead to trigger esd recovery bootloader reset
+	 */
+	cancel_delayed_work_sync(&nvt_esd_check_work);
+	nvt_esd_check_enable(false);
+#endif /* #if NVT_TOUCH_ESD_PROTECT */
+
+	fwtype = str[0]; 
+
+	NVT_LOG("fwtype is %d\n", fwtype);
+
+	
+	switch (fwtype) {
+		case FWTYPE_Normal:
+			nvt_update_firmware(BOOT_UPDATE_FIRMWARE_NAME);
+			break;
+		case FWTYPE_MP:
+			nvt_update_firmware(MP_UPDATE_FIRMWARE_NAME);
+			break;
+		default:
+			NVT_ERR("fwtype error\n");
+	}
+
+	mutex_unlock(&ts->lock);
+
+	NVT_LOG("--\n");
+
+out:
+	kfree(str);
+kzalloc_failed:
+	return ret;
+}
+
+#ifdef HAVE_PROC_OPS
+static const struct proc_ops nvt_fwupdate_fops = {
+	.proc_read = nvt_fwupdate_read,
+};
+#else
+static const struct file_operations nvt_fwupdate_fops = {
+	.owner = THIS_MODULE,
+	.read = nvt_fwupdate_read,		
+};
+#endif
+/*******************************************************
+Description:
 	Novatek touchscreen extra function proc. file node
 	initial function.
 
@@ -675,6 +757,13 @@ int32_t nvt_extra_proc_init(void)
 		NVT_LOG("create proc/%s Succeeded!\n", NVT_DIFF);
 	}
 
+	NVT_proc_fwupdate_entry = proc_create(NVT_UPDATE, 0444, NULL,&nvt_fwupdate_fops);
+	if (NVT_proc_fwupdate_entry == NULL) {
+		NVT_ERR("create proc/nvt_update Failed!\n");
+		return -ENOMEM;
+	} else {
+		NVT_LOG("create proc/nvt_update Succeeded!\n");
+	}
 	return 0;
 }
 
@@ -710,6 +799,11 @@ void nvt_extra_proc_deinit(void)
 		remove_proc_entry(NVT_DIFF, NULL);
 		NVT_proc_diff_entry = NULL;
 		NVT_LOG("Removed /proc/%s\n", NVT_DIFF);
+	}
+	if (NVT_proc_fwupdate_entry != NULL) {
+		remove_proc_entry(NVT_UPDATE, NULL);
+		NVT_proc_fwupdate_entry = NULL;
+		NVT_LOG("Removed /proc/%s\n", NVT_UPDATE);
 	}
 }
 #endif

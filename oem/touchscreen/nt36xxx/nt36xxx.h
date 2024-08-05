@@ -24,6 +24,7 @@
 #include <linux/spi/spi.h>
 #include <linux/uaccess.h>
 #include <linux/version.h>
+#include <linux/power_supply.h>
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
@@ -146,6 +147,12 @@ extern char mp_firmware_name[50];
 #define POINT_DATA_CHECKSUM 1
 #define POINT_DATA_CHECKSUM_LEN 65
 #define NVT_PM_WAIT_BUS_RESUME_COMPLETE 1
+#define FW_STATUS_REPORT 1
+#define NVT_CHARGER_NOTIFIER_CALLBACK 1
+
+//---Customerized command.---
+#define	CMD_ENTER_COMMON_USB_PLUGOUT 	0x51
+#define	CMD_ENTER_COMMON_USB_PLUGIN		0x53
 
 //---ESD Protect.---
 #define NVT_TOUCH_ESD_PROTECT 0
@@ -179,6 +186,20 @@ extern char mp_firmware_name[50];
 #elif IS_ENABLED(CONFIG_DRM_MEDIATEK) || IS_ENABLED(CONFIG_DRM_MEDIATEK_V2)
 #define NVT_MTK_DRM_NOTIFY 1
 #endif
+#endif
+
+#if FW_STATUS_REPORT
+struct nvt_fw_status_report {
+	uint16_t record;
+	uint8_t water;
+	uint8_t palm ;
+	uint8_t hopping;
+	uint8_t bending;
+	uint8_t glove;
+	uint8_t gnd_unstable;
+	uint8_t charger;
+	uint8_t re_calibration_type;
+};
 #endif
 
 struct nvt_ts_data {
@@ -236,6 +257,12 @@ struct nvt_ts_data {
 	bool dev_pm_suspend;
 	struct completion dev_pm_resume_completion;
 #endif
+#if FW_STATUS_REPORT
+	struct nvt_fw_status_report fw_status_report;
+#endif
+	bool charger_plugin;
+	struct work_struct work;
+	struct notifier_block notifier_charger;
 };
 
 #if NVT_TOUCH_PROC
@@ -296,6 +323,7 @@ int32_t nvt_check_fw_status(void);
 int32_t nvt_set_page(uint32_t addr);
 int32_t nvt_wait_auto_copy(void);
 int32_t nvt_write_addr(uint32_t addr, uint8_t data);
+int8_t nvt_charge_mode(bool plugin);
 #if NVT_TOUCH_ESD_PROTECT
 extern void nvt_esd_check_enable(uint8_t enable);
 #endif /* #if NVT_TOUCH_ESD_PROTECT */

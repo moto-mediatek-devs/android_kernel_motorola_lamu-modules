@@ -22,6 +22,11 @@
 
 #include "ilitek_v3.h"
 
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_V2)
+#include "../../../drivers/gpu/drm/mediatek/mediatek_v2/mtk_disp_notify.h"
+#include "../../../drivers/gpu/drm/mediatek/mediatek_v2/mtk_panel_ext.h"
+#endif
+
 #define DTS_INT_GPIO	"touch,irq-gpio"
 #define DTS_RESET_GPIO	"touch,reset-gpio"
 #define DTS_OF_NAME	"tchip,ilitek"
@@ -396,6 +401,45 @@ int ili_irq_register(int type)
 	return ret;
 }
 
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_V2)
+static int ts_mtk_drm_notifier_callback(struct notifier_block *nb,
+					unsigned long event, void *data)
+{
+    if (data) {
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_V2)
+        const unsigned long event_enum[2] = {MTK_DISP_EARLY_EVENT_BLANK, MTK_DISP_EVENT_BLANK};
+        const int blank_enum[2] = {MTK_DISP_BLANK_POWERDOWN, MTK_DISP_BLANK_UNBLANK};
+        int blank_value = *((int *)data);
+#elif IS_ENABLED(CONFIG_FB)
+        const unsigned long event_enum[2] = {FB_EARLY_EVENT_BLANK, FB_EVENT_BLANK};
+        const int blank_enum[2] = {FB_BLANK_POWERDOWN, FB_BLANK_UNBLANK};
+        int blank_value = *((int *)(((struct fb_event *)data)->data));
+#endif
+        ILI_INFO("notifier,event:%lu,blank:%d", event, blank_value);
+        if ((blank_enum[1] == blank_value) && (event_enum[1] == event)) {
+		if (ili_sleep_handler(TP_RESUME) < 0)
+			ILI_ERR("TP resume failed\n");
+        } else if ((blank_enum[0] == blank_value) && (event_enum[0] == event)) {
+		if (ili_sleep_handler(TP_DEEP_SLEEP) < 0)
+			ILI_ERR("TP suspend failed\n");
+        } else {
+            ILI_INFO("notifier,event:%lu,blank:%d, not care", event, blank_value);
+        }
+    } else {
+        ILI_ERR("callback *data is null");
+        return -EINVAL;
+    }
+    return 0;
+}
+static void ilitek_mtk_drm_sleep_init(void)
+{
+	ilits->disp_notifier.notifier_call = ts_mtk_drm_notifier_callback;
+	ILI_INFO("\n");
+	if (mtk_disp_notifier_register("ILI_TOUCH", &ilits->disp_notifier)) {
+		ILI_ERR("Failed to register disp notifier client!!\n");
+	}
+}
+#endif
 #if SPRD_SYSFS_SUSPEND_RESUME
 static ssize_t ts_suspend_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -698,6 +742,10 @@ static int ilitek_plat_probe(void)
 #elif SUSPEND_RESUME_SUPPORT
 	ilitek_plat_sleep_init();
 #endif
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_V2)
+	ilitek_mtk_drm_sleep_init();
+	ILI_INFO("Init mtk drm notifier\n");
+#endif
 	ilits->pm_suspend = false;
 	init_completion(&ilits->pm_completion);
 #if CHARGER_NOTIFIER_CALLBACK
@@ -737,6 +785,10 @@ static int ilitek_plat_remove(void)
 #if SPRD_SYSFS_SUSPEND_RESUME
 	ili_sysfs_remove_device(ilits->dev);
 #endif
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_V2)
+	if (mtk_disp_notifier_unregister(&ilits->disp_notifier))
+		ILI_ERR("[DRM]Error occurred while unregistering disp_notifier.\n");
+#endif
 	ili_dev_remove(ENABLE);
 	return 0;
 }
@@ -771,7 +823,7 @@ static struct ilitek_hwif_info hwif = {
 
 static int __init ilitek_plat_dev_init(void)
 {
-	ILI_INFO("ILITEK TP driver init for QCOM\n");
+	ILI_INFO("ILITEK TP driver init for MTK\n");
 	if (ili_dev_init(&hwif) < 0) {
 		ILI_ERR("Failed to register i2c/spi bus driver\n");
 		return -ENODEV;

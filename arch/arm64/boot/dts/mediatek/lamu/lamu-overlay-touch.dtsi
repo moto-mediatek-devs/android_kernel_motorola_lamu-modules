@@ -15,13 +15,13 @@
         touch,irq-gpio = <&pio 0 0x00>;
         touch,reset-gpio = <&pio 36 0x00>;
 
-        /*chipone,touch-charger-detect-enable;
+        chipone,touch-charger-detect-enable;
         chipone,touch-charger-detect-type = "notify";
-        chipone,touch-charger-detect-psy-name = "charger";
+        chipone,touch-charger-detect-psy-name = "primary_chg";
         chipone,touch-charger-detect-psp = "POWER_SUPPLY_PROP_ONLINE";
         chipone,touch-charger-detect-psp-poll-interval = <1000>;
 
-        chipone,touch-earjack-detect-enable;
+        /*chipone,touch-earjack-detect-enable;
 
         chipone,touch-earjack-state-filepath = "/sys/bus/platform/drivers/Accdet_Driver/state";
         chipone,touch-earjack-poll-interval = <1000>;*/
