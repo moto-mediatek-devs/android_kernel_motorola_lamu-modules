@@ -85,17 +85,25 @@
 #define NVT_PEN_NAME "NVTCapacitivePen"
 
 //---Touch info.---
+#define NVT_SUPER_RESOLUTION_N 4
+#if NVT_SUPER_RESOLUTION_N
+#define POINT_DATA_LEN 108
 /*add by yating.zhu@tinno.com for select fw start*/
 #if NEED_SELECT_VENDOR
 extern int touch_max_width;
 extern int touch_max_height;
-#define TOUCH_MAX_WIDTH touch_max_width
-#define TOUCH_MAX_HEIGHT touch_max_height
+#define TOUCH_MAX_WIDTH touch_max_width * NVT_SUPER_RESOLUTION_N
+#define TOUCH_MAX_HEIGHT touch_max_height * NVT_SUPER_RESOLUTION_N
 /*add by yating.zhu@tinno.com for select fw end*/
+#else
+#define TOUCH_MAX_WIDTH 1080 * NVT_SUPER_RESOLUTION_N
+#define TOUCH_MAX_HEIGHT 2460 * NVT_SUPER_RESOLUTION_N
+#endif //NEED_SELECT_VENDOR
 #else
 #define TOUCH_MAX_WIDTH 1080
 #define TOUCH_MAX_HEIGHT 2460
-#endif //NEED_SELECT_VENDOR
+#define POINT_DATA_LEN 65
+#endif//NVT_SUPER_RESOLUTION_N
 
 #define PEN_MAX_WIDTH 2160
 #define PEN_MAX_HEIGHT 4800
@@ -118,7 +126,7 @@ extern const uint16_t touch_key_array[TOUCH_KEY_NUM];
 #define NVT_TOUCH_PROC 1
 #define NVT_TOUCH_EXT_PROC 1
 #define NVT_TOUCH_MP 1
-#define NVT_SAVE_TEST_DATA_IN_FILE 0
+#define NVT_SAVE_TEST_DATA_IN_FILE 1
 #define MT_PROTOCOL_B 1
 #define WAKEUP_GESTURE 1
 #if WAKEUP_GESTURE

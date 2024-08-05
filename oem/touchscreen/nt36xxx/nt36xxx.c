@@ -166,9 +166,17 @@ char mp_firmware_name[50];
 
 extern int nt36672s_lcd_id;
 extern int nt36528a_lcd_id;
+#if NVT_TOUCH_MP
+extern uint32_t IC_Y_CFG_SIZE;
+extern uint32_t Y_Channel;
+extern uint8_t AIN_Y[64];
+#endif
 
 void nvt_set_size_info(int id) {
 
+#if NVT_TOUCH_MP
+	uint8_t given_array[64] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31};
+#endif
 	pr_info("%s lcd_id is %d\n",__func__,id);
     if (id == 0x0093) {
 		touch_max_width=1080;
@@ -180,7 +188,14 @@ void nvt_set_size_info(int id) {
     } else if (id == 0x0101) {
 		touch_max_width=720;
 		touch_max_height=1604;
+#if NVT_TOUCH_MP
+		IC_Y_CFG_SIZE = 32;
+		Y_Channel = 32;
 
+    for (int i = 0; i < 64; i++) {
+        AIN_Y[i] = given_array[i];
+    }
+#endif
         sprintf(app_firmware_name, "%s_%s", MODULE_VENDOR_2, DEFAULT_APP_FIRMWARE_NAME);
         sprintf(mp_firmware_name, "%s_%s", MODULE_VENDOR_2, DEFAULT_MP_FIRMWARE_NAME);
 
@@ -1627,7 +1642,7 @@ static int32_t nvt_ts_point_data_checksum(uint8_t *buf, uint8_t length)
 }
 #endif /* POINT_DATA_CHECKSUM */
 
-#define POINT_DATA_LEN 65
+//#define POINT_DATA_LEN 65
 /*******************************************************
 Description:
 	Novatek touchscreen work function.
@@ -1679,10 +1694,14 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 	}
 #endif /* NVT_PM_WAIT_BUS_RESUME_COMPLETE */
 
+#if NVT_SUPER_RESOLUTION_N
+	ret = CTP_SPI_READ(ts->client, point_data, POINT_DATA_LEN + 1);
+#else /* #if NVT_SUPER_RESOLUTION_N */
 	if (ts->pen_support)
 		ret = CTP_SPI_READ(ts->client, point_data, POINT_DATA_LEN + PEN_DATA_LEN + 1);
 	else
 		ret = CTP_SPI_READ(ts->client, point_data, POINT_DATA_LEN + 1);
+#endif /* #if NVT_SUPER_RESOLUTION_N */
 	if (ret < 0) {
 		NVT_ERR("CTP_SPI_READ failed.(%d)\n", ret);
 		goto XFER_ERROR;
@@ -1750,6 +1769,19 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 			/* update interrupt timer */
 			irq_timer = jiffies;
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
+
+#if NVT_SUPER_RESOLUTION_N
+			input_x = (uint32_t)(point_data[position + 1] << 8) + (uint32_t) (point_data[position + 2]);
+			input_y = (uint32_t)(point_data[position + 3] << 8) + (uint32_t) (point_data[position + 4]);
+			if ((input_x > TOUCH_MAX_WIDTH) || (input_y > TOUCH_MAX_HEIGHT))
+				continue;
+			input_w = (uint32_t)(point_data[position + 5]);
+			if (input_w == 0)
+				input_w = 1;
+			input_p = (uint32_t)(point_data[1 + 98 + i]);
+			if (input_p == 0)
+				input_p = 1;
+#else /* #if NVT_SUPER_RESOLUTION_N */
 			input_x = (uint32_t)(point_data[position + 1] << 4) + (uint32_t) (point_data[position + 3] >> 4);
 			input_y = (uint32_t)(point_data[position + 2] << 4) + (uint32_t) (point_data[position + 3] & 0x0F);
 			if ((input_x > TOUCH_MAX_WIDTH) || (input_y > TOUCH_MAX_HEIGHT))
@@ -1766,6 +1798,7 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 			}
 			if (input_p == 0)
 				input_p = 1;
+#endif /* #if NVT_SUPER_RESOLUTION_N */
 
 #if MT_PROTOCOL_B
 			press_id[input_id - 1] = 1;
@@ -2117,7 +2150,7 @@ static int nvt_get_tp_info(char *buf, void *arg0)
         "%s-%s-%s-v0x%02x",
         "TIANMA",
         "P329A",
-        "NT36672S",
+        "NT36528A",
         ts->fw_ver);
 	else
         return sprintf(buf,
