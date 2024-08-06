@@ -483,7 +483,7 @@ static int tianma_enable(struct drm_panel *panel)
 #define HSA (4)
 #define HBP (36)
 #define VFP_60 (1240)
-//#define VFP_90 (300)
+#define VFP_90 (284)
 #define VSA (4)
 #define VBP (20)
 #define VAC (1604)
@@ -502,8 +502,8 @@ static const struct drm_display_mode default_mode = {
 	.vtotal = VAC + VFP_60 + VSA + VBP,
 };
 
-/* static const struct drm_display_mode performance_mode = {
-	.clock = 137660,
+static const struct drm_display_mode performance_mode = {
+	.clock = (int)((HAC + HFP + HSA + HBP) * (VAC + VFP_90+ VSA + VBP) * 90 / 1000),
 	.hdisplay = HAC,
 	.hsync_start = HAC + HFP,
 	.hsync_end = HAC + HFP + HSA,
@@ -513,7 +513,7 @@ static const struct drm_display_mode default_mode = {
 	.vsync_end = VAC + VFP_90 + VSA,
 	.vtotal = VAC + VFP_90 + VSA + VBP,
 };
- */
+
 #if defined(CONFIG_MTK_PANEL_EXT)
 static int panel_ext_reset(struct drm_panel *panel, int on)
 {
@@ -593,6 +593,7 @@ static struct mtk_panel_params ext_params = {
 		.count = 1,
 		.para_list[0] = 0x9c,
 	},
+	//.ssc_enable = 0,
 /* 	.dyn = {
 		.switch_en = 1,
 		.pll_clk = 465,
@@ -600,23 +601,23 @@ static struct mtk_panel_params ext_params = {
 	}, */
 };
 
-/* static struct mtk_panel_params ext_params_90hz = {
+static struct mtk_panel_params ext_params_90hz = {
 	.pll_clk = 454,
-	.vfp_low_power = 300,
-	.cust_esd_check = 1,
-	.esd_check_enable = 1,
+	// .vfp_low_power = 300,
+	.cust_esd_check = 0,
+	.esd_check_enable = 0,
 	.lcm_esd_check_table[0] = {
 		.cmd = 0x0a,
 		.count = 1,
 		.para_list[0] = 0x9c,
 	},
-	.dyn = {
+/* 	.dyn = {
 		.switch_en = 1,
 		.pll_clk = 465,
 		.hfp = 56,
-	},
+	}, */
 };
- */
+
 struct drm_display_mode *get_mode_by_id_hfp(struct drm_connector *connector,
 	unsigned int mode)
 {
@@ -645,8 +646,8 @@ static int mtk_panel_ext_param_set(struct drm_panel *panel,
 
 	if (drm_mode_vrefresh(m) == 60)
 		ext->params = &ext_params;
-/* 	else if (drm_mode_vrefresh(m) == 90)
-		ext->params = &ext_params_90hz; */
+	else if (drm_mode_vrefresh(m) == 90)
+		ext->params = &ext_params_90hz;
 	else
 		ret = 1;
 
@@ -683,7 +684,7 @@ struct panel_desc {
 static int tianma_get_modes(struct drm_panel *panel, struct drm_connector *connector)
 {
 	struct drm_display_mode *mode;
-	//struct drm_display_mode *mode2;
+	struct drm_display_mode *mode2;
 
 	mode = drm_mode_duplicate(connector->dev, &default_mode);
 	if (!mode) {
@@ -697,7 +698,7 @@ static int tianma_get_modes(struct drm_panel *panel, struct drm_connector *conne
 	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
 	drm_mode_probed_add(connector, mode);
 
-/* 	mode2 = drm_mode_duplicate(connector->dev, &performance_mode);
+	mode2 = drm_mode_duplicate(connector->dev, &performance_mode);
 	if (!mode2) {
 		dev_info(connector->dev->dev, "failed to add mode %ux%ux@%u\n",
 			 performance_mode.hdisplay, performance_mode.vdisplay,
@@ -707,7 +708,7 @@ static int tianma_get_modes(struct drm_panel *panel, struct drm_connector *conne
 
 	drm_mode_set_name(mode2);
 	mode2->type = DRM_MODE_TYPE_DRIVER;
-	drm_mode_probed_add(connector, mode2); */
+	drm_mode_probed_add(connector, mode2);
 
 	connector->display_info.width_mm = 68;
 	connector->display_info.height_mm = 152;

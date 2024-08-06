@@ -233,199 +233,202 @@ static void txd_panel_init(struct txd *ctx)
 	}
 
 	gpiod_set_value(ctx->reset_gpio, 1);
-	udelay(5 * 1000);
+	udelay(10 * 1000);
 	gpiod_set_value(ctx->reset_gpio, 0);
-	udelay(2 * 1000);
+	udelay(5 * 1000);
 	gpiod_set_value(ctx->reset_gpio, 1);
 	udelay(15 * 1000);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 
-	txd_dcs_write_seq_static(ctx, 0xFF,0x98,0x83,0x01);
-	txd_dcs_write_seq_static(ctx, 0x00,0x51);
-	txd_dcs_write_seq_static(ctx, 0x01,0x17);
-	txd_dcs_write_seq_static(ctx, 0x02,0x00);
-	txd_dcs_write_seq_static(ctx, 0x03,0x00);
-	txd_dcs_write_seq_static(ctx, 0x04,0xCD);
-	txd_dcs_write_seq_static(ctx, 0x05,0x17);
-	txd_dcs_write_seq_static(ctx, 0x06,0x00);
-	txd_dcs_write_seq_static(ctx, 0x07,0x00);
-	txd_dcs_write_seq_static(ctx, 0x08,0x8E);
-	txd_dcs_write_seq_static(ctx, 0x09,0x01);
-	txd_dcs_write_seq_static(ctx, 0x0A,0xF7);
-	txd_dcs_write_seq_static(ctx, 0x0B,0x00);
-	txd_dcs_write_seq_static(ctx, 0x10,0x10);
-	txd_dcs_write_seq_static(ctx, 0x11,0x00);
-	txd_dcs_write_seq_static(ctx, 0x12,0x00);
-	txd_dcs_write_seq_static(ctx, 0x16,0x8E);
-	txd_dcs_write_seq_static(ctx, 0x17,0x01);
-	txd_dcs_write_seq_static(ctx, 0x18,0x77);
-	txd_dcs_write_seq_static(ctx, 0x19,0x00);
-	txd_dcs_write_seq_static(ctx, 0x1E,0x10);
-	txd_dcs_write_seq_static(ctx, 0x0C,0x5D);
-	txd_dcs_write_seq_static(ctx, 0x0D,0x5D);
-	txd_dcs_write_seq_static(ctx, 0x0E,0x00);
-	txd_dcs_write_seq_static(ctx, 0x0F,0x00);
-	txd_dcs_write_seq_static(ctx, 0x1A,0x5D);
-	txd_dcs_write_seq_static(ctx, 0x1B,0x5D);
-	txd_dcs_write_seq_static(ctx, 0x1C,0x00);
-	txd_dcs_write_seq_static(ctx, 0x1D,0x00);
-	txd_dcs_write_seq_static(ctx, 0x28,0x52);
-	txd_dcs_write_seq_static(ctx, 0x29,0x89);
-	txd_dcs_write_seq_static(ctx, 0x2A,0x8A);
-	txd_dcs_write_seq_static(ctx, 0x2B,0x53);
-	txd_dcs_write_seq_static(ctx, 0x31,0x07);
-	txd_dcs_write_seq_static(ctx, 0x32,0x2A);
-	txd_dcs_write_seq_static(ctx, 0x33,0x23);
-	txd_dcs_write_seq_static(ctx, 0x34,0x09);
-	txd_dcs_write_seq_static(ctx, 0x35,0x0D);
-	txd_dcs_write_seq_static(ctx, 0x36,0x11);
-	txd_dcs_write_seq_static(ctx, 0x37,0x13);
-	txd_dcs_write_seq_static(ctx, 0x38,0x15);
-	txd_dcs_write_seq_static(ctx, 0x39,0x17);
-	txd_dcs_write_seq_static(ctx, 0x3A,0x19);
-	txd_dcs_write_seq_static(ctx, 0x3B,0x1B);
-	txd_dcs_write_seq_static(ctx, 0x3C,0x1D);
-	txd_dcs_write_seq_static(ctx, 0x3D,0x1F);
-	txd_dcs_write_seq_static(ctx, 0x3E,0x22);
-	txd_dcs_write_seq_static(ctx, 0x3F,0x07);
-	txd_dcs_write_seq_static(ctx, 0x40,0x07);
-	txd_dcs_write_seq_static(ctx, 0x41,0x07);
-	txd_dcs_write_seq_static(ctx, 0x42,0x07);
-	txd_dcs_write_seq_static(ctx, 0x43,0x07);
-	txd_dcs_write_seq_static(ctx, 0x44,0x07);
-	txd_dcs_write_seq_static(ctx, 0x45,0x07);
-	txd_dcs_write_seq_static(ctx, 0x46,0x07);
-	txd_dcs_write_seq_static(ctx, 0x47,0x07);
-	txd_dcs_write_seq_static(ctx, 0x48,0x2A);
-	txd_dcs_write_seq_static(ctx, 0x49,0x23);
-	txd_dcs_write_seq_static(ctx, 0x4A,0x08);
-	txd_dcs_write_seq_static(ctx, 0x4B,0x0C);
-	txd_dcs_write_seq_static(ctx, 0x4C,0x10);
-	txd_dcs_write_seq_static(ctx, 0x4D,0x12);
-	txd_dcs_write_seq_static(ctx, 0x4E,0x14);
-	txd_dcs_write_seq_static(ctx, 0x4F,0x16);
-	txd_dcs_write_seq_static(ctx, 0x50,0x18);
-	txd_dcs_write_seq_static(ctx, 0x51,0x1A);
-	txd_dcs_write_seq_static(ctx, 0x52,0x1C);
-	txd_dcs_write_seq_static(ctx, 0x53,0x1E);
-	txd_dcs_write_seq_static(ctx, 0x54,0x22);
-	txd_dcs_write_seq_static(ctx, 0x55,0x07);
-	txd_dcs_write_seq_static(ctx, 0x56,0x07);
-	txd_dcs_write_seq_static(ctx, 0x57,0x07);
-	txd_dcs_write_seq_static(ctx, 0x58,0x07);
-	txd_dcs_write_seq_static(ctx, 0x59,0x07);
-	txd_dcs_write_seq_static(ctx, 0x5A,0x07);
-	txd_dcs_write_seq_static(ctx, 0x5B,0x07);
-	txd_dcs_write_seq_static(ctx, 0x5C,0x07);
-	txd_dcs_write_seq_static(ctx, 0xC3,0x00);
-	txd_dcs_write_seq_static(ctx, 0xD0,0x01);
-	txd_dcs_write_seq_static(ctx, 0xD1,0x50);
-	txd_dcs_write_seq_static(ctx, 0xD6,0x80);
-	txd_dcs_write_seq_static(ctx, 0xD3,0x30);
-	txd_dcs_write_seq_static(ctx, 0xF1,0x40);
-	txd_dcs_write_seq_static(ctx, 0xE0,0x7E);
-	txd_dcs_write_seq_static(ctx, 0xE2,0x10);
-	txd_dcs_write_seq_static(ctx, 0xE6,0x22);
-	txd_dcs_write_seq_static(ctx, 0xE7,0x54);
-	txd_dcs_write_seq_static(ctx, 0xEE,0x14);
-	txd_dcs_write_seq_static(ctx, 0xFF,0x98,0x83,0x02);
-	txd_dcs_write_seq_static(ctx, 0x06,0x41);
-	txd_dcs_write_seq_static(ctx, 0x0A,0x1B);
-	txd_dcs_write_seq_static(ctx, 0x0C,0x80);
-	txd_dcs_write_seq_static(ctx, 0x0D,0x84);
-	txd_dcs_write_seq_static(ctx, 0x0E,0x1A);
-	txd_dcs_write_seq_static(ctx, 0x39,0x41);
-	txd_dcs_write_seq_static(ctx, 0x3A,0x84);
-	txd_dcs_write_seq_static(ctx, 0x3B,0x1B);
-	txd_dcs_write_seq_static(ctx, 0x3C,0x7E);
-	txd_dcs_write_seq_static(ctx, 0xF0,0x02);
-	txd_dcs_write_seq_static(ctx, 0xF1,0xBC);
-	txd_dcs_write_seq_static(ctx, 0x29,0x48);
-	txd_dcs_write_seq_static(ctx, 0x2A,0x48);
-	txd_dcs_write_seq_static(ctx, 0x48,0x01);
-	txd_dcs_write_seq_static(ctx, 0x44,0x68);
-	txd_dcs_write_seq_static(ctx, 0xFF,0x98,0x83,0x03);
-	txd_dcs_write_seq_static(ctx, 0x20,0x01);
-	txd_dcs_write_seq_static(ctx, 0x22,0xFA);
-	txd_dcs_write_seq_static(ctx, 0xFF,0x98,0x83,0x05);
-	txd_dcs_write_seq_static(ctx, 0x03,0x00);
-	txd_dcs_write_seq_static(ctx, 0x04,0xD7);
-	txd_dcs_write_seq_static(ctx, 0x69,0xA1);
-	txd_dcs_write_seq_static(ctx, 0x6A,0x97);
-	txd_dcs_write_seq_static(ctx, 0x6D,0x8D);
-	txd_dcs_write_seq_static(ctx, 0x73,0x93);
-	txd_dcs_write_seq_static(ctx, 0x79,0xC9);
-	txd_dcs_write_seq_static(ctx, 0x7F,0xBB);
-	txd_dcs_write_seq_static(ctx, 0x68,0x3E);
-	txd_dcs_write_seq_static(ctx, 0x66,0x33);
-	txd_dcs_write_seq_static(ctx, 0x20,0x22);
-	txd_dcs_write_seq_static(ctx, 0xFF,0x98,0x83,0x06);
-	txd_dcs_write_seq_static(ctx, 0xD9,0x1F);
-	txd_dcs_write_seq_static(ctx, 0xC0,0x44);
-	txd_dcs_write_seq_static(ctx, 0xC1,0x16);
-	txd_dcs_write_seq_static(ctx, 0x0A,0x50);
-	txd_dcs_write_seq_static(ctx, 0xFF,0x98,0x83,0x08);
-	txd_dcs_write_seq_static(ctx, 0xE0,0x00,0x00,0x18,0x50,0x85,0x50,0xC7,0xFF,0x2A,0x5D,0x95,0x85,0xC5,0xF8,0x25,0xAA,0x50,0x7D,0xB2,0xD2,0xFE,0xFB,0x1D,0x48,0x7C,0x3F,0xA6,0xC7,0xDB);
-	txd_dcs_write_seq_static(ctx, 0xE1,0x00,0x00,0x18,0x50,0x85,0x50,0xC7,0xFF,0x2A,0x5D,0x95,0x85,0xC5,0xF8,0x25,0xAA,0x50,0x7D,0xB2,0xD2,0xFE,0xFB,0x1D,0x48,0x7C,0x3F,0xA6,0xC7,0xDB);
-	txd_dcs_write_seq_static(ctx, 0xFF,0x98,0x83,0x0A);
-	txd_dcs_write_seq_static(ctx, 0xE0,0x01);
-	txd_dcs_write_seq_static(ctx, 0xE1,0x0B);
-	txd_dcs_write_seq_static(ctx, 0xE2,0x01);
-	txd_dcs_write_seq_static(ctx, 0xFF,0x98,0x83,0x0B);
-	txd_dcs_write_seq_static(ctx, 0x9A,0x84);
-	txd_dcs_write_seq_static(ctx, 0x9B,0x20);
-	txd_dcs_write_seq_static(ctx, 0x9C,0x03);
-	txd_dcs_write_seq_static(ctx, 0x9D,0x03);
-	txd_dcs_write_seq_static(ctx, 0x9E,0x67);
-	txd_dcs_write_seq_static(ctx, 0x9F,0x67);
-	txd_dcs_write_seq_static(ctx, 0xAA,0x22);
-	txd_dcs_write_seq_static(ctx, 0xAB,0xE0);
-	txd_dcs_write_seq_static(ctx, 0xFF,0x98,0x83,0x0E);
-	txd_dcs_write_seq_static(ctx, 0x11,0x4d);
-	txd_dcs_write_seq_static(ctx, 0x12,0x02);
-	txd_dcs_write_seq_static(ctx, 0x13,0x80);
-	txd_dcs_write_seq_static(ctx, 0x14,0x0F);
-	txd_dcs_write_seq_static(ctx, 0x51,0x01);
-	txd_dcs_write_seq_static(ctx, 0x00,0xA0);
-	txd_dcs_write_seq_static(ctx, 0xFF,0x98,0x83,0x03);
-	txd_dcs_write_seq_static(ctx, 0x8C,0xD2);
-	txd_dcs_write_seq_static(ctx, 0x8D,0xD6);
-	txd_dcs_write_seq_static(ctx, 0x8E,0xDA);
-	txd_dcs_write_seq_static(ctx, 0x8F,0xDE);
-	txd_dcs_write_seq_static(ctx, 0x90,0xDF);
-	txd_dcs_write_seq_static(ctx, 0x91,0xE6);
-	txd_dcs_write_seq_static(ctx, 0x92,0xE9);
-	txd_dcs_write_seq_static(ctx, 0x93,0xED);
-	txd_dcs_write_seq_static(ctx, 0x94,0xF0);
-	txd_dcs_write_seq_static(ctx, 0x95,0xFF);
-	txd_dcs_write_seq_static(ctx, 0x96,0xB5);
-	txd_dcs_write_seq_static(ctx, 0x97,0xBA);
-	txd_dcs_write_seq_static(ctx, 0x98,0xBF);
-	txd_dcs_write_seq_static(ctx, 0x99,0xC4);
-	txd_dcs_write_seq_static(ctx, 0x9A,0xC9);
-	txd_dcs_write_seq_static(ctx, 0x9B,0xCD);
-	txd_dcs_write_seq_static(ctx, 0x9C,0xD5);
-	txd_dcs_write_seq_static(ctx, 0x9D,0xE6);
-	txd_dcs_write_seq_static(ctx, 0x9E,0xF6);
-	txd_dcs_write_seq_static(ctx, 0x9F,0xFB);
-	txd_dcs_write_seq_static(ctx, 0x87,0x4D);
-	txd_dcs_write_seq_static(ctx, 0xFF,0x98,0x83,0x06);
-	txd_dcs_write_seq_static(ctx, 0x06,0xA4);
-	txd_dcs_write_seq_static(ctx, 0xFF,0x98,0x83,0x03);
-	txd_dcs_write_seq_static(ctx, 0xAF,0x18);
-	txd_dcs_write_seq_static(ctx, 0x83,0xB8);
-	txd_dcs_write_seq_static(ctx, 0x84,0x02);
-	txd_dcs_write_seq_static(ctx, 0xFF,0x98,0x83,0x00);
-	txd_dcs_write_seq_static(ctx, 0x51,0x07,0xFF);
-	txd_dcs_write_seq_static(ctx, 0x53,0x2C);
-	txd_dcs_write_seq_static(ctx, 0x55,0x01);
-	txd_dcs_write_seq_static(ctx, 0xFF,0x98,0x83,0x00);
-	txd_dcs_write_seq_static(ctx, 0x35,0x00);
-	txd_dcs_write_seq_static(ctx, 0x11);
+	txd_dcs_write_seq_static(ctx,0xFF,0x98,0x83,0x06);
+	txd_dcs_write_seq_static(ctx,0x3E,0xE2);
+	txd_dcs_write_seq_static(ctx,0xFF,0x98,0x83,0x01);
+	txd_dcs_write_seq_static(ctx,0x00,0x51);
+	txd_dcs_write_seq_static(ctx,0x01,0x17);
+	txd_dcs_write_seq_static(ctx,0x02,0x00);
+	txd_dcs_write_seq_static(ctx,0x03,0x00);
+	txd_dcs_write_seq_static(ctx,0x04,0xCD);
+	txd_dcs_write_seq_static(ctx,0x05,0x17);
+	txd_dcs_write_seq_static(ctx,0x06,0x00);
+	txd_dcs_write_seq_static(ctx,0x07,0x00);
+	txd_dcs_write_seq_static(ctx,0x08,0x8E);
+	txd_dcs_write_seq_static(ctx,0x09,0x01);
+	txd_dcs_write_seq_static(ctx,0x0A,0xF7);
+	txd_dcs_write_seq_static(ctx,0x0B,0x00);
+	txd_dcs_write_seq_static(ctx,0x10,0x10);
+	txd_dcs_write_seq_static(ctx,0x11,0x00);
+	txd_dcs_write_seq_static(ctx,0x12,0x00);
+	txd_dcs_write_seq_static(ctx,0x16,0x8E);
+	txd_dcs_write_seq_static(ctx,0x17,0x01);
+	txd_dcs_write_seq_static(ctx,0x18,0x77);
+	txd_dcs_write_seq_static(ctx,0x19,0x00);
+	txd_dcs_write_seq_static(ctx,0x1E,0x10);
+	txd_dcs_write_seq_static(ctx,0x0C,0x5D);
+	txd_dcs_write_seq_static(ctx,0x0D,0x5D);
+	txd_dcs_write_seq_static(ctx,0x0E,0x00);
+	txd_dcs_write_seq_static(ctx,0x0F,0x00);
+	txd_dcs_write_seq_static(ctx,0x1A,0x5D);
+	txd_dcs_write_seq_static(ctx,0x1B,0x5D);
+	txd_dcs_write_seq_static(ctx,0x1C,0x00);
+	txd_dcs_write_seq_static(ctx,0x1D,0x00);
+	txd_dcs_write_seq_static(ctx,0x28,0x52);
+	txd_dcs_write_seq_static(ctx,0x29,0x89);
+	txd_dcs_write_seq_static(ctx,0x2A,0x8A);
+	txd_dcs_write_seq_static(ctx,0x2B,0x53);
+	txd_dcs_write_seq_static(ctx,0x31,0x07);
+	txd_dcs_write_seq_static(ctx,0x32,0x2A);
+	txd_dcs_write_seq_static(ctx,0x33,0x23);
+	txd_dcs_write_seq_static(ctx,0x34,0x09);
+	txd_dcs_write_seq_static(ctx,0x35,0x0D);
+	txd_dcs_write_seq_static(ctx,0x36,0x11);
+	txd_dcs_write_seq_static(ctx,0x37,0x13);
+	txd_dcs_write_seq_static(ctx,0x38,0x15);
+	txd_dcs_write_seq_static(ctx,0x39,0x17);
+	txd_dcs_write_seq_static(ctx,0x3A,0x19);
+	txd_dcs_write_seq_static(ctx,0x3B,0x1B);
+	txd_dcs_write_seq_static(ctx,0x3C,0x1D);
+	txd_dcs_write_seq_static(ctx,0x3D,0x1F);
+	txd_dcs_write_seq_static(ctx,0x3E,0x22);
+	txd_dcs_write_seq_static(ctx,0x3F,0x07);
+	txd_dcs_write_seq_static(ctx,0x40,0x07);
+	txd_dcs_write_seq_static(ctx,0x41,0x07);
+	txd_dcs_write_seq_static(ctx,0x42,0x07);
+	txd_dcs_write_seq_static(ctx,0x43,0x07);
+	txd_dcs_write_seq_static(ctx,0x44,0x07);
+	txd_dcs_write_seq_static(ctx,0x45,0x07);
+	txd_dcs_write_seq_static(ctx,0x46,0x07);
+	txd_dcs_write_seq_static(ctx,0x47,0x07);
+	txd_dcs_write_seq_static(ctx,0x48,0x2A);
+	txd_dcs_write_seq_static(ctx,0x49,0x23);
+	txd_dcs_write_seq_static(ctx,0x4A,0x08);
+	txd_dcs_write_seq_static(ctx,0x4B,0x0C);
+	txd_dcs_write_seq_static(ctx,0x4C,0x10);
+	txd_dcs_write_seq_static(ctx,0x4D,0x12);
+	txd_dcs_write_seq_static(ctx,0x4E,0x14);
+	txd_dcs_write_seq_static(ctx,0x4F,0x16);
+	txd_dcs_write_seq_static(ctx,0x50,0x18);
+	txd_dcs_write_seq_static(ctx,0x51,0x1A);
+	txd_dcs_write_seq_static(ctx,0x52,0x1C);
+	txd_dcs_write_seq_static(ctx,0x53,0x1E);
+	txd_dcs_write_seq_static(ctx,0x54,0x22);
+	txd_dcs_write_seq_static(ctx,0x55,0x07);
+	txd_dcs_write_seq_static(ctx,0x56,0x07);
+	txd_dcs_write_seq_static(ctx,0x57,0x07);
+	txd_dcs_write_seq_static(ctx,0x58,0x07);
+	txd_dcs_write_seq_static(ctx,0x59,0x07);
+	txd_dcs_write_seq_static(ctx,0x5A,0x07);
+	txd_dcs_write_seq_static(ctx,0x5B,0x07);
+	txd_dcs_write_seq_static(ctx,0x5C,0x07);
+	txd_dcs_write_seq_static(ctx,0xC3,0x00);
+	txd_dcs_write_seq_static(ctx,0xD0,0x01);
+	txd_dcs_write_seq_static(ctx,0xD1,0x50);
+	txd_dcs_write_seq_static(ctx,0xD6,0x80);
+	txd_dcs_write_seq_static(ctx,0xD3,0x30);
+	txd_dcs_write_seq_static(ctx,0xF1,0x40);
+	txd_dcs_write_seq_static(ctx,0xE0,0x7E);
+	txd_dcs_write_seq_static(ctx,0xE2,0x10);
+	txd_dcs_write_seq_static(ctx,0xE6,0x22);
+	txd_dcs_write_seq_static(ctx,0xE7,0x54);
+	txd_dcs_write_seq_static(ctx,0xEE,0x14);
+	txd_dcs_write_seq_static(ctx,0xFF,0x98,0x83,0x02);
+	txd_dcs_write_seq_static(ctx,0x06,0x57);
+	txd_dcs_write_seq_static(ctx,0x08,0x40);
+	txd_dcs_write_seq_static(ctx,0x0A,0x5B);
+	txd_dcs_write_seq_static(ctx,0x0C,0x00);
+	txd_dcs_write_seq_static(ctx,0x0D,0x64);
+	txd_dcs_write_seq_static(ctx,0x0E,0x28);
+	txd_dcs_write_seq_static(ctx,0x39,0x05);
+	txd_dcs_write_seq_static(ctx,0x3A,0x64);
+	txd_dcs_write_seq_static(ctx,0x3B,0x28);
+	txd_dcs_write_seq_static(ctx,0x3C,0xA9);
+	txd_dcs_write_seq_static(ctx,0xF0,0x01);
+	txd_dcs_write_seq_static(ctx,0xF1,0x29);
+	txd_dcs_write_seq_static(ctx,0x29,0x48);
+	txd_dcs_write_seq_static(ctx,0x2A,0x48);
+	txd_dcs_write_seq_static(ctx,0x48,0x01);
+	txd_dcs_write_seq_static(ctx,0x44,0x68);
+	txd_dcs_write_seq_static(ctx,0x40,0x47);
+	txd_dcs_write_seq_static(ctx,0xFF,0x98,0x83,0x03);
+	txd_dcs_write_seq_static(ctx,0x20,0x01);
+	txd_dcs_write_seq_static(ctx,0x22,0xFA);
+	txd_dcs_write_seq_static(ctx,0xFF,0x98,0x83,0x05);
+	txd_dcs_write_seq_static(ctx,0x03,0x00);
+	txd_dcs_write_seq_static(ctx,0x04,0xD7);
+	txd_dcs_write_seq_static(ctx,0x69,0xA1);
+	txd_dcs_write_seq_static(ctx,0x6A,0x97);
+	txd_dcs_write_seq_static(ctx,0x6D,0x8D);
+	txd_dcs_write_seq_static(ctx,0x73,0x93);
+	txd_dcs_write_seq_static(ctx,0x79,0xC9);
+	txd_dcs_write_seq_static(ctx,0x7F,0xBB);
+	txd_dcs_write_seq_static(ctx,0x68,0x3E);
+	txd_dcs_write_seq_static(ctx,0x66,0x33);
+	txd_dcs_write_seq_static(ctx,0x20,0x22);
+	txd_dcs_write_seq_static(ctx,0xFF,0x98,0x83,0x06);
+	txd_dcs_write_seq_static(ctx,0xD9,0x1F);
+	txd_dcs_write_seq_static(ctx,0xC0,0x44);
+	txd_dcs_write_seq_static(ctx,0xC1,0x16);
+	txd_dcs_write_seq_static(ctx,0x93,0x10);
+	txd_dcs_write_seq_static(ctx,0x0A,0x50);
+	txd_dcs_write_seq_static(ctx,0xFF,0x98,0x83,0x08);
+	txd_dcs_write_seq_static(ctx,0xE0,0x00,0x00,0x18,0x50,0x85,0x50,0xC7,0xFF,0x2A,0x5D,0x95,0x85,0xC5,0xF8,0x25,0xAA,0x50,0x7D,0xB2,0xD2,0xFE,0xFB,0x1D,0x48,0x7C,0x3F,0xA6,0xC7,0xDB);
+	txd_dcs_write_seq_static(ctx,0xE1,0x00,0x00,0x18,0x50,0x85,0x50,0xC7,0xFF,0x2A,0x5D,0x95,0x85,0xC5,0xF8,0x25,0xAA,0x50,0x7D,0xB2,0xD2,0xFE,0xFB,0x1D,0x48,0x7C,0x3F,0xA6,0xC7,0xDB);
+	txd_dcs_write_seq_static(ctx,0xFF,0x98,0x83,0x0A);
+	txd_dcs_write_seq_static(ctx,0xE0,0x01);
+	txd_dcs_write_seq_static(ctx,0xE1,0x0B);
+	txd_dcs_write_seq_static(ctx,0xE2,0x01);
+	txd_dcs_write_seq_static(ctx,0xFF,0x98,0x83,0x0B);
+	txd_dcs_write_seq_static(ctx,0x9A,0x85);
+	txd_dcs_write_seq_static(ctx,0x9B,0x8D);
+	txd_dcs_write_seq_static(ctx,0x9C,0x04);
+	txd_dcs_write_seq_static(ctx,0x9D,0x04);
+	txd_dcs_write_seq_static(ctx,0x9E,0x8B);
+	txd_dcs_write_seq_static(ctx,0x9F,0x8B);
+	txd_dcs_write_seq_static(ctx,0xAA,0x22);
+	txd_dcs_write_seq_static(ctx,0xAB,0xE0);
+	txd_dcs_write_seq_static(ctx,0xFF,0x98,0x83,0x0E);
+	txd_dcs_write_seq_static(ctx,0x11,0x4B);
+	txd_dcs_write_seq_static(ctx,0x12,0x02);
+	txd_dcs_write_seq_static(ctx,0x13,0x14);
+	txd_dcs_write_seq_static(ctx,0x00,0xA0);
+	txd_dcs_write_seq_static(ctx,0x14,0x00);
+	txd_dcs_write_seq_static(ctx,0x51,0x00);
+	txd_dcs_write_seq_static(ctx,0xFF,0x98,0x83,0x03);
+	txd_dcs_write_seq_static(ctx,0x8C,0xD2);
+	txd_dcs_write_seq_static(ctx,0x8D,0xD6);
+	txd_dcs_write_seq_static(ctx,0x8E,0xDA);
+	txd_dcs_write_seq_static(ctx,0x8F,0xDE);
+	txd_dcs_write_seq_static(ctx,0x90,0xDF);
+	txd_dcs_write_seq_static(ctx,0x91,0xE6);
+	txd_dcs_write_seq_static(ctx,0x92,0xE9);
+	txd_dcs_write_seq_static(ctx,0x93,0xED);
+	txd_dcs_write_seq_static(ctx,0x94,0xF0);
+	txd_dcs_write_seq_static(ctx,0x95,0xFF);
+	txd_dcs_write_seq_static(ctx,0x96,0xB5);
+	txd_dcs_write_seq_static(ctx,0x97,0xBA);
+	txd_dcs_write_seq_static(ctx,0x98,0xBF);
+	txd_dcs_write_seq_static(ctx,0x99,0xC4);
+	txd_dcs_write_seq_static(ctx,0x9A,0xC9);
+	txd_dcs_write_seq_static(ctx,0x9B,0xCD);
+	txd_dcs_write_seq_static(ctx,0x9C,0xD5);
+	txd_dcs_write_seq_static(ctx,0x9D,0xE6);
+	txd_dcs_write_seq_static(ctx,0x9E,0xF6);
+	txd_dcs_write_seq_static(ctx,0x9F,0xFB);
+	txd_dcs_write_seq_static(ctx,0x87,0x4D);
+	txd_dcs_write_seq_static(ctx,0xFF,0x98,0x83,0x06);
+	txd_dcs_write_seq_static(ctx,0x06,0xA4);
+	txd_dcs_write_seq_static(ctx,0xFF,0x98,0x83,0x03);
+	txd_dcs_write_seq_static(ctx,0xAF,0x18);
+	txd_dcs_write_seq_static(ctx,0x83,0xB8);
+	txd_dcs_write_seq_static(ctx,0x84,0x02);
+	txd_dcs_write_seq_static(ctx,0xFF,0x98,0x83,0x00);
+	txd_dcs_write_seq_static(ctx,0x51,0x07,0xFF);
+	txd_dcs_write_seq_static(ctx,0x53,0x2C);
+	txd_dcs_write_seq_static(ctx,0x55,0x01);
+	txd_dcs_write_seq_static(ctx,0x35,0x00);
+	txd_dcs_write_seq_static(ctx,0x11);
 	msleep(120);
-	txd_dcs_write_seq_static(ctx, 0x29);
-	msleep(50);
-
+	txd_dcs_write_seq_static(ctx,0x29);
+	msleep(20);
 }
 
 static int txd_disable(struct drm_panel *panel)
@@ -500,7 +503,7 @@ static int txd_unprepare(struct drm_panel *panel)
 	gpiod_set_value(ctx->bias_neg, 0);
 	devm_gpiod_put(ctx->dev, ctx->bias_neg);
 
-	udelay(1000);
+	udelay(3000);
 
 	ctx->bias_pos = devm_gpiod_get_index(ctx->dev,
 		"bias", 0, GPIOD_OUT_HIGH);
@@ -556,7 +559,7 @@ static int txd_prepare(struct drm_panel *panel)
 		txd_panel_get_data(ctx);
 #endif
 	is_suspend = 0;
-	pr_info("ft8057s Skip Power Control !\n", __func__);
+	pr_info("%s ili9883c Skip Power Control !\n", __func__);
 	return ret;
 	}
 	else
@@ -601,7 +604,7 @@ static int txd_prepare(struct drm_panel *panel)
 	gpiod_set_value(ctx->bias_pos, 1);
 	devm_gpiod_put(ctx->dev, ctx->bias_pos);
 
-	udelay(5 * 1000);
+	udelay(2 * 1000);
 
 	ctx->bias_neg = devm_gpiod_get_index(ctx->dev,
 		"bias", 1, GPIOD_OUT_HIGH);
@@ -614,7 +617,7 @@ static int txd_prepare(struct drm_panel *panel)
 	devm_gpiod_put(ctx->dev, ctx->bias_neg);
 #endif
 
-	udelay(3 * 1000);
+	udelay(10 * 1000);
 	txd_panel_init(ctx);
 
 	ret = ctx->error;
@@ -654,13 +657,13 @@ static int txd_enable(struct drm_panel *panel)
 }
 
 #define VSA (4)
-#define VBP (384)
+#define VBP (96)
 #define VAC (1604)
-#define VFP_60 (2046)
-//#define VFP_90 (300)
+#define VFP_60 (1300)
+#define VFP_90 (296)
 
 
-#define HFP (28)
+#define HFP (20)
 #define HSA (12)
 #define HBP (20)
 #define HAC (720)
@@ -679,8 +682,8 @@ static const struct drm_display_mode default_mode = {
 	.vtotal = VAC + VFP_60 + VSA + VBP,
 };
 
-/* static const struct drm_display_mode performance_mode = {
-	.clock = 137660,
+static const struct drm_display_mode performance_mode = {
+	.clock = (int)((HAC + HFP + HSA + HBP) * (VAC + VFP_90+ VSA + VBP) * 90 / 1000),
 	.hdisplay = HAC,
 	.hsync_start = HAC + HFP,
 	.hsync_end = HAC + HFP + HSA,
@@ -690,7 +693,7 @@ static const struct drm_display_mode default_mode = {
 	.vsync_end = VAC + VFP_90 + VSA,
 	.vtotal = VAC + VFP_90 + VSA + VBP,
 };
- */
+
 #if defined(CONFIG_MTK_PANEL_EXT)
 static int panel_ext_reset(struct drm_panel *panel, int on)
 {
@@ -762,7 +765,7 @@ static int txd_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 }
 
 static struct mtk_panel_params ext_params = {
-	.pll_clk = 665,
+	.pll_clk = 456,
 	.cust_esd_check = 0,
 	.esd_check_enable = 0,
 	.lcm_esd_check_table[0] = {
@@ -777,23 +780,24 @@ static struct mtk_panel_params ext_params = {
 	}, */
 };
 
-/* static struct mtk_panel_params ext_params_90hz = {
-	.pll_clk = 454,
-	.vfp_low_power = 300,
-	.cust_esd_check = 1,
-	.esd_check_enable = 1,
+static struct mtk_panel_params ext_params_90hz = {
+	.pll_clk = 456,
+	// .vfp_low_power = 300,
+	.cust_esd_check = 0,
+	.esd_check_enable = 0,
 	.lcm_esd_check_table[0] = {
 		.cmd = 0x0a,
 		.count = 1,
 		.para_list[0] = 0x9c,
 	},
-	.dyn = {
+
+/* 	.dyn = {
 		.switch_en = 1,
 		.pll_clk = 465,
 		.hfp = 56,
-	},
+	}, */
 };
- */
+
 struct drm_display_mode *get_mode_by_id_hfp(struct drm_connector *connector,
 	unsigned int mode)
 {
@@ -822,8 +826,8 @@ static int mtk_panel_ext_param_set(struct drm_panel *panel,
 
 	if (drm_mode_vrefresh(m) == 60)
 		ext->params = &ext_params;
-/* 	else if (drm_mode_vrefresh(m) == 90)
-		ext->params = &ext_params_90hz; */
+	else if (drm_mode_vrefresh(m) == 90)
+		ext->params = &ext_params_90hz;
 	else
 		ret = 1;
 
@@ -860,7 +864,7 @@ struct panel_desc {
 static int txd_get_modes(struct drm_panel *panel, struct drm_connector *connector)
 {
 	struct drm_display_mode *mode;
-	//struct drm_display_mode *mode2;
+	struct drm_display_mode *mode2;
 
 	mode = drm_mode_duplicate(connector->dev, &default_mode);
 	if (!mode) {
@@ -874,7 +878,7 @@ static int txd_get_modes(struct drm_panel *panel, struct drm_connector *connecto
 	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
 	drm_mode_probed_add(connector, mode);
 
-/* 	mode2 = drm_mode_duplicate(connector->dev, &performance_mode);
+	mode2 = drm_mode_duplicate(connector->dev, &performance_mode);
 	if (!mode2) {
 		dev_info(connector->dev->dev, "failed to add mode %ux%ux@%u\n",
 			 performance_mode.hdisplay, performance_mode.vdisplay,
@@ -884,7 +888,7 @@ static int txd_get_modes(struct drm_panel *panel, struct drm_connector *connecto
 
 	drm_mode_set_name(mode2);
 	mode2->type = DRM_MODE_TYPE_DRIVER;
-	drm_mode_probed_add(connector, mode2); */
+	drm_mode_probed_add(connector, mode2);
 
 	connector->display_info.width_mm = 68;
 	connector->display_info.height_mm = 152;
