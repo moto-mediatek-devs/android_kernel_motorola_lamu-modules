@@ -143,6 +143,7 @@ struct stAF_DrvList {
 	int (*pAF_Release)(struct inode *a_pstInode, struct file *a_pstFile);
 	int (*pAF_GetFileName)(unsigned char *pFileName);
 	int (*pAF_OisGetHallPos)(int *PosX, int *PosY);
+	unsigned long (*pAF_GetCurrentPos)(void);
 };
 
 #define I2CBUF_MAXSIZE 10

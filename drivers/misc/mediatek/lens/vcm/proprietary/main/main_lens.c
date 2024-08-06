@@ -20,7 +20,8 @@
 #ifdef CONFIG_COMPAT
 #include <linux/compat.h>
 #endif
-
+#include <linux/sched.h>
+#include <linux/kthread.h>
 /* kernel standard */
 #include <linux/regulator/consumer.h>
 #include <linux/pinctrl/consumer.h>
@@ -79,18 +80,13 @@ static struct stAF_OisPosInfo OisPosInfo;
 /* ------------------------- */
 
 static struct stAF_DrvList g_stAF_DrvList[MAX_NUM_OF_LENS] = {
-
 	{1, AFDRV_GT9764AF, GT9764AF_SetI2Cclient, GT9764AF_Ioctl,
-	GT9764AF_Release, GT9764AF_GetFileName, NULL},
-
+	GT9764AF_Release, GT9764AF_GetFileName, NULL, GT9764AF_GetCurrentPos},
 };
 
 static struct stAF_DrvList *g_pstAF_CurDrv;
-
 static spinlock_t g_AF_SpinLock;
-
 static int g_s4AF_Opened;
-
 static struct i2c_client *g_pstAF_I2Cclient;
 
 static dev_t g_AF_devno;
@@ -106,6 +102,177 @@ static struct pinctrl_state *vcamaf_pio_off;
 #define CAMAF_PMIC     "camaf_m1_pmic"
 #define CAMAF_GPIO_ON  "camaf_m1_gpio_on"
 #define CAMAF_GPIO_OFF "camaf_m1_gpio_off"
+
+#define AF_RESONANCE_SCHEME
+#ifdef AF_RESONANCE_SCHEME
+static void camaf_power_init(void);
+static void camaf_power_on(void);
+static void camaf_power_off(void);
+static int s4AF_WriteReg(u16 a_u2Data);
+#define GT9764AF_SLAVE_ADDR 0x18
+#define AF_NOISE_ELIMINATION_POS        0
+
+static spinlock_t vibrate_lock;
+static struct work_struct vibrate_work;
+static void af_noise_vibrate_work(struct work_struct *work);
+static struct work_struct vibrate_stop_work;
+static void af_stop_vibrate_work(struct work_struct *work);
+
+volatile static int g_VibeInfoCnt = 11;
+volatile static int af_noise_start = 0, af_noise_stop = 0, af_noise_pownon_flag = 0;
+
+static struct hrtimer my_timer;
+static enum hrtimer_restart my_timer_func(struct hrtimer *timer)
+{
+	g_VibeInfoCnt--;
+	//LOG_INF("my_timer_func.af_noise_stop=0x%x,g_VibeInfoCnt=%d\n",af_noise_stop,g_VibeInfoCnt);
+	if ((g_VibeInfoCnt < 10) && (af_noise_stop == 0xaa)) {
+		//if(af_noise_stop == 0xaa) {
+
+			schedule_work(&vibrate_stop_work);
+		//}
+		return HRTIMER_NORESTART;
+	}
+	hrtimer_forward_now(timer, ktime_set(1000 / 1000,(1000 % 1000) * 1000000));
+	return HRTIMER_RESTART;
+}
+
+static int my_timer_init(void)
+{
+	printk("Lamu af Resonance scheme %s enter!\n", __func__);
+	hrtimer_init(&my_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	my_timer.function = my_timer_func;
+	printk("Lamu af Resonance scheme %s exit!\n", __func__);
+	return 0;
+}
+
+static void af_stop_vibrate_work(struct work_struct *work)
+{
+	spin_lock(&vibrate_lock);
+	printk("Lamu af Resonance scheme %s enter!\n", __func__);
+	camaf_power_off();
+	af_noise_start = 0;
+	printk("Lamu af Resonance scheme %s enter!\n", __func__);
+	spin_unlock(&vibrate_lock);
+}
+
+static void af_noise_vibrate_work(struct work_struct *work)
+{
+
+	int i=0;
+	int step = 1, temp1 = 512;
+
+	printk("Lamu af Resonance scheme %s starting...!\n", __func__);
+	for(i = 0; i < 200; i++) {
+		if ((temp1 - step) > 400) {
+			step = 20;
+		} else {
+			step = 10;
+		}
+
+		if((temp1 - step) < 10)
+			break;
+		mdelay(2);
+		s4AF_WriteReg(temp1 - step);
+		temp1 = temp1 - step;
+		//printk("af_noise_vibrate_work temp1 value : %d\n", temp1);
+	}
+
+	mdelay(2);
+
+	printk("Lamu af Resonance scheme value : %d\n", AF_NOISE_ELIMINATION_POS);
+	s4AF_WriteReg(AF_NOISE_ELIMINATION_POS);
+
+	spin_lock(&vibrate_lock);
+	//af_noise_start = 0x00;
+	g_VibeInfoCnt = 11;
+	hrtimer_start(&my_timer,
+			ktime_set(1000 / 1000,
+			(1000 % 1000) * 1000000),
+			HRTIMER_MODE_REL);
+	printk("Lamu af Resonance scheme %s stoping...!\n", __func__);
+	spin_unlock(&vibrate_lock);
+}
+
+static int s4AF_WriteReg(u16 a_u2Data)
+{
+	int i4RetValue = 0;
+
+	char puSendCmd[3] = { 0x03, (char)(a_u2Data >> 8),
+		(char)(a_u2Data & 0xFF) };
+
+	g_pstAF_I2Cclient->addr = GT9764AF_SLAVE_ADDR;
+
+	g_pstAF_I2Cclient->addr = g_pstAF_I2Cclient->addr >> 1;
+
+	i4RetValue = i2c_master_send(g_pstAF_I2Cclient, puSendCmd, 3);
+
+	if (i4RetValue < 0) {
+		LOG_INF("I2C send failed!!\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+/******************************************************************************
+ * SYSFS
+ *****************************************************************************/
+/* af_noise strobe sysfs */
+static ssize_t af_noise_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	LOG_INF("Lamu af Resonance scheme show\n");
+	return scnprintf(buf, PAGE_SIZE,"0->off : 1->on\n");
+}
+
+static ssize_t af_noise_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	int temp;
+	LOG_INF("Lamu af Resonance scheme store\n");
+
+	g_VibeInfoCnt = 11;
+	temp = simple_strtol(buf, NULL, 10);//char to int
+	if(temp == 0) {
+		LOG_INF("Lamu af Resonance scheme disable\n");
+		spin_lock(&g_AF_SpinLock);
+		if (g_s4AF_Opened) {
+			spin_unlock(&g_AF_SpinLock);
+			LOG_INF("The device is opened\n");
+			return -1;
+		}
+		spin_unlock(&g_AF_SpinLock);
+
+		af_noise_stop = 0xaa;
+		if(af_noise_start != 0x00) return size;
+		//camaf_power_off();
+	} else if ((temp == 1) || (temp == 2)) {
+		LOG_INF("Lamu af Resonance scheme enable\n");
+		spin_lock(&g_AF_SpinLock);
+		if (g_s4AF_Opened) {
+			spin_unlock(&g_AF_SpinLock);
+			LOG_INF("The device is opened\n");
+			return -1;
+		}
+		spin_unlock(&g_AF_SpinLock);
+		LOG_INF("af_noise_store.af_noise_start=%d\n",af_noise_start);
+		if (af_noise_start == 0x55) {
+			LOG_INF("...3355\n");
+			return size;
+		}
+		camaf_power_init();
+		camaf_power_on();
+		af_noise_start = 0x55;
+		schedule_work(&vibrate_work);
+	} else {
+		LOG_INF("Lamu af Resonance scheme val is unknow\n");
+	}
+	LOG_INF("Lamu af Resonance scheme store...finish...\n");
+	return size;
+}
+static DEVICE_ATTR_RW(af_noise);
+#endif
 
 static void camaf_power_init(void)
 {
@@ -125,7 +292,7 @@ static void camaf_power_init(void)
 			if (IS_ERR(vcamaf_ldo)) {
 				ret = PTR_ERR(vcamaf_ldo);
 				vcamaf_ldo = NULL;
-				LOG_INF("cannot get regulator (%d)\n", ret);
+				LOG_INF("cannot get regulator\n");
 			}
 		}
 
@@ -134,7 +301,7 @@ static void camaf_power_init(void)
 			if (IS_ERR(vcamaf_pio)) {
 				ret = PTR_ERR(vcamaf_pio);
 				vcamaf_pio = NULL;
-				pr_info("cannot get pinctrl (%d)\n", ret);
+				pr_info("cannot get pinctrl\n");
 			} else {
 				vcamaf_pio_on = pinctrl_lookup_state(
 					vcamaf_pio, CAMAF_GPIO_ON);
@@ -142,7 +309,7 @@ static void camaf_power_init(void)
 				if (IS_ERR(vcamaf_pio_on)) {
 					ret = PTR_ERR(vcamaf_pio_on);
 					vcamaf_pio_on = NULL;
-					LOG_INF("cannot get vcamaf_pio_on (%d)\n", ret);
+					LOG_INF("cannot get vcamaf_pio_on\n");
 				}
 
 				vcamaf_pio_off = pinctrl_lookup_state(
@@ -151,7 +318,7 @@ static void camaf_power_init(void)
 				if (IS_ERR(vcamaf_pio_off)) {
 					ret = PTR_ERR(vcamaf_pio_off);
 					vcamaf_pio_off = NULL;
-					LOG_INF("cannot get vcamaf_pio_off (%d)\n", ret);
+					LOG_INF("cannot get vcamaf_pio_off\n");
 				}
 			}
 		}
@@ -163,9 +330,15 @@ static void camaf_power_init(void)
 static void camaf_power_on(void)
 {
 	int ret;
-
+#ifdef AF_RESONANCE_SCHEME
+	if (vcamaf_ldo && (af_noise_pownon_flag <= 0)) {
+#else
 	if (vcamaf_ldo) {
+#endif
 		ret = regulator_enable(vcamaf_ldo);
+#ifdef AF_RESONANCE_SCHEME
+	af_noise_pownon_flag = 1;
+#endif
 		LOG_INF("regulator enable (%d)\n", ret);
 	}
 
@@ -178,9 +351,12 @@ static void camaf_power_on(void)
 static void camaf_power_off(void)
 {
 	int ret;
-
-	if (vcamaf_ldo) {
+	LOG_INF("ig_s4AF_Opened (%d)\n", g_s4AF_Opened);
+	if (vcamaf_ldo && g_s4AF_Opened<=0) {
 		ret = regulator_disable(vcamaf_ldo);
+#ifdef AF_RESONANCE_SCHEME
+	af_noise_pownon_flag = 0;
+#endif
 		LOG_INF("regulator disable (%d)\n", ret);
 	}
 
@@ -188,6 +364,9 @@ static void camaf_power_off(void)
 		ret = pinctrl_select_state(vcamaf_pio, vcamaf_pio_off);
 		LOG_INF("pinctrl disable (%d)\n", ret);
 	}
+#ifdef AF_RESONANCE_SCHEME
+	af_noise_stop = 0x55;
+#endif
 }
 
 #ifdef CONFIG_MACH_MT6765
@@ -212,8 +391,10 @@ static long AF_SetMotorName(__user struct stAF_MotorName *pstMotorName)
 	struct stAF_MotorName stMotorName;
 
 	if (copy_from_user(&stMotorName, pstMotorName,
-			   sizeof(struct stAF_MotorName)))
+			   sizeof(struct stAF_MotorName))) {
 		LOG_INF("copy to user failed when getting motor information\n");
+		return i4RetValue;
+	}
 
 	for (i = 0; i < MAX_NUM_OF_LENS; i++) {
 		if (g_stAF_DrvList[i].uEnable != 1)
@@ -306,10 +487,10 @@ static long AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
 			(__user struct stAF_MotorName *)a_u4Param;
 
 	if (copy_from_user(&stMotorName, pstMotorName,
-			   sizeof(struct stAF_MotorName)))
+			   sizeof(struct stAF_MotorName))) {
 		LOG_INF("copy to user failed when getting motor information\n");
-
-	LOG_INF("GETDRVNAME : set driver name(%s)\n", stMotorName.uMotorName);
+		break;
+	}
 
 	for (i = 0; i < MAX_NUM_OF_LENS; i++) {
 		if (g_stAF_DrvList[i].uEnable != 1)
@@ -455,21 +636,64 @@ static int AF_Open(struct inode *a_pstInode, struct file *a_pstFile)
 /* 2.Shut down the device on last close. */
 /* 3.Only called once on last time. */
 /* Q1 : Try release multiple times. */
+struct RemoveNoiseParam {
+    struct inode *a_pstInode;
+    struct file  *a_pstFile;
+};
+
+static int taskRemoveNoise(void *param)
+{
+    struct inode *a_pstInode = ((struct RemoveNoiseParam *)param)->a_pstInode;
+    struct file  *a_pstFile  = ((struct RemoveNoiseParam *)param)->a_pstFile;
+    unsigned long currentPos = g_pstAF_CurDrv->pAF_GetCurrentPos();
+
+    LOG_INF("remove noise start");
+
+    // multiple times
+    while (currentPos > 100) {
+        currentPos -= 50;
+        g_pstAF_CurDrv->pAF_Ioctl(a_pstFile, AFIOC_T_MOVETO, currentPos);
+        mdelay(4);
+    }
+
+    if (g_pstAF_CurDrv) {
+        g_pstAF_CurDrv->pAF_Release(a_pstInode, a_pstFile);
+        g_pstAF_CurDrv = NULL;
+    } else {
+        spin_lock(&g_AF_SpinLock);
+        g_s4AF_Opened = 0;
+        spin_unlock(&g_AF_SpinLock);
+    }
+
+    camaf_power_off();
+
+    LOG_INF("remove noise end,g_s4AF_Opened;%d",g_s4AF_Opened);
+    return 0;
+}
+
 static int AF_Release(struct inode *a_pstInode, struct file *a_pstFile)
 {
-	LOG_INF("Start\n");
+	struct task_struct *pTask = NULL;
+    struct RemoveNoiseParam param = {
+        .a_pstInode = a_pstInode,
+        .a_pstFile  = a_pstFile
+    };
 
-	if (g_pstAF_CurDrv) {
-		g_pstAF_CurDrv->pAF_Release(a_pstInode, a_pstFile);
-		g_pstAF_CurDrv = NULL;
-	} else {
-		spin_lock(&g_AF_SpinLock);
-		g_s4AF_Opened = 0;
-		spin_unlock(&g_AF_SpinLock);
-	}
+	LOG_INF("Start\n");
+	if (g_pstAF_CurDrv && g_pstAF_CurDrv->pAF_GetCurrentPos != NULL) {
+		pTask = kthread_run(taskRemoveNoise, &param, "taskRemoveNoise");
+    } else {
+		if (g_pstAF_CurDrv) {
+			g_pstAF_CurDrv->pAF_Release(a_pstInode, a_pstFile);
+			g_pstAF_CurDrv = NULL;
+		} else {
+			spin_lock(&g_AF_SpinLock);
+			g_s4AF_Opened = 0;
+			spin_unlock(&g_AF_SpinLock);
+		}
 
 	camaf_power_off();
-
+	}
 	/* OIS/EIS Timer & Workqueue */
 	/* Cancel Timer */
 	hrtimer_cancel(&ois_timer);
@@ -546,7 +770,12 @@ static inline int Register_AF_CharDrv(void)
 
 	if (lens_device == NULL)
 		return -EIO;
-
+#ifdef AF_RESONANCE_SCHEME
+	if (device_create_file(lens_device, &dev_attr_af_noise)) {
+		LOG_INF("Failed to create device file(strobe)\n");
+		device_remove_file(lens_device, &dev_attr_af_noise);
+	}
+#endif
 	LOG_INF("End\n");
 	return 0;
 }
@@ -554,7 +783,10 @@ static inline int Register_AF_CharDrv(void)
 static inline void Unregister_AF_CharDrv(void)
 {
 	LOG_INF("Start\n");
-
+#ifdef AF_RESONANCE_SCHEME
+	LOG_INF("device_remove_file\n");
+	device_remove_file(lens_device, &dev_attr_af_noise);
+#endif
 	/* Release char driver */
 	cdev_del(g_pAF_CharDrv);
 
@@ -563,7 +795,11 @@ static inline void Unregister_AF_CharDrv(void)
 	device_destroy(actuator_class, g_AF_devno);
 
 	class_destroy(actuator_class);
-
+#ifdef AF_RESONANCE_SCHEME
+	cancel_work_sync(&vibrate_work);
+	cancel_work_sync(&vibrate_stop_work);
+	hrtimer_cancel(&my_timer);
+#endif
 	LOG_INF("End\n");
 }
 
@@ -615,7 +851,12 @@ static int AF_i2c_probe(struct i2c_client *client)
 
 		return i4RetValue;
 	}
-
+#ifdef AF_RESONANCE_SCHEME
+	INIT_WORK(&vibrate_work, af_noise_vibrate_work);
+	INIT_WORK(&vibrate_stop_work, af_stop_vibrate_work);
+	my_timer_init();
+	spin_lock_init(&vibrate_lock);
+#endif
 	spin_lock_init(&g_AF_SpinLock);
 
 	LOG_INF("Attached!!\n");

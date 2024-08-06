@@ -291,3 +291,7 @@ int GT9764AF_GetFileName(unsigned char *pFileName)
 	#endif
 	return 1;
 }
+unsigned long GT9764AF_GetCurrentPos(void)
+{
+    return g_u4CurrPosition;
+}
