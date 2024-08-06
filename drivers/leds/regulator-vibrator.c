@@ -23,10 +23,17 @@
 
 #define DEFAULT_MIN_LIMIT 15
 
+// TN modified by feiyu.zhu for EKALAMU
+static unsigned long vib_duration = 0;
+
 struct reg_vibr_config {
 	unsigned int min_volt;
 	unsigned int max_volt;
 	struct regulator *reg;
+// TN modified by feiyu.zhu for EKALAMU
+	unsigned int short_volt;
+	unsigned int long_volt;
+	unsigned int short_duration;
 };
 
 struct reg_vibr {
@@ -39,6 +46,31 @@ struct reg_vibr {
 	struct reg_vibr_config vibr_conf;
 	struct notifier_block oc_handle;
 };
+
+// TN modified by feiyu.zhu for EKALAMU
+static ssize_t vibrator_duration_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%lu\n", vib_duration);
+}
+
+static ssize_t vibrator_duration_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	unsigned long state = 0;
+	ssize_t ret;
+
+	ret = kstrtoul(buf, 10, &state);
+	if (ret)
+	{
+		return ret;
+	}
+
+	vib_duration = state;
+
+	return size;
+}
+static DEVICE_ATTR(vibrator_duration, 0664, vibrator_duration_show, vibrator_duration_store);
 
 static int mt_vibra_init_config(struct device *dev,
 		struct reg_vibr_config *vibr_conf)
@@ -75,6 +107,31 @@ static int mt_vibra_init_config(struct device *dev,
 		return ret;
 	}
 
+// TN modified by feiyu.zhu for EKALAMU
+	ret = of_property_read_u32(dev->of_node, "short-volt",
+		&vibr_conf->short_volt);
+	if (ret) {
+		pr_notice("Error load dts: get short-volt failed!\n");
+		ret = -EINVAL;
+		return ret;
+	}
+
+	ret = of_property_read_u32(dev->of_node, "long-volt",
+		&vibr_conf->long_volt);
+	if (ret) {
+		pr_notice("Error load dts: get long-volt failed!\n");
+		ret = -EINVAL;
+		return ret;
+	}
+
+	ret = of_property_read_u32(dev->of_node, "short-duration",
+		&vibr_conf->short_duration);
+	if (ret) {
+		pr_notice("Error load dts: get short-duration failed!\n");
+		ret = -EINVAL;
+		return ret;
+	}
+
 	pr_info("vibr_conf %u-%u\n",
 		vibr_conf->min_volt, vibr_conf->max_volt);
 
@@ -95,8 +152,43 @@ static int vibr_power_set(struct reg_vibr *vibr)
 	return ret;
 }
 
+// TN modified by feiyu.zhu for EKALAMU
+static int set_vib_volt(struct reg_vibr *vibr, unsigned long duration)
+{
+	int ret = 0;
+
+	if(duration > vibr->vibr_conf.short_duration)
+	{
+		pr_info("set long_volt voltage = %u-%u\n",
+			vibr->vibr_conf.long_volt, vibr->vibr_conf.long_volt);
+		ret = regulator_set_voltage(vibr->vibr_conf.reg,
+			vibr->vibr_conf.long_volt, vibr->vibr_conf.long_volt);
+	}
+	else
+	{
+		pr_info("set short_volt voltage = %u-%u\n",
+			vibr->vibr_conf.short_volt, vibr->vibr_conf.short_volt);
+		ret = regulator_set_voltage(vibr->vibr_conf.reg,
+			vibr->vibr_conf.short_volt, vibr->vibr_conf.short_volt);
+	}
+
+	return ret;
+}
+
 static void vibr_enable(struct reg_vibr *vibr)
 {
+// TN modified by feiyu.zhu for EKALAMU
+	int ret = 0;
+	int volt = 0;
+
+	pr_info("vibr enable vib_duration %lu\n", vib_duration);
+	ret = set_vib_volt(vibr, vib_duration);
+	if(ret < 0)
+	{
+		pr_err("vibr_enable set voltage fail, ret = %d\n", ret);
+	}
+	volt = regulator_get_voltage(vibr->vibr_conf.reg);
+	pr_info("vibr enable volt %d\n", volt);
 	pr_info("vibr enable\n");
 
 	if (!atomic_read(&vibr->reg_status)) {
@@ -180,6 +272,10 @@ static int vib_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto err;
 	}
+
+// TN modified by feiyu.zhu for EKALAMU
+	device_create_file(&pdev->dev, &dev_attr_vibrator_duration);
+
 	m_vibr->vibr_queue = create_singlethread_workqueue(VIB_DEVICE);
 	if (!m_vibr->vibr_queue) {
 		ret = -ENOMEM;
