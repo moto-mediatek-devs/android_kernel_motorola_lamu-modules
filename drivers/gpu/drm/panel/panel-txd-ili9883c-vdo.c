@@ -38,10 +38,11 @@
 #include "../../../../oem/devinfo/dev_info.h"
 #endif
 
-//#define TINNO_LCM_OEM_CONFIG
+#define TINNO_LCM_OEM_CONFIG
 #if defined(TINNO_LCM_OEM_CONFIG)
-#include <focaltech_core.h>
-int gesture_mode = -1;
+// #include <focaltech_core.h>
+int txd_ili_gesture_mode = -1;
+EXPORT_SYMBOL(txd_ili_gesture_mode);
 #endif
 
 int hbm;
@@ -469,9 +470,9 @@ static int txd_unprepare(struct drm_panel *panel)
 	ctx->prepared = false;
 
 #ifdef TINNO_LCM_OEM_CONFIG
-	gesture_mode = fts_lcd_gesture_control();
-	if(gesture_mode) {
-		pr_info("ili9883c Skip Power Control !\n", __func__);
+	// gesture_mode = fts_lcd_gesture_control();
+	if(txd_ili_gesture_mode) {
+		pr_info("%s ili9883c Skip Power Control !\n", __func__);
 		return 0;
 	}
 #endif
@@ -544,8 +545,8 @@ static int txd_prepare(struct drm_panel *panel)
 		return 0;
 
 #ifdef TINNO_LCM_OEM_CONFIG
-	gesture_mode = fts_lcd_gesture_control();
-	if(gesture_mode) {
+	// gesture_mode = fts_lcd_gesture_control();
+	if(txd_ili_gesture_mode) {
 		udelay(10000);
 		txd_panel_init(ctx);
 		ret = ctx->error;
@@ -1241,8 +1242,8 @@ static void txd_shutdown(struct mipi_dsi_device *dsi)
 
 	ctx->error = 0;
 	ctx->prepared = false;
-
-/* 	if(gesture_mode) {
+#ifdef TINNO_LCM_OEM_CONFIG
+	if(txd_ili_gesture_mode) {
 		pr_info("%s + ! ili9883c gesture on !\n", __func__);
 
 #if defined(CONFIG_RT5081_PMU_DSV) || defined(CONFIG_MT6370_PMU_DSV)
@@ -1295,7 +1296,8 @@ static void txd_shutdown(struct mipi_dsi_device *dsi)
 
 		//txd_disable(&ctx->panel);
 		pr_info("%s - ! ili9883c gesture on !\n", __func__);
-	} */
+	}
+#endif
 }
 #endif
 

@@ -918,6 +918,7 @@ int ili_touch_esd_gesture_iram(void)
 	} else {
 	/* Resume gesture loader */
 	ret = ili_ic_func_ctrl("lpwg", 0x6);
+	ret = ili_write_reg();
 	}
 
 	if (ret < 0) {
@@ -2073,11 +2074,22 @@ void ili_report_gesture_mode(u8 *buf, int len)
 	ILI_INFO("gesture code = 0x%x, score = %d\n", gc->code, score);
 
 	switch (gc->code) {
+	case GESTURE_SINGLECLICK:
+		ILI_INFO("Single Click key event\n");
+		input_report_key(input, KEY_GESTURE_TAP1, 1);
+		input_sync(input);
+		input_report_key(input, KEY_GESTURE_TAP1, 0);
+		input_sync(input);
+		gc->type  = GESTURE_SINGLECLICK;
+		gc->clockwise = 1;
+		gc->pos_end.x = gc->pos_start.x;
+		gc->pos_end.y = gc->pos_start.y;
+		break;
 	case GESTURE_DOUBLECLICK:
 		ILI_INFO("Double Click key event\n");
-		input_report_key(input, KEY_GESTURE_POWER, 1);
+		input_report_key(input, KEY_GESTURE_TAP2, 1);
 		input_sync(input);
-		input_report_key(input, KEY_GESTURE_POWER, 0);
+		input_report_key(input, KEY_GESTURE_TAP2, 0);
 		input_sync(input);
 		gc->type  = GESTURE_DOUBLECLICK;
 		gc->clockwise = 1;

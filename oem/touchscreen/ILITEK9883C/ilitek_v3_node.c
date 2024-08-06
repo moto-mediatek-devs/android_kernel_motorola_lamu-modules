@@ -2011,6 +2011,37 @@ static ssize_t ilitek_proc_sram_test_info(struct file *filp, char __user *buff, 
 	return len;
 }
 
+#define ILI_GESTURE_ON(flag)      (flag[0] == '3')
+#define ILI_DOUBLE_TAP_ON(flag)   (flag[0] == '2')
+#define ILI_SINGLE_TAP_ON(flag)   (flag[0] == '1')
+#define ILI_GESTURE_OFF(flag)     (flag[0] == '0')
+#define ILI_GESTURE_JUDGE(flag)   (flag[0] != '0')
+int ili_write_reg(void)
+{
+	int ret = 0;
+	u8 cmd1[7] = {0x01,0x0a,0x08,0x00,0x00,0x08};
+	u8 cmd2[7] = {0x01,0x0a,0x08,0x01,0x00,0x00};
+	u8 cmd3[7] = {0x01,0x0a,0x08,0x01,0x00,0x08};
+
+	ILI_INFO("Write gesture %d cmd to reg !\n", ilits->gesture_tpye);
+
+	if (ilits->gesture_tpye == GESTURE_SINGLE){
+		ILI_INFO("Write gesture GESTURE_SINGLE cmd to reg !\n");
+		ret = ilits->wrapper(cmd1, 6, NULL, 0, ON, OFF);
+	}else if (ilits->gesture_tpye == GESTURE_DOUBLE){
+		ILI_INFO("Write gesture GESTURE_DOUBLE cmd to reg !\n");
+		ret = ilits->wrapper(cmd2, 6, NULL, 0, ON, OFF);
+	}else if (ilits->gesture_tpye == GESTURE_SINGLE_DOUBLE){
+		ILI_INFO("Write gesture GESTURE_SINGLE_DOUBLE cmd to reg !\n");
+		ret = ilits->wrapper(cmd3, 6, NULL, 0, ON, OFF);
+	}else{
+		ILI_ERR("Unrecognized gestures !\n");
+	}
+	if(ret < 0)
+		ILI_ERR("ili_write_reg error ! ilits->wrapper ret = %d\n", ret);
+
+	return ret;
+}
 static ssize_t tp_selftest_result_read(struct file *filp, char __user *buff, size_t size, loff_t *pos)
 {
 	int ret = 0, len = 2;
@@ -2082,6 +2113,73 @@ static ssize_t tp_selftest_result_read(struct file *filp, char __user *buff, siz
 	*pos += len;
 	mutex_unlock(&ilits->touch_mutex);
 	return len;
+}
+static ssize_t tp_gesture_mode_read(struct file *filp, char __user *buff, size_t size, loff_t *pos)
+{
+	u32 len = 0;
+	if (atomic_read(&ilits->tp_reset) == START) {
+		ILI_ERR("ignore request! tp reset atomic is START.\n");
+		return -EINVAL;
+	}
+	if (*pos != 0)
+		return 0;
+	mutex_lock(&ilits->touch_mutex);
+	memset(g_user_buf, 0, USER_STR_BUFF * sizeof(unsigned char));
+	len += snprintf(g_user_buf + len, USER_STR_BUFF - len,
+						"%d\n", ilits->gesture_tpye);
+	if (copy_to_user((char *)buff, g_user_buf, len))
+		ILI_ERR("Failed to copy data to user space\n");
+	*pos += len;
+	mutex_unlock(&ilits->touch_mutex);
+	return len;
+}
+
+static ssize_t tp_gesture_mode_write(struct file *filp, const char *buff, size_t size, loff_t *pos)
+{
+	char cmd[256] = { 0 };
+
+	if (ilits->tp_suspend) {
+		ILI_ERR("In suspend, can't echo, return now");
+		return -EINVAL;
+	}
+
+	if (atomic_read(&ilits->tp_reset) == START) {
+		ILI_ERR("ignore request! tp reset atomic is START.\n");
+		return -EINVAL;
+	}
+	if ((size) > sizeof(cmd)) {
+		ILI_ERR("ERROR! input length is larger than local buffer\n");
+		return -1;
+	}
+	mutex_lock(&ilits->touch_mutex);
+	if (buff != NULL) {
+		if (copy_from_user(cmd, buff, size)) {
+			ILI_INFO("Failed to copy data from user space\n");
+			size = -1;
+			goto out;
+		}
+	}
+
+	ilits->gesture = (ILI_GESTURE_JUDGE(cmd)) ? ENABLE:DISABLE;
+	txd_ili_gesture_mode = ilits->gesture;
+	if (ILI_GESTURE_ON(cmd)) {
+		ilits->gesture_tpye = GESTURE_SINGLE_DOUBLE;
+	} else if (ILI_DOUBLE_TAP_ON(cmd)) {
+		ilits->gesture_tpye = GESTURE_DOUBLE;
+	} else if (ILI_SINGLE_TAP_ON(cmd)) {
+		ilits->gesture_tpye = GESTURE_SINGLE;
+	} else if (ILI_GESTURE_OFF(cmd)) {
+		ilits->gesture_tpye = GESTURE_DISABLE;
+	} else {
+		ILI_INFO("error cmd %s!\n", cmd);
+		goto out;
+	}
+
+	ILI_INFO("ts_data->gesture = %d ,ts_data->gesture_tpye = %d\n",
+				ilits->gesture,ilits->gesture_tpye);
+out:
+	mutex_unlock(&ilits->touch_mutex);
+	return size;
 }
 int ili_get_tp_recore_ctrl(int data)
 {
@@ -3991,7 +4089,19 @@ static struct file_operations proc_show_selftest_result_fops = {
 	.llseek = default_llseek,
 };
 #endif
-
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 6, 0)
+static struct proc_ops proc_tp_gesture_mode_fops = {
+	.proc_read = tp_gesture_mode_read,
+	.proc_write = tp_gesture_mode_write,
+	.proc_lseek = default_llseek,
+};
+#else
+static struct file_operations proc_tp_gesture_mode_fops = {
+	.read = tp_gesture_mode_read,
+	.write = tp_gesture_mode_write,
+	.llseek = default_llseek,
+};
+#endif
 proc_node iliproc[] = {
 	{"ioctl", NULL, &proc_ioctl_fops, false},
 	{"fw_process", NULL, &proc_fw_process_fops, false},
@@ -4020,6 +4130,7 @@ proc_node iliproc[] = {
 
 proc_node tp_info_proc[] = {
 	{"tp_selftest_result", NULL, &proc_show_selftest_result_fops, false},
+	{"tp_gesture_mode", NULL, &proc_tp_gesture_mode_fops, false},
 };
 
 void touch_info_node_init(void)

@@ -199,7 +199,11 @@
 #define DEBUG_NONE		0
 #define DEBUG_ALL		1
 #define DEBUG_OUTPUT	DEBUG_NONE
-
+#define GESTURE_SINGLE_DOUBLE       3
+#define GESTURE_DOUBLE              2
+#define GESTURE_SINGLE              1
+#define GESTURE_DISABLE             0
+extern int txd_ili_gesture_mode;
 #define ILI_INFO(fmt, arg...)						\
 ({									\
 	pr_info("ILITEK:[INFO] (%s, %d): " fmt, __func__, __LINE__, ##arg);	\
@@ -807,6 +811,7 @@ struct ilitek_pen_info {
 #define CONTROL_SLAVE_EXIT_ICE_ADDR		0x181062
 
 /* The example for the gesture virtual keys */
+#define GESTURE_SINGLECLICK				0x57
 #define GESTURE_DOUBLECLICK				0x58
 #define GESTURE_UP						0x60
 #define GESTURE_DOWN					0x61
@@ -821,6 +826,8 @@ struct ilitek_pen_info {
 #define GESTURE_S						0x6A
 #define GESTURE_Z						0x6B
 #define KEY_GESTURE_POWER				KEY_POWER
+#define KEY_GESTURE_TAP2				KEY_POWER
+#define KEY_GESTURE_TAP1				KEY_U
 #define KEY_GESTURE_UP					KEY_UP
 #define KEY_GESTURE_DOWN				KEY_DOWN
 #define KEY_GESTURE_LEFT				KEY_LEFT
@@ -1200,6 +1207,7 @@ struct ilitek_ts_data {
 
 	bool report;
 	bool gesture;
+	int gesture_tpye;
 	bool mp_retry;
 	bool knuckle;
 	int gesture_mode;
@@ -1539,6 +1547,7 @@ extern void ili_tp_reset(void);
 extern void ili_irq_unregister(void);
 extern int ili_irq_register(int type);
 extern void ilitek_plat_charger_init(void);
+extern void ilitek_plat_sleep_init(void);
 
 /* Prototypes for miscs */
 extern void ili_node_init(void);
@@ -1564,6 +1573,7 @@ extern void ili_spi_ice_mode_read(u32 addr, u32 *data, int len, u8 msmode);
 extern int ili_ice_slave_write_register(u32 addr, u32 data, int len);
 
 extern void touch_info_node_init(void);
+int ili_write_reg(void);
 
 static inline void ipio_kfree(void **mem)
 {

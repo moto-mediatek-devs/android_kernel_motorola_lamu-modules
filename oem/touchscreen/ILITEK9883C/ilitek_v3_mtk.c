@@ -88,6 +88,8 @@ void ili_input_register(void)
 
 	/* Gesture keys register */
 	input_set_capability(ilits->input, EV_KEY, KEY_POWER);
+	input_set_capability(ilits->input, EV_KEY, KEY_GESTURE_TAP2);
+	input_set_capability(ilits->input, EV_KEY, KEY_GESTURE_TAP1);
 	input_set_capability(ilits->input, EV_KEY, KEY_GESTURE_UP);
 	input_set_capability(ilits->input, EV_KEY, KEY_GESTURE_DOWN);
 	input_set_capability(ilits->input, EV_KEY, KEY_GESTURE_LEFT);
@@ -103,6 +105,8 @@ void ili_input_register(void)
 	input_set_capability(ilits->input, EV_KEY, KEY_GESTURE_F);
 
 	__set_bit(KEY_GESTURE_POWER, ilits->input->keybit);
+	__set_bit(KEY_GESTURE_TAP2, ilits->input->keybit);
+	__set_bit(KEY_GESTURE_TAP1, ilits->input->keybit);
 	__set_bit(KEY_GESTURE_UP, ilits->input->keybit);
 	__set_bit(KEY_GESTURE_DOWN, ilits->input->keybit);
 	__set_bit(KEY_GESTURE_LEFT, ilits->input->keybit);
@@ -666,7 +670,7 @@ static void ilitek_plat_late_resume(struct early_suspend *h)
 }*/
 #endif/*defined(CONFIG_FB) || defined(CONFIG_DRM_MSM)*/
 
-static void ilitek_plat_sleep_init(void)
+void ilitek_plat_sleep_init(void)
 {
 #if defined(CONFIG_FB) || defined(CONFIG_DRM_MSM)
 	ILI_INFO("Init notifier_fb struct\n");

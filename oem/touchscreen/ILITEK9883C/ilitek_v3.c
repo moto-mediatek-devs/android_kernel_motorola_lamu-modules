@@ -640,6 +640,8 @@ int ili_sleep_handler(int mode)
 			ili_switch_tp_mode(P5_X_FW_GESTURE_MODE);
 			enable_irq_wake(ilits->irq_num);
 			ili_irq_enable();
+			if (ili_write_reg() < 0)
+				ILI_ERR("Write gesture cmd fail in TP suspend\n");
 		} else {
 			if (ili_ic_func_ctrl("sleep", DEEP_SLEEP_IN) < 0)
 				ILI_ERR("Write deep sleep in cmd failed\n");
