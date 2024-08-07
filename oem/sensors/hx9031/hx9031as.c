@@ -54,9 +54,22 @@
 
 #include "hx9031as.h"
 
+#include <linux/notifier.h>
+#include <linux/timer.h>
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include "../../devinfo/dev_info.h"
+#endif
+
 #define KEY_SAR_NEAR 0x2ec
 #define KEY_SAR_CLOSE 0x2ed
 #define KEY_SAR_FAR 0x2ef
+
+#define SAR_CALI_EVENT 0x63616c87
+extern int register_sar_notifier(struct notifier_block *nb);
+extern int unregister_sar_notifier(struct notifier_block *nb);
+
+static struct timer_list debounce_timer;
+static bool debounce_flag = false;
 
 static struct i2c_client *hx9031as_i2c_client = NULL;
 static struct hx9031as_platform_data hx9031as_pdata;
@@ -72,6 +85,18 @@ static int32_t data_lp[HX9031AS_CH_NUM] = { 0 };
 static int32_t data_bl[HX9031AS_CH_NUM] = { 0 };
 static uint16_t data_offset_dac[HX9031AS_CH_NUM] = { 0 };
 static uint8_t hx9031as_data_accuracy = 16;
+
+static bool thres_change_flag = false;
+static int hx9031as_alg_flag = 0;
+static int hx9031as_thres_alg_en = 1;
+static int hx9031as_channel3_diff = 2000;
+static int hx9031as_channel4_diff = 20000;
+static int hx9031as_channel1_alg_thres = 1024;
+static int hx9031as_channel1_alg_thres1 = 1504;
+static int hx9031as_channel1_default_far_thres = 0;
+static int hx9031as_channel1_default_near_thres = 0;
+static int hx9031as_channel1_default_far_thres1 = 0;
+static int hx9031as_channel1_default_near_thres1 = 0;
 
 //hx9031as默认阈值设置值，请客户根据实测修改
 static struct hx9031as_near_far_threshold hx9031as_ch_thres[HX9031AS_CH_NUM] = {
@@ -581,6 +606,25 @@ static int32_t hx9031as_set_thres_far(uint8_t ch, int32_t val)
 	return hx9031as_ch_thres[ch].thr_far;
 }
 
+static void hx9031as_thres_alg(void)
+{
+    PRINT_INF("hx9031as_thres_alg_en = %d, alg_flag = %d\n", hx9031as_thres_alg_en, hx9031as_alg_flag);
+    if((thres_change_flag == true) && ((hx9031as_thres_alg_en == 0) || (hx9031as_alg_flag == 0))){
+        hx9031as_set_thres_near(1, hx9031as_channel1_default_near_thres);
+        hx9031as_set_thres_far(1, hx9031as_channel1_default_far_thres);
+        hx9031as_ch_thres1[1].thr_near = hx9031as_channel1_default_near_thres1;
+        hx9031as_ch_thres1[1].thr_far = hx9031as_channel1_default_far_thres1;
+        thres_change_flag = false;
+    }
+    else if((thres_change_flag == false) && (hx9031as_thres_alg_en == 1) && (hx9031as_alg_flag == 1)){
+        hx9031as_set_thres_near(1, hx9031as_channel1_alg_thres);
+        hx9031as_set_thres_far(1, hx9031as_channel1_alg_thres-32);
+        hx9031as_ch_thres1[1].thr_near = hx9031as_channel1_alg_thres1;
+        hx9031as_ch_thres1[1].thr_far = hx9031as_channel1_alg_thres1-32;
+        thres_change_flag = true;
+    }
+}
+
 static void hx9031as_get_prox_state(void)
 {
 	int ret = -1;
@@ -597,7 +641,7 @@ static void hx9031as_get_prox_state(void)
 	}
 
 	if ((buf[0] != 0) && (buf0[0] == 0x07)) {
-		buf0[0] = ((buf[0] & 0x0F) << 4) | 0x07;
+		buf0[0] = 0x27;
 		ret = hx9031as_write(RW_3B_CALI_DIFF_CFG, buf0, 1);
 	} else if ((buf[0] == 0) && (buf0[0] != 0x07)) {
 		buf0[0] = 0x07;
@@ -705,6 +749,7 @@ static void hx9031as_sample(void)
 	uint8_t bytes_all_channels = 0;
 	uint8_t rx_buf[HX9031AS_CH_NUM * CH_DATA_BYTES_MAX] = { 0 };
 	int32_t data = 0;
+	int32_t hx9031as_channel1_near_thres = 0;
 
 	hx9031as_data_lock(HX9031AS_DATA_LOCK);
 	hx9031as_data_select();
@@ -801,6 +846,18 @@ static void hx9031as_sample(void)
 	}
 	//====================================================================================================
 	hx9031as_data_lock(HX9031AS_DATA_UNLOCK);
+
+    if((data_diff[3] > hx9031as_channel3_diff) || (data_diff[4] > hx9031as_channel4_diff)){
+        hx9031as_alg_flag = 1;
+        hx9031as_channel1_near_thres = hx9031as_get_thres_near(1);
+        PRINT_INF("hx9031as_channel1_near_thres=%d,hx9031as_channel1_near_thres1=%d\n",hx9031as_channel1_near_thres,hx9031as_ch_thres1[1].thr_near);
+        if(hx9031as_thres_alg_en == 1 && data_diff[1] < hx9031as_channel1_near_thres) data_diff[1] = data_diff[1] / 3;
+    }
+    else {
+        hx9031as_alg_flag = 0;
+        hx9031as_channel1_near_thres = hx9031as_get_thres_near(1);
+        PRINT_INF("hx9031as_channel1_near_thres=%d,hx9031as_channel1_near_thres1=%d\n",hx9031as_channel1_near_thres,hx9031as_ch_thres1[1].thr_near);
+    }
 
 	PRINT_DBG("accuracy=%d\n", hx9031as_data_accuracy);
 	PRINT_DBG("DIFF  , %-8d, %-8d, %-8d, %-8d, %-8d\n", data_diff[0],
@@ -1220,6 +1277,7 @@ static void hx9031as_polling_work_func(struct work_struct *work)
 	ENTER;
 	mutex_lock(&hx9031as_ch_en_mutex);
 	hx9031as_sample();
+    hx9031as_thres_alg();
 	hx9031as_get_prox_state();
 
 #if HX9031AS_REPORT_EVKEY
@@ -1248,6 +1306,7 @@ static irqreturn_t hx9031as_irq_handler(int irq, void *pvoid)
 			50); //如果从suspend被中断唤醒，该延时确保i2c控制器也从休眠唤醒并进入工作状态
 	}
 	hx9031as_sample();
+    hx9031as_thres_alg();
 	hx9031as_get_prox_state();
 
 #if HX9031AS_REPORT_EVKEY
@@ -1582,6 +1641,8 @@ static ssize_t hx9031as_threshold_store(const struct class *class,
 
 	thr_near = (thr_near / 32) * 32;
 	thr_far = (thr_far / 32) * 32;
+    hx9031as_channel1_default_near_thres = thr_near;
+    hx9031as_channel1_default_far_thres = thr_far;
 
 	PRINT_INF("set threshold: ch=%d, thr_near=%d, thr_far=%d\n", ch,
 		  thr_near, thr_far);
@@ -1609,6 +1670,89 @@ static ssize_t hx9031as_threshold_show(const struct class *class,
 			      hx9031as_ch_thres[ii].thr_near,
 			      hx9031as_ch_thres[ii].thr_far);
 	}
+
+	return (p - buf);
+}
+
+static ssize_t hx9031as_threshold1_store(const struct class *class,
+					const struct class_attribute *attr,
+					const char *buf, size_t count)
+{
+    unsigned int ch = 0;
+    unsigned int thr_near = 0;
+    unsigned int thr_far = 0;
+
+    ENTER;
+    if (sscanf(buf, "%d,%d,%d", &ch, &thr_near, &thr_far) != 3) {
+        PRINT_ERR("please input 3 numbers in DEC: ch,thr_near,thr_far (eg: 0,500,300)\n");
+        return -EINVAL;
+    }
+
+    if(ch >= HX9031AS_CH_NUM || thr_near > (0x03FF * 32) || thr_far > thr_near) {
+        PRINT_ERR("input value over range! (valid value: ch=%d, thr_near=%d, thr_far=%d)\n", ch, thr_near, thr_far);
+        return -EINVAL;
+    }
+
+    thr_near = (thr_near / 32) * 32;
+    thr_far = (thr_far / 32) * 32;
+    hx9031as_channel1_default_near_thres1 = thr_near;
+    hx9031as_channel1_default_far_thres1 = thr_far;
+
+    PRINT_INF("set default threshold1: ch=%d, thr_near=%d, thr_far=%d\n", ch, thr_near, thr_far);
+    return count;
+}
+
+static ssize_t hx9031as_threshold1_show(const struct class *class,
+					const struct class_attribute *attr, char *buf)
+{
+    int ii = 0;
+    char *p = buf;
+
+    for(ii = 0; ii < HX9031AS_CH_NUM; ii++) {
+        PRINT_INF("ch_%d threshold1: near=%-8d, far=%-8d\n", ii, hx9031as_ch_thres1[ii].thr_near, hx9031as_ch_thres1[ii].thr_far);
+        p += snprintf(p, PAGE_SIZE, "ch_%d threshold1: near=%-8d, far=%-8d\n", ii, hx9031as_ch_thres1[ii].thr_near, hx9031as_ch_thres1[ii].thr_far);
+    }
+
+    return (p - buf);
+}
+
+static ssize_t hx9031as_alg_thres_store(const struct class *class,
+					const struct class_attribute *attr,
+					const char *buf, size_t count)
+{
+    unsigned int en = 0;
+    unsigned int diff3 = 0;
+    unsigned int diff4 = 0;
+    unsigned int thres = 0;
+    unsigned int thres1 = 0;
+
+    ENTER;
+    if (sscanf(buf, "%d,%d,%d,%d,%d", &en, &diff3, &diff4, &thres, &thres1) != 5) {
+        PRINT_ERR("please input 5 numbers in DEC: en,channel3_diff,channel4_diff,channel1_alg_thres,channel1_alg_thres1(eg: 1,2000,20000,1000,1500)\n");
+        return -EINVAL;
+    }
+
+     hx9031as_thres_alg_en = en;
+     hx9031as_channel3_diff = diff3;
+     hx9031as_channel4_diff = diff4;
+     hx9031as_channel1_alg_thres = thres;
+     hx9031as_channel1_alg_thres1 = thres1;
+
+    PRINT_INF("set hx9031as_thres_alg_en: %d, channel3_diff = %d, channel4_diff = %d, channel1_alg_thres=%d, channel1_alg_thres1=%d\n",
+                    hx9031as_thres_alg_en, hx9031as_channel3_diff, hx9031as_channel4_diff, hx9031as_channel1_alg_thres, hx9031as_channel1_alg_thres1);
+    return count;
+}
+
+static ssize_t hx9031as_alg_thres_show(const struct class *class,
+	const struct class_attribute *attr, char *buf)
+{
+    char *p = buf;
+
+    PRINT_INF("hx9031as_thres_alg_en: %d, channel3_diff = %d, channel4_diff = %d, channel1_alg_thres=%d, channel1_alg_thres1=%d\n",
+                    hx9031as_thres_alg_en, hx9031as_channel3_diff, hx9031as_channel4_diff, hx9031as_channel1_alg_thres, hx9031as_channel1_alg_thres1);
+
+    p += snprintf(p, PAGE_SIZE, "hx9031as_thres_alg_en: %d, channel3_diff = %d, channel4_diff = %d, channel1_alg_thres=%d, channel1_alg_thres1=%d\n",
+                    hx9031as_thres_alg_en, hx9031as_channel3_diff, hx9031as_channel4_diff, hx9031as_channel1_alg_thres, hx9031as_channel1_alg_thres1);
 
 	return (p - buf);
 }
@@ -1740,6 +1884,10 @@ static struct class_attribute class_attr_polling_period = __ATTR(
 	polling_period, 0664, hx9031as_polling_show, hx9031as_polling_store);
 static struct class_attribute class_attr_threshold = __ATTR(
 	threshold, 0664, hx9031as_threshold_show, hx9031as_threshold_store);
+static struct class_attribute class_attr_threshold1 = __ATTR(
+        threshold1, 0664, hx9031as_threshold1_show, hx9031as_threshold1_store);
+static struct class_attribute class_attr_alg_thres = __ATTR(
+        alg_thres, 0664, hx9031as_alg_thres_show, hx9031as_alg_thres_store);
 static struct class_attribute class_attr_loglevel =
 	__ATTR(loglevel, 0664, hx9031as_loglevel_show, hx9031as_loglevel_store);
 static struct class_attribute class_attr_accuracy =
@@ -1764,6 +1912,8 @@ static struct attribute *sar_class_attrs[] = {
 	&class_attr_prox_state.attr,
 	&class_attr_polling_period.attr,
 	&class_attr_threshold.attr,
+    &class_attr_threshold1.attr,
+    &class_attr_alg_thres.attr,
 	&class_attr_loglevel.attr,
 	&class_attr_accuracy.attr,
 	&class_attr_dump.attr,
@@ -1788,6 +1938,10 @@ static struct class_attribute sar_class_attributes[] = {
 	       hx9031as_polling_store),
 	__ATTR(threshold, 0664, hx9031as_threshold_show,
 	       hx9031as_threshold_store),
+    __ATTR(threshold1, 0664, hx9031as_threshold1_show,
+            hx9031as_threshold1_store),
+    __ATTR(alg_thres, 0664, hx9031as_alg_thres_show,
+            hx9031as_alg_thres_store),
 	__ATTR(loglevel, 0664, hx9031as_loglevel_show, hx9031as_loglevel_store),
 	__ATTR(accuracy, 0664, hx9031as_accuracy_show, hx9031as_accuracy_store),
 	__ATTR(dump, 0664, hx9031as_dump_show, NULL),
@@ -1986,10 +2140,47 @@ static void hx9031as_input_deinit_abs(struct i2c_client *client)
 }
 #endif
 
+
+void debounce_timer_callback(struct timer_list *t)
+{
+    debounce_flag = false;
+}
+
+static int Debounce_calibration_all(void)
+{
+	if(debounce_flag){
+		PRINT_INF("zjw Debounce_calibration_all enter debounce.\n");
+		return 1;
+	}
+	debounce_flag = true;
+	PRINT_INF("zjw Debounce_calibration_all enter debounce 11.\n");
+	mod_timer(&debounce_timer, jiffies + msecs_to_jiffies(1500));
+	hx9031as_manual_offset_calibration_all_chs();
+	return 0;
+}
+
+int sar_event_handle(struct notifier_block *nb, unsigned long event, void *v)
+{
+	switch(event){
+		case SAR_CALI_EVENT:
+			PRINT_INF("zjw sar_event_handle enter SAR_CALI_EVENT.\n");
+			Debounce_calibration_all();
+			break;
+		default:
+			break;
+	}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block sar_notifier = {
+	.notifier_call = sar_event_handle,
+};
+
 static void hx9031as_ps_notify_callback_work(struct work_struct *work)
 {
 	ENTER;
-	hx9031as_manual_offset_calibration_all_chs();
+	Debounce_calibration_all();
 }
 
 static int hx9031as_ps_get_state(struct power_supply *psy, bool *present)
@@ -2120,7 +2311,10 @@ static int hx9031as_probe(struct i2c_client *client)
 		hx9031as_set_thres_near(ii, hx9031as_ch_thres[ii].thr_near);
 		hx9031as_set_thres_far(ii, hx9031as_ch_thres[ii].thr_far);
 	}
-
+    hx9031as_channel1_default_near_thres = hx9031as_ch_thres[1].thr_near;
+    hx9031as_channel1_default_far_thres = hx9031as_ch_thres[1].thr_far;
+    hx9031as_channel1_default_near_thres1 = hx9031as_ch_thres1[1].thr_near;
+    hx9031as_channel1_default_far_thres1 = hx9031as_ch_thres1[1].thr_far;
 	INIT_DELAYED_WORK(&hx9031as_pdata.polling_work,
 			  hx9031as_polling_work_func);
 
@@ -2166,7 +2360,11 @@ static int hx9031as_probe(struct i2c_client *client)
 	}
 #endif
 
+	timer_setup(&debounce_timer, debounce_timer_callback, 0);
 	hx9031as_ps_notify_init();
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+	FULL_PRODUCT_DEVICE_INFO(ID_SAR_SENSOR, "hx9031as");
+#endif
 	PRINT_INF("probe success\n");
 	return 0;
 
@@ -2185,6 +2383,7 @@ failed_id_check:
 failed_parse_dt:
 failed_i2c_check_functionality:
 	PRINT_ERR("probe failed\n");
+	unregister_sar_notifier(&sar_notifier);
 	return ret;
 }
 
@@ -2198,6 +2397,7 @@ static void hx9031as_remove(struct i2c_client *client)
 #else
 	hx9031as_input_deinit_abs(client);
 #endif
+	del_timer_sync(&debounce_timer);
 	cancel_delayed_work_sync(&(hx9031as_pdata.polling_work));
 	hx9031as_power_on(0);
 }
@@ -2251,12 +2451,14 @@ static int __init hx9031as_module_init(void)
 {
 	ENTER;
 	PRINT_INF("driver version:%s\n", HX9031AS_DRIVER_VER);
+	register_sar_notifier(&sar_notifier);
 	return i2c_add_driver(&hx9031as_i2c_driver);
 }
 
 static void __exit hx9031as_module_exit(void)
 {
 	ENTER;
+	unregister_sar_notifier(&sar_notifier);
 	i2c_del_driver(&hx9031as_i2c_driver);
 }
 

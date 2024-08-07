@@ -31,7 +31,7 @@
 #include <linux/pinctrl/consumer.h>
 #include "mt6358-accdet.h"
 #include "mt6358.h"
-
+#include <linux/notifier.h>
 /* grobal variable definitions */
 #define REGISTER_VAL(x)	(x - 1)
 #define HAS_CAP(_c, _x)	(((_c) & (_x)) == (_x))
@@ -183,6 +183,46 @@ static u32 get_triggered_eint(void);
 static void send_status_event(u32 cable_type, u32 status);
 static inline void accdet_eint_high_level_support(void);
 /* global function declaration */
+
+#define SAR_CALI_EVENT 0x63616c87
+
+static RAW_NOTIFIER_HEAD(sar_notify_list);
+
+static int call_sar_notifiers(unsigned long val, void *v)
+{
+	pr_info(" enter call_sar_notifiers\n");
+	return raw_notifier_call_chain(&sar_notify_list, val, v);
+}
+
+int register_sar_notifier(struct notifier_block *nb)
+{
+	int err;
+	pr_info(" enter register_sar_notifier\n");
+	err = raw_notifier_chain_register(&sar_notify_list, nb);
+
+	if(err)
+		goto out;
+
+out:
+	return err;
+}
+EXPORT_SYMBOL(register_sar_notifier);
+
+int unregister_sar_notifier(struct notifier_block *nb)
+{
+	int err;
+	pr_info(" enter unregister_sar_notifier\n");
+	err = raw_notifier_chain_unregister(&sar_notify_list, nb);
+
+	if(err)
+		goto out;
+
+out:
+	return err;
+}
+EXPORT_SYMBOL(unregister_sar_notifier);
+
+
 inline u32 accdet_read(u32 addr)
 {
 	u32 val = 0;
@@ -852,6 +892,7 @@ static void send_status_event(u32 cable_type, u32 status)
 
 		snd_soc_jack_report(&accdet->jack, report,
 				SND_JACK_MICROPHONE);
+		call_sar_notifiers(SAR_CALI_EVENT ,NULL);
 		pr_info("accdet MICROPHONE(4-pole) %s\n",
 			status ? "PlugIn" : "PlugOut");
 		/* when press key for a long time then plug in

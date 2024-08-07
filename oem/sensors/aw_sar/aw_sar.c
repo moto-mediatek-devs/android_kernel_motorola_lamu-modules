@@ -5,6 +5,10 @@
 #include "aw_sar.h"
 #include "./aw963xx/aw963xx.h"
 
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include "../../devinfo/dev_info.h"
+#endif
+
 #define AW_SAR_I2C_NAME "awinic_sar"
 #define AW_SAR_DRIVER_VERSION "v0.4.0"
 #if 0
@@ -2281,6 +2285,9 @@ static int32_t aw_sar_get_chip_info(struct aw_sar *p_sar)
 				g_aw_sar_driver_list[i].p_chip_init(p_sar);
 				AWLOGI(p_sar->dev, "current use drvier is :%d",
 				       g_aw_sar_driver_list[i].driver_type);
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+				FULL_PRODUCT_DEVICE_INFO(ID_SAR_SENSOR, p_sar->chip_name);
+#endif
 				return AW_OK;
 			}
 		}
