@@ -150,6 +150,22 @@ int sar_data_report(int32_t value[3])
 	return sar_data_report_t(value, 0);
 }
 
+//TN Begin modified by jiawei.zou 20240802 for rearals_cali
+int rearals_cali_report(int *value)
+{
+	int err = 0;
+	struct sensor_event event;
+
+	memset(&event, 0, sizeof(struct sensor_event));
+	event.handle = ID_REAR_ALS;
+	event.flush_action = CALI_ACTION;
+	event.word[0] = value[0];
+	err = sensor_input_event(situation_context_obj->mdev.minor, &event);
+	return err;
+}
+EXPORT_SYMBOL_GPL(rearals_cali_report);
+//TN End modified by jiawei.zou 20240802 for rearals_cali
+
 int situation_notify_t(int handle, int64_t time_stamp)
 {
 	return situation_data_report_t(handle, 1, time_stamp);

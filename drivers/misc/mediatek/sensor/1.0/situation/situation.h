@@ -90,5 +90,8 @@ extern int sar_data_report(int32_t value[3]);
 extern int sar_data_report_t(int32_t value[3], int64_t time_stamp);
 extern int situation_probe(void);
 extern int situation_remove(void);
+//TN Begin modified by jiawei.zou 20240802 for rearals_cali
+extern int rearals_cali_report(int *value);
+//TN End modified by jiawei.zou 20240802 for rearals_cali
 
 #endif

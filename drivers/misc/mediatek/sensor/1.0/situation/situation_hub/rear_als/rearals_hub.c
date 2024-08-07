@@ -71,15 +71,20 @@ static int rearals_factory_enable_calibration(void)
 
 static int rearals_factory_get_cali(int32_t *offset)
 {
-	int err = 0;
+//	int err = 0; //TN modified by jiawei.zou 20240802 for rearals_cali
 	struct rearals_ipi_data *obj = obj_ipi_data;
 
+
+//TN Begin modified by jiawei.zou 20240802 for rearals_cali
+/*
 	err = wait_for_completion_timeout(&obj->calibration_done,
 					  msecs_to_jiffies(3000));
 	if (!err) {
 		pr_err("rearals factory get cali fail!\n");
 		return -1;
 	}
+*/
+//TN End modified by jiawei.zou 20240802 for rearals_cali
 	spin_lock(&calibration_lock);
 	*offset = obj->rearals_cali;
 	spin_unlock(&calibration_lock);
@@ -100,6 +105,7 @@ static int rearals_factory_set_cali(int32_t offset)
 		pr_err("sensor_cfg_to_hub fail\n");
 	obj->rearals_cali = offset;
 	spin_unlock(&calibration_lock);
+	rearals_cali_report(&cfg_data);//TN modified by jiawei.zou 20240802 for rearals_cali
 
 	return err;
 
@@ -175,6 +181,7 @@ static int rearals_recv_data(struct data_unit_t *event, void *reserved)
 		spin_lock(&calibration_lock);
 		obj->rearals_cali = event->data[0];
 		spin_unlock(&calibration_lock);
+		rearals_cali_report(event->data);//TN modified by jiawei.zou 20240802 for rearals_cali
 		complete(&obj->calibration_done);
 	}
 	return err;
