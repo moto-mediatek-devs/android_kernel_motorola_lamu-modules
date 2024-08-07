@@ -4565,8 +4565,7 @@ static int psy_charger_set_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX:
 /*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
-		//g_thermal_charging_current_limit = val->intval;
-		g_thermal_charging_current_limit = -1;
+		g_thermal_charging_current_limit = val->intval;
 #endif /* CONFIG_OEM_TURBO_CHARGER */
 /*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 		info->chg_data[idx].thermal_charging_current_limit =
