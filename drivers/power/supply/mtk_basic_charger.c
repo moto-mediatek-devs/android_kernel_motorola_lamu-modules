@@ -297,6 +297,17 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		is_basic = true;
 	}
 
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	info->setting.pe50_fcc_limit = ((info->pe50.target_fcc < 0) ? 0 : info->pe50.target_fcc);
+	if (pdata->thermal_charging_current_limit < 0 ||
+		pdata->thermal_charging_current_limit > info->pe50.min_therm_current_limit)
+		info->setting.pe50_current_limit_dvchg1 = pdata->thermal_charging_current_limit;
+	else
+		info->setting.pe50_current_limit_dvchg1 = info->pe50.min_therm_current_limit;
+#endif
+/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+
 	if (support_fast_charging(info))
 		is_basic = false;
 	else {
@@ -363,6 +374,15 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 			}
 		}
 	}
+
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	pdata->charging_current_limit = ((info->pe50.target_fcc < 0) ? 0 : info->pe50.target_fcc);
+	chr_err("min_charging_current is too low, info->pe50.target_fcc %d %d\n",
+		pdata->charging_current_limit, info->pe50.target_fcc );
+	info->pe50.target_usb = pdata->input_current_limit;
+#endif
+/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
 
 	sc_select_charging_current(info, pdata);
 

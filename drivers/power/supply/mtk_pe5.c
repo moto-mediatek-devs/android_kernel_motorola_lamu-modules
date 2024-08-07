@@ -771,6 +771,11 @@ static u32 pe50_get_dvchg_vbusovp(struct pe50_algo_info *info, u32 ita)
 /* Calculate IBUSOC S/W level */
 static u32 pe50_get_dvchg_ibusocp(struct pe50_algo_info *info, u32 ita)
 {
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	u32 ibus, ratio = PE50_IBUSOCP_RATIO;
+	ibus = pe50_get_idvchg_lmt(info);
+#else
 	struct pe50_algo_data *data = info->data;
 	struct pe50_algo_desc *desc = info->desc;
 	u32 ibus, ratio = PE50_IBUSOCP_RATIO;
@@ -783,6 +788,8 @@ static u32 pe50_get_dvchg_ibusocp(struct pe50_algo_info *info, u32 ita)
 		ratio += 10;
 	}
 	ibus = max(ibus, desc->idvchg_term);
+#endif
+/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
 	return percent(ibus, ratio);
 }
 
@@ -797,7 +804,13 @@ static u32 pe50_get_vbatovp(struct pe50_algo_info *info)
 /* Calculate IBATOC S/W level */
 static u32 pe50_get_ibatocp(struct pe50_algo_info *info, u32 ita)
 {
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	return percent(info->data->pe50_max_ibat, PE50_IBATOCP_RATIO);
+#else
 	return percent(pe50_cal_ibat(info, ita), PE50_IBATOCP_RATIO);
+#endif
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
 }
 
 /* Calculate ITAOC S/W level */
@@ -2094,6 +2107,11 @@ out:
 static int pe50_algo_measure_r_with_ta_cv(struct pe50_algo_info *info)
 {
 	int ret;
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	struct pe50_algo_data *data = info->data;
+	struct pe50_ta_auth_data *auth_data = &data->ta_auth_data;
+#else
 	struct pe50_algo_data *data = info->data;
 	struct pe50_algo_desc *desc = info->desc;
 	struct pe50_ta_auth_data *auth_data = &data->ta_auth_data;
@@ -2101,6 +2119,8 @@ static int pe50_algo_measure_r_with_ta_cv(struct pe50_algo_info *info)
 				  !data->tried_dual_dvchg) ?
 				  desc->rcable_level_dual[PE50_RCABLE_NORMAL] :
 				  desc->rcable_level[PE50_RCABLE_NORMAL];
+#endif
+/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
 	struct pe50_stop_info sinfo = {
 		.reset_ta = true,
 		.hardreset_ta = false,
@@ -2121,12 +2141,14 @@ static int pe50_algo_measure_r_with_ta_cv(struct pe50_algo_info *info)
 		PE50_ERR("get r info fail(%d)\n", ret);
 		goto err;
 	}
+#if !IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
 	if (data->r_cable > rcable_retry_level) {
 		PE50_INFO("rcable(%d) is worse than normal(%d)\n",
 			  data->r_cable, rcable_retry_level);
 		if (data->err_retry_cnt < PE50_MEASURE_R_RETRY_MAX)
 			goto err;
 	}
+#endif
 	PE50_ERR("avg_r(sw,bat,cable):(%d,%d,%d), r_total:%d\n",
 		 data->r_sw, data->r_bat, data->r_cable, data->r_total);
 select_ita:
@@ -2342,6 +2364,11 @@ err:
 static int pe50_algo_ss_dvchg_with_ta_cv(struct pe50_algo_info *info)
 {
 	int ret, vbat;
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	int ibat, fcc_min;
+#endif
+/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
 	struct pe50_algo_data *data = info->data;
 	struct pe50_algo_desc *desc = info->desc;
 	struct pe50_ta_auth_data *auth_data = &data->ta_auth_data;
@@ -2426,6 +2453,17 @@ single_dvchg_select_ita:
 		PE50_ERR("get vbat fail(%d)\n", ret);
 		goto out;
 	}
+
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	ret = pe50_get_adc(info, PE50_ADCCHAN_IBAT, &ibat);
+	if (ret < 0) {
+		PE50_ERR("get ibat fail(%d)\n", ret);
+		goto out;
+	}
+#endif
+/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+
 	/* VBAT reaches CV level */
 	PE50_INFO("vbat(%d), ita(%d)\n", vbat, data->ita_measure);
 	if (vbat >= data->vbat_cv) {
@@ -2445,8 +2483,25 @@ single_dvchg_select_ita:
 
 	idvchg_lmt = pe50_get_idvchg_lmt(info);
 	/* ITA reaches CC level */
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	if(data->pe50_therm_fcc_limit > 0 &&
+		data->pe50_therm_fcc_limit < data->pe50_fcc_limit)
+		fcc_min = data->pe50_therm_fcc_limit;
+	else
+		fcc_min = data->pe50_fcc_limit;
+
+	PE50_INFO("cc_cv fcc_result(%d),fcc(%d), therm_fcc(%d)\n",
+		fcc_min, data->pe50_fcc_limit, data->pe50_therm_fcc_limit);
+
 	if (data->ita_measure + ita_gap_per_vstep > idvchg_lmt ||
-	    vta == auth_data->vcap_max)
+	    vta == auth_data->vcap_max ||
+	    ibat + 2 * PE50_IBAT_GAP_MA > fcc_min)
+#else
+	if (data->ita_measure + ita_gap_per_vstep > idvchg_lmt ||
+		    vta == auth_data->vcap_max)
+#endif
+/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
 		data->state = PE50_ALGO_CC_CV;
 	else {
 		vstep_cnt = precise_div(idvchg_lmt - data->ita_measure,
@@ -2678,9 +2733,48 @@ err:
 	return pe50_stop(info, &sinfo);
 }
 
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+static int pe50_thermal_ratio(struct pe50_algo_info *info, int ibat, int vbat)
+{
+	struct pe50_algo_data *data = info->data;
+	int target_fcc = 0;
+	int ratio;
+
+	if (data->pe50_therm_fcc_limit > 0) {
+		target_fcc = min((u32)data->pe50_therm_fcc_limit, (u32)data->pe50_fcc_limit);
+		if (ibat - target_fcc > data->pe50_therm_cur_thres) {
+			ratio = data->pe50_therm_step;
+			PE50_INFO("--current for thermal,ratio=%d, target_ibat=%d, now_ibat=%d\n",
+				ratio, target_fcc, ibat);
+		} else if (target_fcc - ibat > data->pe50_therm_cur_thres &&
+			data->vbat_cv - vbat > data->pe50_therm_vol_thres) {
+			ratio = data->pe50_therm_step;
+			PE50_INFO("++current for thermal, ratio=%d, target_ibat=%d, now_ibat=%d, cv=%d vbat=%d\n",
+				ratio, target_fcc, ibat, data->vbat_cv, vbat);
+		} else {
+			ratio = 1;
+			PE50_INFO("keep current for thermal,ratio=%d, target_ibat=%d, now_ibat=%d, cv=%d vbat=%d\n",
+				ratio, target_fcc, ibat, data->vbat_cv, vbat);
+		}
+
+	} else {
+		ratio = 1;
+	}
+
+	return ratio;
+}
+#endif
+/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+
 static int pe50_algo_cc_cv_with_ta_cv(struct pe50_algo_info *info)
 {
 	int ret, vbat, vsys = 0;
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	int fcc_min, ibat, ratio;
+#endif
+/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
 	struct pe50_algo_data *data = info->data;
 	struct pe50_ta_auth_data *auth_data = &data->ta_auth_data;
 	u32 idvchg_lmt, vta = data->vta_setting, ita = data->ita_setting;
@@ -2736,6 +2830,24 @@ static int pe50_algo_cc_cv_with_ta_cv(struct pe50_algo_info *info)
 #endif
 /* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	ret = pe50_get_adc(info, PE50_ADCCHAN_IBAT, &ibat);
+	if (ret < 0) {
+		PE50_ERR("get ibat fail(%d)\n", ret);
+		goto out;
+	}
+
+	if (data->pe50_therm_fcc_limit > 0 &&
+		data->pe50_therm_fcc_limit < data->pe50_fcc_limit)
+		fcc_min = data->pe50_therm_fcc_limit;
+	else
+		fcc_min = data->pe50_fcc_limit;
+	PE50_INFO("cc_cv fcc_result(%d), fcc(%d), therm_fcc(%d)\n",
+		fcc_min, data->pe50_fcc_limit, data->pe50_therm_fcc_limit);
+#endif
+/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+
 	if (vbat >= data->vbat_cv) {
 		PE50_INFO("--vbat >= vbat_cv, %d > %d\n", vbat, data->vbat_cv);
 		vta -= auth_data->vta_step;
@@ -2747,6 +2859,29 @@ static int pe50_algo_cc_cv_with_ta_cv(struct pe50_algo_info *info)
 		ita -= ita_gap_per_vstep;
 		PE50_INFO("--vta, ita(meas,lmt)=(%d,%d)\n", data->ita_measure,
 			  idvchg_lmt);
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	} else if (ibat > fcc_min) {
+		ratio = pe50_thermal_ratio(info, ibat, vbat);
+		vta -= ratio * auth_data->vta_step;
+		ita -= ratio * ita_gap_per_vstep;
+		ita = max(ita, idvchg_lmt);
+		PE50_INFO("--vta, ibat(meas,lmt)=(%d,%d), ratio=%d\n", ibat, fcc_min, ratio);
+	} else if (!data->is_vbat_over_cv && vbat <= data->cv_lower_bound &&
+		   ibat <= (fcc_min - PE50_IBAT_GAP_MA) &&
+		   data->ita_measure <= (idvchg_lmt - ita_gap_per_vstep) &&
+		   vta < auth_data->vcap_max && !data->suspect_ta_cc &&
+		   vsys < (PE50_VSYS_UPPER_BOUND - PE50_VSYS_UPPER_BOUND_GAP)) {
+		ratio = pe50_thermal_ratio(info, ibat, vbat);
+		vta += auth_data->vta_step * ratio;
+		vta = min(vta, (u32)auth_data->vcap_max);
+		ita += ita_gap_per_vstep * ratio;
+		ita = min(ita, idvchg_lmt);
+		if (ita == data->ita_setting)
+			suspect_ta_cc = true;
+		PE50_INFO("++vta, ita(meas,lmt)=(%d,%d), pe50_fcc=%d ratio=%d\n", data->ita_measure,
+			  idvchg_lmt, fcc_min, ratio);
+#else
 	} else if (!data->is_vbat_over_cv && vbat <= data->cv_lower_bound &&
 		   data->ita_measure <= (idvchg_lmt - ita_gap_per_vstep) &&
 		   vta < auth_data->vcap_max && !data->suspect_ta_cc &&
@@ -2759,6 +2894,8 @@ static int pe50_algo_cc_cv_with_ta_cv(struct pe50_algo_info *info)
 			suspect_ta_cc = true;
 		PE50_INFO("++vta, ita(meas,lmt)=(%d,%d)\n", data->ita_measure,
 			  idvchg_lmt);
+#endif
+/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
 	} else if (data->is_vbat_over_cv)
 		data->is_vbat_over_cv = false;
 
@@ -3935,7 +4072,24 @@ static int pe50_set_current_limit(struct chg_alg_device *alg,
 	struct pe50_algo_data *data = info->data;
 	int cv = micro_to_milli(setting->cv);
 	int ic = micro_to_milli(setting->input_current_limit_dvchg1);
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	int fcc = micro_to_milli(setting->pe50_fcc_limit);
+	int therm_fcc = micro_to_milli(setting->pe50_current_limit_dvchg1);
 
+	mutex_lock(&data->ext_lock);
+	if (data->cv_limit != cv || data->input_current_limit != ic
+		|| data->pe50_fcc_limit != fcc
+		|| data->pe50_therm_fcc_limit != therm_fcc) {
+		data->cv_limit = cv;
+		data->input_current_limit = ic;
+		data->pe50_fcc_limit = fcc;
+		PE50_INFO("ic = %d, cv = %d, pe50_fcc= %d therm_fcc = %d\n", ic, cv, fcc, therm_fcc);
+		data->pe50_therm_fcc_limit = therm_fcc;
+		pe50_wakeup_algo_thread(data);
+	}
+	mutex_unlock(&data->ext_lock);
+#else
 	mutex_lock(&data->ext_lock);
 	if (data->cv_limit != cv || data->input_current_limit != ic) {
 		data->cv_limit = cv;
@@ -3944,6 +4098,8 @@ static int pe50_set_current_limit(struct chg_alg_device *alg,
 		pe50_wakeup_algo_thread(data);
 	}
 	mutex_unlock(&data->ext_lock);
+#endif
+/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
 	return 0;
 }
 
@@ -4186,6 +4342,53 @@ static int pe50_parse_dt(struct pe50_algo_info *info)
 			DISABLE_VBAT_THRESHOLD);
 		data->vbat_threshold = DISABLE_VBAT_THRESHOLD;
 	}
+
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	if (of_property_read_u32(np, "pe5_therm_cur_thres", &val) >= 0)
+		data->pe50_therm_cur_thres = val;
+	else if (of_property_read_u32(np, "pe5-therm-cur-thres", &val) >= 0)
+		data->pe50_therm_cur_thres = val;
+	else {
+		pr_notice("pe50 therm current thres using default:%d\n",
+			PE50_THERMAL_CURRENT_THRESHOLD);
+		data->pe50_therm_cur_thres = PE50_THERMAL_CURRENT_THRESHOLD;
+	}
+
+	if (of_property_read_u32(np, "pe5_therm_vol_thres", &val) >= 0)
+		data->pe50_therm_vol_thres = val;
+	else if (of_property_read_u32(np, "pe5-therm-vol-thres", &val) >= 0)
+		data->pe50_therm_vol_thres = val;
+	else {
+		pr_notice("pe50 therm voltage thres using default:%d\n",
+			PE50_THERMAL_VOL_THRESHOLD);
+		data->pe50_therm_vol_thres = PE50_THERMAL_VOL_THRESHOLD;
+	}
+
+	if (of_property_read_u32(np, "pe5_therm_step", &val) >= 0)
+		data->pe50_therm_step = val;
+	else if (of_property_read_u32(np, "pe5-therm-step", &val) >= 0)
+		data->pe50_therm_step = val;
+	else {
+		pr_notice("pe50 therm step using default:%d\n",
+			PE50_THERMAL_STEP);
+		data->pe50_therm_step = PE50_THERMAL_STEP;
+	}
+
+	PE50_INFO("pe50 thermal dts= %d,%d,%d\n",
+		data->pe50_therm_cur_thres, data->pe50_therm_vol_thres, data->pe50_therm_step);
+
+	if (of_property_read_u32(np, "pe5_max_ibat", &val) >= 0)
+		data->pe50_max_ibat = val;
+	else if (of_property_read_u32(np, "pe5-max-ibat", &val) >= 0)
+		data->pe50_max_ibat = val;
+	else {
+		pr_notice("pe50 max ibat using default:%d\n",
+			PE50_MAX_IBAT);
+		data->pe50_max_ibat = PE50_MAX_IBAT;
+	}
+#endif
+/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
 
 	return 0;
 }

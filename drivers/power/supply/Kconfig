@@ -68,6 +68,15 @@ config MTK_PUMP_EXPRESS_50_SUPPORT
 	  Set Yes to enable PE 5.0
 	  Set No to disable PE 5.0
 
+#TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202
+config PE50_FFC_SUPPORT
+	tristate "pe50 ffc support"
+	depends on MTK_PUMP_EXPRESS_50_SUPPORT
+	default n
+	help
+	  support pe50_ffc_support
+#TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202
+
 config MTK_PUMP_EXPRESS_50_PLUS_SUPPORT
 	tristate "MediaTek PUMP EXPRESS 5.0 PLUS"
 	depends on MTK_CHARGER

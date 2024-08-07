@@ -127,6 +127,12 @@ struct chg_limit_setting {
 	int charging_current_limit2;
 	bool vbat_mon_en;
 	int adapter_priority;
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	int pe50_current_limit_dvchg1;
+	int pe50_fcc_limit;
+#endif
+/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
 };
 
 enum chg_alg_props {

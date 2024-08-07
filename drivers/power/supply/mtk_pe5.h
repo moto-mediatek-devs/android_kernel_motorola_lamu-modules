@@ -15,6 +15,16 @@
 #define PRECISION_ENHANCE	5
 
 #define DISABLE_VBAT_THRESHOLD -1
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+#define PE50_IBAT_GAP_MA 50
+#define PE50_THERMAL_CURRENT_THRESHOLD 500
+#define PE50_THERMAL_VOL_THRESHOLD 80
+#define PE50_THERMAL_STEP 3
+#define PE50_MAX_IBAT 6000
+#endif
+/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+
 
 extern int pe50_get_log_level(void);
 #define PE50_DBG(fmt, ...) \
@@ -177,6 +187,16 @@ struct pe50_algo_data {
 	int input_current_limit;
 	int cv_limit;
 	u32 start_soc_max;		/* algo start soc upper bound */
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	u32 pe50_therm_fcc_limit;
+	u32 pe50_fcc_limit;
+	u32 pe50_therm_cur_thres;
+	u32 pe50_therm_step;
+	u32 pe50_max_ibat;
+	u32 pe50_therm_vol_thres;
+#endif
+/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
 };
 
 /* Setting from dtsi */

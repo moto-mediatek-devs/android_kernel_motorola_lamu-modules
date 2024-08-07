@@ -357,6 +357,150 @@ enum chg_data_idx_enum {
 	CHGS_SETTING_MAX,
 };
 
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+enum charging_limit_modes {
+	CHARGING_LIMIT_OFF,
+	CHARGING_LIMIT_RUN,
+	CHARGING_LIMIT_UNKNOWN,
+};
+
+struct pe50_battery_info {
+	int batt_mv;
+	int batt_ma;
+	int batt_soc;
+	int batt_temp;
+	int batt_status;
+	int batt_full_uah;
+	int batt_design_uah;
+//	char batt_sn[pe50_BATT_SN_LEN];
+};
+
+struct pe50_charger_info {
+	int chrg_mv;
+	int chrg_ma;
+	int chrg_type;
+	int chrg_pmax_mw;
+	int chrg_present;
+};
+
+struct pe50_charger_cfg {
+	int target_fcc;
+	int target_fv;
+	int fg_iterm;
+	int chrg_iterm;
+	bool full_charged;
+	bool charging_reset;
+	bool taper_kickoff;
+	bool charging_disable;
+	bool charger_suspend;
+	int demo_mode;
+//	bool factory_mode;
+//	bool factory_version;
+//	int dcp_pmax;
+//	int hvdcp_pmax;
+};
+
+struct pe50_charger_driver {
+	char *name;
+	struct device *dev;
+	int (*get_batt_info)(void *data, struct pe50_battery_info *batt_info);
+	int (*get_chg_info)(void *data, struct pe50_charger_info *chg_info);
+	int (*config_charge)(void *data, struct pe50_charger_cfg *config);
+	bool (*is_charge_tapered)(void *data, int tapered_ma);
+	bool (*is_charge_halt)(void *data);
+	void *data;
+};
+
+struct pe50_ffc_zone {
+	int temp;
+	int ffc_max_mv;
+	int ffc_chg_iterm;
+};
+
+struct pe50_temp_zone {
+	int temp_c;
+	int norm_mv;
+	int fcc_max_ma;
+	int fcc_norm_ma;
+};
+
+#define MAX_NUM_STEPS 10
+
+enum pe50_temp_zones {
+	ZONE_FIRST =0,
+	/* states 0-9 are reserved for zones */
+	ZONE_LAST = MAX_NUM_STEPS + ZONE_FIRST - 1,
+	ZONE_HOT,
+	ZONE_COLD,
+	ZONE_NONE=0XFF,
+};
+
+enum pe50_chrg_step {
+	STEP_MAX,
+	STEP_NORMMAL,
+	STEP_FULLLY,
+	STEP_FLOAT,
+	STEP_DEMO,
+	STEP_STOP,
+	STEP_NONE_N = 0xFF,
+};
+
+struct pe50_params {
+	bool init_done;
+	bool factory_mode;
+	int demo_mode;
+	bool demo_discharging;
+	bool factory_kill_armed;
+	/*adaptive charging*/
+	bool adaptive_charging_disable_ichg;
+	bool adaptive_charging_disable_ibat;
+	bool charging_enable_hz;
+	bool battery_charging_disable;
+	/* Charge Profile */
+	int num_temp_zones;
+	struct pe50_temp_zone *temp_zones;
+	enum pe50_temp_zones pres_temp_zone;
+	enum pe50_chrg_step pres_chrg_step;
+	int chrg_taper_cnt;
+	int temp_state;
+	int chrg_iterm;
+	int back_chrg_iterm;
+	int num_ffc_zones;
+	struct pe50_ffc_zone *ffc_zones;
+	bool enable_charging_limit;
+	bool is_factory_image;
+	enum charging_limit_modes charging_limit_modes;
+	int upper_limit_capacity;
+	int lower_limit_capacity;
+	int base_fv_mv;
+	int vfloat_comp_mv;
+	int batt_health;
+	int max_chrg_temp;
+	/*target parameter*/
+	int target_fv;
+	bool chg_disable;
+	int target_fcc;
+	int target_usb;
+	struct notifier_block chg_reboot;
+	int min_therm_current_limit;
+	bool enable_mux;
+//	struct pe50_mux_chan mux_channel;
+	int wls_switch_en;
+	int wls_boost_en;
+	int charge_rate;
+	unsigned int active_fast_alg;
+	int typec_rp_max_current;
+	int pd_pmax_mw;
+	struct adapter_auth_data apdo_cap;
+	int pd_cap_max_watt;
+	int vbus_h;
+	int vbus_l;
+	int charger_watt;
+};
+#endif
+/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+
 struct mtk_charger {
 	struct platform_device *pdev;
 	struct charger_device *chg1_dev;
@@ -592,6 +736,13 @@ struct mtk_charger {
 	int ext_chr_type;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
+	//struct pe50_charger_cfg pe50;
+
+/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	struct pe50_params pe50;
+#endif
+/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
 
 };
 
