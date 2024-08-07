@@ -59,6 +59,10 @@
 #include <dev_info.h>
 #endif
 
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+extern bool turbo_charger_active;
+extern bool ffc_batt_full;
+#endif
 //static bool allow_set_dp_dm_vol = false;
 
 static int cx2589x_set_boost_current_limit(struct charger_device *chg_dev, u32 uA);
@@ -623,8 +627,8 @@ static int cx2589x_get_state(struct cx2589x_device *cx, struct cx2589x_state *st
 	}
 	state->therm_stat = !!(therm_stat & CX2589x_THERM_STAT);
 
-	pr_info("chrg_type=%d, chrg_stat=%d online=%d\n",
-		state->chrg_type>>5, state->chrg_stat>>3, state->online);
+	pr_info("chrg_type=0x%x, chrg_stat=0x%x online=%d\n",
+		state->chrg_type >> 5, state->chrg_stat >> 3, state->online);
 
 	ret = cx2589x_read_reg(cx, CX2589x_REG_0C, &fault);
 	if (ret) {
@@ -657,6 +661,56 @@ static int cx2589x_get_state(struct cx2589x_device *cx, struct cx2589x_state *st
 	state->vbus_gd = !!(chrg_param_2 & CX2589x_VBUS_GOOD);
 
 	return 0;
+}
+
+static int cx2589x_get_charge_stat(struct cx2589x_device *cx)
+{
+	u8 chrg_stat;
+	int ret;
+	int status = POWER_SUPPLY_STATUS_UNKNOWN;
+
+	ret = cx2589x_read_reg(cx, CX2589x_REG_0B, &chrg_stat);
+	if (ret) {
+		pr_err("read CX2589x_CHRG_STAT fail\n");
+		return status;
+	}
+
+	mutex_lock(&cx->lock);
+	cx->state.chrg_type = chrg_stat & CX2589x_VBUS_STAT_MASK;
+	cx->state.chrg_stat = chrg_stat & CX2589x_CHG_STAT_MASK;
+	mutex_unlock(&cx->lock);
+
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+	pr_info("chrg_type:0x%x, chrg_stat:0x%x, turbo_charger_active:%d , ffc_batt_full:%d\n",
+		cx->state.chrg_type, cx->state.chrg_stat, turbo_charger_active, ffc_batt_full);
+#else
+	pr_info("chrg_type:0x%x, chrg_stat:0x%x\n",
+		cx->state.chrg_type, cx->state.chrg_stat);
+#endif
+
+	if (!cx->state.chrg_type || cx->state.chrg_type == CX2589x_OTG_MODE) {
+		status = POWER_SUPPLY_STATUS_DISCHARGING;
+	} else {
+		switch (cx->state.chrg_stat) {
+		case CX2589x_NOT_CHRGING:
+			status = POWER_SUPPLY_STATUS_NOT_CHARGING;
+			break;
+		case CX2589x_PRECHRG:
+		case CX2589x_FAST_CHRG:
+			status = POWER_SUPPLY_STATUS_CHARGING;
+			break;
+		case CX2589x_TERM_CHRG:
+			status = POWER_SUPPLY_STATUS_FULL;
+			break;
+		}
+	}
+
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+	if ((turbo_charger_active == true) && (ffc_batt_full == true))
+		status = POWER_SUPPLY_STATUS_FULL;
+#endif
+
+	return status;
 }
 
 __maybe_unused static int cx2589x_set_hiz_en(struct charger_device *chg_dev, bool hiz_en)
@@ -831,6 +885,11 @@ static int cx2589x_get_charging_status(struct charger_device *chg_dev, bool *is_
 		*is_done = true;
 	else
 		*is_done = false;
+
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+	if ((turbo_charger_active == true) && (ffc_batt_full == true))
+		*is_done = true;
+#endif
 
 	return 0;
 }
@@ -1029,14 +1088,7 @@ static int cx2589x_charger_get_property(struct power_supply *psy,
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_STATUS:
-		if (!state.chrg_type || (state.chrg_type == CX2589x_OTG_MODE))
-			val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
-		else if (!state.chrg_stat)
-			val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
-		else if (state.chrg_stat == CX2589x_TERM_CHRG)
-			val->intval = POWER_SUPPLY_STATUS_FULL;
-		else
-			val->intval = POWER_SUPPLY_STATUS_CHARGING;
+		val->intval = cx2589x_get_charge_stat(cx);
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_TYPE:
 		switch (state.chrg_stat) {
@@ -1943,10 +1995,15 @@ static int cx2589x_plug_in(struct charger_device *chg_dev)
 	usb_detect_flag = false;
 
 	ret = cx2589x_get_state(cx, &state);
+	if (ret) {
+		pr_err("Failed to get state(%d)\n", ret);
+	}
+
 	mutex_lock(&cx->lock);
 	cx->state = state;
 	mutex_unlock(&cx->lock);
 
+	power_supply_changed(cx->charger);
 	return ret;
 }
 
@@ -1971,9 +2028,6 @@ static struct charger_ops cx2589x_chg_ops = {
 	.dump_registers = cx2589x_dump_register,
 	.plug_in = cx2589x_plug_in,
 	.plug_out = cx2589x_plug_out,
-	/* cable plug in/out */
-	//.plug_in = mt6375_plug_in,
-	//.plug_out = mt6375_plug_out,
 	/* enable */
 	.enable = cx2589x_charging_switch,
 	.is_enabled = cx2589x_is_charging,
@@ -1992,13 +2046,6 @@ static struct charger_ops cx2589x_chg_ops = {
 	.set_mivr = cx2589x_set_input_volt_lim,
 	.get_mivr = cx2589x_get_input_volt_lim,
 	//.get_mivr_state = cx2589x_get_input_minvolt_lim,
-	/* ADC */
-	//.get_adc = mt6375_get_adc,
-	//.get_vbus_adc = mt6375_get_vbus,
-	//.get_ibus_adc = mt6375_get_ibus,
-	//.get_ibat_adc = mt6375_get_ibat,
-	//.get_tchg_adc = mt6375_get_tchg,
-	//.get_zcv = mt6375_get_zcv,
 	/* charing termination */
 	.set_eoc_current = cx2589x_set_term_curr,
 	//.enable_termination = mt6375_enable_te,
