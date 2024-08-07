@@ -571,11 +571,14 @@ static int boe_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 	void *handle, unsigned int level)
 {
 	char bl_tb0[] = {0x51, 0x07, 0xFF};
-	//unsigned int bl_lvl = 0xFF0E;
+	unsigned int bl_lvl = 0x07FF;
 	if (!cb)
 		return -1;
 
-	pr_info("%s: level=%d\n", __func__,level);
+	bl_lvl = level * 251 / 255;
+
+	pr_info("%s: level=%d, bl_lvl=%d\n", __func__, level, bl_lvl);
+
 
 /* 	if (is_hbm & (level > 0x6b8)) {
 		pr_info("%s: Enter hbm mode,return 0! level=%x\n", __func__, level);
@@ -584,8 +587,8 @@ static int boe_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
  */
 	//bl_lvl = ((level << 5) & 0xFF00) | (level & 0x0F);
 
-	bl_tb0[1] = (u8)((level >> 8) & 0x0F);
-	bl_tb0[2] = (u8)(level & 0xFF);
+	bl_tb0[1] = (u8)((bl_lvl >> 8) & 0x0F);
+	bl_tb0[2] = (u8)(bl_lvl & 0xFF);
 
 	cb(dsi, handle, bl_tb0, ARRAY_SIZE(bl_tb0));
 
