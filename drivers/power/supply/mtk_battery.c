@@ -160,6 +160,9 @@ int find_battery_sn(const char *target)
 {
 	for (int i = 0; i < BATTERY_SN_NUMBER; i++) {
 		if (strcmp(BatterySn[i], target) == 0) {
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+			FULL_PRODUCT_DEVICE_INFO(ID_BATTERY, BatterySn[i]);
+#endif
 			return i;
 		}
 	}

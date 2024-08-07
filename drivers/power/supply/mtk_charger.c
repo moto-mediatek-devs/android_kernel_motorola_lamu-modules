@@ -693,41 +693,41 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 		info->data.jeita_temp_above_t4_icurrent = val;
 	else {
 		chr_err("use default jeita_temp_above_t4_icurrent:0\n");
-		info->data.jeita_temp_above_t4_icurrent = 0;
+		info->data.jeita_temp_above_t4_icurrent = JEITA_TEMP_ABOVE_T4_CURRENT;
 	}
 	if (of_property_read_u32(np, "jeita_temp_t3_to_t4_icurrent", &val) >= 0)
 		info->data.jeita_temp_t3_to_t4_icurrent = val;
 	else {
 		chr_err("use default jeita_temp_t3_to_t4_icurrent:%d\n",
-			AC_CHARGER_CURRENT);
-		info->data.jeita_temp_t3_to_t4_icurrent = AC_CHARGER_CURRENT;
+			JEITA_TEMP_T3_TO_T4_CURRENT);
+		info->data.jeita_temp_t3_to_t4_icurrent = JEITA_TEMP_T3_TO_T4_CURRENT;
 	}
 	if (of_property_read_u32(np, "jeita_temp_t2_to_t3_icurrent", &val) >= 0)
 		info->data.jeita_temp_t2_to_t3_icurrent = val;
 	else {
 		chr_err("use default jeita_temp_t2_to_t3_icurrent:%d\n",
-			AC_CHARGER_CURRENT);
-		info->data.jeita_temp_t2_to_t3_icurrent = AC_CHARGER_CURRENT;
+			JEITA_TEMP_T2_TO_T3_CURRENT);
+		info->data.jeita_temp_t2_to_t3_icurrent = JEITA_TEMP_T2_TO_T3_CURRENT;
 	}
 	if (of_property_read_u32(np, "jeita_temp_t1_to_t2_icurrent", &val) >= 0)
 		info->data.jeita_temp_t1_to_t2_icurrent = val;
 	else {
 		chr_err("use default jeita_temp_t1_to_t2_icurrent:%d\n",
-			AC_CHARGER_CURRENT);
-		info->data.jeita_temp_t1_to_t2_icurrent = AC_CHARGER_CURRENT;
+			JEITA_TEMP_T1_TO_T2_CURRENT);
+		info->data.jeita_temp_t1_to_t2_icurrent = JEITA_TEMP_T1_TO_T2_CURRENT;
 	}
 	if (of_property_read_u32(np, "jeita_temp_t0_to_t1_icurrent", &val) >= 0)
 		info->data.jeita_temp_t0_to_t1_icurrent = val;
 	else {
 		chr_err("use default jeita_temp_t0_to_t1_icurrent:%d\n",
-			AC_CHARGER_CURRENT);
-		info->data.jeita_temp_t0_to_t1_icurrent = AC_CHARGER_CURRENT;
+			JEITA_TEMP_T0_TO_T1_CURRENT);
+		info->data.jeita_temp_t0_to_t1_icurrent = JEITA_TEMP_T0_TO_T1_CURRENT;
 	}
 	if (of_property_read_u32(np, "jeita_temp_below_t0_icurrent", &val) >= 0)
 		info->data.jeita_temp_below_t0_icurrent = val;
 	else {
 		chr_err("use default jeita_temp_below_t0_icurrent:0\n");
-		info->data.jeita_temp_below_t0_icurrent = 0;
+		info->data.jeita_temp_below_t0_icurrent = JEITA_TEMP_BELOW_T0_CURRENT;
 	}
 /* TN End modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
 /* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
@@ -736,7 +736,7 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 		info->data.hvdcp_temp_above_t4_icurrent = val;
 	else {
 		chr_err("use default hvdcp_temp_above_t4_icurrent:0\n");
-		info->data.hvdcp_temp_above_t4_icurrent = 0;
+		info->data.hvdcp_temp_above_t4_icurrent = HVDCP_TEMP_ABOVE_T4_CURRENT;
 	}
 
 	if (of_property_read_u32(np, "hvdcp_temp_t3_to_t4_icurrent", &val) >= 0)
@@ -744,7 +744,7 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 	else {
 		chr_err("use default hvdcp_temp_t3_to_t4_icurrent:%d\n",
 			HVDCP_CHARGER_CURRENT);
-		info->data.hvdcp_temp_t3_to_t4_icurrent = HVDCP_CHARGER_CURRENT;
+		info->data.hvdcp_temp_t3_to_t4_icurrent = HVDCP_TEMP_T3_TO_T4_CURRENT;
 	}
 
 	if (of_property_read_u32(np, "hvdcp_temp_t2_to_t3_icurrent", &val) >= 0)
@@ -752,7 +752,7 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 	else {
 		chr_err("use default hvdcp_temp_t2_to_t3_icurrent:%d\n",
 			HVDCP_CHARGER_CURRENT);
-		info->data.hvdcp_temp_t2_to_t3_icurrent = HVDCP_CHARGER_CURRENT;
+		info->data.hvdcp_temp_t2_to_t3_icurrent = HVDCP_TEMP_T2_TO_T3_CURRENT;
 	}
 
 	if (of_property_read_u32(np, "hvdcp_temp_t1_to_t2_icurrent", &val) >= 0)
@@ -760,7 +760,7 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 	else {
 		chr_err("use default hvdcp_temp_t1_to_t2_icurrent:%d\n",
 			HVDCP_CHARGER_CURRENT);
-		info->data.hvdcp_temp_t1_to_t2_icurrent = HVDCP_CHARGER_CURRENT;
+		info->data.hvdcp_temp_t1_to_t2_icurrent = HVDCP_TEMP_T1_TO_T2_CURRENT;
 	}
 
 	if (of_property_read_u32(np, "hvdcp_temp_t0_to_t1_icurrent", &val) >= 0)
@@ -768,14 +768,14 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 	else {
 		chr_err("use default hvdcp_temp_t0_to_t1_icurrent:%d\n",
 			HVDCP_CHARGER_CURRENT);
-		info->data.hvdcp_temp_t0_to_t1_icurrent = HVDCP_CHARGER_CURRENT;
+		info->data.hvdcp_temp_t0_to_t1_icurrent = HVDCP_TEMP_T0_TO_T1_CURRENT;
 	}
 
 	if (of_property_read_u32(np, "hvdcp_temp_below_t0_icurrent", &val) >= 0)
 		info->data.hvdcp_temp_below_t0_icurrent = val;
 	else {
 		chr_err("use default hvdcp_temp_below_t0_icurrent:0\n");
-		info->data.hvdcp_temp_below_t0_icurrent = 0;
+		info->data.hvdcp_temp_below_t0_icurrent = HVDCP_TEMP_BELOW_T0_CURRENT;
 	}
 
 	if (of_property_read_u32(np, "hvdcp_input_current_limit", &val) >= 0)

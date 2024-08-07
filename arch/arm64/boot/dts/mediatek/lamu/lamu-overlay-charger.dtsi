@@ -3,6 +3,16 @@
 #include <dt-bindings/phy/phy.h>
 #include <dt-bindings/pinctrl/mt6768-pinfunc.h>
 
+&lk_charger {
+	/* charging current */
+	usb_charger_current = <500000>;
+	ac_charger_current = <1500000>;
+	ac_charger_input_current = <3200000>;
+	non_std_ac_charger_current = <1500000>;
+	charging_host_charger_current = <1500000>;
+	ta_ac_charger_current = <1500000>;
+	pd_charger_current = <1500000>;
+};
 &charger {
 	battery_cv = <4500000>;
 	max_charger_voltage = <11000000>;
