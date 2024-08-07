@@ -455,6 +455,25 @@
 	trustonic,real-drv = <1>;
  };
 
+/* yangyong add SVP feature begin*/
+&mtkheap_region_svp {
+	status = "ok";
+};
+
+&mtkheap_region_wfd {
+	status = "ok";
+};
+
+&mtee_svp {
+	mtee: MTEE {
+		compatible = "mediatek,mtk_svp_on_mtee_support";
+	};
+	svp: SecureVideoPath {
+		compatible = "mediatek,mtk_sec_video_path_support";
+	};
+};
+/* yangyong add SVP feature end */
+
 /* DISPSYS GPIO standardization end*/
 
 #include <lamu/cust.dtsi>
