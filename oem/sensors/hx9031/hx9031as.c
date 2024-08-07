@@ -76,18 +76,18 @@ static uint8_t hx9031as_data_accuracy = 16;
 //hx9031as默认阈值设置值，请客户根据实测修改
 static struct hx9031as_near_far_threshold hx9031as_ch_thres[HX9031AS_CH_NUM] = {
 	{ .thr_near = 320, .thr_far = 320 }, //ch0
-	{ .thr_near = 320, .thr_far = 288 },
+	{ .thr_near = 192, .thr_far = 160 },
 	{ .thr_near = 640, .thr_far = 640 },
-	{ .thr_near = 160, .thr_far = 128 },
-	{ .thr_near = 160, .thr_far = 128 },
+	{ .thr_near = 96, .thr_far = 64 },
+	{ .thr_near = 224, .thr_far = 192 },
 };
 
 static struct hx9031as_near_far_threshold1 hx9031as_ch_thres1[HX9031AS_CH_NUM] = {
 	{ .thr_near = 640, .thr_far = 320 }, //ch0
-	{ .thr_near = 640, .thr_far = 288 },
+	{ .thr_near = 512, .thr_far = 480 },
 	{ .thr_near = 640, .thr_far = 640 },
-	{ .thr_near = 640, .thr_far = 128 },
-	{ .thr_near = 640, .thr_far = 128 },
+	{ .thr_near = 128, .thr_far = 96 },
+	{ .thr_near = 416, .thr_far = 384 },
 };
 
 static DEFINE_MUTEX(hx9031as_i2c_rw_mutex);
