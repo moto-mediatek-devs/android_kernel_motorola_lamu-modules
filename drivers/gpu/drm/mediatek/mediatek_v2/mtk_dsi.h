@@ -125,6 +125,7 @@ struct mtk_dsi {
 	struct clk *hs_clk;
 
 	u32 data_rate;
+	u32 data_rate_khz;
 	u32 d_rate;
 	u32 ulps_wakeup_prd;
 	u32 bdg_data_rate;
@@ -182,6 +183,9 @@ struct mtk_dsi {
 	unsigned int set_partial_update;
 	unsigned int roi_y_offset;
 	unsigned int roi_height;
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+	enum drm_connector_status connect_status;
+#endif
 };
 
 enum dsi_porch_type;

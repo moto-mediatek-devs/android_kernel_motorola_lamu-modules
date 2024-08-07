@@ -34,7 +34,7 @@ TRACE_EVENT(binder_vip_set,
 		__entry->b_vip_prio = b_vip_prio;
 		__entry->b_throttle = b_throttle;
 	),
-	TP_printk("%d -> %d: (%d, %d) / (%d, %d)",
+	TP_printk("%d -> %d: (%d, %d) -> (%d, %d)",
 		__entry->a_pid,
 		__entry->b_pid,
 		__entry->a_vip_prio,
@@ -44,32 +44,34 @@ TRACE_EVENT(binder_vip_set,
 );
 
 TRACE_EVENT(binder_vip_restore,
-	TP_PROTO(pid_t b_pid, int now_vip_prio, unsigned int now_throttle, int bavk_vip_prio,
-		unsigned int back_throttle),
-	TP_ARGS(b_pid, now_vip_prio, now_throttle, bavk_vip_prio, back_throttle),
+	TP_PROTO(pid_t b_pid, int restore_vip_prio),
+	TP_ARGS(b_pid, restore_vip_prio),
 
 	TP_STRUCT__entry(
 		__field(pid_t, b_pid)
-		__field(int, now_vip_prio)
-		__field(unsigned int, now_throttle)
-		__field(int, bavk_vip_prio)
-		__field(unsigned int, back_throttle)
+		__field(int, restore_vip_prio)
 	),
 	TP_fast_assign(
 		__entry->b_pid = b_pid;
-		__entry->now_vip_prio = now_vip_prio;
-		__entry->now_throttle = now_throttle;
-		__entry->bavk_vip_prio = bavk_vip_prio;
-		__entry->back_throttle = back_throttle;
+		__entry->restore_vip_prio = restore_vip_prio;
 	),
-	TP_printk("%d: (%d, %d)->(%d, %d)",
+	TP_printk("%d: restore to: %d",
 		__entry->b_pid,
-		__entry->now_vip_prio,
-		__entry->now_throttle,
-		__entry->bavk_vip_prio,
-		__entry->back_throttle)
+		__entry->restore_vip_prio)
 );
 
+TRACE_EVENT(turbo_feats_set,
+	TP_PROTO(unsigned int feats),
+	TP_ARGS(feats),
+
+	TP_STRUCT__entry(
+		__field(unsigned int, feats)
+	),
+	TP_fast_assign(
+		__entry->feats = feats;
+	),
+	TP_printk("feats=%d", __entry->feats)
+);
 
 TRACE_EVENT(turbo_set,
 	TP_PROTO(struct task_struct *p),
@@ -297,6 +299,36 @@ TRACE_EVENT(turbo_rtmutex_prepare_setprio,
 	TP_printk("original_prio=%d prio=%d",
 		__entry->original_prio,
 		__entry->prio)
+);
+
+TRACE_EVENT(turbo_vvip_set,
+	TP_PROTO(int pid),
+	TP_ARGS(pid),
+	TP_STRUCT__entry(
+		__field(int, pid)
+	),
+
+	TP_fast_assign(
+		__entry->pid = pid;
+	),
+
+	TP_printk("pid=%d",
+		__entry->pid)
+);
+
+TRACE_EVENT(turbo_vvip_unset,
+	TP_PROTO(int pid),
+	TP_ARGS(pid),
+	TP_STRUCT__entry(
+		__field(int, pid)
+	),
+
+	TP_fast_assign(
+		__entry->pid = pid;
+	),
+
+	TP_printk("pid=%d",
+		__entry->pid)
 );
 
 TRACE_EVENT(turbo_vip,

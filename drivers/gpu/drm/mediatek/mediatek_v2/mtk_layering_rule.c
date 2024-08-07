@@ -58,9 +58,6 @@ static uint16_t layer_mapping_table[HRT_TB_NUM] = {
 static uint16_t layer_mapping_table_mt6985[HRT_TB_NUM] = {
 	0x0003, 0x007E, 0x007A, 0x0001
 }; //0x0006:one OVL_2L, 0x007E:three OVL_2L
-static uint16_t layer_mapping_table_mt6899[HRT_TB_NUM] = {
-	0x0003, 0x001E, 0x001A, 0x0001
-}; //0x0006:one OVL_2L, 0x007E:three OVL_2L
 static uint16_t layer_mapping_table_vds_switch[HRT_TB_NUM] = {
 	0x0003, 0x0078, 0x0078, 0x0078
 };
@@ -84,9 +81,6 @@ static uint16_t ovl_mapping_table[HRT_TB_NUM] = {
 };
 static uint16_t ovl_mapping_table_mt6985[HRT_TB_NUM] = {
 	0x0002, 0x0055, 0x0055, 0x0001
-}; //0x0005:one OVL_2L, 0x0055:three OVL_2L
-static uint16_t ovl_mapping_table_mt6899[HRT_TB_NUM] = {
-	0x0002, 0x0015, 0x0015, 0x0001
 }; //0x0005:one OVL_2L, 0x0055:three OVL_2L
 static uint16_t ovl_mapping_tb_vds_switch[HRT_TB_NUM] = {
 	0x0002, 0x0045, 0x0045, 0x0045
@@ -592,9 +586,6 @@ static uint16_t get_mapping_table(struct drm_device *dev, int disp_idx, int disp
 				map = get_dynamic_mapping_table(dev, disp_idx, disp_list,
 						DISP_HW_OVL_TB, addon_data->hrt_type);
 			else {
-				if (priv->data->mmsys_id == MMSYS_MT6899)
-					map = ovl_mapping_table_mt6899[addon_data->hrt_type];
-				else
 					map = ovl_mapping_table_mt6985[addon_data->hrt_type];
 			}
 		else if (priv->data->ovl_exdma_rule)
@@ -629,9 +620,6 @@ static uint16_t get_mapping_table(struct drm_device *dev, int disp_idx, int disp
 					tmp_map = get_dynamic_mapping_table(dev, disp_idx,
 						disp_list, DISP_HW_LAYER_TB, addon_data->hrt_type);
 				else {
-					if (priv->data->mmsys_id == MMSYS_MT6899)
-						tmp_map = layer_mapping_table_mt6899[addon_data->hrt_type];
-					else
 						tmp_map = layer_mapping_table_mt6985[addon_data->hrt_type];
 				}
 			else
@@ -706,6 +694,7 @@ void mtk_layering_rule_init(struct drm_device *dev)
 		path_data = mtk_addon_module_get_path(module_data->module);
 
 		if(private->data->mmsys_id != MMSYS_MT6991 &&
+			private->data->mmsys_id != MMSYS_MT6899 &&
 			private->data->mmsys_id != MMSYS_MT6989) {
 			comp = private->ddp_comp[module_data->attach_comp];
 			if (!comp) {
@@ -1221,4 +1210,5 @@ static struct layering_rule_ops l_rule_ops = {
 	.fbdc_adjust_layout = fbdc_adjust_layout,
 	.fbdc_restore_layout = fbdc_restore_layout,
 	.fbdc_rule = filter_by_fbdc,
+	.layering_get_valid_hrt = layering_get_valid_hrt,
 };

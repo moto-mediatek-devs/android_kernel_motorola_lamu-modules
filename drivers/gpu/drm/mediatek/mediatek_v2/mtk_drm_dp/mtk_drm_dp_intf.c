@@ -30,6 +30,9 @@
 #include "../mtk_drm_drv.h"
 
 #include "mtk_drm_dp_intf_regs.h"
+#include "mtk_drm_dp_common.h"
+
+extern struct mtk_dp *g_mtk_dp;
 
 enum mtk_dpi_out_bit_num {
 	MTK_DPI_OUT_BIT_NUM_8BITS,
@@ -1309,6 +1312,16 @@ static int mtk_dpintf_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		*base_bw = mtk_dpintf_get_frame_hrt_bw_base_by_mode(mtk_crtc, dp_intf);
 	}
 		break;
+	case CONNECTOR_IS_ENABLE:
+	{
+		unsigned int *connector_enable =
+			(unsigned int *)params;
+		if (g_mtk_dp) {
+			*connector_enable = g_mtk_dp->dp_ready;
+			DDPMSG("connect status:%d\n", g_mtk_dp->dp_ready);
+		}
+	}
+		break;
 	default:
 		break;
 	}
@@ -1331,11 +1344,11 @@ static irqreturn_t mtk_dp_intf_irq_status(int irq, void *dev_id)
 	status &= 0xf;
 	if (status) {
 		mtk_dpi_mask(dpi, DPI_INTSTA, 0, status);
-		if (status & INT_VSYNC_STA)
+		if (mtk_crtc && (status & INT_VSYNC_STA))
 			mtk_crtc_vblank_irq(&mtk_crtc->base);
 
 		if (status & INT_UNDERFLOW_STA)
-			DDPMSG("[E]%s dpintf underflow!\n", __func__);
+			DDPDBG("[E]%s dpintf underflow!\n", __func__);
 	}
 
 	return IRQ_HANDLED;

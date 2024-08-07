@@ -1785,6 +1785,8 @@ int mdrv_DPTx_TrainingFlow(struct mtk_dp *mtk_dp, u8 ubLaneRate, u8 ubLaneCount)
 
 	mhal_DPTx_SetTxLane(mtk_dp, ubTargetLaneCount);
 	mhal_DPTx_SetTxRate(mtk_dp, ubTargetLinkRate);
+	if (g_mtk_dp->priv->data->mmsys_id == MMSYS_MT6899)
+		mhal_DPTx_PHYD_Reset(mtk_dp);
 
 	do {
 		ubTrainRetryTimes++;
@@ -2731,7 +2733,8 @@ void mdrv_DPTx_I2S_Audio_Config(struct mtk_dp *mtk_dp)
 
 	if (g_mtk_dp->priv->data->mmsys_id != MMSYS_MT6897
 		&& g_mtk_dp->priv->data->mmsys_id != MMSYS_MT6989
-		&& g_mtk_dp->priv->data->mmsys_id != MMSYS_MT6991)
+		&& g_mtk_dp->priv->data->mmsys_id != MMSYS_MT6991
+		&& g_mtk_dp->priv->data->mmsys_id != MMSYS_MT6899)
 		mhal_DPTx_Audio_PG_EN(mtk_dp, ucChannel, ucFs, false);
 	else
 		mhal_DPTx_Audio_TDM_PG_EN(mtk_dp, ucChannel, ucFs, false);//DPTX audio for TDM

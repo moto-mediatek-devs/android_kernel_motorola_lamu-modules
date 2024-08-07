@@ -52,6 +52,7 @@ LIST_HEAD(hmp_domains);
 #define TURBO_ENABLE		1
 #define TURBO_DISABLE		0
 #define INHERIT_THRESHOLD	4
+#define VIP_PRIO_OFFSET		5
 #define type_offset(type)		 (type * 4)
 #define task_turbo_nice(nice) (nice == 0xbeef || nice == 0xbeee)
 #define task_restore_nice(nice) (nice == 0xbeee)
@@ -62,6 +63,10 @@ LIST_HEAD(hmp_domains);
 		list_for_each_entry_reverse(hmpd, &hmp_domains, hmp_domains)
 #define hmp_cpu_domain(cpu)     (per_cpu(hmp_cpu_domain, (cpu)))
 
+#define is_VIP_basic(vts) (vts->basic_vip)
+#define is_VVIP(vts) (vts->vvip)
+#define is_priority_based_vip(vts) ((vts->priority_based_prio <= MAX_PRIORITY_BASED_VIP) &&	\
+	(vts->priority_based_prio >= MIN_PRIORITY_BASED_VIP))
 /*
  * Unsigned subtract and clamp on underflow.
  *
@@ -126,13 +131,9 @@ static void rwsem_list_add(struct task_struct *task, struct list_head *entry,
 static bool binder_start_turbo_inherit(struct task_struct *from,
 					struct task_struct *to);
 static void binder_stop_turbo_inherit(struct task_struct *p);
-void (*binder_start_vip_inherit_hook)(int to_pid,
-					int ori_to_vip_prio, int desired_vip_prio,
-					unsigned int desired_throttle_time) = NULL;
+void (*binder_start_vip_inherit_hook)(int to_pid, int inherited_vip_prio) = NULL;
 EXPORT_SYMBOL(binder_start_vip_inherit_hook);
-void (*binder_stop_vip_inherit_hook)(int pid,
-				int back_prio, int now_prio,
-				unsigned int back_throttle_time) = NULL;
+void (*binder_stop_vip_inherit_hook)(int pid, int inherited_vip_prio) = NULL;
 EXPORT_SYMBOL(binder_stop_vip_inherit_hook);
 static inline struct task_struct *rwsem_owner(struct rw_semaphore *sem);
 static inline bool rwsem_test_oflags(struct rw_semaphore *sem, long flags);
@@ -167,7 +168,7 @@ static int avg_cpu_loading;
 static int cpu_loading_thres = 95;
 static int tt_vip_enable = 1;
 static int binder_vip_inheritance_enable = 1;
-static int binder_nonvip_inheritance_enable = 1;
+static int binder_nonvip_inheritance_enable;
 static struct cpu_info ci;
 static u64 checked_timestamp;
 static int max_cpus;
@@ -1073,36 +1074,50 @@ bool binder_start_vip_inherit(struct task_struct *from,
 	struct task_turbo_t *to_turbo_data;
 	struct vip_task_struct *vts_from;
 	struct vip_task_struct *vts_to;
-	int ori_to_vip_prio, desired_vip_prio;
-	unsigned int ori_throttle_time, desired_throttle_time;
+	int inherited_vip_prio;
 	int to_pid;
 
 	if (!from || !to)
 		goto done;
 
-	desired_vip_prio = get_vip_task_prio(from);
-	if (!binder_nonvip_inheritance_enable && desired_vip_prio == -1)
-		goto done;
-
+	inherited_vip_prio = get_vip_task_prio(from);
 	vts_from = get_vip_t(from);
-	vts_to = get_vip_t(to);
+	if (inherited_vip_prio == NOT_VIP) {
+		if (!rt_task(from))
+			goto done;
+		if (is_VVIP(vts_from))
+			inherited_vip_prio = VVIP;
+		else if (is_priority_based_vip(vts_from))
+			inherited_vip_prio = vts_from->priority_based_prio;
+		else if (is_VIP_basic(vts_from))
+			inherited_vip_prio = WORKER_VIP;
+		else
+			goto done;
+	}
 	to_turbo_data = get_task_turbo_t(to);
-	ori_to_vip_prio = get_vip_task_prio(to);
-	ori_throttle_time = vts_to->throttle_time;
-	desired_throttle_time = vts_from->throttle_time;
-	to_pid = to->pid;
-
-	trace_binder_vip_set(from->pid, to_pid, desired_vip_prio,desired_throttle_time,
-					ori_to_vip_prio, ori_throttle_time);
-
-	if (desired_vip_prio == ori_to_vip_prio &&
-		desired_throttle_time == ori_throttle_time)
+	if (to_turbo_data->vip_prio_backup != 0)
 		goto done;
 
-	to_turbo_data->vip_prio_backup = ori_to_vip_prio;
-	to_turbo_data->throttle_time_backup = ori_throttle_time;
-	binder_start_vip_inherit_hook(to_pid, ori_to_vip_prio,
-				desired_vip_prio, desired_throttle_time/1000000);
+	if (get_vip_task_prio(to) == inherited_vip_prio)
+		goto done;
+
+	vts_to = get_vip_t(to);
+	if (inherited_vip_prio == VVIP) {
+		if (is_VVIP(vts_to))
+			goto done;
+	} else if (inherited_vip_prio == WORKER_VIP) {
+		if (is_VIP_basic(vts_to))
+			goto done;
+	} else {
+		if (is_priority_based_vip(vts_to) && (vts_to->priority_based_prio==inherited_vip_prio))
+			goto done;
+	}
+	to_pid = to->pid;
+	to_turbo_data->vip_prio_backup = inherited_vip_prio + VIP_PRIO_OFFSET;
+	trace_binder_vip_set(from->pid, to_pid, inherited_vip_prio, vts_from->throttle_time,
+					get_vip_task_prio(to), vts_to->throttle_time);
+	binder_start_vip_inherit_hook(to_pid, inherited_vip_prio);
+	vts_to->throttle_time = vts_from->throttle_time;
 	return true;
 done:
 	return false;
@@ -1111,26 +1126,18 @@ done:
 void binder_stop_vip_inherit(struct task_struct *p)
 {
 	struct task_turbo_t *turbo_data;
-	struct vip_task_struct *vts;
 	int pid;
-	int back_prio, now_prio;
-	unsigned int back_throttle_time, now_throttle_time;
+	int inherited_vip_prio;
 
 	turbo_data = get_task_turbo_t(p);
-	back_prio = turbo_data->vip_prio_backup;
-	if (back_prio == -2)
+	inherited_vip_prio = turbo_data->vip_prio_backup;
+	if (inherited_vip_prio == 0)
 		return;
-
-	vts = get_vip_t(p);
+	inherited_vip_prio -= VIP_PRIO_OFFSET;
 	pid = p->pid;
-	now_prio = get_vip_task_prio(p);
-	back_throttle_time = turbo_data->throttle_time_backup;
-	now_throttle_time = vts->throttle_time;
-
-	trace_binder_vip_restore(pid, now_prio, now_throttle_time, back_prio, back_throttle_time);
-	binder_stop_vip_inherit_hook(pid, back_prio, now_prio, back_throttle_time/1000000);
-	turbo_data->vip_prio_backup = -2;
-	turbo_data->throttle_time_backup = 12000000;
+	trace_binder_vip_restore(pid, inherited_vip_prio);
+	binder_stop_vip_inherit_hook(pid, inherited_vip_prio);
+	turbo_data->vip_prio_backup = 0;
 }
 
 static void probe_android_vh_binder_set_priority(void *ignore, struct binder_transaction *t,
@@ -1529,12 +1536,20 @@ static void rwsem_list_add(struct task_struct *task,
 		struct list_head *pos = NULL;
 		struct list_head *n = NULL;
 		struct rwsem_waiter *waiter = NULL;
+		struct rwsem_waiter *entry_waiter;
 
-		/* insert turbo task pior to first non-turbo task */
+		/*
+		 * Insert turbo task prior to first non-turbo task.
+		 * Make sure only the first waiter can have its handoff_set
+		 * set here.
+		 */
+		entry_waiter = list_entry(entry, struct rwsem_waiter, list);
 		list_for_each_safe(pos, n, head) {
 			waiter = list_entry(pos,
 					struct rwsem_waiter, list);
 			if (!is_turbo_task(waiter->task)) {
+				entry_waiter->handoff_set = waiter->handoff_set;
+				waiter->handoff_set = false;
 				list_add(entry, waiter->list.prev);
 				return;
 			}
@@ -1644,8 +1659,10 @@ static inline void set_scheduler_tuning(struct task_struct *task)
 
 	/* trigger renice for turbo task */
 	set_user_nice(task, 0xbeef);
-	if (tt_vip_enable)
+	if (tt_vip_enable) {
 		set_task_vvip_and_throttle(task_pid_nr(task), 60);
+		trace_turbo_vvip_set(task_pid_nr(task));
+	}
 
 	trace_sched_turbo_nice_set(task, NICE_TO_PRIO(cur_nice), task->prio);
 }
@@ -1660,6 +1677,7 @@ static inline void unset_scheduler_tuning(struct task_struct *task)
 	set_user_nice(task, 0xbeee);
 	unset_task_vvip(task_pid_nr(task));
 
+	trace_turbo_vvip_unset(task_pid_nr(task));
 	trace_sched_turbo_nice_set(task, cur_prio, task->prio);
 }
 
@@ -1778,8 +1796,8 @@ static void init_turbo_attr(struct task_struct *p)
 	turbo_data->render = 0;
 	atomic_set(&(turbo_data->inherit_types), 0);
 	turbo_data->inherit_cnt = 0;
-	turbo_data->vip_prio_backup = -2;
-	turbo_data->throttle_time_backup = 12000000;
+	turbo_data->vip_prio_backup = 0;
+	turbo_data->throttle_time_backup = 0;
 }
 
 int get_turbo_feats(void)
@@ -1862,9 +1880,11 @@ static int set_task_turbo_feats(const char *buf,
 	}
 	spin_unlock(&TURBO_SPIN_LOCK);
 
-	if (!ret)
+	if (!ret) {
 		pr_info("%s: task_turbo_feats is change to %d successfully",
 				TAG, task_turbo_feats);
+		trace_turbo_feats_set(task_turbo_feats);
+	}
 	return ret;
 }
 

@@ -188,8 +188,14 @@ struct mtk_iommu_data {
 	struct mtk_smi_larb_iommu	larb_imu[MTK_LARB_NR_MAX];
 };
 
+struct mtk_iommu_mm_pm_ops {
+	int (*pm_get)(void);
+	int (*pm_put)(void);
+};
+
 struct mtk_iommu_ops {
 	int (*update_pm_status)(u32 type, u32 id, bool pm_sta);
+	void (*set_pm_ops)(const struct mtk_iommu_mm_pm_ops *ops);
 };
 
 static inline int compare_of(struct device *dev, void *data)

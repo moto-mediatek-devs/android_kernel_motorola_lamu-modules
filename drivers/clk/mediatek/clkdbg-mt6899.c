@@ -262,14 +262,11 @@ const char * const *get_mt6899_all_clk_names(void)
 		"ufsao_unipro_sys",
 		"ufsao_u_phy_sap",
 		"ufsao_u_phy_ahb_s_busck",
-		"ufsao_u_ao_26m_ck",
 
 		/* ufscfg_pdn */
 		"ufspdn_ufshci_ufs",
 		"ufspdn_ufshci_aes",
 		"ufspdn_ufshci_u_ahb",
-		"ufspdn_ufshci_u_axi",
-		"ufspdn_u_26m_ck",
 
 		/* imp_iic_wrap_en */
 		"impen_i3c2",
@@ -510,22 +507,15 @@ const char * const *get_mt6899_all_clk_names(void)
 		"img_vcore_img_26m",
 
 		/* vdec_soc_gcon_base */
-		"vde1_larb1_cken",
 		"vde1_lat_cken",
 		"vde1_lat_active",
-		"vde1_lat_cken_eng",
 		"vde1_vdec_cken",
 		"vde1_vdec_active",
-		"vde1_vdec_cken_eng",
 
 		/* vdec_gcon_base */
-		"vde2_larb1_cken",
 		"vde2_lat_cken",
-		"vde2_lat_active",
-		"vde2_lat_cken_eng",
 		"vde2_vdec_cken",
 		"vde2_vdec_active",
-		"vde2_vdec_cken_eng",
 
 		/* venc_gcon */
 		"ven1_larb",
@@ -692,11 +682,6 @@ const char * const *get_mt6899_all_clk_names(void)
 		"camv_cv_cam2mm0_subc_dis",
 		"camv_cv_mm0_subc_dis",
 
-		/* mminfra_ao_config */
-		"mminfra_ao_gce_d",
-		"mminfra_ao_gce_m",
-		"mminfra_ao_gce_26m",
-
 		/* mdpsys_config */
 		"mdp_mutex0",
 		"mdp_apb_bus",
@@ -713,6 +698,7 @@ const char * const *get_mt6899_all_clk_names(void)
 		"mdp_apb_db",
 		"mdp_birsz0",
 		"mdp_c3d0",
+		"mdp_f26m_slow_ck",
 
 		/* mdpsys1_config */
 		"mdp1_mdp_mutex0",
@@ -735,6 +721,7 @@ const char * const *get_mt6899_all_clk_names(void)
 		"mdp1_mdp_birsz0",
 		"mdp1_mdp_c3d0",
 		"mdp1_mdp_fg0",
+		"mdp1_f26m_slow_ck",
 
 		/* ccipll_pll_ctrl */
 		"ccipll",

@@ -500,22 +500,31 @@ struct mml_frame_config {
 	struct list_head entry;
 	struct mml_frame_info info;
 	enum mml_sys_id sysid;		/* main mmlsys used for this config */
-	/* frame input pixel size after rrot binning and rotate */
-	struct mml_frame_size frame_in;		/* source size, w/ rrot bin and rrot rotate */
-	struct mml_crop frame_in_crop[MML_MAX_OUTPUTS];	/* frame_in w/ crop */
-	struct mml_frame_size rrot_out[MML_PIPE_CNT];	/* dual rrot to merge split size */
-	struct mml_frame_size frame_in_hdr;	/* hdr/aal input frame size, maybe rsz out in dl */
-	struct mml_frame_size frame_tile_sz;	/* rdma/rrot to downstream tile size */
+
+	/* frame input image size after rrot binning and rotate */
+	struct mml_frame_size frame_in;
+	/* frame input crop size after rrot binning and rotate by output */
+	struct mml_crop frame_in_crop[MML_MAX_OUTPUTS];
+	/* rrot output tile size to merge by pipe */
+	struct mml_frame_size rrot_out[MML_PIPE_CNT];
+	/* hdr, aal, and c3d input size from rdma or rsz */
+	struct mml_frame_size frame_in_hdr;
+	/* frame input pixel size (tile full size) after rrot binning and rotate,
+	 * and crop offset, round up, and alignment.
+	 */
+	struct mml_frame_size frame_tile_sz;
 	/* binning level config by: 2'd0: 1; 2'd1: 2; 2'd2: 4; 2'd3: 8 */
 	u8 bin_x;
 	u8 bin_y;
+	/* frame output rotate/flip on wrot */
 	u8 out_rotate[MML_MAX_OUTPUTS];
 	bool out_flip[MML_MAX_OUTPUTS];
-	/* frame output pixel size */
+	/* frame output image size before wrot rotate */
 	struct mml_frame_size frame_out[MML_MAX_OUTPUTS];
 	/* direct-link input roi offset and output rect */
 	struct mml_rect dl_in[MML_PIPE_CNT];
 	struct mml_rect dl_out[MML_PIPE_CNT];
+
 	struct list_head tasks;
 	struct list_head await_tasks;
 	struct list_head done_tasks;
@@ -698,6 +707,8 @@ struct mml_task {
 
 	/* make command cache labels for reuse command */
 	struct mml_task_reuse reuse[MML_PIPE_CNT];
+	struct cmdq_poll_reuse dpc_reuse_sys;
+	struct cmdq_poll_reuse dpc_reuse_mutex;
 
 	/* config and done on thread */
 	struct kthread_work work_config[MML_PIPE_CNT];
@@ -821,7 +832,7 @@ struct mml_comp_hw_ops {
 			      struct mml_comp_config *ccfg);
 	void (*qos_set)(struct mml_comp *comp, struct mml_task *task,
 			struct mml_comp_config *ccfg, u32 throughput, u32 tput_up);
-	void (*qos_clear)(struct mml_comp *comp, bool dpc);
+	void (*qos_clear)(struct mml_comp *comp, struct mml_task *task, bool dpc);
 	void (*task_done)(struct mml_comp *comp, struct mml_task *task,
 			  struct mml_comp_config *ccfg);
 };
@@ -846,6 +857,8 @@ struct mml_comp {
 	s32 clk_cnt;
 	u32 srt_bw;
 	u32 hrt_bw;
+	u32 stash_srt_bw;
+	u32 stash_hrt_bw;
 	struct icc_path *icc_path;
 	struct icc_path *icc_dpc_path;
 	struct icc_path *icc_stash_path;

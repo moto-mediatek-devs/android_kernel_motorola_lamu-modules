@@ -21,8 +21,8 @@
 #define EVT_LEN				40
 #define PWR_ID_SHIFT			0
 #define PWR_STA_SHIFT			8
-#define HWV_INT_MTCMOS_TRIGGER		0x0008
-#define HWV_IRQ_STATUS			0x0500
+#define HWV_INT_MTCMOS_TRIGGER		0x80000
+#define HWV_IRQ_STATUS			0x1500
 
 static DEFINE_SPINLOCK(pwr_trace_lock);
 static unsigned int pwr_event[EVT_LEN];
@@ -367,24 +367,17 @@ struct pd_check_swcg img_vcore_d1a_swcgs[] = {
 };
 /* vdec_soc_gcon_base */
 struct pd_check_swcg vdec_soc_gcon_base_swcgs[] = {
-	SWCG("vde1_larb1_cken"),
 	SWCG("vde1_lat_cken"),
 	SWCG("vde1_lat_active"),
-	SWCG("vde1_lat_cken_eng"),
 	SWCG("vde1_vdec_cken"),
 	SWCG("vde1_vdec_active"),
-	SWCG("vde1_vdec_cken_eng"),
 	SWCG(NULL),
 };
 /* vdec_gcon_base */
 struct pd_check_swcg vdec_gcon_base_swcgs[] = {
-	SWCG("vde2_larb1_cken"),
 	SWCG("vde2_lat_cken"),
-	SWCG("vde2_lat_active"),
-	SWCG("vde2_lat_cken_eng"),
 	SWCG("vde2_vdec_cken"),
 	SWCG("vde2_vdec_active"),
-	SWCG("vde2_vdec_cken_eng"),
 	SWCG(NULL),
 };
 /* venc_gcon */
@@ -553,13 +546,6 @@ struct pd_check_swcg cam_vcore_r1a_swcgs[] = {
 	SWCG("camv_cv_mm0_subc_dis"),
 	SWCG(NULL),
 };
-/* mminfra_ao_config */
-struct pd_check_swcg mminfra_ao_config_swcgs[] = {
-	SWCG("mminfra_ao_gce_d"),
-	SWCG("mminfra_ao_gce_m"),
-	SWCG("mminfra_ao_gce_26m"),
-	SWCG(NULL),
-};
 /* mdpsys_config */
 struct pd_check_swcg mdpsys_config_swcgs[] = {
 	SWCG("mdp_mutex0"),
@@ -577,6 +563,7 @@ struct pd_check_swcg mdpsys_config_swcgs[] = {
 	SWCG("mdp_apb_db"),
 	SWCG("mdp_birsz0"),
 	SWCG("mdp_c3d0"),
+	SWCG("mdp_f26m_slow_ck"),
 	SWCG(NULL),
 };
 /* mdpsys1_config */
@@ -601,6 +588,7 @@ struct pd_check_swcg mdpsys1_config_swcgs[] = {
 	SWCG("mdp1_mdp_birsz0"),
 	SWCG("mdp1_mdp_c3d0"),
 	SWCG("mdp1_mdp_fg0"),
+	SWCG("mdp1_f26m_slow_ck"),
 	SWCG(NULL),
 };
 
@@ -630,25 +618,24 @@ struct subsys_cgs_check mtk_subsys_check[] = {
 	{MT6899_CHK_PD_ISP_TRAW, MT6899_CHK_PD_ISP_MAIN, traw_dip1_swcgs, traw_dip1},
 	{MT6899_CHK_PD_ISP_TRAW, MT6899_CHK_PD_ISP_MAIN, traw_cap_dip1_swcgs, traw_cap_dip1},
 	{MT6899_CHK_PD_ISP_MAIN, MT6899_CHK_PD_ISP_VCORE, img_vcore_d1a_swcgs, img_v},
-	{MT6899_CHK_PD_VDE1, MT6899_CHK_PD_MM_INFRA, vdec_soc_gcon_base_swcgs, vde1},
-	{MT6899_CHK_PD_VDE0, MT6899_CHK_PD_MM_INFRA, vdec_gcon_base_swcgs, vde2},
+	{MT6899_CHK_PD_VDE0, MT6899_CHK_PD_MM_INFRA, vdec_soc_gcon_base_swcgs, vde1},
+	{MT6899_CHK_PD_VDE1, MT6899_CHK_PD_VDE0, vdec_gcon_base_swcgs, vde2},
 	{MT6899_CHK_PD_VEN0, MT6899_CHK_PD_MM_INFRA, venc_gcon_swcgs, ven1},
 	{MT6899_CHK_PD_VEN1, MT6899_CHK_PD_VEN0, venc_gcon_core1_swcgs, ven2},
-	{MT6899_CHK_PD_CAM_VCORE, MT6899_CHK_PD_MM_INFRA, cam_main_r1a_swcgs, cam_m},
-	{MT6899_CHK_PD_CAM_MAIN, MT6899_CHK_PD_CAM_VCORE, camsys_mraw_swcgs, cam_mr},
-	{MT6899_CHK_PD_CAM_MAIN, MT6899_CHK_PD_CAM_VCORE, camsys_ipe_swcgs, camsys_ipe},
-	{MT6899_CHK_PD_CAM_MAIN, MT6899_CHK_PD_CAM_VCORE, camsys_rawa_swcgs, cam_ra},
-	{MT6899_CHK_PD_CAM_MAIN, MT6899_CHK_PD_CAM_VCORE, camsys_rmsa_swcgs, camsys_rmsa},
-	{MT6899_CHK_PD_CAM_MAIN, MT6899_CHK_PD_CAM_VCORE, camsys_yuva_swcgs, cam_ya},
-	{MT6899_CHK_PD_CAM_MAIN, MT6899_CHK_PD_CAM_VCORE, camsys_rawb_swcgs, cam_rb},
-	{MT6899_CHK_PD_CAM_MAIN, MT6899_CHK_PD_CAM_VCORE, camsys_rmsb_swcgs, camsys_rmsb},
-	{MT6899_CHK_PD_CAM_MAIN, MT6899_CHK_PD_CAM_VCORE, camsys_yuvb_swcgs, cam_yb},
-	{MT6899_CHK_PD_CAM_MAIN, MT6899_CHK_PD_CAM_VCORE, camsys_rawc_swcgs, cam_rc},
-	{MT6899_CHK_PD_CAM_MAIN, MT6899_CHK_PD_CAM_VCORE, camsys_rmsc_swcgs, camsys_rmsc},
-	{MT6899_CHK_PD_CAM_MAIN, MT6899_CHK_PD_CAM_VCORE, camsys_yuvc_swcgs, cam_yc},
-	{MT6899_CHK_PD_CAM_VCORE, MT6899_CHK_PD_MM_INFRA, ccu_main_swcgs, ccu},
-	{MT6899_CHK_PD_CAM_MAIN, MT6899_CHK_PD_CAM_VCORE, cam_vcore_r1a_swcgs, camv},
-	{MT6899_CHK_PD_MM_INFRA, PD_NULL, mminfra_ao_config_swcgs, mminfra_ao_config},
+	{MT6899_CHK_PD_CAM_MAIN, MT6899_CHK_PD_CAM_VCORE, cam_main_r1a_swcgs, cam_m},
+	{MT6899_CHK_PD_CAM_MRAW, MT6899_CHK_PD_CAM_MAIN, camsys_mraw_swcgs, cam_mr},
+	{MT6899_CHK_PD_CAM_MRAW, MT6899_CHK_PD_CAM_MAIN, camsys_ipe_swcgs, camsys_ipe},
+	{MT6899_CHK_PD_CAM_SUBA, MT6899_CHK_PD_CAM_MAIN, camsys_rawa_swcgs, cam_ra},
+	{MT6899_CHK_PD_CAM_SUBA, MT6899_CHK_PD_CAM_MAIN, camsys_rmsa_swcgs, camsys_rmsa},
+	{MT6899_CHK_PD_CAM_SUBA, MT6899_CHK_PD_CAM_MAIN, camsys_yuva_swcgs, cam_ya},
+	{MT6899_CHK_PD_CAM_SUBB, MT6899_CHK_PD_CAM_MAIN, camsys_rawb_swcgs, cam_rb},
+	{MT6899_CHK_PD_CAM_SUBB, MT6899_CHK_PD_CAM_MAIN, camsys_rmsb_swcgs, camsys_rmsb},
+	{MT6899_CHK_PD_CAM_SUBB, MT6899_CHK_PD_CAM_MAIN, camsys_yuvb_swcgs, cam_yb},
+	{MT6899_CHK_PD_CAM_SUBC, MT6899_CHK_PD_CAM_MAIN, camsys_rawc_swcgs, cam_rc},
+	{MT6899_CHK_PD_CAM_SUBC, MT6899_CHK_PD_CAM_MAIN, camsys_rmsc_swcgs, camsys_rmsc},
+	{MT6899_CHK_PD_CAM_SUBC, MT6899_CHK_PD_CAM_MAIN, camsys_yuvc_swcgs, cam_yc},
+	{MT6899_CHK_PD_CAM_CCU, MT6899_CHK_PD_CAM_VCORE, ccu_main_swcgs, ccu},
+	{MT6899_CHK_PD_CAM_VCORE, MT6899_CHK_PD_MM_INFRA, cam_vcore_r1a_swcgs, camv},
 	{MT6899_CHK_PD_MML0, MT6899_CHK_PD_DIS1, mdpsys_config_swcgs, mdp},
 	{MT6899_CHK_PD_MML1, MT6899_CHK_PD_DIS1, mdpsys1_config_swcgs, mdp1},
 };
@@ -743,14 +730,17 @@ static enum chk_sys_id debug_dump_id[] = {
 	mfgsc_ao,
 	vlpcfg,
 	vlp_ck,
-	hfrp,
-	hfrp_bus,
+	vlp_ao,
 	cci,
 	cpu_ll,
 	cpu_bl,
 	cpu_b,
 	ptp,
 	hwv,
+	mm_hwv,
+	hfrp,
+	hfrp_bus,
+	mminfra_hwvote,
 	chk_sys_num,
 };
 
@@ -891,13 +881,6 @@ static u32 get_pd_pwr_status(int pd_id)
 }
 
 static int off_mtcmos_id[] = {
-	PD_NULL,
-};
-
-static int notice_mtcmos_id[] = {
-	MT6899_CHK_PD_PERI_USB0,
-	MT6899_CHK_PD_ADSP_INFRA,
-	MT6899_CHK_PD_ADSP_AO,
 	MT6899_CHK_PD_ISP_TRAW,
 	MT6899_CHK_PD_ISP_DIP1,
 	MT6899_CHK_PD_ISP_MAIN,
@@ -923,9 +906,16 @@ static int notice_mtcmos_id[] = {
 	MT6899_CHK_PD_MM_INFRA,
 	MT6899_CHK_PD_DP_TX,
 	MT6899_CHK_PD_CSI_RX,
+	PD_NULL,
+};
+
+static int notice_mtcmos_id[] = {
 	MT6899_CHK_PD_MD1,
 	MT6899_CHK_PD_CONN,
+	MT6899_CHK_PD_PERI_USB0,
 	MT6899_CHK_PD_PERI_AUDIO,
+	MT6899_CHK_PD_ADSP_INFRA,
+	MT6899_CHK_PD_ADSP_AO,
 	MT6899_CHK_PD_ADSP_TOP,
 	PD_NULL,
 };
@@ -983,6 +973,17 @@ static void check_hwv_irq_sta(void)
 		debug_dump(MT6899_CHK_PD_NUM, 0);
 }
 
+static void check_mm_hwv_irq_sta(void)
+{
+	u32 irq_sta;
+
+	irq_sta = get_mt6899_reg_value(mm_hwv, HWV_IRQ_STATUS);
+	pr_notice("mm hwv irq: %x\n", irq_sta);
+
+	if ((irq_sta & HWV_INT_MTCMOS_TRIGGER) == HWV_INT_MTCMOS_TRIGGER)
+		debug_dump(MT6899_CHK_PD_NUM, 0);
+}
+
 /*
  * init functions
  */
@@ -1003,6 +1004,7 @@ static struct pdchk_ops pdchk_mt6899_ops = {
 	.dump_power_event = dump_power_event,
 	.is_suspend_retry_stop = pdchk_is_suspend_retry_stop,
 	.check_hwv_irq_sta = check_hwv_irq_sta,
+	.check_mm_hwv_irq_sta = check_mm_hwv_irq_sta,
 };
 
 static int pd_chk_mt6899_probe(struct platform_device *pdev)

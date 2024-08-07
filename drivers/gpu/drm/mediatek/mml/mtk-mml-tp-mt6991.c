@@ -1000,13 +1000,14 @@ static inline bool tp_need_resize(struct mml_frame_info *info, bool *can_binning
 
 	/* for binning */
 	if (mml_binning && info->mode == MML_MODE_DIRECT_LINK) {
-		if (can_binning && (cw >= w * 2 || ch >= h * 2))
+		if (can_binning && (cw >= w * 2 || ch >= h * 2) &&
+			MML_FMT_YUV420(info->src.format)) {
 			*can_binning = true;
-
-		if (cw >= w * 2)
-			cw = cw / 2;
-		if (ch >= h * 2)
-			ch = ch / 2;
+			if (cw >= w * 2)
+				cw = cw / 2;
+			if (ch >= h * 2)
+				ch = ch / 2;
+		}
 	}
 
 	return info->dest_cnt != 1 ||
@@ -1244,8 +1245,7 @@ static void tp_select_path(struct mml_topology_cache *cache,
 	enum mml_color dest_fmt = cfg->info.dest[0].data.format;
 
 	en_rsz = tp_need_resize(&cfg->info, &can_binning) || mml_force_rsz;
-	en_pq = cfg->info.dest[0].pq_config.en ||
-		(MML_FMT_ALPHA(dest_fmt) && MML_FMT_IS_YUV(dest_fmt)) ||
+	en_pq = cfg->info.dest[0].pq_config.en || MML_FMT_IS_AYUV(dest_fmt) ||
 		mml_force_rsz == 2;
 	hdrvp = en_pq && cfg->info.dest[0].pq_config.en_hdr &&
 		!cfg->info.dest[0].pq_config.en_region_pq;

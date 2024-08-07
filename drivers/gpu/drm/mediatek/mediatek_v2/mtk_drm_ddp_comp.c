@@ -37,6 +37,10 @@
 #include <soc/mediatek/smi.h>
 #endif
 
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#include "mtk_drm_auto/mtk_drm_ddp_comp_auto.h"
+#endif
+
 #define DISP_OD_EN 0x0000
 #define DISP_OD_INTEN 0x0008
 #define DISP_OD_INTSTA 0x000c
@@ -115,6 +119,8 @@
 #define MT6989_DISP1_DDREN_ACK_CON 0x3f
 #define MT6989_OVL_SODI_REQ_SEL (BIT(8))
 #define MT6989_OVL_SODI_REQ_VAL (BIT(12) | BIT(13) | BIT(14) | BIT(15))
+
+#define MT6899_DISP0_DDREN_ACK_CON 0x0
 
 #define MT6879_DVFS_HALT_MASK_SEL_ALL             REG_FLD_MSB_LSB(21, 16)
 	#define MT6879_DVFS_HALT_MASK_SEL_RDMA0       REG_FLD_MSB_LSB(16, 16)
@@ -386,6 +392,7 @@ static const char *const mtk_ddp_comp_stem[MTK_DDP_COMP_TYPE_MAX] = {
 	[MTK_MML_WROT] = "mml_wrot",
 };
 
+#if !IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
 struct mtk_ddp_comp_match {
 	enum mtk_ddp_comp_id index;
 	enum mtk_ddp_comp_type type;
@@ -676,11 +683,7 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
 	{DDP_COMPONENT_OVLSYS_DLO_ASYNC4, MTK_DISP_VIRTUAL, -1, NULL, 0},
 	{DDP_COMPONENT_OVLSYS_DLO_ASYNC5, MTK_DISP_VIRTUAL, -1, NULL, 0},
 /* 280 */	{DDP_COMPONENT_OVLSYS_DLO_ASYNC6, MTK_DISP_VIRTUAL, -1, NULL, 0},
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
-	{DDP_COMPONENT_OVLSYS_DLO_ASYNC7, MTK_DISP_VIRTUAL, 15, NULL, 0},
-#else
 	{DDP_COMPONENT_OVLSYS_DLO_ASYNC7, MTK_DISP_DLO_ASYNC, 15, NULL, 0},
-#endif
 	{DDP_COMPONENT_OVLSYS_DLO_ASYNC8, MTK_DISP_VIRTUAL, -1, NULL, 0},
 	{DDP_COMPONENT_OVLSYS_DLO_ASYNC9, MTK_DISP_VIRTUAL, -1, NULL, 0},
 	{DDP_COMPONENT_OVLSYS_DLO_ASYNC10, MTK_DISP_VIRTUAL, -1, NULL, 0},
@@ -944,15 +947,9 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
 	{DDP_COMPONENT_OVLSYS1_DLO_ASYNC3, MTK_DISP_DLO_ASYNC, 24, NULL, 0},
 	{DDP_COMPONENT_OVLSYS1_DLO_ASYNC4, MTK_DISP_DLO_ASYNC, 25, NULL, 0},
 	{DDP_COMPONENT_OVLSYS1_DLO_ASYNC5, MTK_DISP_DLO_ASYNC, 26, NULL, 0},
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
-	{DDP_COMPONENT_OVLSYS1_DLO_ASYNC6, MTK_DISP_VIRTUAL, 27, NULL, 0},
-	{DDP_COMPONENT_OVLSYS1_DLO_ASYNC7, MTK_DISP_VIRTUAL, 28, NULL, 0},
-	{DDP_COMPONENT_OVLSYS1_DLO_ASYNC8, MTK_DISP_VIRTUAL, 29, NULL, 0},
-#else
 	{DDP_COMPONENT_OVLSYS1_DLO_ASYNC6, MTK_DISP_DLO_ASYNC, 27, NULL, 0},
 	{DDP_COMPONENT_OVLSYS1_DLO_ASYNC7, MTK_DISP_DLO_ASYNC, 28, NULL, 0},
 	{DDP_COMPONENT_OVLSYS1_DLO_ASYNC8, MTK_DISP_DLO_ASYNC, 29, NULL, 0},
-#endif
 	{DDP_COMPONENT_OVLSYS1_DLO_ASYNC9, MTK_DISP_DLO_ASYNC, 30, NULL, 0},
 	{DDP_COMPONENT_OVLSYS1_DLO_ASYNC10, MTK_DISP_VIRTUAL, 31, NULL, 0},
 /* 550 */	{DDP_COMPONENT_OVLSYS1_DLO_ASYNC11, MTK_DISP_VIRTUAL, -1, NULL, 0},
@@ -1053,6 +1050,7 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
 	{DDP_COMPONENT_VDISP_AO, MTK_DISP_VDISP_AO, 0, NULL, 0},
 	{DDP_COMPONENT_MML_MUTEX1, MTK_MML_MUTEX, 1, NULL, 0},
 };
+#endif
 
 bool mtk_ddp_comp_is_output(struct mtk_ddp_comp *comp)
 {
@@ -1069,16 +1067,6 @@ bool mtk_ddp_comp_is_output_by_id(enum mtk_ddp_comp_id id)
 
 	return mtk_ddp_matches[id].is_output;
 }
-
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
-bool mtk_ddp_comp_is_rdma(struct mtk_ddp_comp *comp)
-{
-	if (mtk_ddp_comp_get_type(comp->id) == MTK_OVL_EXDMA)
-		return true;
-
-	return false;
-}
-#endif
 
 void mtk_ddp_comp_get_name(struct mtk_ddp_comp *comp, char *buf, int buf_len)
 {
@@ -3103,7 +3091,10 @@ void mt6989_mtk_sodi_config(struct drm_device *drm, enum mtk_ddp_comp_id id,
 			writel_relaxed(v, priv->side_config_regs +  MMSYS_EMI_REQ_CTL);
 
 		/* DDREN_ACK_CON 0x3F4 */
-		v = MT6989_DISP0_DDREN_ACK_CON;
+		if (priv->data->mmsys_id == MMSYS_MT6899)
+			v = MT6899_DISP0_DDREN_ACK_CON;
+		else
+			v = MT6989_DISP0_DDREN_ACK_CON;
 		writel_relaxed(v, priv->config_regs + DISPSYS0_DDREN_ACK_CON);
 		if (priv->side_config_regs) {
 			v = MT6989_DISP1_DDREN_ACK_CON;
@@ -3114,7 +3105,10 @@ void mt6989_mtk_sodi_config(struct drm_device *drm, enum mtk_ddp_comp_id id,
 		if (priv->ovlsys0_regs) {
 			v = (readl(priv->ovlsys0_regs + MMSYS_MISC)
 				& (~0x3FFFC));
-			v |= 0x28000;
+			if (priv->data->mmsys_id == MMSYS_MT6899)
+				v |= 0x3C000;
+			else
+				v |= 0x28000;
 			writel_relaxed(v, priv->ovlsys0_regs + MMSYS_MISC);
 
 			v = readl(priv->ovlsys0_regs + MMSYS_SODI_REQ_MASK);
@@ -3148,8 +3142,12 @@ void mt6989_mtk_sodi_config(struct drm_device *drm, enum mtk_ddp_comp_id id,
 		}
 		/* 0xF0/0xF4: config on OVLSYS(HARD CODE) */
 		if (priv->ovlsys0_regs_pa) {
-			cmdq_pkt_write(handle, NULL, priv->ovlsys0_regs_pa +
-				MMSYS_MISC, 0x28000, 0x3FFFC);
+			if (priv->data->mmsys_id == MMSYS_MT6899)
+				cmdq_pkt_write(handle, NULL, priv->ovlsys0_regs_pa +
+					MMSYS_MISC, 0x3C000, 0x3FFFC);
+			else
+				cmdq_pkt_write(handle, NULL, priv->ovlsys0_regs_pa +
+					MMSYS_MISC, 0x28000, 0x3FFFC);
 			cmdq_pkt_write(handle, NULL, priv->ovlsys0_regs_pa +
 				MMSYS_SODI_REQ_MASK, 0, MT6989_OVL_SODI_REQ_VAL);
 		}
@@ -3168,7 +3166,8 @@ void mt6991_mtk_sodi_config(struct drm_device *drm, enum mtk_ddp_comp_id id,
 	struct mtk_drm_private *priv = drm->dev_private;
 	unsigned int sodi_req_val = 0, sodi_req_mask = 0;
 	unsigned int emi_req_val = 0, emi_req_mask = 0;
-	unsigned int val, val_mask;
+	unsigned int val;
+	unsigned int val_mask = 0;
 	bool en = *((bool *)data);
 
 	if (id == DDP_COMPONENT_ID_MAX) { /* config when top clk on */

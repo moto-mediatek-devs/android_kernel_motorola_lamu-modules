@@ -189,9 +189,10 @@ int mtk_vidle_user_power_keep_v1(enum mtk_vidle_voter_user user)
 	if (disp_dpc_driver.dpc_vidle_power_keep == NULL || vidle_data.drm_priv == NULL)
 		return 0;
 
-	if (atomic_read(&vidle_data.drm_priv->kernel_pm.status) == KERNEL_SHUTDOWN ||
-	    atomic_read(&vidle_data.drm_priv->kernel_pm.wakelock_cnt) == 0)
+	if (atomic_read(&vidle_data.drm_priv->kernel_pm.status) == KERNEL_SHUTDOWN)
 		return -1;
+	else if (atomic_read(&vidle_data.drm_priv->kernel_pm.wakelock_cnt) == 0)
+		user |= VOTER_ONLY;
 
 	return disp_dpc_driver.dpc_vidle_power_keep(user);
 }
@@ -202,9 +203,10 @@ void mtk_vidle_user_power_release_v1(enum mtk_vidle_voter_user user)
 		return;
 
 	irq_log_store();
-	if (atomic_read(&vidle_data.drm_priv->kernel_pm.status) == KERNEL_SHUTDOWN ||
-	    atomic_read(&vidle_data.drm_priv->kernel_pm.wakelock_cnt) == 0)
+	if (atomic_read(&vidle_data.drm_priv->kernel_pm.status) == KERNEL_SHUTDOWN)
 		return;
+	else if (atomic_read(&vidle_data.drm_priv->kernel_pm.wakelock_cnt) == 0)
+		user |= VOTER_ONLY;
 
 	irq_log_store();
 	disp_dpc_driver.dpc_vidle_power_release(user);
@@ -713,7 +715,7 @@ void mtk_vidle_srt_bw_set(const u32 bw_in_mb)
 	vidle_data.srt_bw = bw_in_mb;
 	if (disp_dpc_driver.dpc_srt_bw_set) {
 		if (vidle_data.dpc_version == DPC_VER1)
-			disp_dpc_driver.dpc_hrt_bw_set(DPC_SUBSYS_DISP, bw_in_mb, !atomic_read(&g_ff_enabled));
+			disp_dpc_driver.dpc_srt_bw_set(DPC_SUBSYS_DISP, bw_in_mb, !atomic_read(&g_ff_enabled));
 		else
 			disp_dpc_driver.dpc_srt_bw_set(DPC_SUBSYS_DISP, bw_in_mb, true);
 	} else
@@ -761,6 +763,12 @@ void mtk_vidle_dpc_analysis(void)
 		disp_dpc_driver.dpc_analysis();
 }
 
+void mtk_vidle_debug_cmd_adapter(const char *opt)
+{
+	if (disp_dpc_driver.dpc_debug_cmd)
+		disp_dpc_driver.dpc_debug_cmd(opt);
+}
+
 void mtk_vidle_wait_init(void)
 {
 	DDPFUNC("wait_for_completion +");
@@ -774,31 +782,9 @@ void mtk_vidle_dsi_pll_set(const u32 value)
 		disp_dpc_driver.dpc_dsi_pll_set(value);
 }
 
-void mtk_vidle_register_v2(const struct dpc_funcs *funcs)
-{
-	disp_dpc_driver = *funcs;
-
-	if(vidle_data.level != U8_MAX) {
-		DDPINFO("%s need set level:%d\n", __func__, vidle_data.level);
-		mtk_vidle_dvfs_set(vidle_data.level);
-	}
-
-	if(vidle_data.hrt_bw != U32_MAX) {
-		DDPINFO("%s need set hrt bw:%d\n", __func__, vidle_data.hrt_bw);
-		mtk_vidle_dvfs_set(vidle_data.hrt_bw);
-	}
-
-	if(vidle_data.srt_bw != U32_MAX) {
-		DDPINFO("%s need set srt bw:%d\n", __func__, vidle_data.srt_bw);
-		mtk_vidle_dvfs_set(vidle_data.srt_bw);
-	}
-}
-
 void mtk_vidle_register_v1(const struct dpc_funcs *funcs)
 {
 	int ret = 0;
-
-	disp_dpc_driver = *funcs;
 
 	if (vidle_data.panel_type != PANEL_TYPE_COUNT) {
 		DDPINFO("%s set panel:%d\n", __func__, vidle_data.panel_type);
@@ -834,11 +820,10 @@ void mtk_vidle_register(const struct dpc_funcs *funcs, enum mtk_dpc_version vers
 		__func__, vidle_data.panel_type, version,
 		vidle_data.level, vidle_data.hrt_bw, vidle_data.srt_bw);
 	vidle_data.dpc_version = version;
+	disp_dpc_driver = *funcs;
 
 	if(version == DPC_VER1)
 		mtk_vidle_register_v1(funcs);
-	else
-		mtk_vidle_register_v2(funcs);
 
 	complete(&dpc_registered);
 }
@@ -864,3 +849,9 @@ int mtk_vidle_get_power_if_in_use(void)
 	return 0;
 }
 EXPORT_SYMBOL(mtk_vidle_get_power_if_in_use);
+
+void mtk_vidle_put_power(void)
+{
+	mtk_drm_pm_ctrl(vidle_data.drm_priv, DISP_PM_PUT);
+}
+EXPORT_SYMBOL(mtk_vidle_put_power);

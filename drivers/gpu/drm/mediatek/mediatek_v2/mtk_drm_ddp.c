@@ -3383,6 +3383,25 @@
 #define MT6989_MUTEX_OVLSYS_EOF_DPI0 (MT6989_MUTEX_OVLSYS_SOF_DPI0 << 6)
 #define MT6989_MUTEX_OVLSYS_EOF_DPI1 (MT6989_MUTEX_OVLSYS_SOF_DPI1 << 6)
 
+#define MT6899_MUTEX_SOF_SINGLE_MODE 0
+#define MT6899_MUTEX_SOF_DSI0 1
+#define MT6899_MUTEX_SOF_DSI1 2
+#define MT6899_MUTEX_SOF_DSI2 3
+#define MT6899_MUTEX_SOF_DPI0 4
+#define MT6899_MUTEX_EOF_DSI0 (MT6899_MUTEX_SOF_DSI0 << 6)
+#define MT6899_MUTEX_EOF_DSI1 (MT6899_MUTEX_SOF_DSI1 << 6)
+#define MT6899_MUTEX_EOF_DSI2 (MT6899_MUTEX_SOF_DSI2 << 6)
+#define MT6899_MUTEX_EOF_DPI0 (MT6899_MUTEX_SOF_DPI0 << 6)
+#define MT6899_MUTEX_OVLSYS_SOF_DSI0 1
+#define MT6899_MUTEX_OVLSYS_SOF_DSI1 3
+#define MT6899_MUTEX_OVLSYS_SOF_DSI2 2
+#define MT6899_MUTEX_OVLSYS_SOF_DPI0 4
+#define MT6899_MUTEX_OVLSYS_EOF_DSI0 (MT6899_MUTEX_OVLSYS_SOF_DSI0 << 6)
+#define MT6899_MUTEX_OVLSYS_EOF_DSI1 (MT6899_MUTEX_OVLSYS_SOF_DSI1 << 6)
+#define MT6899_MUTEX_OVLSYS_EOF_DSI2 (MT6899_MUTEX_OVLSYS_SOF_DSI2 << 6)
+#define MT6899_MUTEX_OVLSYS_EOF_DPI0 (MT6899_MUTEX_OVLSYS_SOF_DPI0 << 6)
+
+
 #define DISP_REG_CONFIG_MMSYS_CG_CON0_MT6989 0x100
 #define DISP_REG_CONFIG_MMSYS_CG_CON1_MT6989 0x110
 
@@ -7647,6 +7666,30 @@ static const unsigned int mt6989_mutex_ovlsys_sof[DDP_MUTEX_SOF_MAX] = {
 			MT6989_MUTEX_OVLSYS_SOF_DPI1 | MT6989_MUTEX_OVLSYS_EOF_DPI1,
 };
 
+static const unsigned int mt6899_mutex_sof[DDP_MUTEX_SOF_MAX] = {
+		[DDP_MUTEX_SOF_SINGLE_MODE] = MT6899_MUTEX_SOF_SINGLE_MODE,
+		[DDP_MUTEX_SOF_DSI0] =
+			MT6899_MUTEX_SOF_DSI0 | MT6899_MUTEX_EOF_DSI0,
+		[DDP_MUTEX_SOF_DSI1] =
+			MT6899_MUTEX_SOF_DSI1 | MT6899_MUTEX_EOF_DSI1,
+		[DDP_MUTEX_SOF_DSI2] =
+			MT6899_MUTEX_SOF_DSI2 | MT6899_MUTEX_EOF_DSI2,
+		[DDP_MUTEX_SOF_DPI0] =
+			MT6899_MUTEX_SOF_DPI0 | MT6899_MUTEX_EOF_DPI0,
+};
+
+static const unsigned int mt6899_mutex_ovlsys_sof[DDP_MUTEX_SOF_MAX] = {
+		[DDP_MUTEX_SOF_SINGLE_MODE] = MT6899_MUTEX_SOF_SINGLE_MODE,
+		[DDP_MUTEX_SOF_DSI0] =
+			MT6899_MUTEX_OVLSYS_SOF_DSI0 | MT6899_MUTEX_OVLSYS_EOF_DSI0,
+		[DDP_MUTEX_SOF_DSI1] =
+			MT6899_MUTEX_OVLSYS_SOF_DSI1 | MT6899_MUTEX_OVLSYS_EOF_DSI1,
+		[DDP_MUTEX_SOF_DPI0] =
+			MT6899_MUTEX_OVLSYS_SOF_DPI0 | MT6899_MUTEX_OVLSYS_EOF_DPI0,
+		[DDP_MUTEX_SOF_DSI2] =
+			MT6899_MUTEX_OVLSYS_SOF_DSI2 | MT6899_MUTEX_OVLSYS_EOF_DSI2,
+};
+
 static const unsigned int mt6991_mutex_sof[DDP_MUTEX_SOF_MAX] = {
 		[DDP_MUTEX_SOF_SINGLE_MODE] = MT6991_MUTEX_SOF_SINGLE_MODE,
 		[DDP_MUTEX_SOF_DSI0] =
@@ -7858,8 +7901,8 @@ static const struct mtk_disp_ddp_data mt6989_ddp_driver_data = {
 static const struct mtk_disp_ddp_data mt6899_ddp_driver_data = {
 	.mutex_mod = mt6899_mutex_mod,
 	.mutex_ovlsys_mod = mt6899_ovlsys_mutex_mod,
-	.mutex_sof = mt6989_mutex_sof,
-	.mutex_ovlsys_sof = mt6989_mutex_ovlsys_sof,
+	.mutex_sof = mt6899_mutex_sof,
+	.mutex_ovlsys_sof = mt6899_mutex_ovlsys_sof,
 	.mutex_mod_reg = {MT6983_DISP_MUTEX0_MOD0, DISP_REG_MUTEX_MOD2},
 	.mutex_sof_reg = MT6983_DISP_MUTEX0_SOF,
 	.mutex_rst_reg = DISP_REG_MUTEX_RST_REG,
@@ -22103,6 +22146,9 @@ static int mtk_ddp_ovl_con_MT6899(enum mtk_ddp_comp_id cur,
 		else
 			value = DISP_OVL2_2L_TO_BLEND_CROSSBAR2;
 		*mask = DISP_OVL2_2L_TO_BG_CROSSBAR2 | DISP_OVL2_2L_TO_BLEND_CROSSBAR2;
+	} else if (cur == DDP_COMPONENT_OVL3_2L) {
+		value = DISP_OVL3_2L_TO_BLEND_CROSSBAR3;
+		*mask = DISP_OVL3_2L_TO_BLEND_CROSSBAR3;
 	} else {
 		value = -1;
 		*mask = 0;
@@ -22128,6 +22174,9 @@ static int mtk_ddp_ovl_blend_cb_MT6899(enum mtk_ddp_comp_id cur, enum mtk_ddp_co
 		break;
 	case DDP_COMPONENT_OVL2_2L:
 		*addr = MT6989_OVL_BLEND_CROSSBAR2_MOUT_EN;
+		break;
+	case DDP_COMPONENT_OVL3_2L:
+		*addr = MT6989_OVL_BLEND_CROSSBAR3_MOUT_EN;
 		break;
 	default:
 		value = -1;
@@ -22391,7 +22440,11 @@ static int mtk_ddp_mout_en_MT6899(const struct mtk_mmsys_reg_data *data,
 		return value;
 	}
 
-	if ((cur == DDP_COMPONENT_DLI_ASYNC0 &&
+	if ((cur == DDP_COMPONENT_OVL2_2L &&
+		next == DDP_COMPONENT_OVLSYS_UFBC_WDMA0)) {
+		*addr = MT6989_OVL_BLEND_CROSSBAR2_MOUT_EN;
+		value = MT6989_DISP_OVL2_2L_TO_UFBC_WDMA0;
+	} else if ((cur == DDP_COMPONENT_DLI_ASYNC0 &&
 		next == DDP_COMPONENT_PQ0_OUT_CB4)){
 		/* PQ_IN_CROSSBAR */
 		*addr = MT6989_PQ_IN_CROSSBAR0_MOUT_EN;
@@ -22401,7 +22454,12 @@ static int mtk_ddp_mout_en_MT6899(const struct mtk_mmsys_reg_data *data,
 		/* PQ_IN_CROSSBAR */
 		*addr = MT6989_PQ_IN_CROSSBAR6_MOUT_EN;
 		value = MT6989_DISP_DLI_RELAY6_TO_PQ_OUT_CROSSBAR5;
-	} else if (cur == DDP_COMPONENT_OVLSYS_Y2R0 && next == DDP_COMPONENT_OVL0_2L) {
+	} else if ((cur == DDP_COMPONENT_DLI_ASYNC2 &&
+		next == DDP_COMPONENT_PQ0_OUT_CB5)){
+		/* PQ_IN_CROSSBAR */
+		*addr = MT6989_PQ_IN_CROSSBAR2_MOUT_EN;
+		value = MT6989_DISP_DLI_RELAY2_TO_PQ_OUT_CROSSBAR5;
+	}else if (cur == DDP_COMPONENT_OVLSYS_Y2R0 && next == DDP_COMPONENT_OVL0_2L) {
 		/* OVL_PQ_IN_CROSSBAR */
 		*addr = MT6989_OVL_PQ_IN_CROSSBAR0_MOUT_EN;
 		value = MT6989_DISP_Y2R0_TO_PQ_OVL0_2L;
@@ -22589,7 +22647,7 @@ static int mtk_ddp_mout_en_MT6899(const struct mtk_mmsys_reg_data *data,
 		next == DDP_COMPONENT_MERGE0_OUT_CB5)) {
 		/* COMP_OUT_CROSSBAR */
 		*addr = MT6989_COMP_OUT_CROSSBAR9_MOUT_EN;
-		value = MT6989_DISP_COMP_IN_CROSSBAR12_TO_MERGE_OUT_CROSSBAR4;
+		value = MT6989_DISP_COMP_IN_CROSSBAR12_TO_MERGE_OUT_CROSSBAR5;
 	} else if ((cur == DDP_COMPONENT_COMP0_OUT_CB7 &&
 		next == DDP_COMPONENT_MERGE0_OUT_CB3)) {
 		/* COMP_OUT_CROSSBAR */
@@ -22633,8 +22691,8 @@ static int mtk_ddp_mout_en_MT6899(const struct mtk_mmsys_reg_data *data,
 	} else if ((cur == DDP_COMPONENT_MERGE0_OUT_CB5 &&
 		next == DDP_COMPONENT_DP_INTF0)) {
 		/* MERGE_OUT_CROSSBAR */
-		*addr = MT6989_MERGE_OUT_CROSSBAR4_MOUT_EN;
-		value = MT6989_DISP_COMP_OUT_CROSSBAR4_TO_DP_INTF0;
+		*addr = MT6989_MERGE_OUT_CROSSBAR5_MOUT_EN;
+		value = MT6989_DISP_COMP_OUT_CROSSBAR5_TO_DP_INTF0;
 	} else if ((cur == DDP_COMPONENT_MERGE0_OUT_CB5 &&
 		next == DDP_COMPONENT_DSI1)) {
 		/* discrete MERGE_OUT_CROSSBAR */
@@ -23980,6 +24038,50 @@ static int mtk_ddp_disp1_merge_out_cb_MT6991(enum mtk_ddp_comp_id cur,
 	return value;
 }
 
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+static int mtk_ddp_pq_path_sel_MT6991(enum mtk_ddp_comp_id cur,
+				      enum mtk_ddp_comp_id next,
+				      unsigned int *addr)
+{
+	int value = -1;
+
+	switch (cur) {
+	case DDP_COMPONENT_MDP_RSZ0:
+	case DDP_COMPONENT_MDP_RSZ1:
+		*addr = MT6991_PQ_PATH_SEL;
+		break;
+	default:
+		value = -1;
+		return value;
+	}
+
+	/* set value according to dst comp */
+	switch (next) {
+	case DDP_COMPONENT_TDSHP0:
+		value = 16;
+		break;
+	case DDP_COMPONENT_TDSHP1:
+		value = (16 << 8);
+		break;
+	case DDP_COMPONENT_ID_MAX:
+		value = 0;
+		break;
+
+	default:
+		value = -1;
+		return value;
+	}
+	DDPDBG("%s, cur=%s->next=%s, addr:0x%x, value:0x%x\n",
+		__func__,
+		mtk_dump_comp_str_id(cur),
+		mtk_dump_comp_str_id(next),
+		*addr,
+		value);
+
+	return value;
+}
+#endif
+
 static int mtk_ddp_mout_en_MT6991(const struct mtk_mmsys_reg_data *data,
 			   enum mtk_ddp_comp_id cur, enum mtk_ddp_comp_id next,
 			   unsigned int *addr)
@@ -24027,6 +24129,13 @@ static int mtk_ddp_mout_en_MT6991(const struct mtk_mmsys_reg_data *data,
 	value = mtk_ddp_disp0_pq_in_cb_MT6991(cur, next, addr);
 	if (value > 0)
 		return value;
+
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+	if (mtk_ddp_comp_get_type(cur) == MTK_DISP_MDP_RSZ) {
+		value = mtk_ddp_pq_path_sel_MT6991(cur, next, addr);
+		return value;
+	}
+#endif
 
 	/* dispsys0 pq_out_cb */
 	value = mtk_ddp_disp0_pq_out_cb_MT6991(cur, next, addr);
@@ -31306,6 +31415,8 @@ void mtk_disp_mutex_src_set(struct mtk_drm_crtc *mtk_crtc, bool is_cmd_mode)
 			&& drm_crtc_index(&mtk_crtc->base) == 0) {
 			if (priv->data->mmsys_id == MMSYS_MT6768)
 				sof |= MT6768_MUTEX_EOF_DSI0;
+			if (priv->data->mmsys_id == MMSYS_MT6765)
+				sof |= MT6765_MUTEX_EOF_DSI0;
 		}
 		writel_relaxed(
 			sof,
@@ -31557,6 +31668,8 @@ void mtk_disp_mutex_add_comp_with_cmdq(struct mtk_drm_crtc *mtk_crtc,
 		&& drm_crtc_index(&mtk_crtc->base) == 0) {
 		if (drm_priv->data->mmsys_id == MMSYS_MT6768)
 			sof |= MT6768_MUTEX_EOF_DSI0;
+		else if (drm_priv->data->mmsys_id == MMSYS_MT6765)
+			sof |= MT6765_MUTEX_EOF_DSI0;
 	}
 	cmdq_pkt_write(handle, mtk_crtc->gce_obj.base,
 		       regs_pa + DISP_REG_MUTEX_SOF(ddp->data, mutex->id),
@@ -32149,6 +32262,7 @@ static irqreturn_t mtk_disp_mutex_irq_handler(int irq, void *dev_id)
 		}
 		if (val & (0x1 << m_id)) {
 			DDPIRQ("[IRQ] mutex%d sof!\n", m_id);
+			DRM_MMP_EVENT_START(drm, 0, 0);
 			DRM_MMP_MARK(mutex[m_id], val, 0);
 			if (m_id == 0)
 				drm_trace_tag_mark("mutex0_sof");

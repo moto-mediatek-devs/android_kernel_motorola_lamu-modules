@@ -19,9 +19,19 @@ obj-$(CONFIG_MTK_DCM_MT6768) += mt6768_dcm.o
 mt6768_dcm-objs := mt6768_dcm_internal.o mt6768_dcm_autogen.o
 endif
 
+ifneq ($(wildcard $(srctree)/$(src)/mt6781_dcm_internal.c),)
+obj-$(CONFIG_MTK_DCM_MT6781) += mt6781_dcm.o
+mt6781_dcm-objs := mt6781_dcm_internal.o mt6781_dcm_autogen.o
+endif
+
 ifneq ($(wildcard $(srctree)/$(src)/mt6833_dcm_internal.c),)
 obj-$(CONFIG_MTK_DCM_MT6833) += mt6833_dcm.o
 mt6833_dcm-objs := mt6833_dcm_internal.o mt6833_dcm_autogen.o
+endif
+
+ifneq ($(wildcard $(srctree)/$(src)/mt6853_dcm_internal.c),)
+obj-$(CONFIG_MTK_DCM_MT6853) += mt6853_dcm.o
+mt6853_dcm-objs := mt6853_dcm_internal.o mt6853_dcm_autogen.o
 endif
 
 ifneq ($(wildcard $(srctree)/$(src)/mt6885_dcm_internal.c),)

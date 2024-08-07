@@ -105,6 +105,9 @@ module_param(mml_crc_test, int, 0644);
 int mml_freq_for_tppa;
 module_param(mml_freq_for_tppa, int, 0644);
 
+int mml_opp_rsv = 4;
+module_param(mml_opp_rsv, int, 0644);
+
 struct mml_dpc {
 	atomic_t task_cnt;
 	atomic_t exc_pw_cnt[mml_max_sys];
@@ -123,6 +126,8 @@ struct mml_dev {
 	struct mml_comp *comps[MML_MAX_COMPONENTS];
 	struct mml_sys_state sys_state[mml_max_sys];
 	struct mml_sys_qos qos[mml_max_sys];
+	u16 port_srt_bw[mml_max_sys][MML_MAX_PORT];
+	u16 port_hrt_bw[mml_max_sys][MML_MAX_PORT];
 	u32 vcp_ref;
 	struct mutex sys_state_mutex;
 	struct mml_sys *sys;
@@ -374,7 +379,7 @@ void mml_qos_init(struct mml_dev *mml, struct platform_device *pdev, u32 sysid)
 			break;
 
 		/* available freq from table, store in MHz */
-		sysqos->opp_speeds[i] = (u32)div_u64(freq, 1000000) - 5;
+		sysqos->opp_speeds[i] = (u32)div_u64(freq, 1000000) - mml_opp_rsv;
 		sysqos->opp_volts[i] = dev_pm_opp_get_voltage(opp);
 		sysqos->freq_max = sysqos->opp_speeds[i];
 		mml_log("mml%u opp %u: %uMHz\t%d",
@@ -441,8 +446,8 @@ u32 mml_qos_update_tput(struct mml_dev *mml, bool dpc, enum mml_sys_id sysid, bo
 		goto done;
 	sysqos->current_level = i;
 
-	mml_msg_qos("%s sys %u dvfs update %u to %u(%u)",
-		__func__, sysid, tp->qos[sysid].current_volt, volt, sysqos->opp_speeds[i]);
+	mml_msg_qos("%s sys %u dvfs update %u to %u(%u)by tput %u",
+		__func__, sysid, tp->qos[sysid].current_volt, volt, sysqos->opp_speeds[i], tput);
 	tp->qos[sysid].current_volt = volt;
 	mml_trace_begin("mml_volt_%u", volt);
 
@@ -970,7 +975,7 @@ s32 mml_comp_pw_enable(struct mml_comp *comp, const s8 mode)
 
 #ifndef MML_FPGA
 	mml_msg_dpc("%s comp %u pm_runtime_resume_and_get", __func__, comp->id);
-	mml_mmp(dpc_pm_runtime_get, MMPROFILE_FLAG_PULSE, comp->id, 0);
+	mml_mmp(pw_get, MMPROFILE_FLAG_PULSE, comp->id, 0);
 	ret = pm_runtime_resume_and_get(comp->larb_dev);
 	if (ret)
 		mml_err("%s enable fail ret:%d", __func__, ret);
@@ -997,7 +1002,7 @@ s32 mml_comp_pw_disable(struct mml_comp *comp, const s8 mode)
 
 #ifndef MML_FPGA
 	mml_msg_dpc("%s comp %u pm_runtime_put_sync", __func__, comp->id);
-	mml_mmp(dpc_pm_runtime_put, MMPROFILE_FLAG_PULSE, comp->id, 0);
+	mml_mmp(pw_put, MMPROFILE_FLAG_PULSE, comp->id, 0);
 	pm_runtime_put_sync(comp->larb_dev);
 #endif
 
@@ -1046,9 +1051,6 @@ s32 mml_comp_clk_disable(struct mml_comp *comp, bool dpc)
 			__func__, comp->id, comp->name, comp->clk_cnt);
 		return -EINVAL;
 	}
-
-	/* clear bandwidth before disable if this component support dma */
-	call_hw_op(comp, qos_clear, dpc);
 
 	mml_mmp(clk_disable, MMPROFILE_FLAG_START, comp->id, 0);
 	for (i = 0; i < ARRAY_SIZE(comp->clks); i++) {
@@ -1099,7 +1101,7 @@ void mml_dpc_task_cnt_inc(struct mml_task *task)
 		call_hw_op(path->mmlsys, pw_enable, task->config->info.mode);
 		if (path->mmlsys2)
 			call_hw_op(path->mmlsys2, pw_enable, task->config->info.mode);
-		mml_mmp(dpc_cfg, MMPROFILE_FLAG_START, 1, 0);
+		mml_mmp(dpc, MMPROFILE_FLAG_START, 1, 0);
 		mml_dpc_exc_release(mml, path->mmlsys->sysid);
 		call_hw_op(path->mmlsys, mminfra_pw_disable);
 		mml_clock_unlock(mml);
@@ -1124,7 +1126,7 @@ void mml_dpc_task_cnt_dec(struct mml_task *task)
 		mml_clock_lock(mml);
 		call_hw_op(path->mmlsys, mminfra_pw_enable);
 		mml_dpc_exc_keep(mml, path->mmlsys->sysid);
-		mml_mmp(dpc_cfg, MMPROFILE_FLAG_END, 0, 0);
+		mml_mmp(dpc, MMPROFILE_FLAG_END, 0, 0);
 		if (path->mmlsys2)
 			call_hw_op(path->mmlsys2, pw_disable,
 				task->config->info.mode);
@@ -1227,6 +1229,8 @@ void mml_dpc_dc_enable(struct mml_dev *mml, u32 sysid, bool dcen)
 		mml_mmp(dpc_dc, MMPROFILE_FLAG_END, sysid, 0);
 	}
 
+	mml_msg_dpc("%s group en sys %u group %s",
+		__func__, sysid, dcen ? "false" : "true");
 	mml_dpc_group_enable(sysid, !dcen);
 }
 
@@ -1286,14 +1290,14 @@ static u32 mml_calc_bw_couple(struct mml_dev *mml, u32 datasize)
 		return (u32)div_u64((u64)datasize * 21, 80000);
 }
 
-void mml_comp_qos_set(struct mml_comp *comp, struct mml_task *task,
-	struct mml_comp_config *ccfg, u32 throughput, u32 tput_up)
+void mml_comp_qos_calc(struct mml_comp *comp, struct mml_task *task,
+	struct mml_comp_config *ccfg, u32 throughput)
 {
 	struct mml_frame_config *cfg = task->config;
 	const struct mml_frame_dest *dest = &cfg->info.dest[0];
 	struct mml_pipe_cache *cache = &cfg->cache[ccfg->pipe];
 	u32 datasize, srt_bw, hrt_bw, stash_srt_bw, stash_hrt_bw;
-	bool hrt, updated = false;
+	bool hrt;
 
 	datasize = comp->hw_ops->qos_datasize_get(task, ccfg);
 	if (!datasize) {
@@ -1344,69 +1348,104 @@ void mml_comp_qos_set(struct mml_comp *comp, struct mml_task *task,
 
 	/* store for debug log */
 	task->pipe[ccfg->pipe].bandwidth = max(srt_bw, task->pipe[ccfg->pipe].bandwidth);
-	if (comp->srt_bw != srt_bw || comp->hrt_bw != hrt_bw) {
-		mml_trace_begin("mml_bw_%u_%u", srt_bw, hrt_bw);
-#ifndef MML_FPGA
-		if (cfg->dpc) {
-			u32 srt_icc, hrt_icc;
 
-			if (mtk_mml_hrt_mode == MML_HRT_OSTD_MAX) {
-				srt_icc = MBps_to_icc(srt_bw);
-				hrt_icc = hrt_bw <= mml_hrt_bound ?
-					MTK_MMQOS_MAX_BW : MBps_to_icc(hrt_bw);
-			} else if (mtk_mml_hrt_mode == MML_HRT_OSTD_ONLY) {
+	comp->srt_bw = max_t(u32, comp->srt_bw, srt_bw);
+	comp->hrt_bw = max_t(u32, comp->hrt_bw, hrt_bw);
+	comp->stash_srt_bw = max_t(u32, comp->stash_srt_bw, stash_srt_bw);
+	comp->stash_hrt_bw = max_t(u32, comp->stash_hrt_bw, stash_hrt_bw);
+
+	mml_msg("%s comp %u bw %u %u stash %u %u tput %u%s",
+		__func__, comp->id, srt_bw, hrt_bw, stash_srt_bw, stash_hrt_bw, throughput,
+		hrt ? " hrt" : "");
+}
+
+void mml_comp_qos_set(struct mml_comp *comp, struct mml_task *task,
+	struct mml_comp_config *ccfg, u32 throughput, u32 tput_up)
+{
+	struct mml_frame_config *cfg = task->config;
+	struct mml_dev *mml = cfg->mml;
+	struct mml_pipe_cache *cache = &cfg->cache[ccfg->pipe];
+	const u32 srt_bw = comp->srt_bw, hrt_bw = comp->hrt_bw;
+	const u32 stash_srt_bw = comp->stash_srt_bw, stash_hrt_bw = comp->stash_hrt_bw;
+	bool hrt = cfg->info.mode == MML_MODE_RACING || cfg->info.mode == MML_MODE_DIRECT_LINK;
+	bool updated = false;
+
+	/* store for debug log */
+	task->pipe[ccfg->pipe].bandwidth = max(comp->srt_bw, task->pipe[ccfg->pipe].bandwidth);
+	if (srt_bw == mml->port_srt_bw[comp->sysid][comp->larb_port] &&
+		hrt_bw == mml->port_hrt_bw[comp->sysid][comp->larb_port])
+		goto skip_update;
+
+	/* disable clock will set bw to 0, so skip bw 0 here to reduce mips in config thread */
+	if (!srt_bw && !hrt_bw)
+		goto skip_clear;
+
+	mml_trace_begin("mml_comp%u_bw_%u_%u", comp->id, srt_bw, hrt_bw);
+#ifndef MML_FPGA
+	if (cfg->dpc) {
+		u32 srt_icc, hrt_icc;
+
+		if (mtk_mml_hrt_mode == MML_HRT_OSTD_MAX) {
+			srt_icc = MBps_to_icc(srt_bw);
+			hrt_icc = hrt_bw <= mml_hrt_bound ?
+				MTK_MMQOS_MAX_BW : MBps_to_icc(hrt_bw);
+		} else if (mtk_mml_hrt_mode == MML_HRT_OSTD_ONLY) {
+			srt_icc = 0;
+			hrt_icc = MTK_MMQOS_MAX_BW;
+		} else if (mtk_mml_hrt_mode == MML_HRT_LIMIT) {
+			if (hrt_bw < mml_hrt_bound) {
 				srt_icc = 0;
 				hrt_icc = MTK_MMQOS_MAX_BW;
-			} else if (mtk_mml_hrt_mode == MML_HRT_LIMIT) {
-				if (hrt_bw < mml_hrt_bound) {
-					srt_icc = 0;
-					hrt_icc = MTK_MMQOS_MAX_BW;
-				} else {
-					srt_icc = MBps_to_icc(srt_bw);
-					hrt_icc = MBps_to_icc(hrt_bw);
-				}
 			} else {
-				/* MML_HRT_ENABLE, MML_HRT_MMQOS */
 				srt_icc = MBps_to_icc(srt_bw);
 				hrt_icc = MBps_to_icc(hrt_bw);
 			}
-
-			mtk_icc_set_bw(comp->icc_dpc_path, srt_icc, hrt_icc);
-			if (comp->icc_stash_path)
-				mtk_icc_set_bw(comp->icc_dpc_stash_path,
-					MBps_to_icc(stash_srt_bw), MBps_to_icc(stash_hrt_bw));
 		} else {
-			mtk_icc_set_bw(comp->icc_path,
-				MBps_to_icc(srt_bw), MBps_to_icc(hrt_bw));
-			if (comp->icc_stash_path)
-				mtk_icc_set_bw(comp->icc_stash_path,
-					MBps_to_icc(stash_srt_bw), MBps_to_icc(stash_hrt_bw));
+			/* MML_HRT_ENABLE, MML_HRT_MMQOS */
+			srt_icc = MBps_to_icc(srt_bw);
+			hrt_icc = MBps_to_icc(hrt_bw);
 		}
-#endif
-		comp->srt_bw = srt_bw;
-		comp->hrt_bw = hrt_bw;
-		mml_trace_end();
-		updated = true;
-	}
 
+		mtk_icc_set_bw(comp->icc_dpc_path, srt_icc, hrt_icc);
+		if (comp->icc_stash_path)
+			mtk_icc_set_bw(comp->icc_dpc_stash_path,
+				MBps_to_icc(stash_srt_bw), MBps_to_icc(stash_hrt_bw));
+	} else {
+		mtk_icc_set_bw(comp->icc_path,
+			MBps_to_icc(srt_bw), MBps_to_icc(hrt_bw));
+		if (comp->icc_stash_path)
+			mtk_icc_set_bw(comp->icc_stash_path,
+				MBps_to_icc(stash_srt_bw), MBps_to_icc(stash_hrt_bw));
+	}
+#endif
+	mml_trace_end();
+	updated = true;
+
+skip_clear:
+	mml->port_srt_bw[comp->sysid][comp->larb_port] = srt_bw;
+	mml->port_hrt_bw[comp->sysid][comp->larb_port] = hrt_bw;
+
+skip_update:
 	if (cfg->dpc) {
-		task->dpc_srt_bw[comp->sysid] += comp->srt_bw;
-		task->dpc_hrt_bw[comp->sysid] += comp->hrt_bw;
+		task->dpc_srt_bw[comp->sysid] += srt_bw;
+		task->dpc_hrt_bw[comp->sysid] += hrt_bw;
 		task->dpc_srt_write_bw[comp->sysid] += stash_srt_bw;
 		task->dpc_hrt_write_bw[comp->sysid] += stash_hrt_bw;
 	}
 
 	mml_mmp(bandwidth, MMPROFILE_FLAG_PULSE, comp->id, (comp->srt_bw << 16) | comp->hrt_bw);
 
-	mml_msg_qos("%s comp %u %s bw %u %u stash %u %u by throughput %u pixel %u size %u%s%s dpc %u mode %d",
+	mml_msg_qos("%s comp %u %s bw %u %u stash %u %u by throughput %u pixel %u%s%s dpc %u hrtmode %d",
 		__func__, comp->id, comp->name, srt_bw, hrt_bw, stash_srt_bw, stash_hrt_bw,
-		throughput, cache->max_tput_pixel, datasize,
+		throughput, cache->max_tput_pixel,
 		hrt ? " hrt" : "", updated ? " update" : "",
 		task->config->dpc, mtk_mml_hrt_mode);
 }
 
-void mml_comp_qos_clear(struct mml_comp *comp, bool dpc)
+void mml_comp_qos_clear(struct mml_comp *comp, struct mml_task *task, bool dpc)
 {
+	struct mml_dev *mml = task->config->mml;
+
 #ifndef MML_FPGA
 	if (dpc) {
 		mtk_icc_set_bw(comp->icc_dpc_path, 0, 0);
@@ -1420,6 +1459,12 @@ void mml_comp_qos_clear(struct mml_comp *comp, bool dpc)
 #endif
 	comp->srt_bw = 0;
 	comp->hrt_bw = 0;
+	comp->stash_srt_bw = 0;
+	comp->stash_hrt_bw = 0;
+	mml->port_srt_bw[comp->sysid][comp->larb_port] = 0;
+	mml->port_hrt_bw[comp->sysid][comp->larb_port] = 0;
+
+	mml_mmp(bandwidth, MMPROFILE_FLAG_PULSE, comp->id, 0);
 
 	mml_msg_qos("%s comp %u %s qos bw clear%s",
 		__func__, comp->id, comp->name, dpc ? " dpc" : "");
@@ -2181,7 +2226,12 @@ static int mml_probe(struct platform_device *pdev)
 	if (mml->dpc_disable)
 		mml_log("dpc disable by project");
 
+#if defined(MML_IR_SUPPORT)
 	mml->racing_en = of_property_read_bool(dev->of_node, "racing-enable");
+	if (mml->racing_en)
+		mml_log("IR mode enable");
+#endif
+
 	mml->v4l2_en = of_property_read_bool(dev->of_node, "v4l2-enable");
 
 	mml->tablet_ext = of_property_read_bool(dev->of_node, "tablet-ext");

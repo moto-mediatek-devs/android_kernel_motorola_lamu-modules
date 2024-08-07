@@ -5131,6 +5131,11 @@ static int fbt_boost_policy(
 	fbt_get_aa(loading, boost_info->cl_loading, cluster_num, t1, t_Q2Q,
 		separate_aa_final, max_cap_cluster, sec_cap_cluster, &aa_n, &aa_b, &aa_m);
 	thread_info->frame_aa = loading;
+	// workaround, special code for APDF
+	if (test_bit(USER_TYPE, &thread_info->master_type)) {
+		aa_n = aa_n * XGF_DEFAULT_EMA_DIVIDEND / 10;
+		aa_n += thread_info->dep_aa * (10 - XGF_DEFAULT_EMA_DIVIDEND) / 10;
+	}
 	thread_info->dep_aa = aa_n;
 
 	if (boost_info->cl_loading && cluster_num > 1)
@@ -6424,6 +6429,11 @@ int fpsgo_base2fbt_get_max_blc_pid(int *pid, unsigned long long *buffer_id)
 	mutex_unlock(&fbt_mlock);
 
 	return 1;
+}
+
+int fpsgo_base2fbt_get_cluster_num(void)
+{
+	return cluster_num;
 }
 
 void fpsgo_base2fbt_check_max_blc(void)

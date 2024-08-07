@@ -948,13 +948,13 @@ static void mtk_ovl_update_hrt_usage(struct mtk_drm_crtc *mtk_crtc,
 				plane_state->comp_state.ext_lye_id);
 		return;
 	}
-	DDPINFO("%s ovl:%d,lye:%d,ext:%d,fmt:0x%x, addr:0x%llx,comp:%d\n", __func__,
+	DDPINFO("%s ovl:%d,lye:%d,ext:%d,fmt:0x%x, addr:0x%llx,comp:0x%llx\n", __func__,
 			plane_state->comp_state.comp_id,
 			plane_state->comp_state.lye_id,
 			plane_state->comp_state.ext_lye_id,
 			plane_state->base.fb->format->format,
 			mtk_fb_get_dma(plane_state->base.fb),
-			 plane_state->prop_val[PLANE_PROP_COMPRESS]);
+			plane_state->prop_val[PLANE_PROP_COMPRESS]);
 
 	fmt = plane_state->base.fb->format->format;
 
@@ -972,7 +972,7 @@ static void mtk_ovl_update_hrt_usage(struct mtk_drm_crtc *mtk_crtc,
 				DDPINFO("%s,ignore mml m:%d-%d,crtc:%u,ovl:%u,l:%u,fmt:0x%x,bpp:%u\n",
 					__func__, plane_state->mml_mode,
 					plane_state->pending.mml_mode,
-					crtc_idx, comp->id, phy_id + lye_id,
+					crtc_idx, comp->id, (unsigned int)(phy_id + lye_id),
 					fmt, mtk_crtc->usage_ovl_fmt[(phy_id + lye_id)]);
 				return;
 			}
@@ -1469,8 +1469,11 @@ static void mtk_ovl_config(struct mtk_ddp_comp *comp,
 		else
 			fps = drm_mode_vrefresh(&crtc->state->adjusted_mode);
 
-		if (cfg->w <= 1080) {
-			if (fps <= 60) {
+		if (crtc->state->adjusted_mode.hdisplay <= 1080) {
+			if (fps == 30) {
+				bw_monitor_config |= REG_FLD_VAL(FLD_OVL_BURST_ACC_WIN_SIZE, 4);
+				ovl_win_size = 5;
+			} else if (fps <= 60) {
 				bw_monitor_config |= REG_FLD_VAL(FLD_OVL_BURST_ACC_WIN_SIZE, 8);
 				ovl_win_size = 9;
 			} else {
@@ -1478,7 +1481,10 @@ static void mtk_ovl_config(struct mtk_ddp_comp *comp,
 				ovl_win_size = 18;
 			}
 		} else {
-			if (fps <= 60) {
+			if (fps == 30) {
+				bw_monitor_config |= REG_FLD_VAL(FLD_OVL_BURST_ACC_WIN_SIZE, 4);
+				ovl_win_size = 5;
+			} else if (fps <= 60) {
 				bw_monitor_config |= REG_FLD_VAL(FLD_OVL_BURST_ACC_WIN_SIZE, 11);
 				ovl_win_size = 12;
 			} else {
@@ -2413,7 +2419,7 @@ static void set_sec_phy_layer_dom_cmdq(struct mtk_ddp_comp *comp,
 	u32 domain_val = 0, domain_mask = 0;
 	struct mtk_drm_private *priv = comp->mtk_crtc->base.dev->dev_private;
 
-	if (priv->data->mmsys_id == MMSYS_MT6768) {
+	if (priv->data->mmsys_id == MMSYS_MT6768 || priv->data->mmsys_id == MMSYS_MT6765) {
 		cmdq_pkt_write(handle, comp->cmdq_base,
 				comp->regs_pa + OVL_SECURE,
 				BIT(id), BIT(id));
@@ -2436,7 +2442,7 @@ static void set_sec_ext_layer_dom_cmdq(struct mtk_ddp_comp *comp,
 	u32 domain_val = 0, domain_mask = 0;
 	struct mtk_drm_private *priv = comp->mtk_crtc->base.dev->dev_private;
 
-	if (priv->data->mmsys_id == MMSYS_MT6768) {
+	if (priv->data->mmsys_id == MMSYS_MT6768 || priv->data->mmsys_id == MMSYS_MT6765) {
 		cmdq_pkt_write(handle, comp->cmdq_base,
 				comp->regs_pa + OVL_SECURE,
 				BIT(id + EXT_SECURE_OFFSET),
@@ -2456,7 +2462,7 @@ static void clr_sec_phy_layer_dom_cmdq(struct mtk_ddp_comp *comp,
 	u32 domain_val = 0, domain_mask = 0;
 	struct mtk_drm_private *priv = comp->mtk_crtc->base.dev->dev_private;
 
-	if (priv->data->mmsys_id == MMSYS_MT6768) {
+	if (priv->data->mmsys_id == MMSYS_MT6768 || priv->data->mmsys_id == MMSYS_MT6765) {
 		cmdq_pkt_write(handle, comp->cmdq_base,
 				comp->regs_pa + OVL_SECURE,
 				0, BIT(id));
@@ -2479,7 +2485,7 @@ static void clr_sec_ext_layer_dom_cmdq(struct mtk_ddp_comp *comp,
 	u32 domain_val = 0, domain_mask = 0;
 	struct mtk_drm_private *priv = comp->mtk_crtc->base.dev->dev_private;
 
-	if (priv->data->mmsys_id == MMSYS_MT6768) {
+	if (priv->data->mmsys_id == MMSYS_MT6768 || priv->data->mmsys_id == MMSYS_MT6765) {
 		cmdq_pkt_write(handle, comp->cmdq_base,
 				comp->regs_pa + OVL_SECURE,
 				0, BIT(id + EXT_SECURE_OFFSET));
@@ -4055,6 +4061,7 @@ void mtk_ovl_cal_golden_setting(struct mtk_ddp_config *cfg,
 	bool is_dc = cfg->p_golden_setting_context->is_dc;
 	struct mtk_disp_ovl *ovl = comp_to_ovl(comp);
 	const struct mtk_disp_ovl_data *data = ovl->data;
+	struct mtk_drm_private *priv = comp->mtk_crtc->base.dev->dev_private;
 
 	DDPDBG("%s,is_dc:%d\n", __func__, is_dc);
 
@@ -4087,9 +4094,12 @@ void mtk_ovl_cal_golden_setting(struct mtk_ddp_config *cfg,
 
 	/* OVL_RDMA_BUF_LOW_TH */
 	gs[GS_OVL_RDMA_ULTRA_LOW_TH] = 0;
-	gs[GS_OVL_RDMA_PRE_ULTRA_LOW_TH] = (!is_dc) ?
-				0 : (gs[GS_OVL_RDMA_FIFO_SIZE] / 8);
-
+	if (priv && priv->data->mmsys_id == MMSYS_MT6877)
+		gs[GS_OVL_RDMA_PRE_ULTRA_LOW_TH] = (!is_dc) ?
+					0 : (gs[GS_OVL_RDMA_FIFO_SIZE] / 12);
+	else
+		gs[GS_OVL_RDMA_PRE_ULTRA_LOW_TH] = (!is_dc) ?
+					0 : (gs[GS_OVL_RDMA_FIFO_SIZE] / 8);
 	/* OVL_RDMA_BUF_HIGH_TH */
 	gs[GS_OVL_RDMA_PRE_ULTRA_HIGH_TH] = (!is_dc) ?
 				0 : (gs[GS_OVL_RDMA_FIFO_SIZE] * 6 / 8);
@@ -4299,7 +4309,6 @@ static int mtk_ovl_replace_bootup_mva(struct mtk_ddp_comp *comp,
 	if (src_on & 0x1) {
 		layer_addr = read_phy_layer_addr(comp, 0);
 		if (priv->data->mmsys_id == MMSYS_MT6989 &&
-			priv->data->mmsys_id == MMSYS_MT6899 &&
 			comp->id == DDP_COMPONENT_OVL0_2L) {
 			DDPMSG("%s, replace mva same as pa %pad\n", __func__, &layer_addr);
 			domain = iommu_get_domain_for_dev(comp->dev);
@@ -4322,7 +4331,6 @@ static int mtk_ovl_replace_bootup_mva(struct mtk_ddp_comp *comp,
 	if (src_on & 0x2) {
 		layer_addr = read_phy_layer_addr(comp, 1);
 		if (priv->data->mmsys_id == MMSYS_MT6989 &&
-			priv->data->mmsys_id == MMSYS_MT6899 &&
 			comp->id == DDP_COMPONENT_OVL0_2L) {
 			DDPMSG("%s, replace mva same as pa %pad\n", __func__, &layer_addr);
 			write_phy_layer_addr_cmdq(comp, handle, 1, layer_addr);
@@ -4563,7 +4571,7 @@ static int mtk_ovl_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 
 		if (!IS_ERR_OR_NULL(comp->hrt_qos_req_other)) {
 			if (phy_id + 1 >= MAX_LAYER_NR) {
-				DDPINFO("%s,invalid layer:%u\n", __func__, (unsigned int)(phy_id + 1));
+				DDPINFO("%s,invalid layer:%u\n", __func__, (unsigned int)(phy_id + 1U));
 				break;
 			}
 
@@ -4649,14 +4657,14 @@ static int mtk_ovl_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 
 		if (!IS_ERR_OR_NULL(comp->hrt_qos_req_other)) {
 			if (phy_id + 1 >= MAX_LAYER_NR) {
-				DDPINFO("%s,invalid layer:%u\n", __func__, (unsigned int)(phy_id + 1));
+				DDPINFO("%s,invalid layer:%u\n", __func__, (unsigned int)(phy_id + 1U));
 				break;
 			}
 
 			port_bw = (bw_val * mtk_crtc->usage_ovl_fmt[phy_id + 1]) >> 2;
 			if (port_bw > comp->last_hrt_bw_other) {
 				DDPQOS("%s/%u,layer:%u fast up:%u->%u compress:%d\n",
-					mtk_dump_comp_str_id(comp->id), comp->id, phy_id + 1,
+					mtk_dump_comp_str_id(comp->id), comp->id, (unsigned int)(phy_id + 1U),
 					comp->last_hrt_bw_other, port_bw, mtk_crtc->usage_ovl_compr[phy_id + 1]);
 				__mtk_disp_set_module_hrt(comp->hrt_qos_req_other, comp->id, port_bw,
 					priv->data->respective_ostdl);
@@ -4665,7 +4673,7 @@ static int mtk_ovl_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 					NO_PENDING_HRT, ~0);
 			} else if (port_bw < comp->last_hrt_bw_other) {
 				DDPQOS("%s/%u,layer:%u slow down:%u->%u compress:%d\n",
-					mtk_dump_comp_str_id(comp->id), comp->id, phy_id + 1,
+					mtk_dump_comp_str_id(comp->id), comp->id, (unsigned int)(phy_id + 1U),
 					comp->last_hrt_bw_other, port_bw, mtk_crtc->usage_ovl_compr[phy_id + 1]);
 				cmdq_pkt_write(handle, mtk_crtc->gce_obj.base,
 					mtk_get_gce_backup_slot_pa(mtk_crtc, DISP_SLOT_CUR_BW_VAL(phy_id + 1)),
@@ -4740,7 +4748,7 @@ static int mtk_ovl_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		}
 		if (!IS_ERR_OR_NULL(comp->hrt_qos_req_other)) {
 			if (phy_id + 1 >= MAX_LAYER_NR) {
-				DDPINFO("%s,invalid layer:%u\n", __func__, (unsigned int)(phy_id + 1));
+				DDPINFO("%s,invalid layer:%u\n", __func__, (unsigned int)(phy_id + 1U));
 				break;
 			}
 
@@ -4748,7 +4756,7 @@ static int mtk_ovl_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 				DISP_SLOT_CUR_BW_VAL(phy_id + 1));
 			if (port_bw != NO_PENDING_HRT && port_bw <= comp->last_hrt_bw_other) {
 				DDPQOS("%s/%u,layer:%u final down:%u slot:%u\n",
-					mtk_dump_comp_str_id(comp->id), comp->id, phy_id + 1,
+					mtk_dump_comp_str_id(comp->id), comp->id, (unsigned int)(phy_id + 1U),
 					comp->last_hrt_bw_other, port_bw);
 				__mtk_disp_set_module_hrt(comp->hrt_qos_req_other, comp->id, comp->last_hrt_bw_other,
 					priv->data->respective_ostdl);
@@ -4799,40 +4807,70 @@ static int mtk_ovl_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 			force_update = (force_update == DISP_BW_FORCE_UPDATE) ? 1 : 0;
 		}
 
+		/* update total srt BW: case1:fast up, case2:slow down*/
 		if (!force_update && !update_pending) {
-			mtk_crtc->total_srt += comp->qos_bw;
-			if (!IS_ERR_OR_NULL(comp->qos_req_other))
+			if (comp->qos_bw) {
+				DDPDBG("ovl:%u, update total srt bw:%u->%u\n",
+					comp->id, mtk_crtc->total_srt,
+					(unsigned int)(mtk_crtc->total_srt + comp->qos_bw));
+				mtk_crtc->total_srt += comp->qos_bw;
+			}
+			if (!IS_ERR_OR_NULL(comp->qos_req_other) && comp->qos_bw_other) {
+				DDPDBG("ovl:%u, update total srt bw other:%u->%u\n",
+					comp->id, mtk_crtc->total_srt,
+					(unsigned int)(mtk_crtc->total_srt + comp->qos_bw_other));
 				mtk_crtc->total_srt += comp->qos_bw_other;
+			}
 		}
 
 		/* process normal */
 		if (!force_update && comp->last_qos_bw == comp->qos_bw) {
-			if (IS_ERR_OR_NULL(comp->qos_req_other) ||
-			    (comp->last_qos_bw_other == comp->qos_bw_other))
+			if (comp->qos_bw)
+				DDPDBG("ovl:%u, IGNORE srt bw:%u->%u @%s\n",
+					comp->id, comp->last_qos_bw, comp->qos_bw,
+					update_pending ? "FINAL DOWN" : "FAST UP");
+			if (IS_ERR_OR_NULL(comp->qos_req_other))
 				break;
+			else if (comp->last_qos_bw_other == comp->qos_bw_other) {
+				if (comp->qos_bw_other)
+					DDPDBG("ovl:%u, IGNORE srt bw other:%u->%u @%s\n",
+						comp->id, comp->last_qos_bw_other, comp->qos_bw_other,
+						update_pending ? "FINAL DOWN" : "FAST UP");
+				break;
+			}
 			goto other;
 		}
 
-		if ((comp->last_qos_bw <= comp->qos_bw) || force_update) {
+		/* update srt bw: case1:force update, case2:fast up, case3:final down */
+		if (force_update ||
+			(comp->last_qos_bw < comp->qos_bw) ||
+			((comp->last_qos_bw > comp->qos_bw) && update_pending)) {
 			__mtk_disp_set_module_srt(comp->qos_req, comp->id, comp->qos_bw, 0,
 					DISP_BW_NORMAL_MODE, priv->data->real_srt_ostdl);
+			DDPQOS("ovl:%u %s srt bw:%u->%u\n", comp->id,
+				force_update ? "FORCE UPDATE" : (update_pending ? "FINAL DOWN" : "FAST UP"),
+				comp->last_qos_bw, comp->qos_bw);
 			comp->last_qos_bw = comp->qos_bw;
-		}
-		if (!force_update)
-			mtk_crtc->total_srt += comp->qos_bw;
+		} else if (comp->last_qos_bw > comp->qos_bw)
+			DDPDBG("ovl:%u, SLOW DOWN srt bw:%u->%u\n",
+				comp->id, comp->last_qos_bw, comp->qos_bw);
 
 other:
+		/* update other srt bw: case1:force update, case2:fast up, case3:final down */
 		if (!IS_ERR_OR_NULL(comp->qos_req_other)) {
-			if ((comp->last_qos_bw_other <= comp->qos_bw_other) || force_update) {
+			if (force_update ||
+				(comp->last_qos_bw_other < comp->qos_bw_other) ||
+				((comp->last_qos_bw_other > comp->qos_bw_other) && update_pending)) {
 				__mtk_disp_set_module_srt(comp->qos_req_other, comp->id, comp->qos_bw_other, 0,
 					DISP_BW_NORMAL_MODE, priv->data->real_srt_ostdl);
+				DDPQOS("ovl:%u %s srt bw other:%u->%u\n", comp->id,
+					force_update ? "FORCE UPDATE" : (update_pending ? "FINAL DOWN" : "FAST UP"),
+					comp->last_qos_bw_other, comp->qos_bw_other);
 				comp->last_qos_bw_other = comp->qos_bw_other;
-			}
-			if (!force_update)
-				mtk_crtc->total_srt += comp->qos_bw_other;
+			} else if (comp->last_qos_bw_other > comp->qos_bw_other)
+				DDPDBG("ovl:%u, SLOW DOWN srt bw other:%u->%u\n",
+					comp->id, comp->last_qos_bw_other, comp->qos_bw_other);
 		}
-		DDPINFO("update ovl qos bw to %u, %u\n",
-			comp->qos_bw, comp->qos_bw_other);
 		break;
 	}
 	case OVL_REPLACE_BOOTUP_MVA: {

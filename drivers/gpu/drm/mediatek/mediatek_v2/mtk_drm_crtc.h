@@ -1056,6 +1056,7 @@ struct mtk_drm_crtc {
 	struct drm_writeback_connector wb_connector;
 	bool wb_enable;
 	bool wb_hw_enable;
+	bool wb_error;
 
 	struct mtk_drm_crtc_caps crtc_caps;
 	const struct mtk_crtc_path_data *path_data;
@@ -1166,6 +1167,7 @@ struct mtk_drm_crtc {
 	wait_queue_head_t signal_mml_last_job_is_flushed_wq;
 	bool is_mml;
 	bool is_mml_dl;
+	bool skip_check_trigger;
 	bool is_mml_dc;
 	unsigned int mml_debug;
 	bool is_force_mml_scen;
@@ -1243,6 +1245,7 @@ struct mtk_drm_crtc {
 	struct mtk_crtc_se_plane se_plane[MTK_FB_SE_NUM];
 	enum DISP_SE_STATE se_state;
 
+	bool is_plane0_updated;
 };
 
 enum BL_GAMMA_GAIN {
@@ -1293,6 +1296,7 @@ struct mtk_cmdq_cb_data {
 	void __iomem *disp_mutex_reg_va;
 	void __iomem *mmlsys_reg_va;
 	bool is_mml;
+	bool is_mml_dl;
 	unsigned int pres_fence_idx;
 	struct drm_framebuffer *wb_fb;
 	unsigned int wb_fence_idx;
@@ -1636,10 +1640,5 @@ void mtk_drm_crtc_exdma_path_setting_reset_without_cmdq(struct mtk_drm_crtc *mtk
 
 void mtk_crtc_gce_event_config(struct drm_crtc *crtc);
 void mtk_crtc_vdisp_ao_config(struct drm_crtc *crtc);
-
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
-struct mtk_ddp_comp *mtk_crtc_get_comp_with_index(struct mtk_drm_crtc *mtk_crtc,
-						  struct mtk_plane_state *plane_state);
-#endif
 
 #endif /* MTK_DRM_CRTC_H */

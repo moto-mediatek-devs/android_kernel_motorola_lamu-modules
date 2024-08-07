@@ -637,6 +637,15 @@ void mtk_dump_mminfra_ck(void *_priv)
 			mt_get_fmeter_freq(22, CKGEN_CK2),
 			mt_get_fmeter_freq(20, CKGEN_CK2),
 			mt_get_fmeter_freq(9, ABIST));
+	} else if (priv->data->mmsys_id == MMSYS_MT6899) {
+		static void __iomem *vlp_vote_done;
+
+		if (!vlp_vote_done)
+			vlp_vote_done = ioremap(0x1c00091c, 0x4);
+
+		/* defined in clk-mt6899-fmeter.c */
+		DDPMSG("FM_MMINFRA_CK:%u VLP_VOTE_DONE:%u\n",
+			mt_get_fmeter_freq(21, CKGEN_CK2), readl(vlp_vote_done));
 	}
 }
 
@@ -2221,14 +2230,14 @@ static void mtk_drm_cwb_info_init(struct drm_crtc *crtc)
 	if (crtc_idx == 0) {
 		if (cwb_info->scn == WDMA_WRITE_BACK) {
 			cwb_info->comp = priv->ddp_comp[DDP_COMPONENT_WDMA0];
-			if (priv->data->mmsys_id == MMSYS_MT6989)
+			if (priv->data->mmsys_id == MMSYS_MT6989 || priv->data->mmsys_id == MMSYS_MT6899)
 				cwb_info->comp = priv->ddp_comp[DDP_COMPONENT_WDMA1];
 		}
 		else if ((priv->data->mmsys_id == MMSYS_MT6985 ||
 					priv->data->mmsys_id == MMSYS_MT6897)
 			&& cwb_info->scn == WDMA_WRITE_BACK_OVL)
 			cwb_info->comp = priv->ddp_comp[DDP_COMPONENT_OVLSYS_WDMA1];
-		else if (priv->data->mmsys_id == MMSYS_MT6989)
+		else if (priv->data->mmsys_id == MMSYS_MT6989 || priv->data->mmsys_id == MMSYS_MT6899)
 			cwb_info->comp = priv->ddp_comp[DDP_COMPONENT_OVLSYS_WDMA1];
 	}
 
@@ -3910,6 +3919,19 @@ static void process_dbg_opt(const char *opt)
 		disp_gamma_debug(crtc, opt + 6);
 	} else if (strncmp(opt, "oddmr:", 4) == 0) {
 		mtk_disp_oddmr_debug(opt + 6);
+	} else if (strncmp(opt, "mtcmos:", 7) == 0) {
+		int ret;
+		unsigned int pd_id, on;
+
+		ret = sscanf(opt, "mtcmos:%u,%u\n", &pd_id, &on);
+		if (ret != 2) {
+			DDPMSG("mtcmos:0,1 for pd_id(0), power on(1)\n");
+			return;
+		}
+		if (vdisp_func.debug_mtcmos_ctrl)
+			vdisp_func.debug_mtcmos_ctrl(pd_id, on);
+	} else if (strncmp(opt, "dpc:", 4) == 0) {
+		mtk_vidle_debug_cmd_adapter(opt + 4);
 	} else if (strncmp(opt, "aee:", 4) == 0) {
 		DDPAEE("trigger aee dump of mmproile\n");
 	} else if (strncmp(opt, "send_ddic_test:", 15) == 0) {

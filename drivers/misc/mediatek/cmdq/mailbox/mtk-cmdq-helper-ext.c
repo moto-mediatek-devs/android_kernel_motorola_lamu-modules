@@ -487,7 +487,9 @@ struct cmdq_client *cmdq_mbox_create(struct device *dev, int index)
 	if (IS_ERR(client->chan)) {
 		cmdq_err("channel request fail:%ld idx:%d",
 			PTR_ERR(client->chan), index);
+#if !IS_ENABLED(CONFIG_VHOST_CMDQ)
 		dump_stack();
+#endif
 		kfree(client);
 		return NULL;
 	}
@@ -3133,11 +3135,13 @@ static void cmdq_flush_async_cb(struct cmdq_cb_data data)
 
 	if (data.err == -EINVAL) {
 		cmdq_pkt_err_irq_dump(pkt);
+#if !IS_ENABLED(CONFIG_VHOST_CMDQ)
 #if !IS_ENABLED(CONFIG_MTK_CMDQ_DEBUG)
 		if (error_irq_bug_on)
 			BUG_ON(1);
 #else
 		BUG_ON(1);
+#endif
 #endif
 	}
 
@@ -3153,7 +3157,7 @@ static void cmdq_flush_async_cb(struct cmdq_cb_data data)
 	debug_end[debug_cnt++] = sched_clock();
 #endif
 #endif
-	complete(&pkt->cmplt);
+
 #if IS_ENABLED(CONFIG_MTK_IRQ_MONITOR_DEBUG)
 #ifdef CMDQ_SECURE_SUPPORT
 	if (!pkt->sec_data) {
@@ -3163,6 +3167,7 @@ static void cmdq_flush_async_cb(struct cmdq_cb_data data)
 	}
 #endif
 #endif
+	complete(&pkt->cmplt);
 }
 #endif
 

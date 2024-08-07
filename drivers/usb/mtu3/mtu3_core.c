@@ -254,7 +254,8 @@ int mtu3_device_enable(struct mtu3 *mtu)
 				SSUSB_U2_UTMI_DATABUS_16_8);
 	}
 
-	if (!mtu->ssusb->utmi_8bit) {
+	if (mtu->ssusb->utmi_width == 16 ||
+	    of_device_is_compatible(mtu->ssusb->dev->of_node, "mediatek,mt6991-mtu3")) {
 		mtu3_setbits(ibase, U3D_SSUSB_SYS_CK_CTRL, SSUSB_U2_UTMI_DATABUS_16_8);
 		dev_info(mtu->dev, "U3D_SSUSB_SYS_CK_CTRL - value:0x%x\n",
 			mtu3_readl(ibase, U3D_SSUSB_SYS_CK_CTRL));
@@ -481,8 +482,10 @@ void mtu3_ep_stall_set(struct mtu3_ep *mep, bool set)
 	}
 
 	if (!set) {
+		mtu3_qmu_stop(mep);
 		mtu3_ep_reset(mep);
 		mep->flags &= ~MTU3_EP_STALL;
+		mtu3_qmu_resume(mep);
 	} else {
 		mep->flags |= MTU3_EP_STALL;
 	}
@@ -1155,6 +1158,36 @@ static int mtu3_set_dma_mask(struct mtu3 *mtu)
 	return ret;
 }
 
+static void ssusb_get_host_speed_max(struct mtu3 *mtu)
+{
+	u32 cap_val, host_u3p_num;
+
+	if (mtu == NULL || mtu->ippc_base == NULL)
+		return;
+
+	cap_val = mtu3_readl(mtu->ippc_base, U3D_SSUSB_IP_XHCI_CAP);
+	host_u3p_num = SSUSB_IP_XHCI_U3_PORT_NUM(cap_val);
+
+	if (host_u3p_num) {
+		cap_val = (mtu3_readl(mtu->ippc_base, U3D_SSUSB_IP_MAC_CAP) &
+			  SSUSB_IP_MAC_U3_SPEED_CAP_MSK) >> SSUSB_IP_MAC_U3_SPEED_CAP_OFST;
+		switch (cap_val) {
+		case SSUSB_IP_MAC_U3_SPEED_GEN2X2:
+		case SSUSB_IP_MAC_U3_SPEED_GEN2X1:
+			mtu->max_speed_host = USB_SPEED_SUPER_PLUS;
+			break;
+		case SSUSB_IP_MAC_U3_SPEED_GEN1X2:
+		case SSUSB_IP_MAC_U3_SPEED_GEN1X1:
+			mtu->max_speed_host = USB_SPEED_SUPER;
+			break;
+		default:
+			mtu->max_speed_host = USB_SPEED_HIGH;
+			break;
+		}
+	} else
+		mtu->max_speed_host = USB_SPEED_HIGH;
+}
+
 int ssusb_gadget_init(struct ssusb_mtk *ssusb)
 {
 	struct device *dev = ssusb->dev;
@@ -1185,8 +1218,6 @@ int ssusb_gadget_init(struct ssusb_mtk *ssusb)
 	ssusb->u3d = mtu;
 	mtu->ssusb = ssusb;
 	mtu->max_speed = usb_get_maximum_speed(dev);
-	if (of_property_read_u32(dev->of_node, "maximum-speed-host", &mtu->max_speed_host) < 0)
-		mtu->max_speed_host = USB_SPEED_SUPER_PLUS;
 
 	mtu->u3_lpm = !of_property_read_bool(dev->of_node, "usb3-lpm-disable");
 	mtu->u3_u1gou2 = !of_property_read_bool(dev->of_node, "usb3-u1gou2-disable");
@@ -1213,6 +1244,11 @@ int ssusb_gadget_init(struct ssusb_mtk *ssusb)
 		dev_err(dev, "mtu3 hw init failed:%d\n", ret);
 		return ret;
 	}
+	if (of_property_read_u32(dev->of_node, "maximum-speed-host", &mtu->max_speed_host) < 0)
+		ssusb_get_host_speed_max(mtu);
+
+	dev_info(dev, "max_speed_host: %s\n", usb_speed_string(mtu->max_speed_host));
+
 
 	ret = mtu3_set_dma_mask(mtu);
 	if (ret) {

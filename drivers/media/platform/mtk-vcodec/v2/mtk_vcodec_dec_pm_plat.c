@@ -309,6 +309,12 @@ void mtk_prepare_vdec_dvfs(struct mtk_vcodec_dev *dev)
 		mtk_v4l2_debug(0, "[VDEC] no need vdec-mmdvfs-in-adaptive");
 	dev->vdec_dvfs_params.mmdvfs_in_adaptive = vdec_req;
 
+	vdec_req = 0;
+	ret = of_property_read_s32(pdev->dev.of_node, "vdec-set-bw-in-min-freq", &vdec_req);
+	if (ret)
+		mtk_v4l2_debug(0, "[VDEC] no need vdec-set-bw-in-min-freq, default %d", vdec_req);
+	dev->vdec_dvfs_params.set_bw_in_min_freq = vdec_req;
+
 	ret = of_property_read_s32(pdev->dev.of_node, "vdec-cpu-hint-mode", &flag);
 	if (ret) {
 		mtk_v4l2_debug(0, "[VDEC] no need vdec-cpu-hint-mode");
@@ -495,7 +501,8 @@ void mtk_vdec_pmqos_begin_inst(struct mtk_vcodec_ctx *ctx)
 			dev->vdec_dvfs_params.min_freq;
 
 		if (dev->vdec_larb_bw[i].larb_type < VCODEC_LARB_SUM) {
-			if (dev->vdec_dvfs_params.target_freq == dev->vdec_dvfs_params.min_freq) {
+			if (!dev->vdec_dvfs_params.set_bw_in_min_freq &&
+				(dev->vdec_dvfs_params.target_freq == dev->vdec_dvfs_params.min_freq)) {
 				mtk_icc_set_bw(dev->vdec_qos_req[i],
 					MBps_to_icc(0), 0);
 				mtk_v4l2_debug(8, "[VDEC] larb %d bw %u (min opp, no request) MB/s",
@@ -686,7 +693,7 @@ void mtk_vdec_prepare_vcp_dvfs_data(struct mtk_vcodec_ctx *ctx, unsigned long *i
 	vsi_data->codec_fmt = ctx->q_data[MTK_Q_DATA_SRC].fmt->fourcc;
 	vsi_data->is_active = ctx->is_active;
 
-	ctx->last_monitor_op = 0; // for monitor op rate
+	ctx->last_monitor_op = -1; // for monitor op rate
 	ctx->op_rate_adaptive = ctx->dec_params.operating_rate; // for monitor op rate
 	return;
 }
@@ -757,7 +764,7 @@ void mtk_vdec_dvfs_update_dvfs_params(struct mtk_vcodec_ctx *ctx)
  *	Function name: mtk_vdec_dvfs_monitor_op_rate
  *	Description: This function updates the op rate of ctx by monitoring input buffer queued.
  *			1. Montior period: 500 ms
- *			2. Bypass the first interval
+ *			2. Bypass the first interval, compare op rate of 2nd & 3rd interval
  *			3. The monitored rate needs to be stable (<20% compares to prev interval)
  *			4. Diff > 20% than current used op rate
  *	Returns: Boolean, the op rate needs to be updated
@@ -765,7 +772,8 @@ void mtk_vdec_dvfs_update_dvfs_params(struct mtk_vcodec_ctx *ctx)
 bool mtk_vdec_dvfs_monitor_op_rate(struct mtk_vcodec_ctx *ctx, int buf_type)
 {
 	unsigned int cur_in_timestamp, time_diff, threshold = 20;
-	unsigned int prev_op, cur_op, tmp_op;/* monitored op in the prev interval */
+	unsigned int cur_op, tmp_op;/* monitored op in the prev interval */
+	int prev_op;
 	bool update_op = false;
 
 	if (buf_type != V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE ||
@@ -792,9 +800,14 @@ bool mtk_vdec_dvfs_monitor_op_rate(struct mtk_vcodec_ctx *ctx, int buf_type)
 		mtk_v4l2_debug(4, "[VDVFS][VDEC][ADAPTIVE][%d] prev_op: %d, moni_op: %d, cur_adp_op: %d",
 			ctx->id, prev_op, ctx->last_monitor_op, cur_op);
 
-		if (prev_op <= 0)
+		if (prev_op < 0) {
+			// first interval, bypass
+			ctx->last_monitor_op = 0;
 			return false;
-
+		} else if (prev_op == 0) {
+			// second interval, need compare to 3rd interval value
+			return false;
+		}
 		tmp_op = MAX(ctx->last_monitor_op, prev_op);
 
 		update_op = mtk_dvfs_check_op_diff(prev_op, ctx->last_monitor_op, threshold, 1) &&

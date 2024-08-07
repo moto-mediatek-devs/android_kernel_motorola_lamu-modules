@@ -811,3 +811,25 @@ config DRM_PANEL_DIJIN_TD4160_VDO
 	  td4160 dijin hdplus vdo panel. The panel has a 720x1604
 	  resolution and uses 24-bits RGB per pixel. It provides a
 	  MIPI DSI interface to host.
+
+config DRM_PANEL_NT37707_BOE_FHDPLUS_CMD_LTPO
+	tristate "mt6991 nt37707 boe fhdplus cmd ltpo panel"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here if you want to enable support for mt6991
+	  nt37707 boe fhdplus cmd ltpo panel. The panel has a 1216x2640
+	  resolution and uses 24-bits RGB per pixel. It provides a
+	  MIPI DSI interface to host.
+
+config DRM_PANEL_RM692J0_TM_FHDPLUS_CMD_LTPO
+	tristate "mt6991 rm692j0 tm fhdplus cmd ltpo panel"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here if you want to enable support for mt6991
+	  rm692j0 tm fhdplus cmd ltpo panel. The panel has a 1216x2640
+	  resolution and uses 24-bits RGB per pixel. It provides a
+	  MIPI DSI interface to host.

@@ -25,8 +25,6 @@
 
 #include "mmevent.h"
 
-#define MIN(x, y)   ((x) <= (y) ? (x) : (y))
-
 /* If it is 64bit use __pa_nodebug, otherwise use __pa_symbol_nodebug or __pa */
 #ifndef __pa_nodebug
 #ifdef __pa_symbol_nodebug
@@ -153,7 +151,7 @@ char *hash_table_to_char_array(unsigned int *p_buffer_size)
 		total_size += 16 + strlen(entry->value) + 2;
 	}
 
-	MMEMSG("total_size:%d", total_size);
+	MMEINFO("total_size:%d", total_size);
 	if (total_size == 0) {
 		MMEERR("total_size is 0");
 		return NULL;
@@ -704,23 +702,37 @@ static void get_pid_info(struct mme_unit_t *p_ring_buffer, unsigned int buffer_u
 
 					if (!get_hash_value((unsigned long)p_str))
 						add_hash_entry((unsigned long)p_str, p_str);
+				} else {
+					MMEERR("invalid p_str, index:%d, p_str:%llx, unit_size:%d, i:%d",
+							index, (unsigned long long)p_str, unit_size, i);
 				}
 			}
 
 			if (type == DATA_FLAG_STACK_REGION_STRING) {
+				int max_length = (unit_size - MME_HEADER_UNIT_SIZE) * MME_UNIT_SIZE - data_size;
+
+				max_length = MIN(max_length, MAX_STACK_STR_SIZE);
 				p_str = (char *)p;
-				if (is_valid_addr(p_str))
-					type_size = _ALIGN_4_BYTES(strlen(p_str)+1);
-				else
-					MMEERR("invalid stack region addr, index:%d, p_str:%llx, i:%d",
-						index, (unsigned long long)p_str, i);
+				type_size = sizeof(char *);
+				p_str += type_size;
+
+				while (*p_str != '\0' && type_size < max_length) {
+					type_size += 1;
+					p_str += 1;
+				}
+				if (type_size == max_length && *p_str != '\0') {
+					MMEERR("invalid stack str,index:%d,type_size:%d,unit_size:%d,data_size:%d,i:%d",
+							index, type_size, unit_size, data_size, i);
+					break;
+				}
+				type_size = _ALIGN_4_BYTES(type_size + 1);
 			}
 
 			data_size += type_size;
 			p += type_size;
 		}
 
-		index += _MME_UNIT_NUM(data_size);
+		index += unit_size;
 		MMEINFO("END, data_size = %d, unit size = %d, index:%d",
 				data_size, unit_size, index);
 	}
@@ -902,7 +914,7 @@ void mmevent_mrdump_buffer(unsigned long *vaddr, unsigned long *size)
 {
 	unsigned int copy_size = 0;
 
-	MMEMSG("mme mrdump begin");
+	MMEMSG("mrdump +");
 	if (!bmme_init_buffer) {
 		MMEERR("RingBuffer is not initialized");
 		return;
@@ -918,6 +930,7 @@ void mmevent_mrdump_buffer(unsigned long *vaddr, unsigned long *size)
 	*vaddr = (unsigned long)g_mrdump_buffer;
 	mme_get_dump_buffer(0, g_mrdump_buffer, MME_MRDUMP_BUFFER_SIZE, &copy_size, true);
 	*size = copy_size;
+	MMEMSG("mrdump - size:%lu", *size);
 }
 
 // ------------------------------- Driver Section ---------------------------------------------

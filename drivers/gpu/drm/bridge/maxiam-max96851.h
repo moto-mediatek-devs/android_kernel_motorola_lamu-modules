@@ -49,6 +49,7 @@
 #define SERDES_DUAL_LINK					"ser-dual-link"
 #define SUPPORT_MST							"ser-dp-mst"
 #define SUPPORT_TOUCH						"support-touch"
+#define USE_DEFAULT_SETTING					"use-default-setting"
 
 #define PANEL_FEATURE						"feature"
 #define PANEL_FEATURE_HANDLE				"feature-handle"
@@ -203,6 +204,7 @@ struct max96851_bridge {
 	bool is_support_touch;
 	bool prepared;
 	bool enabled;
+	bool suspend;
 	bool is_dp;
 
 	char *panel_name;

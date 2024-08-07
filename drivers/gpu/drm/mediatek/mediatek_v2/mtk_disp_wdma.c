@@ -628,13 +628,15 @@ static void mtk_wdma_start(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle)
 	} else {
 		if (data && data->aid_sel) {
 			aid_sel_offset = data->aid_sel(comp);
-			if (priv->data->mmsys_id == MMSYS_MT6989)
+			if (priv->data->mmsys_id == MMSYS_MT6989 ||
+				priv->data->mmsys_id == MMSYS_MT6899)
 				mmsys_reg = priv->ovlsys1_regs_pa;
 			else if (priv->data->mmsys_id == MMSYS_MT6991)
 				mmsys_reg = priv->ovlsys1_regs_pa + MT6991_OVLSYS_SEC_OFFSET;
 		}
 		if (aid_sel_offset) {
-			if (priv->data->mmsys_id == MMSYS_MT6989)
+			if (priv->data->mmsys_id == MMSYS_MT6989 ||
+				priv->data->mmsys_id == MMSYS_MT6899)
 				cmdq_pkt_write(handle, comp->cmdq_base,
 					mmsys_reg + MT6989_OVLSYS1_WDMA0_AID_MANU, BIT(0), BIT(0));
 			else if (priv->data->mmsys_id == MMSYS_MT6991) {
@@ -1289,6 +1291,7 @@ static int wdma_config_yuv420(struct mtk_ddp_comp *comp,
 		if (wdma->data->aid_sel) {
 			aid_sel_offset = wdma->data->aid_sel(comp);
 			if (priv->data->mmsys_id == MMSYS_MT6989 ||
+				priv->data->mmsys_id == MMSYS_MT6899 ||
 				priv->data->mmsys_id == MMSYS_MT6991)
 				mmsys_reg = priv->ovlsys1_regs_pa;
 		}
@@ -1575,6 +1578,7 @@ static void mtk_wdma_config(struct mtk_ddp_comp *comp,
 		if (wdma->data && wdma->data->aid_sel) {
 			aid_sel_offset = wdma->data->aid_sel(comp);
 			if (priv->data->mmsys_id == MMSYS_MT6989 ||
+				priv->data->mmsys_id == MMSYS_MT6899 ||
 				priv->data->mmsys_id == MMSYS_MT6991)
 				mmsys_reg = priv->ovlsys1_regs_pa;
 		}
@@ -1740,7 +1744,8 @@ static void mtk_wdma_addon_config(struct mtk_ddp_comp *comp,
 
 	/* WDMA secure memory buffer config */
 	if (is_secure) {
-		if (priv->data->mmsys_id == MMSYS_MT6989) {
+		if (priv->data->mmsys_id == MMSYS_MT6989 ||
+			priv->data->mmsys_id == MMSYS_MT6899) {
 			mtk_ddp_write(comp, 0x0,
 				WDMA_SECURITY_DISABLE, handle);
 			mmsys_reg = priv->side_config_regs_pa;
@@ -1762,7 +1767,8 @@ static void mtk_wdma_addon_config(struct mtk_ddp_comp *comp,
 							mmsys_reg + MT6991_DISP1_WDMA1_AID_SETTING, BIT(0), BIT(0));
 		}
 	} else {
-		if (priv->data->mmsys_id == MMSYS_MT6989) {
+		if (priv->data->mmsys_id == MMSYS_MT6989 ||
+			priv->data->mmsys_id == MMSYS_MT6899) {
 			mtk_ddp_write(comp, 0x1,
 				WDMA_SECURITY_DISABLE, handle);
 			mmsys_reg = priv->side_config_regs_pa;
@@ -2305,7 +2311,7 @@ static int mtk_wdma_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		}
 		data->bw = comp->hrt_bw;
 		if (data->bw > 0)
-			DDPMSG("%s, wdma comp:%d, larb:%d, bw:%d\n",
+			DDPDBG("%s, wdma comp:%d, larb:%d, bw:%d\n",
 				__func__, comp->id, data->larb_id, data->bw);
 		break;
 	}
@@ -2318,7 +2324,8 @@ static int mtk_wdma_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 				MTK_DRM_OPT_MMQOS_SUPPORT))
 			break;
 
-		if (wdma->info_data->force_ostdl_bw)
+		if (wdma->info_data->force_ostdl_bw &&
+			!wdma->info_data->is_support_ufbc)
 			ostdl_bw = wdma->info_data->force_ostdl_bw;
 		else
 			ostdl_bw = bw;
@@ -2330,9 +2337,10 @@ static int mtk_wdma_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 			if (!IS_ERR_OR_NULL(comp->hrt_qos_req)) {
 				__mtk_disp_set_module_hrt(comp->hrt_qos_req, comp->id, ostdl_bw,
 					priv->data->respective_ostdl);
-				DDPINFO("%s: %s:%d update port hrt BW:%u->%u/%u\n", __func__,
-					mtk_dump_comp_str(comp), comp->id,
-					comp->last_hrt_bw, comp->hrt_bw, ostdl_bw);
+				DDPINFO("%s: %s:%d update port hrt BW:%u->%u/%u,force:%d,bw:%u\n",
+					__func__, mtk_dump_comp_str(comp), comp->id,
+					comp->last_hrt_bw, comp->hrt_bw, ostdl_bw,
+					wdma->info_data->force_ostdl_bw, bw);
 				comp->last_hrt_bw = ostdl_bw;
 			}
 			if (wdma->data->hrt_channel)
@@ -2822,6 +2830,25 @@ static const struct mtk_disp_wdma_data mt6989_wdma_driver_data = {
 	.use_larb_control_sec = false,
 };
 
+static const struct mtk_disp_wdma_data mt6899_wdma_driver_data = {
+	.fifo_size_1plane = PARSE_FROM_DTS,
+	.fifo_size_uv_1plane = PARSE_FROM_DTS,
+	.fifo_size_2plane = PARSE_FROM_DTS,
+	.fifo_size_uv_2plane = PARSE_FROM_DTS,
+	.fifo_size_3plane = PARSE_FROM_DTS,
+	.fifo_size_uv_3plane = PARSE_FROM_DTS,
+	.force_ostdl_bw = 7000,
+	.buf_con1_fld_fifo_pseudo_size = REG_FLD_MSB_LSB(11, 0),
+	.buf_con1_fld_fifo_pseudo_size_uv = REG_FLD_MSB_LSB(22, 12),
+	.sodi_config = mt6989_mtk_sodi_config,
+	.aid_sel = &mtk_wdma_aid_sel_MT6989,
+	.check_wdma_sec_reg = &mtk_wdma_check_sec_reg_MT6989,
+	.support_shadow = false,
+	.need_bypass_shadow = true,
+	.is_support_34bits = true,
+	.use_larb_control_sec = false,
+};
+
 static const struct mtk_disp_wdma_data mt6991_wdma_driver_data = {
 	.fifo_size_1plane = PARSE_FROM_DTS,
 	.fifo_size_uv_1plane = 29,
@@ -2899,6 +2926,8 @@ static const struct of_device_id mtk_disp_wdma_driver_dt_match[] = {
 	 .data = &mt6835_wdma_driver_data},
 	{.compatible = "mediatek,mt6989-disp-wdma",
 	 .data = &mt6989_wdma_driver_data},
+	{.compatible = "mediatek,mt6899-disp-wdma",
+	 .data = &mt6899_wdma_driver_data},
 	{.compatible = "mediatek,mt6991-disp-wdma",
 	 .data = &mt6991_wdma_driver_data},
 	{},

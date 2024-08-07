@@ -158,7 +158,12 @@ static void ssusb_hwrscs_req_v2_v3(struct ssusb_mtk *ssusb,
 		break;
 	case MTU3_STATE_OFFLOAD:
 		/* Clear req for offload scenario */
-		spm_ctrl &= SSUSB_SPM_REQ_OFFLOAD_MSK;
+		spm_ctrl &= ~(SSUSB_SPM_REQ_OFFLOAD_MSK ^ spm_msk);
+
+		/* set apsrc=0 and ddren=1, inform peri not to protect bus */
+		if (of_device_is_compatible(ssusb->dev->of_node, "mediatek,mt6899-mtu3"))
+			spm_ctrl |= SSUSB_SPM_DDR_EN;
+
 		break;
 	case MTU3_STATE_RESUME:
 		spm_ctrl |= spm_msk;
@@ -166,7 +171,7 @@ static void ssusb_hwrscs_req_v2_v3(struct ssusb_mtk *ssusb,
 		break;
 	case MTU3_STATE_SUSPEND:
 		/* Clear req for host suspend scenario */
-		spm_ctrl &= SSUSB_SPM_VCORE_EN;
+		spm_ctrl &= ~(SSUSB_SPM_VCORE_EN ^ spm_msk) ;
 		smc_req = SSUSB_SMC_HWRECS_SUSPEND;
 		break;
 	default:
@@ -1161,7 +1166,7 @@ get_phy:
 	of_property_read_u32(node, "mediatek,ux-exit-lfps-gen2", &ssusb->ux_exit_lfps_gen2);
 	of_property_read_u32(node, "mediatek,polling-scdlfps-time", &ssusb->polling_scdlfps_time);
 
-	ssusb->utmi_8bit = of_property_read_bool(node, "mediatek,utmi-8bit");
+	of_property_read_u32(node, "mediatek,utmi-width", &ssusb->utmi_width);
 	ssusb->keep_ao = of_property_read_bool(node, "mediatek,keep-host-on");
 
 	otg_sx->vbus = devm_regulator_get(dev, "vbus");
