@@ -45,6 +45,10 @@
 #endif
 #include "common_ese.h"
 
+//yangyong add NXP NFC compatible begin
+#include "../../oem/devinfo/dev_info.h"
+//yangyong add NXP NFC compatible end
+
 /**
  * i2c_disable_irq()
  *
@@ -533,6 +537,12 @@ static int __init nfc_i2c_dev_init(void)
 	int ret = 0;
 
 	pr_info("%s: Loading NXP NFC I2C driver\n", __func__);
+	//yangyong add NXP NFC compatible begin
+	if(0 == oem_pcba_nfc_exist()) {
+		pr_err("SKU2 SKU3 SKU4 SKU7 SKU8 SKU9 MainBoard, NOT support NFC\n");
+		return 0;
+	}
+	//yangyong add NXP NFC compatible end
 	ret = i2c_add_driver(&nfc_i2c_dev_driver);
 	if (ret != 0)
 		pr_err("%s: NFC I2C add driver error ret %d\n", __func__, ret);
