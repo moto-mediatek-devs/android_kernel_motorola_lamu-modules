@@ -67,4 +67,5 @@
 	MULTI_TEMP_GAUGE0 = <(1)>;
 /* Multi gauge0 enable*/
 #include "lamu_battery_table_ext.dtsi"
+#include "lamu_battery_prop_dim2_ext.dtsi"
 };

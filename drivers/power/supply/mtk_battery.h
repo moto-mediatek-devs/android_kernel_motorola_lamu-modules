@@ -1784,6 +1784,12 @@ static const char * const BatterySn[BATTERY_SN_NUMBER] = {
 #define MULTI_BATTERY			0
 #define BATTERY_ID_CHANNEL_NUM	1
 #define BATTERY_PROFILE_ID		0
+/* TN Begin modified by xinjun.lu/860715 20240808 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+#define TOTAL_BATTERY_NUMBER	6
+#else
 #define TOTAL_BATTERY_NUMBER	4
+#endif
+/* TN End modified by xinjun.lu/860715 20240808 CR/EKLAMU-202 */
 
 #endif /* __MTK_BATTERY_INTF_H__ */
