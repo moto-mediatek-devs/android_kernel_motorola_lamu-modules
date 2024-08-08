@@ -2383,6 +2383,7 @@ static ssize_t gesture_en_store(struct device *dev,
     else
         cts_disable_gesture_wakeup(cts_dev);
 
+    boe_cts_gesture_mode = enable;
     return count;
 }
 

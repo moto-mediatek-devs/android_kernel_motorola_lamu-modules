@@ -746,6 +746,8 @@ extern void cts_enable_gesture_wakeup(struct cts_device *cts_dev);
 extern void cts_disable_gesture_wakeup(struct cts_device *cts_dev);
 extern bool cts_is_gesture_wakeup_enabled(const struct cts_device *cts_dev);
 extern int cts_get_gesture_info(struct cts_device *cts_dev, void *gesture_info);
+
+extern int boe_cts_gesture_mode;
 #endif /* CFG_CTS_GESTURE */
 
 extern int cts_set_int_data_types(struct cts_device *cts_dev, u16 types);

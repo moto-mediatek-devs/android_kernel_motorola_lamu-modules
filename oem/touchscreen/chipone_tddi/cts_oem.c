@@ -114,6 +114,7 @@ struct cts_oem_data {
     struct proc_dir_entry *diffdata_proc_entry;
     struct proc_dir_entry *rawdata_proc_entry;
     struct proc_dir_entry *chipone_selftest_proc_entry;
+    struct proc_dir_entry *cts_gesture_proc_entry;
 
     bool test_config_from_dt_has_parsed;
 
@@ -1650,6 +1651,61 @@ static const struct file_operations chipone_selftest_fops = {
 };
 #endif
 
+static int cts_gesture_mode_show(struct seq_file *m, void *v)
+{
+    struct chipone_ts_data *cts_data = m->private;
+    struct cts_device *cts_dev = &cts_data->cts_dev;
+	seq_printf(m, "tp_gesture_mode:%s\n",cts_is_gesture_wakeup_enabled(cts_dev) ? "enable" : "disable");
+	return 0;
+}
+
+static int cts_gesture_mode_open(struct inode *inode, struct file *file)
+{
+    return single_open(file, cts_gesture_mode_show, pde_data(inode));
+}
+extern struct chipone_ts_data *g_cts_data;
+static ssize_t cts_gesture_mode_write(struct file *filp, const char *buff, size_t size, loff_t *pos)
+{
+    struct chipone_ts_data *cts_data = g_cts_data;
+    struct cts_device *cts_dev = &cts_data->cts_dev;
+    u8 enable = 0;
+
+	char buf[256] = { 0 };
+
+	if (buff != NULL) {
+		if (copy_from_user(buf, buff, size)) {
+			cts_err("Failed to copy data from user space\n");
+			size = -1;
+			return size;
+		}
+	}
+
+    if (buf[0] == 'Y' || buf[0] == 'y' || buf[0] == '1')
+        enable = 1;
+
+    if (enable)
+        cts_enable_gesture_wakeup(cts_dev);
+    else
+        cts_disable_gesture_wakeup(cts_dev);
+
+    boe_cts_gesture_mode = enable;
+	return size;
+}
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 6, 0)
+static struct proc_ops proc_cts_gesture_mode_fops = {
+	.proc_open = cts_gesture_mode_open,
+	.proc_read = seq_read,
+	.proc_write = cts_gesture_mode_write,
+	.proc_lseek = default_llseek,
+};
+#else
+static struct file_operations proc_cts_gesture_mode_fops = {
+	.open = cts_gesture_mode_open,
+	.read = seq_read,
+	.write = cts_gesture_mode_write,
+	.llseek = default_llseek,
+};
+#endif
 
 int cts_oem_init(struct chipone_ts_data *cts_data)
 {
@@ -1735,7 +1791,11 @@ int cts_oem_init(struct chipone_ts_data *cts_data)
 		cts_err("create /proc/touch_info/tp_selftest_result Failed!\n");
 		return -1;
 	}
-
+	oem_data->cts_gesture_proc_entry = proc_create_data("tp_gesture_mode", 0664, touch_info_dir, &proc_cts_gesture_mode_fops, cts_data);
+	if (oem_data->cts_gesture_proc_entry == NULL) {
+		cts_err("create /proc/touch_info/tp_gesture_mode Failed!\n");
+		return -1;
+	}
     cts_data->oem_data = oem_data;
     oem_data->cts_data = cts_data;
     return 0;
@@ -1795,6 +1855,11 @@ int cts_oem_deinit(struct chipone_ts_data *cts_data)
         cts_info("  Remove /proc/touch_info/tp_selftest_result");
         remove_proc_entry("tp_selftest_result", touch_info_dir);
         oem_data->chipone_selftest_proc_entry = NULL;
+    }
+    if (oem_data->cts_gesture_proc_entry) {
+        cts_info("  Remove /proc/touch_info/tp_gesture_mode");
+        remove_proc_entry("tp_gesture_mode", touch_info_dir);
+        oem_data->cts_gesture_proc_entry = NULL;
     }
 	if (touch_info_dir != NULL) {
 		remove_proc_entry("touch_info", NULL);
