@@ -73,7 +73,7 @@ extern int qc3p_charger_ready;
 
 #define QC3_VOLT_STEP                    200 /* mV */
 #define QC3_BASE_VOLT                   5000 /* mV */
-#define QC3_TARGE_VOLT                  6000 /* mV */
+#define QC3_TARGE_VOLT                  6600 /* mV */
 
 struct z350_chip {
 	struct i2c_client *i2c;

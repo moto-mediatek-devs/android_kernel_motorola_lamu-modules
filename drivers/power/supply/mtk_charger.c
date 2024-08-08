@@ -129,15 +129,15 @@ static char *stepchg_str[] = {
 #endif
 /* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
 
-/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+/* TN Begin modified by xinjun.lu/860715 20240808 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
-#define HVDCP_TARGE_VOLT  6000 //mV
+#define HVDCP_TARGE_VOLT  6600 //mV
 #define HVDCP_MAX_VOLT    (HVDCP_TARGE_VOLT + 200) //mV
 static bool first_insert = true;
 bool is_hvdcp_charger_ready = false;
 EXPORT_SYMBOL(is_hvdcp_charger_ready);
 #endif
-/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+/* TN End modified by xinjun.lu/860715 20240808 CR/EKLAMU-202 */
 
 #ifdef MODULE
 static char __chg_cmdline[COMMAND_LINE_SIZE];

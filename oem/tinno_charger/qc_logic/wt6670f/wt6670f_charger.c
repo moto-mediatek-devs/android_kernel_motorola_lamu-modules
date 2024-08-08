@@ -124,7 +124,7 @@ extern int qc3p_charger_ready;
 
 #define QC3_VOLT_STEP                    200 /* mV */
 #define QC3_BASE_VOLT                   5000 /* mV */
-#define QC3_TARGE_VOLT                  6400 /* mV */
+#define QC3_TARGE_VOLT                  6600 /* mV */
 
 static int m_chg_type = 0;
 
