@@ -5375,6 +5375,9 @@ static int mtk_mipi_tx_pll_prepare_mt6768(struct clk_hw *hw)
 		return -EINVAL;
 	}
 
+	/*set volate*/
+	writel(0x4444221A, mipi_tx->regs + MIPITX_VOLTAGE_SEL); // TN modified by kexin.wang/860557 20240808 CR/EKLAMU-2138
+
 	writel(0x0, mipi_tx->regs + MIPITX_PRESERVED);
 	writel(0x00FF12E0, mipi_tx->regs + MIPITX_PLL_CON4);
 	/* BG_LPF_EN / BG_CORE_EN */
