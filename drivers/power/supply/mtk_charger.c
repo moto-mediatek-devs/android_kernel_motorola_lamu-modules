@@ -134,8 +134,6 @@ static char *stepchg_str[] = {
 #define HVDCP_TARGE_VOLT  6600 //mV
 #define HVDCP_MAX_VOLT    (HVDCP_TARGE_VOLT + 200) //mV
 static bool first_insert = true;
-bool is_hvdcp_charger_ready = false;
-EXPORT_SYMBOL(is_hvdcp_charger_ready);
 #endif
 /* TN End modified by xinjun.lu/860715 20240808 CR/EKLAMU-202 */
 
@@ -4746,7 +4744,6 @@ static int mtk_charger_plug_out(struct mtk_charger *info)
 /* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
 	first_insert = true;
-	is_hvdcp_charger_ready = false;
 	cancel_delayed_work(&info->hvdcp_work);
 	chr_err("%s: cancel hvdcp work\n", __func__);
 #endif

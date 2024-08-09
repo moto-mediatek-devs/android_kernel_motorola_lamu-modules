@@ -20,7 +20,6 @@
 extern bool qc_logic_probe_done;
 extern bool mtk_can_charging;
 extern bool is_turbo_charger_ready;
-extern bool is_hvdcp_charger_ready;
 extern bool turbo_charger_active;
 /*TN Begin modified by lingfei.tang/77407 20231201 CR/EKFOGO4G-5993*/
 extern int ffc_reduce_count;
@@ -1858,17 +1857,14 @@ static int turbo_charger_psy_notifier_cb(struct notifier_block *nb,
 				info->turbo_charger_active = true;
 				schedule_delayed_work(&info->turbo_charger_work,
 							msecs_to_jiffies(0));
-			} else if (info->turbo_charger_type == QC3P_POWER_15W) {
-				is_hvdcp_charger_ready = true;
 			}
-			TURBO_CHARGER_DBG("turbo charger type:%d, hvdcp charger type:%d, mtk_can_charging:%d\n",
-						info->turbo_charger_type, is_hvdcp_charger_ready, mtk_can_charging);
+			TURBO_CHARGER_DBG("turbo charger type:%d, mtk_can_charging:%d\n",
+						info->turbo_charger_type, mtk_can_charging);
 		}
 	} else if (psy == info->usb_psy) {
 		//if (!info->sw.usb_online && info->turbo_charger_active) {
 		if (info->sw.charger_type == POWER_SUPPLY_TYPE_UNKNOWN && info->turbo_charger_active) {
 			TURBO_CHARGER_DBG("plug out charger, stop turbo charger\n");
-			is_hvdcp_charger_ready = false;
 			turbo_charger_disconnect(info);
 		}
 	}
@@ -2119,7 +2115,7 @@ static int turbo_charger_probe(struct platform_device *pdev)
 	info->turbo_charger_result = 0;
 	info->turbo_charger_cc_loop_stage = false;
 	info->qc_phy_z350 = false;
-	info->qc_phy_z350 = false;
+	info->qc_phy_wt6670f = false;
 
 	mutex_init(&info->turbo_charger_lock);
 
