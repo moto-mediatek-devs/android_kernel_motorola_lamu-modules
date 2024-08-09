@@ -51,6 +51,12 @@ struct charger_data;
 #define V_CHARGER_MAX 6500000 /* 6.5 V */
 #define V_CHARGER_MIN 4600000 /* 4.6 V */
 #define VBUS_OVP_VOLTAGE 15000000 /* 15V */
+/* TN Begin modified by xinjun.lu/860715 20240809 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+#define EOC_CURRENT 335000 /* ua */
+#endif
+/* TN End modified by xinjun.lu/860715 20240809 CR/EKLAMU-202 */
+
 /* dual battery */
 #define V_CS_BATTERY_CV 4350 /* mV */
 #define AC_CS_NORMAL_CC 2000 /* mV */
@@ -315,7 +321,11 @@ struct charger_custom_data {
 	int min_charger_voltage_1;
 	int min_charger_voltage_2;
 	int max_dmivr_charger_current;
-
+/* TN Begin modified by xinjun.lu/860715 20240809 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	int eoc_current;
+#endif
+/* TN End modified by xinjun.lu/860715 20240809 CR/EKLAMU-202 */
 };
 
 struct charger_data {

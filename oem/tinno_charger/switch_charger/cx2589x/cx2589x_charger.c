@@ -313,7 +313,13 @@ __maybe_unused static int cx2589x_get_term_curr(struct cx2589x_device *cx)
 		return ret;
 
 	reg_val &= CX2589x_TERMCHRG_CUR_MASK;
-	curr = reg_val * CX2589x_TERMCHRG_CURRENT_STEP_uA + offset;
+	if (reg_val <= CX2589x_TERMCHRG_335mA) {
+		curr = reg_val * CX2589x_TERMCHRG_CURRENT_STEP1_uA + offset;
+	} else {
+		offset = CX2589x_TERMCHRG_I_MIDDLE_uA;
+		curr = (reg_val - CX2589x_TERMCHRG_335mA) * CX2589x_TERMCHRG_CURRENT_STEP2_uA + offset;
+	}
+
 	return curr;
 }
 
@@ -329,11 +335,30 @@ __maybe_unused static int cx2589x_get_prechrg_curr(struct cx2589x_device *cx)
 		return ret;
 
 	reg_val = (reg_val&CX2589x_PRECHRG_CUR_MASK) >> 4;
-	curr = reg_val * CX2589x_PRECHRG_CURRENT_STEP_uA + offset;
+	curr = reg_val * CX2589x_PRECHRG_CURRENT_STEP1_uA + offset;
+
+	if (reg_val <= CX2589x_PRECHRG_337mA) {
+		curr = reg_val * CX2589x_PRECHRG_CURRENT_STEP1_uA + offset;
+	} else {
+		offset = CX2589x_PRECHRG_I_MIDDLE_uA;
+		curr = (reg_val - CX2589x_PRECHRG_337mA) * CX2589x_PRECHRG_CURRENT_STEP2_uA + offset;
+	}
+
 
 	return curr;
 }
 
+
+/*
+Termination Current Limit
+0000 每 0101: 40mA 每 335mA, step=59mA
+0110 每 1011: 400mA 每 725mA, step=65mA
+ITERM > 725mA is not defined
+Default: 217mA (0011)
+0000 每 40mA, 0001 每 99mA, 0010 每 158mA, 0011 每 217mA
+0100 每 276mA, 0101 每 335mA, 0110 每 400mA, 0111 每 465mA
+1000 每 530mA, 1001 每 595mA, 1010 每 660mA, 1011 每 725mA
+*/
 static int cx2589x_set_term_curr(struct charger_device *chg_dev, u32 uA)
 {
 	u8 reg_val;
@@ -344,12 +369,28 @@ static int cx2589x_set_term_curr(struct charger_device *chg_dev, u32 uA)
 	else if (uA > CX2589x_TERMCHRG_I_MAX_uA)
 		uA = CX2589x_TERMCHRG_I_MAX_uA;
 
-	reg_val = (uA - CX2589x_TERMCHRG_I_MIN_uA) / CX2589x_TERMCHRG_CURRENT_STEP_uA;
+	if (uA <= CX2589x_TERMCHRG_I_MIDDLE_uA) {
+		reg_val = (uA - CX2589x_TERMCHRG_I_MIN_uA + (CX2589x_TERMCHRG_CURRENT_STEP1_uA / 2))
+			/ CX2589x_TERMCHRG_CURRENT_STEP1_uA;
+	} else {
+		reg_val = (uA - CX2589x_TERMCHRG_I_MIDDLE_uA + (CX2589x_TERMCHRG_CURRENT_STEP2_uA / 2))
+			/ CX2589x_TERMCHRG_CURRENT_STEP2_uA + CX2589x_TERMCHRG_335mA;
+	}
+	pr_info("set iterm uA=%d uA, reg_val=0x%x\n", uA, reg_val);
 
-	dev_info(cx->dev, "%s: set iterm curr = %duA\n", __func__, uA);
 	return cx2589x_update_bits(cx, CX2589x_REG_05, CX2589x_TERMCHRG_CUR_MASK, reg_val);
 }
 
+/*
+Precharge Current Limit
+0000 每 0101: 52mA 每 337mA, step=57mA
+0110 每 1011: 401mA 每 721mA, step=64mA
+IPRECHG > 721mA is not defined.
+Default: 109mA (0001)
+0000 每 52mA, 0001 每 109mA, 0010 每 166mA, 0011 每 223mA
+0100 每 280mA, 0101 每 337mA, 0110 每 401mA, 0111 每 465mA
+1000 每 529mA, 1001 每 593mA, 1010 每 657mA, 1011 每 721mA
+*/
 static int cx2589x_set_prechrg_curr(struct cx2589x_device *cx, int uA)
 {
 	u8 reg_val;
@@ -360,9 +401,16 @@ static int cx2589x_set_prechrg_curr(struct cx2589x_device *cx, int uA)
 	else if (uA > CX2589x_PRECHRG_I_MAX_uA)
 		uA = CX2589x_PRECHRG_I_MAX_uA;
 
-	reg_val = (uA - CX2589x_PRECHRG_I_MIN_uA) / CX2589x_PRECHRG_CURRENT_STEP_uA;
-
+	if (uA <= CX2589x_PRECHRG_I_MIDDLE_uA) {
+		reg_val = (uA - CX2589x_PRECHRG_I_MIN_uA + (CX2589x_PRECHRG_CURRENT_STEP1_uA / 2))
+			/ CX2589x_PRECHRG_CURRENT_STEP1_uA;
+	} else {
+		reg_val = (uA - CX2589x_PRECHRG_I_MIDDLE_uA + (CX2589x_PRECHRG_CURRENT_STEP2_uA / 2))
+			/ CX2589x_PRECHRG_CURRENT_STEP2_uA + CX2589x_PRECHRG_337mA;
+	}
 	reg_val = reg_val << 4;
+	pr_info("set prechrg uA=%d uA, reg_val=0x%x\n", uA, reg_val);
+
 	return cx2589x_update_bits(cx, CX2589x_REG_05, CX2589x_PRECHRG_CUR_MASK, reg_val);
 }
 

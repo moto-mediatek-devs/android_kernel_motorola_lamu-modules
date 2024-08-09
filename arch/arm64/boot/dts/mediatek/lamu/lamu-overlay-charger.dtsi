@@ -60,6 +60,9 @@
 	temp_t0_thres = <(-20)>;
 	temp_t0_thres_plus_x_degree = <(-17)>;
 	temp_neg_10_thres = <(-22)>;
+/* TN Begin modified by xinjun.lu/860715 20240809 CR/EKLAMU-202 */
+	eoc_current = <335000>;
+/* TN End modified by xinjun.lu/860715 20240809 CR/EKLAMU-202 */
 };
 
 &pdc {

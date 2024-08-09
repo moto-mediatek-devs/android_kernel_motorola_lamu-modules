@@ -687,29 +687,7 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 	if (of_property_read_u32(np, "adapter-priority", &val)>= 0)
 		info->setting.adapter_priority = val;
 
-	/*	dual parallel battery*/
-	np = of_parse_phandle(dev->of_node, "current-selector", 0);
-	if (np) {
-		info->cs_gpio_index = of_get_named_gpio(dev->of_node, "cs-gpios", 0);
-		if (of_property_read_string(np, "cs-name",
-			&info->curr_select_name) < 0) {
-			chr_err("%s: no cs-name\n", __func__);
-			info->curr_select_name = "NULL";
-		}
-		info->cs_with_gauge =
-			of_property_read_bool(np, "cs-gauge");
-		chr_err("%s: %d\n", __func__, info->cs_with_gauge);
-		if (of_property_read_u32(np, "comp-resist", &val) >= 0)
-			info->comp_resist = val;
-		else
-			info->comp_resist = 25;
-	} else {
-		chr_err("%s: failed to get current_selector\n", __func__);
-		info->cs_hw_disable = true;
-		info->curr_select_name = "NULL";
-	}
-
-/* TN Begin modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
+/* TN Begin modified by xinjun.lu/860715 20240809 CR/EKLAMU-202 */
 	if (of_property_read_u32(np, "jeita_temp_above_t4_icurrent", &val) >= 0)
 		info->data.jeita_temp_above_t4_icurrent = val;
 	else {
@@ -750,8 +728,7 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 		chr_err("use default jeita_temp_below_t0_icurrent:0\n");
 		info->data.jeita_temp_below_t0_icurrent = JEITA_TEMP_BELOW_T0_CURRENT;
 	}
-/* TN End modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
-/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+
 #if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
 	if (of_property_read_u32(np, "hvdcp_temp_above_t4_icurrent", &val) >= 0)
 		info->data.hvdcp_temp_above_t4_icurrent = val;
@@ -815,7 +792,40 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 		info->data.hvdcp_charging_current_limit = HVDCP_CHARGER_CURRENT;
 	}
 #endif
-/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	if (of_property_read_u32(np, "eoc_current", &val) >= 0)
+		info->data.eoc_current = val;
+	else if (of_property_read_u32(np, "eoc-current", &val) >= 0)
+		info->data.eoc_current = val;
+	else {
+		chr_err("use default EOC_CURRENT:%d\n", EOC_CURRENT);
+		info->data.eoc_current = EOC_CURRENT;
+	}
+	chr_err("%s:eoc_current:%d\n", __func__, info->data.eoc_current);
+#endif
+/* TN End modified by xinjun.lu/860715 20240809 CR/EKLAMU-202 */
+
+	/*	dual parallel battery*/
+	np = of_parse_phandle(dev->of_node, "current-selector", 0);
+	if (np) {
+		info->cs_gpio_index = of_get_named_gpio(dev->of_node, "cs-gpios", 0);
+		if (of_property_read_string(np, "cs-name",
+			&info->curr_select_name) < 0) {
+			chr_err("%s: no cs-name\n", __func__);
+			info->curr_select_name = "NULL";
+		}
+		info->cs_with_gauge =
+			of_property_read_bool(np, "cs-gauge");
+		chr_err("%s: %d\n", __func__, info->cs_with_gauge);
+		if (of_property_read_u32(np, "comp-resist", &val) >= 0)
+			info->comp_resist = val;
+		else
+			info->comp_resist = 25;
+	} else {
+		chr_err("%s: failed to get current_selector\n", __func__);
+		info->cs_hw_disable = true;
+		info->curr_select_name = "NULL";
+	}
 }
 
 static void mtk_charger_start_timer(struct mtk_charger *info)
@@ -4795,6 +4805,12 @@ static int mtk_charger_plug_in(struct mtk_charger *info,
 
 	charger_dev_plug_in(info->chg1_dev);
 	mtk_charger_force_disable_power_path(info, CHG1_SETTING, false);
+/* TN Begin modified by xinjun.lu/860715 20240809 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	charger_dev_set_eoc_current(info->chg1_dev, info->data.eoc_current); //set cut-off current
+#endif
+/* TN End modified by xinjun.lu/860715 20240809 CR/EKLAMU-202 */
+
 
 	return 0;
 }
