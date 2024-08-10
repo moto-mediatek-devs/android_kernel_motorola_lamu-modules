@@ -280,7 +280,7 @@ static struct hx9031as_addr_val_pair hx9031as_reg_init_list[] = {
 	{ RW_23_GLOBAL_CTRL2, 0x00 },
 
 	{ RW_02_PRF_CFG, 0x17 },
-	{ RW_0D_RANGE_7_0, 0x11 },
+	{ RW_0D_RANGE_7_0, 0x00 },
 	{ RW_0E_RANGE_9_8, 0x00 },
 	{ RW_0F_RANGE_18_16, 0x00 },
 
@@ -290,14 +290,14 @@ static struct hx9031as_addr_val_pair hx9031as_reg_init_list[] = {
 	{ RW_13_AVG12_CFG, 0x03 },
 	{ RW_14_AVG34_CFG, 0x33 },
 
-	{ RW_1F_SAMPLE_NUM_7_0, 0x65 },
-	{ RW_21_INTEGRATION_NUM_7_0, 0x65 },
+	{ RW_1F_SAMPLE_NUM_7_0, 0x71 },
+	{ RW_21_INTEGRATION_NUM_7_0, 0x71 },
 
 	{ RW_2A_LP_ALP_1_0_CFG, 0x33 },
 	{ RW_2B_LP_ALP_3_2_CFG, 0x33 },
-	{ RW_29_LP_ALP_4_CFG, 0x03 },
-	{ RW_2C_UP_ALP_1_0_CFG, 0x88 },
-	{ RW_2D_UP_ALP_3_2_CFG, 0x88 },
+	{ RW_29_LP_ALP_4_CFG, 0x02 },
+	{ RW_2C_UP_ALP_1_0_CFG, 0x78 },
+	{ RW_2D_UP_ALP_3_2_CFG, 0x78 },
 	{ RW_2E_DN_UP_ALP_0_4_CFG, 0x18 },
 	{ RW_2F_DN_ALP_2_1_CFG, 0x11 },
 	{ RW_30_DN_ALP_4_3_CFG, 0x11 },
