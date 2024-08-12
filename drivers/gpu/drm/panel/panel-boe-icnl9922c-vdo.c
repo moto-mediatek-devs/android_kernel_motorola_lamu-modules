@@ -296,9 +296,9 @@ static int boe_unprepare(struct drm_panel *panel)
 	boe_dcs_write_seq_static(ctx, 0xF0,0x00,0x00,0x00);
 
 	boe_dcs_write_seq_static(ctx, 0xAC,0x0A,0x00);
-	boe_dcs_write_seq_static(ctx, 0x28);
+	boe_dcs_write_seq_static(ctx, 0x28,0x00,0x00);
 	msleep(10);
-	boe_dcs_write_seq_static(ctx, 0x10);
+	boe_dcs_write_seq_static(ctx, 0x10,0x00,0x00);
 	msleep(120);
 
 	ctx->error = 0;
