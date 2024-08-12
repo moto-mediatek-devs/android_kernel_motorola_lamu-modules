@@ -2005,6 +2005,7 @@ def get_overlay_modules_list():
         mgk_64_device_modules.append("oem/tinno_charger/typec/aw35616/aw35616.ko")
         mgk_64_device_modules.append("oem/tinno_charger/typec/sc2150/sc2150.ko")
         mgk_64_device_modules.append("oem/tinno_charger/typec/cps8851/cps8851.ko")
+        mgk_64_device_modules.append("oem/tinno_charger/typec/aw35615/aw35615.ko")
         mgk_64_device_modules.append("oem/audiopa/fs1815/snd-soc-fs1815.ko")
         mgk_64_device_modules.append("oem/tinno_charger/qc_logic/z350/z350.ko")
         mgk_64_device_modules.append("oem/tinno_charger/qc_logic/wt6670f/wt6670f.ko")

@@ -110,6 +110,7 @@ struct Port {
 	AW_BOOL                isContractValid;          /* PD Contract Valid */
 	AW_BOOL                IsHardReset;              /* HR is occurring */
 	AW_BOOL                IsPRSwap;                 /* PR is occurring */
+	AW_BOOL                IsPRSwapOk;               /* PR is ok */
 	AW_BOOL                IsVCONNSource;            /* VConn state */
 	AW_BOOL                USBPDTxFlag;              /* Have msg to Tx */
 	AW_U8                  CollisionCounter;         /* Collisions for PE */
@@ -182,6 +183,7 @@ struct Port {
 	ExtMsgState_t          ExtTxOrRx;                  /* Tx' or Rx'ing  */
 	ExtHeader_t            ExtTxHeader;
 	ExtHeader_t            ExtRxHeader;
+	AW_BOOL                GetExtFlag;
 	AW_BOOL                ExtWaitTxRx;                /* Waiting to Tx/Rx */
 	AW_U16                 ExtChunkOffset;             /* Next chunk offset */
 	AW_U8                  ExtMsgBuffer[260];

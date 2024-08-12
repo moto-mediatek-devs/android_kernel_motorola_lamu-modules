@@ -32,6 +32,10 @@ void VIF_InitializeSrcCaps(doDataObject_t *src_caps)
 	for (i = 0; i < chip->port.src_pdo_size; ++i) {
 		gSrc_caps[i].FPDOSupply.Voltage = chip->port.src_pdo_vol[i] / 50;
 		gSrc_caps[i].FPDOSupply.MaxCurrent = chip->port.src_pdo_cur[i] / 10;
+		if (i > 0) {
+			gSrc_caps[i].FPDOSupply.USBCommCapable = 0;
+			gSrc_caps[i].FPDOSupply.DataRoleSwap = 0;
+		}
 	}
 
 	for (i = 0; i < 7; ++i)
@@ -56,6 +60,13 @@ void VIF_InitializeSnkCaps(doDataObject_t *snk_caps)
 	for (i = 0; i < chip->port.snk_pdo_size; ++i) {
 		gSnk_caps[i].FPDOSink.Voltage = chip->port.snk_pdo_vol[i] / 50;
 		gSnk_caps[i].FPDOSink.OperationalCurrent = chip->port.snk_pdo_cur[i] / 10;
+		if (i > 0) {
+			gSnk_caps[i].FPDOSink.DataRoleSwap = 0;
+			gSnk_caps[i].FPDOSink.USBCommCapable = 0;
+			gSnk_caps[i].FPDOSink.ExternallyPowered = 0;
+			gSnk_caps[i].FPDOSink.HigherCapability = 0;
+			gSnk_caps[i].FPDOSink.DualRolePower = 0;
+		}
 	}
 
 	for (i = 0; i < 7; ++i)

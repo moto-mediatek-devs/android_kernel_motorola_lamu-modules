@@ -520,8 +520,19 @@ int pe50_hal_get_soc(struct chg_alg_device *alg, u32 *soc)
 	union power_supply_propval val = {0,};
 	struct pe50_hal *hal = chg_alg_dev_get_drv_hal_data(alg);
 
+/*TN Begin modified by hao.jia/809321 20240812 CR/EKLAMU-202*/
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	if (IS_ERR_OR_NULL(hal->bat_psy)) {
+		hal->bat_psy = power_supply_get_by_name("battery");
+		if (IS_ERR_OR_NULL(hal->bat_psy)) {
+			goto out;
+		}
+	}
+#else
 	if (IS_ERR_OR_NULL(hal->bat_psy))
 		goto out;
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/*TN End modified by hao.jia/809321 20240812 CR/EKLAMU-202*/
 
 	ret = power_supply_get_property(hal->bat_psy,
 					POWER_SUPPLY_PROP_CAPACITY, &val);

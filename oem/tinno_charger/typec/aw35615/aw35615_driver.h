@@ -14,9 +14,9 @@
 #include <linux/kernel.h>
 #include "modules/dpm.h"
 
-//#if KERNEL_VERSION(4, 19, 1) <= LINUX_VERSION_CODE
+#if KERNEL_VERSION(4, 19, 1) <= LINUX_VERSION_CODE
 #define AW_KERNEL_VER_OVER_4_19_1
-//#endif
+#endif
 
 /* AW35615 Device ID */
 
@@ -114,7 +114,7 @@
 #define VBUS_MV_VSAFE0V		840	 /* Closest value for MDAC resolution */
 #define VBUS_MV_VSAFE0V_DISCH	600
 #define VBUS_MV_VSAFE5V_DISC	3200
-#define VBUS_MV_VSAFE5V_L	4150
+#define VBUS_MV_VSAFE5V_L	4450
 #define VBUS_MV_VSAFE5V_H	5500
 
 #define VBUS_PD_TO_MV(v)   (v * 50)	 /* Convert 50mv PD values to mv */

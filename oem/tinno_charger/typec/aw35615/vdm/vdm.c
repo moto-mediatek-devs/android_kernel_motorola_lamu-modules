@@ -71,6 +71,7 @@ AW_S32 requestDiscoverIdentity(Port_t *port, SopType sop)
 		__vdmh.SVDM.SVID = PD_SID;
 		/* structured VDM Header */
 		__vdmh.SVDM.VDMType = STRUCTURED_VDM;
+		__vdmh.SVDM.Version_Min = DPM_SVdmVer(port, sop);
 		/* version 1.0 or 2.0 */
 		__vdmh.SVDM.Version = DPM_SVdmVer(port, sop);
 		/* does not matter for Discover Identity */
@@ -92,6 +93,7 @@ AW_S32 requestDiscoverIdentity(Port_t *port, SopType sop)
 		__vdmh.SVDM.SVID = PD_SID;
 		/* structured VDM Header */
 		__vdmh.SVDM.VDMType = STRUCTURED_VDM;
+		__vdmh.SVDM.Version_Min = DPM_SVdmVer(port, sop);
 		/* version 1.0 or 2.0 */
 		__vdmh.SVDM.Version = DPM_SVdmVer(port, sop);
 		/* does not matter for Discover Identity */
@@ -134,6 +136,7 @@ AW_S32 requestDiscoverSvids(Port_t *port, SopType sop)
 	__vdmh.SVDM.SVID = PD_SID;
 	/* structured VDM Header */
 	__vdmh.SVDM.VDMType = STRUCTURED_VDM;
+	__vdmh.SVDM.Version_Min = DPM_SVdmVer(port, sop);
 	/* version 1.0 or 2.0 */
 	__vdmh.SVDM.Version = DPM_SVdmVer(port, sop);
 	/* does not matter for Discover SVIDs */
@@ -174,6 +177,7 @@ AW_S32 requestDiscoverModes(Port_t *port, SopType sop, AW_U16 svid)
 	__vdmh.SVDM.SVID = svid;
 	/* structured VDM Header */
 	__vdmh.SVDM.VDMType = STRUCTURED_VDM;
+	__vdmh.SVDM.Version_Min = DPM_SVdmVer(port, sop);
 	/* version 1.0 or 2.0 */
 	__vdmh.SVDM.Version = DPM_SVdmVer(port, sop);
 	/* does not matter for Discover Modes */
@@ -210,6 +214,7 @@ AW_S32 requestSendAttention(Port_t *port, SopType sop, AW_U16 svid, AW_U8 mode)
 	__vdmh.SVDM.SVID = svid;
 	/* structured VDM Header */
 	__vdmh.SVDM.VDMType = STRUCTURED_VDM;
+	__vdmh.SVDM.Version_Min = DPM_SVdmVer(port, sop);
 	/* version 1.0 or 2.0 */
 	__vdmh.SVDM.Version = DPM_SVdmVer(port, sop);
 	/* use the mode index that needs attention */
@@ -274,6 +279,7 @@ AW_S32 processDiscoverIdentity(Port_t *port, SopType sop, AW_U32 *arr_in, AW_U32
 		}
 
 		vdmh_out.SVDM.VDMType = STRUCTURED_VDM;
+		vdmh_out.SVDM.Version_Min = DPM_SVdmVer(port, sop);
 		/* version 1.0 or 2.0 */
 		vdmh_out.SVDM.Version = DPM_SVdmVer(port, sop);
 		/* doesn't matter for Discover Identity */
@@ -322,6 +328,9 @@ AW_S32 processDiscoverIdentity(Port_t *port, SopType sop, AW_U32 *arr_in, AW_U32
 				arr[length] = getBitsForAmaVdo(amavdo_out);
 				length++;
 			}
+
+			if (port->PdRevSop == USBPDSPECREV3p0)
+				length = 7;
 		}
 
 		sendVdmMessage(port, sop, arr, length, port->originalPolicyState);
@@ -432,6 +441,7 @@ AW_S32 processDiscoverSvids(Port_t *port, SopType sop, AW_U32 *arr_in, AW_U32 le
 		vdmh_out.SVDM.SVID = PD_SID;
 		/* Discovery SVIDs is Structured */
 		vdmh_out.SVDM.VDMType = STRUCTURED_VDM;
+		vdmh_out.SVDM.Version_Min = DPM_SVdmVer(port, sop);
 		/* version 1.0 or 2.0 */
 		vdmh_out.SVDM.Version = DPM_SVdmVer(port, sop);
 		/* doesn't matter for Discover SVIDs */
@@ -547,6 +557,7 @@ AW_S32 processDiscoverModes(Port_t *port, SopType sop, AW_U32 *arr_in, AW_U32 le
 		vdmh_out.SVDM.SVID = vdmh_in.SVDM.SVID;
 		/* Discovery Modes is Structured */
 		vdmh_out.SVDM.VDMType = STRUCTURED_VDM;
+		vdmh_out.SVDM.Version_Min = DPM_SVdmVer(port, sop);
 		/* version 1.0 or 2.0 */
 		vdmh_out.SVDM.Version = DPM_SVdmVer(port, sop);
 		/* doesn't matter for Discover Modes */
@@ -642,6 +653,7 @@ AW_S32 processEnterMode(Port_t *port, SopType sop, AW_U32 *arr_in, AW_U32 length
 		svdmh_out.SVDM.SVID = svdmh_in.SVDM.SVID;
 		/* Enter Mode is Structured */
 		svdmh_out.SVDM.VDMType = STRUCTURED_VDM;
+		svdmh_out.SVDM.Version_Min = DPM_SVdmVer(port, sop);
 		/* version 1.0 or 2.0 */
 		svdmh_out.SVDM.Version = DPM_SVdmVer(port, sop);
 		/* reflect the object position */
@@ -714,6 +726,7 @@ AW_S32 processExitMode(Port_t *port, SopType sop, AW_U32 *arr_in, AW_U32 length_
 		vdmh_out.SVDM.SVID = vdmh_in.SVDM.SVID;
 		/* Exit Mode is Structured */
 		vdmh_out.SVDM.VDMType = STRUCTURED_VDM;
+		vdmh_out.SVDM.Version_Min = DPM_SVdmVer(port, sop);
 		/* version 1.0 or 2.0 */
 		vdmh_out.SVDM.Version = DPM_SVdmVer(port, sop);
 		/* reflect the object position */
@@ -797,6 +810,7 @@ AW_S32 processSvidSpecific(Port_t *port, SopType sop, AW_U32 *arr_in, AW_U32 len
 	vdmh_out.SVDM.SVID = vdmh_in.SVDM.SVID;
 	/* All are structured in this switch-case */
 	vdmh_out.SVDM.VDMType = STRUCTURED_VDM;
+	vdmh_out.SVDM.Version_Min = DPM_SVdmVer(port, sop);
 	/* version 1.0 or 2.0 */
 	vdmh_out.SVDM.Version = DPM_SVdmVer(port, sop);
 	/* value doesn't matter here */
@@ -866,13 +880,11 @@ AW_S32 processVdmMessage(Port_t *port, SopType sop, AW_U32 *arr_in, AW_U32 lengt
 			(sop == SOP_TYPE_SOP1 || sop == SOP_TYPE_SOP2))
 			DPM_SetSpecRev(port, sop, (SpecRev)port->PolicyRxHeader.SpecRevision);
 
-		#ifdef AW_DEBUG_CODE
-		if (DPM_SVdmVer(port, sop) != vdmh_in.SVDM.Version) {
-			printf("%u\n", vdmh_in.SVDM.Version);
+		/* if (DPM_SVdmVer(port, sop) != vdmh_in.SVDM.Version) { */
+			/* AW_LOG("%u\n", vdmh_in.SVDM.Version); */
 			/* Invalid structured VDM version */
-			return 1;
-		}
-		#endif
+			/* return 1; */
+		/* } */
 
 		/* different actions for different commands */
 		switch (vdmh_in.SVDM.Command) {
@@ -935,6 +947,7 @@ AW_S32 requestEnterMode(Port_t *port, SopType sop, AW_U16 svid, AW_U32 mode_inde
 	vdmh.SVDM.SVID = svid;
 	/* structured VDM Header */
 	vdmh.SVDM.VDMType = STRUCTURED_VDM;
+	vdmh.SVDM.Version_Min = DPM_SVdmVer(port, sop);
 	/* version 1.0 or 2.0 */
 	vdmh.SVDM.Version = DPM_SVdmVer(port, sop);
 	/* select mode */
@@ -972,6 +985,7 @@ AW_S32 requestExitMode(Port_t *port, SopType sop, AW_U16 svid, AW_U32 mode_index
 	vdmh.SVDM.SVID = svid;
 	/* structured VDM Header */
 	vdmh.SVDM.VDMType = STRUCTURED_VDM;
+	vdmh.SVDM.Version_Min = DPM_SVdmVer(port, sop);
 	/* version 1.0 or 2.0 */
 	vdmh.SVDM.Version = DPM_SVdmVer(port, sop);
 	/* select mode */

@@ -457,7 +457,11 @@ void ProtocolTransmitMessage(Port_t *port)
 		return;
 	}
 
-	port->Registers.Control.N_RETRIES = DPM_Retries(port, port->ProtocolMsgTxSop);
+	//port->Registers.Control.N_RETRIES = DPM_Retries(port, port->ProtocolMsgTxSop);
+	if (port->PolicyTxHeader.SpecRevision == 1)
+		port->Registers.Control.N_RETRIES = 3;
+	else if (port->PolicyTxHeader.SpecRevision == 2)
+		port->Registers.Control.N_RETRIES = 2;
 	port->Registers.Control.AUTO_RETRY = 1;
 
 	DeviceWrite(port, regControl3, 1, &port->Registers.Control.byte[3]);

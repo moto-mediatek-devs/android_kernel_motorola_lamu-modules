@@ -396,6 +396,7 @@ void DP_ProcessPartnerAttention(struct Port *port, DisplayPortStatus_t stat)
 			/* disable display port data if active */
 			if (port->DisplayPortData.DpConfigured == AW_TRUE)
 				break;
+			break;
 		case DP_MODE_DFP_D:
 		/* TODO: handle DP source device present */
 			if (port->DisplayPortData.DpCapMatched == AW_TRUE &&
@@ -418,9 +419,10 @@ void DP_ProcessPartnerAttention(struct Port *port, DisplayPortStatus_t stat)
 			}
 			break;
 		case DP_MODE_BOTH:
-		if (port->DisplayPortData.DpCapMatched)
-			/* Send previously selected configuration */
-			DP_RequestPartnerConfig(port, port->DisplayPortData.DpPpConfig);
+			if (port->DisplayPortData.DpCapMatched)
+				/* Send previously selected configuration */
+				DP_RequestPartnerConfig(port, port->DisplayPortData.DpPpConfig);
+			break;
 		}
 	}
 

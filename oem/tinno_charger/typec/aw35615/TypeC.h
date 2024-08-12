@@ -14,7 +14,7 @@
 
 /* Type C Timing Parameters */
 #define tAMETimeout     (900 * TICK_SCALE_TO_MS) /* Alternate Mode Entry Time */
-#define tCCDebounce     (120 * TICK_SCALE_TO_MS)
+#define tCCDebounce     (103 * TICK_SCALE_TO_MS)
 #define tPDDebounce     (15  * TICK_SCALE_TO_MS)
 #define tTryTimeout     (100 * TICK_SCALE_TO_MS)
 #define tDRPTryWait     (100 * TICK_SCALE_TO_MS)

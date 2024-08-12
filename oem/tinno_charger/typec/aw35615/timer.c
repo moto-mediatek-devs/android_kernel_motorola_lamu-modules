@@ -32,9 +32,11 @@ void TimerRestart(struct TimerObj *obj)
 
 void TimerDisable(struct TimerObj *obj)
 {
-	/* Zero means disabled */
-	obj->starttime_ = obj->period_ = 0;
-	obj->disablecount_ = 0;
+	if (obj != AW_NULL) {
+		/* Zero means disabled */
+		obj->starttime_ = obj->period_ = 0;
+		obj->disablecount_ = 0;
+	}
 }
 
 AW_BOOL TimerDisabled(struct TimerObj *obj)

@@ -205,10 +205,14 @@ AW_BOOL aw_GPIO_Get_IntN(void)
 
 	/* If your system routes GPIO calls through a queue of some kind, then*/
 	/* it may need to be able to sleep. If so, this call must be used.*/
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
+	ret = !gpio_get_value(chip->gpio_IntN); /* Int_N is active low */
+#else
 	if (gpio_cansleep(chip->gpio_IntN))
 		ret = !gpio_get_value_cansleep(chip->gpio_IntN);
 	else
 		ret = !gpio_get_value(chip->gpio_IntN); /* Int_N is active low */
+#endif /* LINUX_VERSION_CODE */
 
 	return (ret != 0);
 }
@@ -254,6 +258,7 @@ int DeviceWrite(Port_t *port, AW_U8 reg_addr, AW_U8 length, AW_U8 *buf)
 		return -ENOMEM;
 	}
 
+	cpu_latency_qos_update_request(&chip->pm_gos_request, 150);
 	wdbuf[0] = reg_addr;
 	memcpy(&wdbuf[1], buf, length);
 
@@ -262,6 +267,7 @@ int DeviceWrite(Port_t *port, AW_U8 reg_addr, AW_U8 length, AW_U8 *buf)
 		pr_err("%s: i2c master send error\n", __func__);
 
 	kfree(wdbuf);
+	cpu_latency_qos_update_request(&chip->pm_gos_request, PM_QOS_DEFAULT_VALUE);
 
 	return ret;
 }
@@ -292,6 +298,7 @@ int DeviceRead(Port_t *port, AW_U8 reg_addr, AW_U8 length, AW_U8 *buf)
 		return  -ENOMEM;
 	}
 
+	cpu_latency_qos_update_request(&chip->pm_gos_request, 150);
 	msgs[1].buf = rdbuf;
 
 	ret = i2c_transfer(chip->client->adapter, msgs, ARRAY_SIZE(msgs));
@@ -300,6 +307,7 @@ int DeviceRead(Port_t *port, AW_U8 reg_addr, AW_U8 length, AW_U8 *buf)
 	if (buf != NULL)
 		memcpy(buf, rdbuf, length);
 	kfree(rdbuf);
+	cpu_latency_qos_update_request(&chip->pm_gos_request, PM_QOS_DEFAULT_VALUE);
 
 	return ret;
 }
@@ -815,11 +823,12 @@ void aw_InitializeCore(void)
 	}
 
 	core_initialize(&chip->port);
-	chip->sink_timer = 31500;
-	chip->source_timer = 28900;
-	chip->source_end_timer = 31500;
+	usleep_range(4000, 5000);
+	chip->sink_timer = 30000;
+	chip->source_timer = 30000;
+	chip->source_end_timer = 3;
 	chip->port.sink_bist_reg = 0x60;
-	chip->sink_reg_bist = 0x54;
+	chip->sink_reg_bist = 0x50;
 	chip->source_reg_bist = 0x65;
 	AW_LOG(" Core is initialized!\n");
 }
@@ -882,6 +891,7 @@ void aw_InitChipData(void)
 	chip->numRetriesI2C = RETRIES_I2C;
 
 	/* Worker thread setup */
+	chip->wakelock_flag = AW_FALSE;
 	INIT_WORK(&chip->sm_worker, work_function);
 
 	chip->queued = AW_FALSE;
@@ -942,6 +952,7 @@ AW_S32 aw_EnableInterrupts(void)
 		return ret;
 	}
 
+	device_init_wakeup(&chip->client->dev, true);
 	enable_irq_wake(chip->gpio_IntN_irq);
 
 	return 0;
@@ -1003,6 +1014,7 @@ static irqreturn_t _aw_isr_intn(AW_S32 irq, void *dev_id)
 	/* Schedule the process to handle the state machine processing */
 	if (!chip->queued) {
 		chip->queued = AW_TRUE;
+		pm_wakeup_event(&chip->client->dev, 500);
 		queue_work(chip->highpri_wq, &chip->sm_worker);
 	}
 
@@ -1160,11 +1172,14 @@ static void work_function(struct work_struct *work)
 	/* Disable timer while processing */
 	aw_StopTimer(&chip->sm_timer);
 
+	if (!chip->wakelock_flag) {
+		chip->wakelock_flag = AW_TRUE;
 #ifdef AW_KERNEL_VER_OVER_4_19_1
-	__pm_stay_awake(chip->aw35615_wakelock);
+		__pm_stay_awake(chip->aw35615_wakelock);
 #else
-	wake_lock(&chip->aw35615_wakelock);
+		wake_lock(&chip->aw35615_wakelock);
 #endif
+	}
 
 	down(&chip->suspend_lock);
 
@@ -1193,11 +1208,20 @@ static void work_function(struct work_struct *work)
 	}
 
 	up(&chip->suspend_lock);
+
+	if (chip->wakelock_flag && ((chip->port.ConnState == AudioAccessory) ||
+			(chip->port.ConnState == AttachedSink) || (chip->port.ConnState == AttachVbusOnlyok) ||
+			(chip->port.ConnState == AttachedSource) || (chip->port.ConnState == PoweredAccessory) ||
+			(chip->port.ConnState == DebugAccessorySink) || (chip->port.ConnState == DebugAccessorySource) ||
+			(chip->port.ConnState == Unattached))) {
+		chip->wakelock_flag = AW_FALSE;
 #ifdef AW_KERNEL_VER_OVER_4_19_1
-	__pm_relax(chip->aw35615_wakelock);
+		__pm_relax(chip->aw35615_wakelock);
 #else
-	wake_unlock(&chip->aw35615_wakelock);
+		wake_unlock(&chip->aw35615_wakelock);
 #endif
+	}
+
 }
 
 void stop_usb_host(struct aw35615_chip *chip)
@@ -1347,6 +1371,7 @@ void handle_core_event(AW_U32 event, AW_U8 portId, void *usr_ctx, void *app_ctx)
 		break;
 	case CC_NO_ORIENT:
 		AW_LOG("aw35615 CC_NO_ORIENT=0x%x\n", event);
+		chip->tcpc->pd_port.pe_data.pe_ready = AW_FALSE;
 		if (usb_state == 1) {
 			stop_usb_peripheral(chip);
 			usb_state = 0;
@@ -1367,8 +1392,10 @@ void handle_core_event(AW_U32 event, AW_U8 portId, void *usr_ctx, void *app_ctx)
 		AW_LOG("aw35615 :PD_STATE_CHANGED=0x%x, PE_ST=%d\n",
 				event, chip->port.PolicyState);
 
-		if (chip->port.PolicyState == peSinkSendHardReset)
+		if (chip->port.PolicyState == peSinkTransitionDefault) {
+			chip->tcpc->pd_port.pe_data.pe_ready = AW_FALSE;
 			tcpci_notify_pd_state(chip->tcpc, PD_CONNECT_HARD_RESET);
+		}
 
 		if (chip->port.PolicyState == peSinkReady &&
 			chip->port.PolicyHasContract == AW_TRUE) {
@@ -1376,6 +1403,7 @@ void handle_core_event(AW_U32 event, AW_U8 portId, void *usr_ctx, void *app_ctx)
 				chip->port.pd_state = AW_TRUE;
 				chip->tcpc->pd_port.data_role = PD_ROLE_UFP;
 				chip->tcpc->pd_port.power_role = PD_ROLE_SINK;
+				chip->tcpc->pd_port.pe_data.pe_ready = AW_TRUE;
 				if (chip->port.src_support_pps)
 					tcpci_notify_pd_state(chip->tcpc, PD_CONNECT_PE_READY_SNK_APDO);
 				else
@@ -1391,6 +1419,7 @@ void handle_core_event(AW_U32 event, AW_U8 portId, void *usr_ctx, void *app_ctx)
 				chip->port.pd_state = AW_TRUE;
 				chip->tcpc->pd_port.data_role = PD_ROLE_DFP;
 				chip->tcpc->pd_port.power_role = PD_ROLE_SOURCE;
+				chip->tcpc->pd_port.pe_data.pe_ready = AW_TRUE;
 				tcpci_notify_pd_state(chip->tcpc, PD_CONNECT_PE_READY_SRC_PD30);
 			}
 		}

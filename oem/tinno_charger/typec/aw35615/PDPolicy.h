@@ -48,6 +48,7 @@ void PolicySourceWaitNewCapabilities(Port_t *port);
 void PolicySourceAlertReceived(Port_t *port);
 void PolicyGetBatteryCap(Port_t *port);
 void PolicyGetBatteryStatus(Port_t *port);
+void PolicyGetSinkCapExt(Port_t *port);
 #endif /* AW_HAVE_SRC || (AW_HAVE_SNK && AW_HAVE_ACCMODE) */
 
 #ifdef AW_HAVE_SNK

@@ -47,14 +47,14 @@
 /* General PD Settings Tab */
 #define PD_Specification_Revision 2         /* Revision 3.0 */
 #define SOP_Capable YES                     /* Always YES */
-#define SOP_P_Capable YES
+#define SOP_P_Capable NO
 #define SOP_PP_Capable NO
 #define SOP_P_Debug_Capable NO              /* Not Currently Implemented */
 #define SOP_PP_Debug_Capable NO             /* Not Currently Implemented */
 #define USB_Comms_Capable YES
 #define DR_Swap_To_DFP_Supported YES
 #define DR_Swap_To_UFP_Supported YES
-#define Unconstrained_Power YES
+#define Unconstrained_Power NO
 #define VCONN_Swap_To_On_Supported NO
 #define VCONN_Swap_To_Off_Supported NO
 #define Responds_To_Discov_SOP_UFP YES
@@ -64,14 +64,14 @@
 /* USB Type-C Tab */
 #define Type_C_Implements_Try_SRC NO        /* only one shall be enabled by */
 #define Type_C_Implements_Try_SNK YES        /* the port at the same time, try src or snk*/
-#define Rp_Value 2                          /* 0: Def 1: 1.5A 2: 3A Advertised*/
+#define Rp_Value 0                          /* 0: Def 1: 1.5A 2: 3A Advertised*/
 #define Type_C_Supports_Audio_Accessory YES
 #define Type_C_Is_VCONN_Powered_Accessory NO
 #define Type_C_Is_Debug_Target_SRC YES
 #define Type_C_Is_Debug_Target_SNK YES
-#define Type_C_Can_Act_As_Host NO           /* Not Controlled by this driver */
+#define Type_C_Can_Act_As_Host YES           /* Not Controlled by this driver */
 #define Type_C_Host_Speed 0                 /* Not Controlled by this driver */
-#define Type_C_Can_Act_As_Device NO         /* Not Controlled by this driver */
+#define Type_C_Can_Act_As_Device YES         /* Not Controlled by this driver */
 #define Type_C_Device_Speed 0               /* Not Controlled by this driver */
 #define Type_C_Is_Alt_Mode_Controller NO    /* Not Controlled by this driver */
 #define Type_C_Is_Alt_Mode_Device NO        /* Not Controlled by this driver */
@@ -212,10 +212,10 @@
 /* SOP Discovery - Part One Tab */
 #define Structured_VDM_Version_SOP 1        //; 1: V2.0
 #define XID_SOP 0
-#define Data_Capable_as_USB_Host_SOP NO
-#define Data_Capable_as_USB_Device_SOP NO
-#define Product_Type_UFP_SOP 0                  //; 0: Undefined
-#define Product_Type_DFP_SOP 0                  //; 0: Undefined
+#define Data_Capable_as_USB_Host_SOP YES
+#define Data_Capable_as_USB_Device_SOP YES
+#define Product_Type_UFP_SOP 2                  //; 0: Undefined
+#define Product_Type_DFP_SOP 2                  //; 0: Undefined
 #define Modal_Operation_Supported_SOP NO
 #define Connector_Type 2
 #define USB_VID_SOP 0x344f
