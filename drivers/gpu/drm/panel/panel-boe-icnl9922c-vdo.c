@@ -253,7 +253,7 @@ static void boe_panel_init(struct boe *ctx)
 	boe_dcs_write_seq_static(ctx, 0x35,0x00,0x00);
 	boe_dcs_write_seq_static(ctx, 0x51,0x00,0x00);
 	boe_dcs_write_seq_static(ctx, 0x53,0x2C,0x00);
-	boe_dcs_write_seq_static(ctx, 0x55,0x01,0x00);
+	boe_dcs_write_seq_static(ctx, 0x55,0x00,0x00);
 	msleep(5);
 
 	boe_dcs_write_seq_static(ctx, 0x11,0x00,0x00);
