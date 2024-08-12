@@ -1671,71 +1671,73 @@ static DEVICE_ATTR_RW(BatteryNotify);
 
 /* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
-static ssize_t factory_input_charging_current_show(struct device *dev,
+static ssize_t factory_enable_switch_charger_show(struct device *dev,
 				  struct device_attribute *attr, char *buf)
 {
 	struct mtk_charger *pinfo = dev->driver_data;
-	int fac_icc = 0;
 
-	fac_icc = pinfo->chg_data[CHG1_SETTING].factory_input_current_limit;
-	chr_err("%s: %d\n", __func__, fac_icc);
-	return sprintf(buf, "%d\n", fac_icc);
+	chr_err("%s: %d\n", __func__, pinfo->factory_enable_switch_charger);
+	return sprintf(buf, "%d\n", pinfo->factory_enable_switch_charger);
 }
 
-static ssize_t factory_input_charging_current_store(struct device *dev,
-				   struct device_attribute *attr,
-				   const char *buf, size_t size)
+static ssize_t factory_enable_switch_charger_store(struct device *dev,
+				  struct device_attribute *attr, const char *buf, size_t size)
 {
 	struct mtk_charger *pinfo = dev->driver_data;
-	struct charger_data *chg_data;
 	signed int temp;
-
-	chg_data = &pinfo->chg_data[CHG1_SETTING];
 	if (kstrtoint(buf, 10, &temp) == 0) {
-		if (temp < 0)
-			chg_data->factory_input_current_limit = 0;
-		else
-			chg_data->factory_input_current_limit = temp;
-	} else {
-		chr_err("%s: format error!\n", __func__);
+		if (temp == 1) {
+			pinfo->enable_factory_charging_test = true;
+			charger_dev_enable(pinfo->dvchg1_dev, false);
+			msleep(100);
+			charger_dev_set_input_current(pinfo->chg1_dev, 2000000);
+			charger_dev_set_charging_current(pinfo->chg1_dev, 1500000);
+			charger_dev_enable(pinfo->chg1_dev, true);
+		} else {
+			pinfo->enable_factory_charging_test = false;
+			charger_dev_enable(pinfo->chg1_dev, false);
+		}
+		pinfo->factory_enable_switch_charger = temp;
 	}
+	chr_err("%s: %d\n", __func__, pinfo->factory_enable_switch_charger);
 	return size;
 }
 
-static DEVICE_ATTR_RW(factory_input_charging_current);
+static DEVICE_ATTR_RW(factory_enable_switch_charger);
 
-static ssize_t factory_charging_current_show(struct device *dev,
+static ssize_t factory_enable_pump_charger_show(struct device *dev,
 				  struct device_attribute *attr, char *buf)
 {
 	struct mtk_charger *pinfo = dev->driver_data;
-	int fac_cc = 0;
 
-	fac_cc = pinfo->chg_data[CHG1_SETTING].factory_charging_current_limit;
-	chr_err("%s: %d\n", __func__, fac_cc);
-	return sprintf(buf, "%d\n", fac_cc);
+	chr_err("%s: %d\n", __func__, pinfo->factory_enable_pump_charger);
+	return sprintf(buf, "%d\n", pinfo->factory_enable_pump_charger);
 }
 
-static ssize_t factory_charging_current_store(struct device *dev,
-				   struct device_attribute *attr,
-				   const char *buf, size_t size)
+static ssize_t factory_enable_pump_charger_store(struct device *dev,
+				  struct device_attribute *attr, const char *buf, size_t size)
 {
 	struct mtk_charger *pinfo = dev->driver_data;
-	struct charger_data *chg_data;
 	signed int temp;
-
-	chg_data = &pinfo->chg_data[CHG1_SETTING];
 	if (kstrtoint(buf, 10, &temp) == 0) {
-		if (temp < 0)
-			chg_data->factory_charging_current_limit = 0;
-		else
-			chg_data->factory_charging_current_limit = temp;
-	} else {
-		chr_err("%s: format error!\n", __func__);
+		if (temp == 1) {
+			pinfo->enable_factory_charging_test = true;
+			charger_dev_enable(pinfo->chg1_dev, false);
+			charger_dev_enable_adc(pinfo->dvchg1_dev, true);
+			msleep(100);
+			charger_dev_enable(pinfo->dvchg1_dev, true);
+		} else {
+			pinfo->enable_factory_charging_test = false;
+			charger_dev_enable(pinfo->dvchg1_dev, false);
+			charger_dev_enable_adc(pinfo->dvchg1_dev, false);
+		}
+		pinfo->factory_enable_pump_charger = temp;
 	}
+	chr_err("%s: %d\n", __func__, pinfo->factory_enable_pump_charger);
 	return size;
 }
 
-static DEVICE_ATTR_RW(factory_charging_current);
+static DEVICE_ATTR_RW(factory_enable_pump_charger);
 
 /* TN Begin modified by jirui.li/860702 20240724 CR/EKLAMU-620 */
 #define FACTORY_CHARGING_LIMIT_SOC_DEFAULT 65
@@ -4258,6 +4260,12 @@ static void charger_check_status(struct mtk_charger *info)
 		charging = false;
 	if (info->enable_charger == false)
 		charging = false;
+#if IS_ENABLED(CONFIG_FACTORY_BUILD)
+	if (info->enable_factory_charging_test == true) {
+		info->can_charging = false;
+		return;
+	}
+#endif /* CONFIG_FACTORY_BUILD*/
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 
@@ -5469,11 +5477,10 @@ static int mtk_charger_setup_files(struct platform_device *pdev)
 
 /* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
-	ret = device_create_file(&(pdev->dev), &dev_attr_factory_input_charging_current);
+	ret = device_create_file(&(pdev->dev), &dev_attr_factory_enable_switch_charger);
 	if (ret)
 		goto _out;
-
-	ret = device_create_file(&(pdev->dev), &dev_attr_factory_charging_current);
+	ret = device_create_file(&(pdev->dev), &dev_attr_factory_enable_pump_charger);
 	if (ret)
 		goto _out;
 /* TN Begin modified by jirui.li/860702 20240722 CR/EKLAMU-620 */
@@ -6071,17 +6078,14 @@ static int mtk_charger_probe(struct platform_device *pdev)
 		info->chg_data[i].thermal_charging_current_limit = -1;
 		info->chg_data[i].thermal_input_current_limit = -1;
 		info->chg_data[i].input_current_limit_by_aicl = -1;
-/* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
-		info->chg_data[i].factory_input_current_limit = -1;
-		info->chg_data[i].factory_charging_current_limit = -1;
-#endif /* CONFIG_OEM_TINNO_CHARGER && CONFIG_FACTORY_BUILD */
-/* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 	}
 	info->enable_hv_charging = true;
 
 /* TN Begin modified by jirui.li/860702 20240724 CR/EKLAMU-620 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
+	info->enable_factory_charging_test = false;
+	info->factory_enable_switch_charger = false;
+	info->factory_enable_pump_charger = false;
 	info->factory_charging_limit_soc = FACTORY_CHARGING_LIMIT_SOC_DEFAULT;
 #endif /* CONFIG_OEM_TINNO_CHARGER && CONFIG_FACTORY_BUILD */
 /* TN Begin modified by jirui.li/860702 20240724 CR/EKLAMU-620 */
