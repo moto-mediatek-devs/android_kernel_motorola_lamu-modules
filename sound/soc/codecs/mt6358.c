@@ -29,6 +29,12 @@
 extern int fsm_add_codec_controls(struct snd_soc_component *codec);
 #endif
 
+#if IS_ENABLED(CONFIG_SND_SOC_AW87XXX)
+extern int aw87xxx_add_codec_controls(void *codec);
+#endif
+
+extern bool audiopa_is_aw;
+
 #define MAX_DEBUG_WRITE_INPUT 256
 #define CODEC_SYS_DEBUG_SIZE (1024 * 32)
 
@@ -6699,13 +6705,34 @@ static int mt6358_codec_probe(struct snd_soc_component *cmpnt)
 				       mt6358_snd_vow_controls,
 				       ARRAY_SIZE(mt6358_snd_vow_controls));
 #if IS_ENABLED(CONFIG_SND_SOC_FS1815)
-	ret = fsm_add_codec_controls(cmpnt);
-	if (ret < 0) {
-		pr_err("%s: add fsm1815_codec_controls failed, ret %d\n",
-			__func__, ret);
+	pr_err("%s SFL_ enter add fsm kcontrol\n", __func__);
+	if (audiopa_is_aw == false)
+	{
+		ret = fsm_add_codec_controls(cmpnt);
+		if (ret < 0) {
+			pr_err("%s SFL_ add fsm_codec_controls fail, ret %d\n", __func__, ret)
+;
 		return ret;
+		}else{
+			pr_err("%s SFL_ add fsm_codec_controls success, ret %d\n", __func__, ret);
+		}
 	}
 #endif
+
+#if IS_ENABLED(CONFIG_SND_SOC_AW87XXX)
+	pr_err("%s SFL_ enter snd_card_add_aw87xxx_dev \n", __func__);
+	if (audiopa_is_aw == true)
+	{
+		ret = aw87xxx_add_codec_controls((void *)cmpnt);
+		if (ret < 0) {
+			pr_err("%s SFL_ add_aw_codec_controls failed, err %d\n", __func__, ret);
+			return ret;
+		}else{
+			pr_err("%s SFL_ add aw_codec_controls success, ret %d\n", __func__, ret);
+		}
+	}
+#endif
+
 	mt6358_codec_init_reg(priv);
 
 #if !defined(SKIP_SB) && !defined(CONFIG_FPGA_EARLY_PORTING)

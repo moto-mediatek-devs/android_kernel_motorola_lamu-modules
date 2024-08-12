@@ -7,3 +7,4 @@ obj-y += sensors/
 #obj-y += panel/
 obj-y += audiopa/
 obj-y += nfc/
+obj-y += audiopa_aw/

@@ -43,6 +43,9 @@ static DEFINE_MUTEX(g_algo_auth_dsp_lock);
 int g_algo_auth_st;
 #endif
 
+bool audiopa_is_aw = false;
+EXPORT_SYMBOL(audiopa_is_aw);
+
 /*************************************************************************
  * aw87xxx variable
  ************************************************************************/
@@ -1312,10 +1315,11 @@ int aw87xxx_dev_init(struct aw_device *aw_dev)
 
 	ret = aw87xxx_dev_get_chipid(aw_dev);
 	if (ret < 0) {
+		audiopa_is_aw = false;
 		AW_DEV_LOGE(aw_dev->dev, "read chipid is failed,ret=%d", ret);
 		return ret;
 	}
-
+	audiopa_is_aw = true;
 	ret = aw_dev_chip_init(aw_dev);
 
 	return ret;

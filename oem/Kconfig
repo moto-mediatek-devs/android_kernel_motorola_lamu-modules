@@ -71,6 +71,12 @@ config NXP_NFC_I2C
     help
       support oem_nxp_pn560uk
 
+config SND_SOC_AW87XXX
+        tristate "SoC Audio for awinic AW87XXX analog PA"
+        depends on PROJECT_LAMU
+        default m
+        help
+          support aw87xxx analog aw_audiopa
 
 source "$(KCONFIG_EXT_PREFIX)/oem/sensors/Kconfig"
 
