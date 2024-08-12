@@ -12,7 +12,7 @@
 /*	The ui_soc will keep 100% until SOC drop X percents after unplugged*/
 	R_FG_VALUE = <(5)>;
 /*	R_sense resistance*/
-	EMBEDDED_SEL = <(0)>;
+	EMBEDDED_SEL = <(1)>;
 /*	Configures whether using embedded battery or not*/
 	PMIC_SHUTDOWN_CURRENT = <(20)>;
 /*	System shutdown current*/
@@ -34,7 +34,7 @@
 /*	Battery temperature T2*/
 	TEMPERATURE_T3 = <(0)>;
 /*	Battery temperature T3*/
-	TEMPERATURE_T4 = <(-6)>;
+	TEMPERATURE_T4 = <(-10)>;
 /*	Battery temperature T4*/
 	TEMPERATURE_T5 = <(-10)>;
 /*	Battery temperature T5*/
