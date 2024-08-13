@@ -795,6 +795,19 @@ static int als_set_cali(uint8_t *data, uint8_t count)
 	return sensor_cfg_to_hub(ID_LIGHT, data, count);
 }
 
+/* +20240617 wnn add mtk sensor 1.0 flicker support start */
+static int rearals_set_cali(uint8_t *data, uint8_t count)
+{
+//	int32_t *buf = (int32_t *)data;
+//	struct alspshub_ipi_data *obj = obj_ipi_data;
+
+//	spin_lock(&calibration_lock);
+//	atomic_set(&obj->als_cali, buf[0]);
+//	spin_unlock(&calibration_lock);
+	return sensor_cfg_to_hub(ID_REAR_ALS, data, count);
+}
+/* -20240617 wnn add mtk sensor 1.0 flicker support end */
+
 static int rgbw_enable(int en)
 {
 	int res = 0;
@@ -1051,6 +1064,9 @@ static int alspshub_probe(struct platform_device *pdev)
 	als_ctl.batch = als_batch;
 	als_ctl.flush = als_flush;
 	als_ctl.set_cali = als_set_cali;
+	/* +20240617 wnn add mtk sensor 1.0 flicker support start */
+	als_ctl.rearset_cali = rearals_set_cali;
+	/* -20240617 wnn add mtk sensor 1.0 flicker support end */
 	als_ctl.rgbw_enable = rgbw_enable;
 	als_ctl.rgbw_batch = rgbw_batch;
 	als_ctl.rgbw_flush = rgbw_flush;

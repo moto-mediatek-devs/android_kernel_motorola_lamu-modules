@@ -634,6 +634,32 @@ static ssize_t alscali_store(struct device *dev,
 	return count;
 }
 
+/* +20240617 wnn add mtk sensor 1.0 flicker support start */
+static ssize_t rearalscali_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct alsps_context *cxt = NULL;
+	int err = 0;
+	uint8_t *cali_buf = NULL;
+
+	pr_info("rearals set cali:%d count=%d\n", *(int*)buf, count);
+	cali_buf = vzalloc(count);
+	if (!cali_buf)
+		return -ENOMEM;
+	memcpy(cali_buf, buf, count);
+
+	mutex_lock(&alsps_context_obj->alsps_op_mutex);
+	cxt = alsps_context_obj;
+	if (cxt->als_ctl.rearset_cali != NULL)
+		err = cxt->als_ctl.rearset_cali(cali_buf, count);
+	if (err < 0)
+		pr_err("rearals set cali err %d\n", err);
+	mutex_unlock(&alsps_context_obj->alsps_op_mutex);
+	vfree(cali_buf);
+	return count;
+}
+/* -20240617 wnn add mtk sensor 1.0 flicker support end */
+
 #if !IS_ENABLED(CONFIG_NANOHUB) || !IS_ENABLED(CONFIG_MTK_ALSPSHUB)
 static int ps_enable_and_batch(void)
 {
@@ -991,6 +1017,9 @@ DEVICE_ATTR_RW(alsbatch);
 DEVICE_ATTR_RW(alsflush);
 DEVICE_ATTR_RO(alsdevnum);
 DEVICE_ATTR_WO(alscali);
+/* +20240617 wnn add mtk sensor 1.0 flicker support start */
+DEVICE_ATTR_WO(rearalscali);
+/* -20240617 wnn add mtk sensor 1.0 flicker support end */
 DEVICE_ATTR_RW(psactive);
 DEVICE_ATTR_RW(psbatch);
 DEVICE_ATTR_RW(psflush);
@@ -1003,6 +1032,9 @@ static struct attribute *als_attributes[] = {
 	&dev_attr_alsflush.attr,
 	&dev_attr_alsdevnum.attr,
 	&dev_attr_alscali.attr,
+	/* +20240617 wnn add mtk sensor 1.0 flicker support start */
+	&dev_attr_rearalscali.attr,
+	/* -20240617 wnn add mtk sensor 1.0 flicker support end */
 	NULL
 };
 
@@ -1154,7 +1186,10 @@ int als_register_control_path(struct als_control_path *ctl)
 	cxt->als_ctl.enable_nodata = ctl->enable_nodata;
 	cxt->als_ctl.batch = ctl->batch;
 	cxt->als_ctl.flush = ctl->flush;
+	/* +20240617 wnn add mtk sensor 1.0 flicker support start */
 	cxt->als_ctl.set_cali = ctl->set_cali;
+	/* -20240617 wnn add mtk sensor 1.0 flicker support end */
+	cxt->als_ctl.rearset_cali = ctl->rearset_cali;
 	cxt->als_ctl.rgbw_enable = ctl->rgbw_enable;
 	cxt->als_ctl.rgbw_batch = ctl->rgbw_batch;
 	cxt->als_ctl.rgbw_flush = ctl->rgbw_flush;

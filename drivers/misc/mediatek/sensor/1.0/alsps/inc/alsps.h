@@ -60,6 +60,9 @@ struct als_control_path {
 		int64_t maxBatchReportLatencyNs);
 	int (*flush)(void);	    /* open data rerport to HAL */
 	int (*set_cali)(uint8_t *data, uint8_t count);
+	/* +20240617 wnn add mtk sensor 1.0 flicker support start */
+	int (*rearset_cali)(uint8_t *data, uint8_t count);
+	/* -20240617 wnn add mtk sensor 1.0 flicker support end */
 	int (*rgbw_enable)(int en);
 	int (*rgbw_batch)(int flag, int64_t samplingPeriodNs,
 		int64_t maxBatchReportLatencyNs);
