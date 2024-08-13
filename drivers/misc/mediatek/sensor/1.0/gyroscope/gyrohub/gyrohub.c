@@ -605,7 +605,7 @@ static int gyrohub_factory_clear_cali(void)
 #endif
 	return 0;
 }
-static int gyrohub_factory_set_cali(int32_t data[3])
+static int gyrohub_factory_set_cali(int32_t data_buf[3])
 {
 #ifdef MTK_OLD_FACTORY_CALIBRATION
 	int err = 0;
@@ -615,8 +615,40 @@ static int gyrohub_factory_set_cali(int32_t data[3])
 		pr_err("gyrohub_WriteCalibration failed!\n");
 		return -1;
 	}
-#endif
 	return 0;
+//TN modified by jiawei.zou 20240808 for gyro_cali BEGIN
+#else
+	int32_t *buf = (int32_t *)data_buf;
+	struct gyro_data data;
+	int32_t cfg_data[12] = {0};
+	struct gyrohub_ipi_data *obj = obj_ipi_data;
+	data.x = buf[0];
+	data.y = buf[1];
+	data.z = buf[2];
+	gyro_cali_report(&data);
+	spin_lock(&calibration_lock);
+	obj->static_cali[GYROHUB_AXIS_X] =  buf[0];
+	obj->static_cali[GYROHUB_AXIS_Y] =  buf[1];
+	obj->static_cali[GYROHUB_AXIS_Z] =  buf[2];
+	cfg_data[0] = obj->dynamic_cali[0];
+	cfg_data[1] = obj->dynamic_cali[1];
+	cfg_data[2] = obj->dynamic_cali[2];
+
+	cfg_data[3] = obj->static_cali[0];
+	cfg_data[4] = obj->static_cali[1];
+	cfg_data[5] = obj->static_cali[2];
+
+	cfg_data[6] = obj->temperature_cali[0];
+	cfg_data[7] = obj->temperature_cali[1];
+	cfg_data[8] = obj->temperature_cali[2];
+	cfg_data[9] = obj->temperature_cali[3];
+	cfg_data[10] = obj->temperature_cali[4];
+	cfg_data[11] = obj->temperature_cali[5];
+	obj->static_cali_status = 0;
+	spin_unlock(&calibration_lock);
+	return sensor_cfg_to_hub(ID_GYROSCOPE,(uint8_t *)cfg_data, sizeof(cfg_data));
+//TN modified by jiawei.zou 20240808 for gyro_cali END
+#endif
 }
 static int gyrohub_factory_get_cali(int32_t data[3])
 {
