@@ -642,8 +642,8 @@ static ssize_t rearalscali_store(struct device *dev,
 	int err = 0;
 	uint8_t *cali_buf = NULL;
 
-	pr_info("rearals set cali:%d count=%d\n", *(int*)buf, count);
-	cali_buf = vzalloc(count);
+	pr_info("rearals set cali:%d count=%d\n", *(int*)buf, (int)count);
+	cali_buf = vzalloc((int)count);
 	if (!cali_buf)
 		return -ENOMEM;
 	memcpy(cali_buf, buf, count);
