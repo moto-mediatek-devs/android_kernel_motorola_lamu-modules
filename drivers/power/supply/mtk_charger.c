@@ -4676,6 +4676,10 @@ static int hvdcp_charger_detect_notifier_cb(struct notifier_block *nb,
 				chr_type = val.intval;
 				if (chr_type == POWER_SUPPLY_USB_TYPE_DCP) {
 					if (oem_pcba_charge_power() == CHARGE_POWER_18W) {
+						if (adapter_dev_get_property(info->select_adapter, CAP_TYPE) == MTK_PD_APDO) {
+							chr_err("%s: ignore QC3 detection due to pd pps adapter\n", __func__);
+							return NOTIFY_DONE;
+						}
 						chr_err("%s: found 18W device, try to detect QC3 charger\n", __func__);
 						charger_dev_set_dp_voltage(info->chg1_dev, 600000);
 						schedule_delayed_work(&info->hvdcp_work, msecs_to_jiffies(1500));

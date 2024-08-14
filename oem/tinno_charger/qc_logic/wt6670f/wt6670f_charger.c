@@ -1363,7 +1363,23 @@ static int wt6670f_psy_notifier_cb(struct notifier_block *nb,
 	struct wt6670f_charger *chip = container_of(nb, struct wt6670f_charger, nb);
 	union power_supply_propval val = {0};
 	struct power_supply *psy = data;
+	struct power_supply *chg_psy = NULL;
+	struct mtk_charger *info = NULL;
 	int ret = 0;
+
+	if (IS_ERR_OR_NULL(chg_psy)) {
+		chg_psy = power_supply_get_by_name("mtk-master-charger");
+		if (IS_ERR_OR_NULL(chg_psy)) {
+			pr_err("failed to get mtk-master-charger device\n");
+			return NOTIFY_DONE;
+		} else {
+			info = (struct mtk_charger *)power_supply_get_drvdata(chg_psy);
+			if (IS_ERR_OR_NULL(info)) {
+				pr_err("failed to get mtk charger info device\n");
+				return NOTIFY_DONE;
+			}
+		}
+	}
 
 	pr_info("enter, power supply name is %s\n", psy->desc->name);
 
@@ -1390,6 +1406,11 @@ static int wt6670f_psy_notifier_cb(struct notifier_block *nb,
 			pr_err("get charger type from switch charger failed\n");
 		} else {
 			if (val.intval == POWER_SUPPLY_USB_TYPE_DCP) {
+				if (adapter_dev_get_property(info->select_adapter, CAP_TYPE) == MTK_PD_APDO) {
+					pr_info("ignore QC3 or QC3P detection due to pd pps adapter\n");
+					return NOTIFY_DONE;
+				}
+
 				if (chip->qc3p_type == QC3P_POWER_NONE && chip->first_detect_dcp == true) {
 					pr_info("detect DCP and QC3P not detected, try to QC3P detection\n");
 					schedule_delayed_work(&chip->get_charger_type_work, 0);
