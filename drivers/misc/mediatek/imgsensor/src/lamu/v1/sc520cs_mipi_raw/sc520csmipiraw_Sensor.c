@@ -1262,7 +1262,10 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 			*sensor_id = return_sensor_id();
 			if (*sensor_id == imgsensor_info.sensor_id) {
 				LOG_INF("i2c write id  : 0x%x, sensor id: 0x%x\n", imgsensor.i2c_write_id, *sensor_id);
-				LOG_INF("[sc520cs-otp]sc520cs,check OTP \n");
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+				FULL_PRODUCT_DEVICE_CB(ID_MAIN2_CAM, wide_cam_get_info, NULL);
+#endif
+                LOG_INF("[sc520cs-otp]sc520cs,check OTP \n");
                 for(j=0;j<2;j++){
                                 rc = 0;
                                 rc = sc520cs_sensor_otp_info(threshold[j],threshold1[j]);
@@ -1277,9 +1280,6 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
                                 LOG_INF("sc520cs-otp %d st read module id success", j);
                                 return ERROR_NONE;
                             }
-#if IS_ENABLED(CONFIG_OEM_DEVINFO)
-				FULL_PRODUCT_DEVICE_CB(ID_MAIN2_CAM, wide_cam_get_info, NULL);
-#endif
 
 							return ERROR_NONE;
 			}

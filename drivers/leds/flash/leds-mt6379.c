@@ -93,7 +93,9 @@ static int mt6379_torch_set_brightness(struct led_classdev *led_cdev,
 	struct mt6379_data *data = mtflash->driver_data;
 	struct regmap *regmap = data->regmap;
 	unsigned int mask, enable = 0;
+#ifdef CONFIG_MTK_FLASHLIGHT_PT
 	unsigned int cur;
+#endif
 	int ret;
 
 	mutex_lock(&data->lock);
@@ -322,9 +324,10 @@ static const struct led_flash_ops mt6379_flash_ops = {
 #if IS_ENABLED(CONFIG_MTK_FLASHLIGHT)
 static struct led_classdev_flash *mt6379_flash_class[MT6379_FLASH_MAX_LED];
 static DEFINE_MUTEX(mt6379_mutex);
+#if IS_ENABLED(CONFIG_MTK_FLASHLIGHT_DLPT)
 /* define usage count */
 static int fd_use_count;
-
+#endif
 #define MT6379_VIN (3.6)
 
 #if !IS_ENABLED(CONFIG_MTK_FLASHLIGHT_THERMAL)
@@ -337,11 +340,11 @@ static int flash_state_to_current_limit[FLASHLIGHT_COOLER_MAX_STATE] = {
 
 static int mt6379_set_scenario(int scenario)
 {
+#if IS_ENABLED(CONFIG_MTK_FLASHLIGHT_DLPT)
 	struct mt6379_flash *mtflash = container_of(
 					mt6379_flash_class[MT6379_FLASH_LED1],
 					struct mt6379_flash,
 					flash);
-#if IS_ENABLED(CONFIG_MTK_FLASHLIGHT_DLPT)
 	if (scenario & FLASHLIGHT_SCENARIO_CAMERA_MASK) {
 		flashlight_kicker_pbm_by_device_id(&mtflash->dev_id,
 			MT6379_ISTRB_MAXUA / 1000 * MT6379_VIN);
@@ -356,6 +359,7 @@ static int mt6379_set_scenario(int scenario)
 
 static int mt6379_open(void)
 {
+#if IS_ENABLED(CONFIG_MTK_FLASHLIGHT_DLPT)
 	struct mt6379_flash *mtflash = container_of(
 					mt6379_flash_class[MT6379_FLASH_LED1],
 					struct mt6379_flash,
@@ -363,7 +367,6 @@ static int mt6379_open(void)
 	mutex_lock(&mt6379_mutex);
 	fd_use_count++;
 
-#if IS_ENABLED(CONFIG_MTK_FLASHLIGHT_DLPT)
 	flashlight_kicker_pbm_by_device_id(&mtflash->dev_id,
 				MT6379_ITOR_MAXUA / 1000 * MT6379_VIN * 2);
 	mdelay(1);
@@ -376,6 +379,7 @@ static int mt6379_open(void)
 
 static int mt6379_release(void)
 {
+#if IS_ENABLED(CONFIG_MTK_FLASHLIGHT_DLPT)
 	struct mt6379_flash *mtflash = container_of(
 					mt6379_flash_class[MT6379_FLASH_LED1],
 					struct mt6379_flash,
@@ -384,7 +388,6 @@ static int mt6379_release(void)
 	mutex_lock(&mt6379_mutex);
 	fd_use_count--;
 
-#if IS_ENABLED(CONFIG_MTK_FLASHLIGHT_DLPT)
 	flashlight_kicker_pbm_by_device_id(&mtflash->dev_id, 0);
 #endif
 

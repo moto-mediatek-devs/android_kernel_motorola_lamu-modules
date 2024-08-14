@@ -1806,7 +1806,7 @@ static int fl_parse_dt(struct device *dev)
 		return -ENODEV;
 
 	np = dev->of_node;
-
+#ifdef CONFIG_MTK_FLASHLIGHT_PT
 	if (of_property_read_u32(np, "low-battery-level", &pt_low_bat_level))
 		pr_info("Parse no dt, low-battery-level.\n");
 	if (of_property_read_u32(np, "battery-percent-level", &pt_bat_pc_level))
@@ -1816,7 +1816,7 @@ static int fl_parse_dt(struct device *dev)
 
 	pr_info("Parse dt pt=(%u,%u,%u).\n",
 		pt_low_bat_level, pt_bat_pc_level, pt_bat_oc_level);
-
+#endif
 	return 0;
 }
 
