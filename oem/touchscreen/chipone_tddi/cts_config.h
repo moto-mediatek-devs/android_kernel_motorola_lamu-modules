@@ -19,7 +19,9 @@
 /* #define CONFIG_CTS_ICTYPE_ICNL9951 */
 
 /* For Goole Security */
-/* #define CFG_CTS_FOR_GKI */
+#if !IS_ENABLED(CONFIG_FACTORY_BUILD)
+#define CFG_CTS_FOR_GKI
+#endif
 
 /** Whether reset pin is used */
 #define CFG_CTS_HAS_RESET_PIN
