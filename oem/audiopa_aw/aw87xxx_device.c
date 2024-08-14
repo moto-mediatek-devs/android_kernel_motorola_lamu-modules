@@ -23,6 +23,9 @@
 #include <linux/io.h>
 #include <linux/init.h>
 #include <linux/timer.h>
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include "../devinfo/dev_info.h"
+#endif
 #include "aw87xxx.h"
 #include "aw87xxx_device.h"
 #include "aw87xxx_dsp.h"
@@ -1316,10 +1319,16 @@ int aw87xxx_dev_init(struct aw_device *aw_dev)
 	ret = aw87xxx_dev_get_chipid(aw_dev);
 	if (ret < 0) {
 		audiopa_is_aw = false;
+		#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+		FULL_PRODUCT_DEVICE_INFO(ID_AUDIOPA, "fs1815");
+		#endif
 		AW_DEV_LOGE(aw_dev->dev, "read chipid is failed,ret=%d", ret);
 		return ret;
 	}
 	audiopa_is_aw = true;
+	#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+	FULL_PRODUCT_DEVICE_INFO(ID_AUDIOPA, "aw87564");
+	#endif
 	ret = aw_dev_chip_init(aw_dev);
 
 	return ret;
