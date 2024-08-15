@@ -664,6 +664,18 @@ static void hx9031as_get_prox_state(void)
 			PRINT_INF("channel_state=IDLE  %d   ", ii);
 			PRINT_INF("state=0x%02X\n", ((buf[0] >> ii) & 0x01));
 		}
+//Modify by jiawei.zou for Compatible SAR input event report Begin
+	}
+
+    channel_state[0] = channel_state[1];//ant0
+    channel_state[2] = channel_state[4];//ant3
+    channel_state[4] = channel_state[3];//ant5
+
+    channel_state[1] = IDLE;
+    channel_state[4] = IDLE;
+    channel_state[3] = IDLE;
+    for (uint8_t ii = 0; ii < HX9031AS_CH_NUM; ii++) {
+//Modify by jiawei.zou for Compatible SAR input event report End
 		hx9031as_pdata.prox_state[ii] = channel_state[ii];
 		PRINT_INF("channel_state=0x%02X\n", channel_state[ii]);
 	}
