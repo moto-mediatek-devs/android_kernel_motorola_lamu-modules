@@ -181,6 +181,7 @@
 
 /*init param*/
 #define CX2589x_EN_ILIM			BIT(6)
+#define CX2589x_BOOST_FREQ_500K		BIT(5)
 #define CX2589x_EN_ICO			BIT(4)
 #define CX2589x_EN_HVDCP		BIT(3)
 

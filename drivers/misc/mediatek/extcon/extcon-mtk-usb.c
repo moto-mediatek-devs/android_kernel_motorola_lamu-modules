@@ -40,7 +40,7 @@ static struct charger_device *primary_dvchg = NULL;
 /* TN Begin modified by jirui.li/860702 20240724 CR/EKLAMU-834 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 #define BOOST_VOLTAGE_LIMIT		5200000
-#define BOOST_CURRENT_LIMIT		2000000
+#define BOOST_CURRENT_LIMIT		1875000
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by jirui.li/860702 20240724 CR/EKLAMU-834 */
 #if IS_ENABLED(CONFIG_TCPC_CLASS)

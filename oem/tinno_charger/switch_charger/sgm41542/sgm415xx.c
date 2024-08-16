@@ -2084,6 +2084,15 @@ static int sgm4154x_set_boost_current_limit(struct charger_device *chg_dev, u32 
 	int ret = 0;
 	struct sgm4154x_device *sgm = charger_get_data(chg_dev);
 
+	if (uA <= BOOST_CURRENT_LIMIT[0])
+		uA = BOOST_CURRENT_LIMIT[0];
+	else if (uA >= BOOST_CURRENT_LIMIT[1])
+		uA = BOOST_CURRENT_LIMIT[1];
+	else if (uA - BOOST_CURRENT_LIMIT[0] < (BOOST_CURRENT_LIMIT[1] - BOOST_CURRENT_LIMIT[0]) / 2)
+		uA = BOOST_CURRENT_LIMIT[0];
+	else
+		uA = BOOST_CURRENT_LIMIT[1];
+
 	if (uA == BOOST_CURRENT_LIMIT[0]) {
 		ret = sgm4154x_update_bits(sgm, SGM4154x_CHRG_CTRL_2,
 				SGM4154x_BOOST_LIM, 0);
@@ -2091,6 +2100,7 @@ static int sgm4154x_set_boost_current_limit(struct charger_device *chg_dev, u32 
 		ret = sgm4154x_update_bits(sgm, SGM4154x_CHRG_CTRL_2,
 				SGM4154x_BOOST_LIM, BIT(7));
 	}
+	pr_info("set boost current limit:%d\n", uA);
 
 	return ret;
 }

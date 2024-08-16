@@ -1701,6 +1701,7 @@ static int cx2589x_hw_init(struct cx2589x_device *cx)
 	cx2589x_update_bits(cx, CX2589x_REG_00, CX2589x_EN_ILIM, 0);  //disable ILIM pin
 	cx2589x_update_bits(cx, CX2589x_REG_02, CX2589x_EN_ICO, 0);   //disable ico
 	cx2589x_update_bits(cx, CX2589x_REG_02, CX2589x_EN_HVDCP, 0); //disable hvdcp
+	cx2589x_update_bits(cx, CX2589x_REG_02, CX2589x_BOOST_FREQ_500K, 0x20); //boost freq 1-500khz
 	cx2589x_update_bits(cx, CX2589x_REG_0A, CX2589x_BOOST_LIM, 0x4);  //BOOST_LIM = 1.65A
 
 	ret = cx2589x_set_ichrg_curr(s_chg_dev_otg,
@@ -1970,6 +1971,7 @@ static int cx2589x_set_boost_current_limit(struct charger_device *chg_dev, u32 u
 		val = 7;
 
 	ret = cx2589x_update_bits(cx, CX2589x_REG_0A, CX2589x_BOOST_LIM, val);
+	pr_info("set boost current limit uA=%d, reg_val=0x%x\n", uA, val);
 
 	return ret;
 }
