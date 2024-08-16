@@ -226,25 +226,25 @@ static int td4376_panel_bias_disable(void)
 }
 #endif
 
+int td4376_panel_tprst_set(int level)
+{
+	ptx->tprst_gpio =
+		devm_gpiod_get(ptx->dev, "tprst", GPIOD_OUT_HIGH);
+	if (IS_ERR(ptx->tprst_gpio)) {
+		dev_info(ptx->dev, "%s: cannot get tprst_gpio %ld\n",
+			__func__, PTR_ERR(ptx->tprst_gpio));
+		return PTR_ERR(ptx->tprst_gpio);
+	}
+	gpiod_set_value(ptx->tprst_gpio, level ? 1 : 0);
+	devm_gpiod_put(ptx->dev, ptx->tprst_gpio);
+	return 0;
+}
+EXPORT_SYMBOL(td4376_panel_tprst_set);
+
 static void td4376_panel_init(struct td4376 *ctx)
 {
 
-#if 0
-	ctx->tprst_gpio =
-		devm_gpiod_get(ctx->dev, "tprst", GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->tprst_gpio)) {
-		dev_info(ctx->dev, "%s: cannot get tprst_gpio %ld\n",
-			__func__, PTR_ERR(ctx->tprst_gpio));
-		return;
-	}
-
-	gpiod_set_value(ctx->tprst_gpio, 1);
-	msleep(10);
-	gpiod_set_value(ctx->tprst_gpio, 0);
-	msleep(20);
-	gpiod_set_value(ctx->tprst_gpio, 1);
-	msleep(20);
-	devm_gpiod_put(ctx->dev, ctx->tprst_gpio);
+#if 1
 
 	ctx->reset_gpio =
 		devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
@@ -262,7 +262,7 @@ static void td4376_panel_init(struct td4376 *ctx)
 	msleep(20);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 #endif
-	msleep(20);
+	msleep(5);
 
 	td4376_dcs_write_seq_static(ctx, 0xB0,0x04);
 	td4376_dcs_write_seq_static(ctx, 0xD6,0x00);
@@ -276,7 +276,7 @@ static void td4376_panel_init(struct td4376 *ctx)
 	td4376_dcs_write_seq_static(ctx, 0x11);
 	msleep(120);
 	td4376_dcs_write_seq_static(ctx, 0x29);
-	msleep(10);
+	msleep(20);
 }
 
 static int td4376_disable(struct drm_panel *panel)
@@ -308,7 +308,7 @@ static int td4376_unprepare(struct drm_panel *panel)
 	is_suspend = 1;
 
 	td4376_dcs_write_seq_static(ctx, 0x28);
-	msleep(120);
+	msleep(20);
 	td4376_dcs_write_seq_static(ctx, 0x10);
 	msleep(120);
 
@@ -429,7 +429,7 @@ static int td4376_prepare(struct drm_panel *panel)
 	udelay(5000);
 #endif
 
-#if 0
+#if 1
 	ctx->reset_gpio =
 		devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(ctx->reset_gpio)) {
@@ -441,6 +441,22 @@ static int td4376_prepare(struct drm_panel *panel)
 	gpiod_set_value(ctx->reset_gpio, 0);
 	udelay(5 * 1000);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
+
+	ctx->tprst_gpio =
+		devm_gpiod_get(ctx->dev, "tprst", GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->tprst_gpio)) {
+		dev_info(ctx->dev, "%s: cannot get tprst_gpio %ld\n",
+			__func__, PTR_ERR(ctx->tprst_gpio));
+		return PTR_ERR(ctx->tprst_gpio);
+	}
+
+	// gpiod_set_value(ctx->tprst_gpio, 1);
+	// msleep(10);
+	gpiod_set_value(ctx->tprst_gpio, 0);
+	msleep(10);
+	gpiod_set_value(ctx->tprst_gpio, 1);
+	msleep(10);
+	devm_gpiod_put(ctx->dev, ctx->tprst_gpio);
 
 #if defined(CONFIG_RT5081_PMU_DSV) || defined(CONFIG_MT6370_PMU_DSV)
 	td4376_panel_bias_enable();

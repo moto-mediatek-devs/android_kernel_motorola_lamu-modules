@@ -60,6 +60,7 @@ struct dijin {
 	struct drm_panel panel;
 	struct backlight_device *backlight;
 	struct gpio_desc *reset_gpio;
+	struct gpio_desc *tprst_gpio;
 	struct gpio_desc *vddio_gpio;
 	struct gpio_desc *bias_pos, *bias_neg;
 	struct gpio_desc *bl_en_gpio;
@@ -225,6 +226,21 @@ static int dijin_panel_bias_disable(void)
 }
 #endif
 
+int dijin_panel_tprst_set(int level)
+{
+	ptx->tprst_gpio =
+		devm_gpiod_get(ptx->dev, "tprst", GPIOD_OUT_HIGH);
+	if (IS_ERR(ptx->tprst_gpio)) {
+		dev_info(ptx->dev, "%s: cannot get tprst_gpio %ld\n",
+			__func__, PTR_ERR(ptx->tprst_gpio));
+		return PTR_ERR(ptx->tprst_gpio);
+	}
+	gpiod_set_value(ptx->tprst_gpio, level ? 1 : 0);
+	devm_gpiod_put(ptx->dev, ptx->tprst_gpio);
+	return 0;
+}
+EXPORT_SYMBOL(dijin_panel_tprst_set);
+
 static void dijin_panel_init(struct dijin *ctx)
 {
 	ctx->reset_gpio =
@@ -236,11 +252,11 @@ static void dijin_panel_init(struct dijin *ctx)
 	}
 
 	gpiod_set_value(ctx->reset_gpio, 1);
-	udelay(5 * 1000);
+	msleep(10);
 	gpiod_set_value(ctx->reset_gpio, 0);
-	udelay(2 * 1000);
+	msleep(20);
 	gpiod_set_value(ctx->reset_gpio, 1);
-	udelay(15 * 1000);
+	msleep(20);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 
 	dijin_dcs_write_seq_static(ctx, 0xFF, 0x10);
@@ -414,6 +430,19 @@ static int dijin_prepare(struct drm_panel *panel)
 	udelay(5 * 1000);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 
+	ctx->tprst_gpio =
+		devm_gpiod_get(ctx->dev, "tprst", GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->tprst_gpio)) {
+		dev_info(ctx->dev, "%s: cannot get tprst_gpio %ld\n",
+			__func__, PTR_ERR(ctx->tprst_gpio));
+		return PTR_ERR(ctx->tprst_gpio);
+	}
+	gpiod_set_value(ctx->tprst_gpio, 0);
+	msleep(10);
+	gpiod_set_value(ctx->tprst_gpio, 1);
+	msleep(10);
+	devm_gpiod_put(ctx->dev, ctx->tprst_gpio);
+
 #if defined(CONFIG_RT5081_PMU_DSV) || defined(CONFIG_MT6370_PMU_DSV)
 	dijin_panel_bias_enable();
 #else
@@ -479,11 +508,11 @@ static int dijin_enable(struct drm_panel *panel)
 	return 0;
 }
 
-#define HFP (36)
+#define HFP (32)
 #define HSA (4)
-#define HBP (36)
+#define HBP (32)
 #define VFP_60 (1080)
-#define VFP_90 (300)
+#define VFP_90 (180)
 #define VSA (4)
 #define VBP (32)
 #define VAC (1604)
@@ -586,8 +615,8 @@ static int dijin_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 
 static struct mtk_panel_params ext_params = {
 	.pll_clk = 390,
-	.cust_esd_check = 0,
-	.esd_check_enable = 0,
+	.cust_esd_check = 1,
+	.esd_check_enable = 1,
 	.lcm_esd_check_table[0] = {
 		.cmd = 0x0a,
 		.count = 1,
@@ -601,7 +630,7 @@ static struct mtk_panel_params ext_params = {
 };
 
  static struct mtk_panel_params ext_params_90hz = {
-	.pll_clk = 454,
+	.pll_clk = 390,
 	// .vfp_low_power = 300,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,

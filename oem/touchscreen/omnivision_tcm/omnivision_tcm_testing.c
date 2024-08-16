@@ -1923,10 +1923,17 @@ static int testing_reset_open(void)
 	tcm_hcd->update_watchdog(tcm_hcd, false);
 #endif
 
+#if IS_ENABLED(CONFIG_OVT_SET_BY_LCD)
+	ovt_lcd_set_tprst_gpio(bdata->reset_on_state);
+	msleep(bdata->reset_active_ms);
+	ovt_lcd_set_tprst_gpio(!bdata->reset_on_state);
+	msleep(bdata->reset_active_ms);
+#else
 	gpio_set_value(bdata->reset_gpio, bdata->reset_on_state);
 	msleep(bdata->reset_active_ms);
 	gpio_set_value(bdata->reset_gpio, !bdata->reset_on_state);
 	msleep(bdata->reset_delay_ms);
+#endif
 
 #ifdef WATCHDOG_SW
 	tcm_hcd->update_watchdog(tcm_hcd, true);

@@ -521,10 +521,6 @@ static int zeroflash_parse_fw_image(void)
 	return 0;
 }
 /*add by yating.zhu@tinno.com for select fw start*/
-extern int td4160_lcd_id;
-extern int td4376_lcd_id;
-int lcd_id = 0;
-
 char* omnivision_get_fw_image_name(int id) {
     static char name[50];
 
@@ -552,8 +548,6 @@ static int zeroflash_get_fw_image(void)
 #if USE_OMNIVSION_IMG_FILE
 /*add by yating.zhu@tinno.com for select fw start*/
 	char fw_image_name[50];
-
-	lcd_id = td4160_lcd_id | td4376_lcd_id;
 
 	strcpy(fw_image_name, omnivision_get_fw_image_name(lcd_id));
 /*add by yating.zhu@tinno.com for select fw end*/
@@ -1132,7 +1126,9 @@ static void zeroflash_do_f35_firmware_download(void)
 	struct rmi_f35_data data;
 	struct ovt_tcm_hcd *tcm_hcd = zeroflash_hcd->tcm_hcd;
 	static unsigned int retry_count;
+#if !IS_ENABLED(CONFIG_OVT_SET_BY_LCD)
 	const struct ovt_tcm_board_data *bdata = tcm_hcd->hw_if->bdata;
+#endif
 
 	if (tcm_hcd->irq_enabled) {
 		retval = tcm_hcd->enable_irq(tcm_hcd, false, true);
@@ -1208,9 +1204,15 @@ static void zeroflash_do_f35_firmware_download(void)
 
 exit:
 	if (retval < 0) {
+#if IS_ENABLED(CONFIG_OVT_SET_BY_LCD)
+		ovt_lcd_set_tprst_gpio(0);
+		msleep(5);
+		ovt_lcd_set_tprst_gpio(1);
+#else
         gpio_set_value(bdata->reset_gpio, 0);
         msleep(5);
-        gpio_set_value(bdata->reset_gpio, 1);        
+        gpio_set_value(bdata->reset_gpio, 1);
+#endif
         msleep(5);
 		retry_count++;
     }
@@ -1245,7 +1247,9 @@ static void zeroflash_do_romboot_firmware_download(void)
 	unsigned int data_size_blocks;
 	unsigned int image_size;
 	struct ovt_tcm_hcd *tcm_hcd = zeroflash_hcd->tcm_hcd;
+#if !IS_ENABLED(CONFIG_OVT_SET_BY_LCD)
 	const struct ovt_tcm_board_data *bdata = tcm_hcd->hw_if->bdata;
+#endif
 
 	LOGN(tcm_hcd->pdev->dev.parent,
 			"Prepare ROMBOOT firmware download\n");
@@ -1330,9 +1334,15 @@ static void zeroflash_do_romboot_firmware_download(void)
 				"Failed to write command ROMBOOT DOWNLOAD");
 		UNLOCK_BUFFER(zeroflash_hcd->out);
 		if (tcm_hcd->status_report_code != REPORT_IDENTIFY) {
+#if IS_ENABLED(CONFIG_OVT_SET_BY_LCD)
+			ovt_lcd_set_tprst_gpio(0);
+			msleep(5);
+			ovt_lcd_set_tprst_gpio(1);
+#else
 			gpio_set_value(bdata->reset_gpio, 0);
 			msleep(5);
 			gpio_set_value(bdata->reset_gpio, 1);
+#endif
 			msleep(5);
 		}
 		goto exit;
@@ -1344,9 +1354,15 @@ static void zeroflash_do_romboot_firmware_download(void)
 		LOGE(tcm_hcd->pdev->dev.parent,
 				"Failed to switch to bootloader");
 		if (tcm_hcd->status_report_code != REPORT_IDENTIFY) {
+#if IS_ENABLED(CONFIG_OVT_SET_BY_LCD)
+			ovt_lcd_set_tprst_gpio(0);
+			msleep(5);
+			ovt_lcd_set_tprst_gpio(1);
+#else
 			gpio_set_value(bdata->reset_gpio, 0);
 			msleep(5);
 			gpio_set_value(bdata->reset_gpio, 1);
+#endif
 			msleep(5);
 		}
 		goto exit;
