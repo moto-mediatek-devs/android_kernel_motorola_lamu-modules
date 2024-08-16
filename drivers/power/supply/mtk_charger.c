@@ -5844,8 +5844,10 @@ static int psy_charger_set_property(struct power_supply *psy,
 			val->intval;
 /* TN Begin modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
-		if (info->disable_thermal_current_limit)
+		if (info->disable_thermal_current_limit) {
 			info->chg_data[idx].thermal_charging_current_limit = -1;
+			g_thermal_charging_current_limit = -1;
+		}
 #endif
 /* TN End modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
 		break;
@@ -5854,8 +5856,10 @@ static int psy_charger_set_property(struct power_supply *psy,
 			val->intval;
 /* TN Begin modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
-		if (info->disable_thermal_current_limit)
+		if (info->disable_thermal_current_limit) {
 			info->chg_data[idx].thermal_input_current_limit = -1;
+			g_thermal_charging_current_limit = -1;
+		}
 #endif
 /* TN End modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
 		break;
