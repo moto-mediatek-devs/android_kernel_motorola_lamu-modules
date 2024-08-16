@@ -190,7 +190,7 @@ static RAW_NOTIFIER_HEAD(sar_notify_list);
 
 static int call_sar_notifiers(unsigned long val, void *v)
 {
-	pr_info(" enter call_sar_notifiers\n");
+	pr_info("enter call_sar_notifiers\n");
 	return raw_notifier_call_chain(&sar_notify_list, val, v);
 }
 
@@ -873,6 +873,7 @@ static void send_status_event(u32 cable_type, u32 status)
 			snd_soc_jack_report(&accdet->jack, report,
 					SND_JACK_MICROPHONE);
 		}
+		call_sar_notifiers(SAR_CALI_EVENT ,NULL);
 		pr_info("accdet HEADPHONE(3-pole) %s\n",
 			status ? "PlugIn" : "PlugOut");
 		break;

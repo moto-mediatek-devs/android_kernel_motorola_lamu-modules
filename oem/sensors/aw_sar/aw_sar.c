@@ -44,6 +44,12 @@ static struct mutex aw_sar_lock;
 struct aw_sar *p_class;
 static int32_t aw_sar_get_chip_info(struct aw_sar *p_sar);
 static void aw_sar_sensor_free(struct aw_sar *p_sar);
+//TN modified by jiawei.zou 20240816 for earphone_plug cali BEGIN
+#define SAR_CALI_EVENT 0x63616c87
+struct aw_sar *global_sar = NULL;
+extern int register_sar_notifier(struct notifier_block *nb);
+extern int unregister_sar_notifier(struct notifier_block *nb);
+//TN modified by jiawei.zou 20240816 for earphone_plug cali END
 
 //Because disable/enable_irq api Therefore, IRQ is embedded
 void aw_sar_disable_irq(struct aw_sar *p_sar)
@@ -2031,9 +2037,10 @@ static int aw_sar_ps_notify_callback(struct notifier_block *self,
 			return retval;
 		}
 		if (event == PSY_EVENT_PROP_CHANGED) {
-			if (p_sar->ps_is_present == present)
+			if (p_sar->ps_is_present == present){
 				//AWLOGE(p_sar->dev, "ps present state not change");
 				return 0;
+				}
 		}
 		p_sar->ps_is_present = present;
 		schedule_work(&p_sar->ps_notify_work);
@@ -2256,6 +2263,25 @@ static int32_t aw_sar_regulator_power(struct aw_sar *p_sar)
 	return ret;
 }
 
+//TN modified by jiawei.zou 20240816 for earphone_plug cali Begin
+int aw_sar_event_handle(struct notifier_block *nb, unsigned long event, void *v)
+{
+	switch(event){
+		case SAR_CALI_EVENT:
+			aw_sar_aot(global_sar);
+			break;
+		default:
+			break;
+	}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block aw_sar_notifier = {
+	.notifier_call = aw_sar_event_handle,
+};
+//TN modified by jiawei.zou 20240816 for earphone_plug cali End
+
 /**
  * @brief Distinguish different chips by chip name and obtain relevant chip information
  *
@@ -2321,6 +2347,7 @@ static int32_t aw_sar_i2c_probe(struct i2c_client *i2c) //todo
 
 	if (!i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C)) {
 		pr_err("check_functionality failed!\n");
+		unregister_sar_notifier(&aw_sar_notifier);//TN modified by jiawei.zou 20240816 for earphone_plug cali
 		return -EIO;
 	}
 
@@ -2331,7 +2358,7 @@ static int32_t aw_sar_i2c_probe(struct i2c_client *i2c) //todo
 		ret = -AW_ERR;
 		goto err_malloc;
 	}
-
+	global_sar = p_sar;//TN modified by jiawei.zou 20240816 for earphone_plug cali
 	p_sar->dev = &i2c->dev;
 	p_sar->i2c = i2c;
 	i2c_set_clientdata(i2c, p_sar);
@@ -2373,6 +2400,11 @@ err_get_voltage:
 		aw_sar_power_deinit(p_sar);
 
 err_malloc:
+//TN modified by jiawei.zou 20240816 for earphone_plug cali Begin
+	if (ret != 0) {
+		unregister_sar_notifier(&aw_sar_notifier);
+	}
+//TN modified by jiawei.zou 20240816 for earphone_plug cali End
 	return ret;
 }
 
@@ -2511,10 +2543,11 @@ static int32_t __init aw_sar_i2c_init(void)
 	int32_t ret = 0;
 
 	pr_info("awinic sar driver version %s\n", AW_SAR_DRIVER_VERSION);
-
+	register_sar_notifier(&aw_sar_notifier);//TN modified by jiawei.zou 20240816 for earphone_plug cali
 	ret = i2c_add_driver(&aw_sar_i2c_driver);
 	if (ret) {
 		pr_err("fail to add aw_sar device into i2c\n");
+		unregister_sar_notifier(&aw_sar_notifier);//TN modified by jiawei.zou 20240816 for earphone_plug cali
 		return ret;
 	}
 
@@ -2524,6 +2557,7 @@ static int32_t __init aw_sar_i2c_init(void)
 module_init(aw_sar_i2c_init);
 static void __exit aw_sar_i2c_exit(void)
 {
+	unregister_sar_notifier(&aw_sar_notifier);//TN modified by jiawei.zou 20240816 for earphone_plug cali
 	i2c_del_driver(&aw_sar_i2c_driver);
 }
 module_exit(aw_sar_i2c_exit);
