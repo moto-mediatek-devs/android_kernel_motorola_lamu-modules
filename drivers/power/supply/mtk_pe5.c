@@ -1282,17 +1282,6 @@ static inline int pe50_start(struct pe50_algo_info *info)
 		return ret;
 	}
 
-/* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
-		ret = pe50_hal_enable_adc(info->alg, DVCHG1, true);
-		if (ret < 0) {
-			PE50_ERR("enable DVCHG1 ADC fail(%d)\n", ret);
-			return ret;
-		}
-		msleep(20);
-#endif
-/* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
-
 	/* Check DVCHG registers stat first */
 	for (i = PE50_DVCHG_MASTER; i < PE50_DVCHG_MAX; i++) {
 		if (!data->is_dvchg_exist[i])
@@ -1305,6 +1294,17 @@ static inline int pe50_start(struct pe50_algo_info *info)
 		}
 	}
 
+/* TN Begin modified by xinjun.lu/860715 20240814 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
+	ret = pe50_hal_enable_adc(info->alg, DVCHG1, true);
+	if (ret < 0) {
+		PE50_ERR("enable DVCHG1 ADC fail(%d)\n", ret);
+		return ret;
+	}
+	msleep(20);
+#endif
+/* TN End modified by xinjun.lu/860715 20240814 CR/EKLAMU-202 */
+
 	pe50_init_algo_data(info);
 	alarm_start_relative(&data->timer, ktime);
 	return 0;
@@ -1314,6 +1314,8 @@ static inline int pe50_start(struct pe50_algo_info *info)
 /* PE5.0 Algo State Machine                                              */
 /* =================================================================== */
 
+/* TN Begin modified by xinjun.lu/860715 20240814 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 static int pe50_calculate_rcable_by_swchg(struct pe50_algo_info *info)
 {
 	struct pe50_algo_data *data = info->data;
@@ -1428,6 +1430,8 @@ static int pe50_calculate_rcable_by_swchg(struct pe50_algo_info *info)
 
 	return 0;
 }
+#endif
+/* TN End modified by xinjun.lu/860715 20240814 CR/EKLAMU-202 */
 
 static int pe50_adjust_vta_with_ta_cv(struct pe50_algo_info *info)
 {
@@ -1472,10 +1476,15 @@ static int pe50_algo_init_with_ta_cc(struct pe50_algo_info *info)
 	struct pe50_algo_data *data = info->data;
 	struct pe50_algo_desc *desc = info->desc;
 	struct pe50_ta_auth_data *auth_data = &data->ta_auth_data;
+/* TN Begin modified by xinjun.lu/860715 20240814 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	u32 rcable_retry_level = (data->is_dvchg_exist[PE50_DVCHG_SLAVE] &&
 				  !data->tried_dual_dvchg) ?
 				  desc->rcable_level_dual[PE50_RCABLE_NORMAL] :
 				  desc->rcable_level[PE50_RCABLE_NORMAL];
+#endif
+/* TN End modified by xinjun.lu/860715 20240814 CR/EKLAMU-202 */
+
 	struct pe50_stop_info sinfo = {
 		.reset_ta = true,
 		.hardreset_ta = false,
@@ -1515,6 +1524,8 @@ static int pe50_algo_init_with_ta_cc(struct pe50_algo_info *info)
 	vbat_avg = precise_div(vbat_avg, avg_times);
 	data->zcv = vbat_avg;
 
+/* TN Begin modified by xinjun.lu/860715 20240814 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	ret = pe50_calculate_rcable_by_swchg(info);
 	if (ret < 0) {
 		PE50_ERR("calculate rcable by swchg fail(%d)\n", ret);
@@ -1526,6 +1537,8 @@ static int pe50_algo_init_with_ta_cc(struct pe50_algo_info *info)
 		if (data->err_retry_cnt < PE50_INIT_RETRY_MAX)
 			goto err;
 	}
+#endif
+/* TN End modified by xinjun.lu/860715 20240814 CR/EKLAMU-202 */
 
 	/* Initial setting, no need to check ita_lmt */
 	ret = pe50_set_ta_cap_cc_by_cali_vta(info, data->idvchg_ss_init);
@@ -2980,6 +2993,7 @@ static bool pe50_check_eoc(struct pe50_algo_info *info,
 		if (algo_running)
 			data->start_soc_max = desc->start_soc_max -
 					      PE50_START_SOC_MAX_GAP;
+		PE50_ERR("should stop pe5\n");
 		return false;
 	}
 

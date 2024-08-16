@@ -108,7 +108,7 @@ struct tag_bootmode {
 	u32 boottype;
 };
 
-/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+/* TN Begin modified by xinjun.lu/860715 20240814 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
 static struct mtk_charger *pe50_info;
 #define CHG_SHOW_MAX_SIZE 50
@@ -118,16 +118,16 @@ static struct mtk_charger *pe50_info;
 #define HYSTERISIS_DEGC 2
 
 static char *stepchg_str[] = {
-	[STEP_MAX]		= "MAX",
-	[STEP_NORM]		= "NORMAL",
-	[STEP_FULL]		= "FULL",
-	[STEP_FLOAT]		= "FLOAT",
-	[STEP_DEMO]		= "DEMO",
-	[STEP_STOP]		= "STOP",
-	[STEP_NONE_N]		= "NONE",
+	[STEP_MAX_PE50]		= "MAX",
+	[STEP_NORM_PE50]		= "NORMAL",
+	[STEP_FULL_PE50]		= "FULL",
+	[STEP_FLOAT_PE50]		= "FLOAT",
+	[STEP_DEMO_PE50]		= "DEMO",
+	[STEP_STOP_PE50]		= "STOP",
+	[STEP_NONE_PE50]		= "NONE",
 };
 #endif
-/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+/* TN End modified by xinjun.lu/860715 20240814 CR/EKLAMU-202 */
 
 /* TN Begin modified by xinjun.lu/860715 20240808 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
@@ -2859,7 +2859,7 @@ int pe50_get_prop_from_battery(struct mtk_charger *info,
 		info->bat_psy = power_supply_get_by_name("battery");
 
 		if (!info->bat_psy) {
-			pr_err("[%s]Error getting battery power sypply\n", __func__);
+			chr_err("[%s]Error getting battery power sypply\n", __func__);
 			return -EINVAL;
 		}
 	}
@@ -2879,7 +2879,7 @@ int pe50_set_prop_to_battery(struct mtk_charger *info,
 		info->bat_psy = power_supply_get_by_name("battery");
 
 		if (!info->bat_psy) {
-			pr_err("[%s]Error getting battery power sypply\n", __func__);
+			chr_err("[%s]Error getting battery power sypply\n", __func__);
 			return -EINVAL;
 		}
 	}
@@ -2898,7 +2898,7 @@ int pe50_get_prop_from_charger(struct mtk_charger *info,
 
 	chg_psy = power_supply_get_by_name("mtk-master-charger");
 	if (chg_psy == NULL || IS_ERR(chg_psy)) {
-		pr_err("%s Couldn't get chg_psy\n", __func__);
+		chr_err("%s Couldn't get chg_psy\n", __func__);
 		return -EINVAL;
 	}
 
@@ -2915,13 +2915,13 @@ static int parse_pe50_dt(struct mtk_charger *info, struct device *dev)
 	int i;
 
 	if (!node) {
-		pr_info("[%s]pe50 dtree info. missing\n",__func__);
+		chr_err("[%s]pe50 dtree info. missing\n",__func__);
 		return -ENODEV;
 	}
 #if 0
 	if (of_find_property(node, "pe50,pe50-cycle-cv-steps", &byte_len)) {
 		if ((byte_len / sizeof(u32)) % 2) {
-			pr_err("[%s]DT error wrong pe50 cycle batt_cv zones, byte_len = %d\n",
+			chr_err("[%s]DT error wrong pe50 cycle batt_cv zones, byte_len = %d\n",
 				__func__, byte_len);
 			return -ENODEV;
 		}
@@ -2940,14 +2940,14 @@ static int parse_pe50_dt(struct mtk_charger *info, struct device *dev)
 				(u32 *)info->pe50.cycle_cv_steps,
 				byte_len / sizeof(u32));
 		if (rc < 0) {
-			pr_err("[%s]Couldn't read pe50 cycle cv steps rc = %d\n", __func__, rc);
+			chr_err("[%s]Couldn't read pe50 cycle cv steps rc = %d\n", __func__, rc);
 			return rc;
 		}
-		pr_info("[%s]pe50 cycle cv steps: Num: %d\n",
+		chr_info("[%s]pe50 cycle cv steps: Num: %d\n",
 				__func__,
 				info->pe50.num_cycle_cv_steps);
 		for (i = 0; i < info->pe50.num_cycle_cv_steps; i++) {
-			pr_info("[%s]pe50 cycle cv steps: cycle > %d, delta_cv_mv = %d mV\n",
+			chr_info("[%s]pe50 cycle cv steps: cycle > %d, delta_cv_mv = %d mV\n",
 				__func__,
 				info->pe50.cycle_cv_steps[i].cycle,
 				info->pe50.cycle_cv_steps[i].delta_cv_mv);
@@ -2955,13 +2955,13 @@ static int parse_pe50_dt(struct mtk_charger *info, struct device *dev)
 	} else {
 		info->pe50.cycle_cv_steps = NULL;
 		info->pe50.num_cycle_cv_steps = 0;
-		pr_err("[%s]pe50 cycle cv steps is not set\n", __func__);
+		chr_err("[%s]pe50 cycle cv steps is not set\n", __func__);
 	}
 #endif
 
 	if (of_find_property(node, "pe50,pe50-temp-zones", &byte_len)) {
 		if ((byte_len / sizeof(u32)) % 4) {
-			pr_err("[%s]DT error wrong pe50 temp zones\n",__func__);
+			chr_err("[%s]DT error wrong pe50 temp zones\n",__func__);
 			return -ENODEV;
 		}
 
@@ -2979,13 +2979,13 @@ static int parse_pe50_dt(struct mtk_charger *info, struct device *dev)
 				(u32 *)info->pe50.temp_zones,
 				byte_len / sizeof(u32));
 		if (rc < 0) {
-			pr_err("[%s]Couldn't read pe50 temp zones rc = %d\n", __func__, rc);
+			chr_err("[%s]Couldn't read pe50 temp zones rc = %d\n", __func__, rc);
 			return rc;
 		}
-		pr_info("[%s]"
+		chr_info("[%s]"
 			"pe50 temp zones: Num: %d\n", __func__, info->pe50.num_temp_zones);
 		for (i = 0; i < info->pe50.num_temp_zones; i++) {
-			pr_info("[%s]"
+			chr_info("[%s]"
 				"pe50 temp zones: Zone %d, Temp %d C, "
 				"Step Volt %d mV, Full Rate %d mA, "
 				"Taper Rate %d mA\n", __func__, i,
@@ -2994,16 +2994,16 @@ static int parse_pe50_dt(struct mtk_charger *info, struct device *dev)
 				info->pe50.temp_zones[i].fcc_max_ma,
 				info->pe50.temp_zones[i].fcc_norm_ma);
 		}
-		info->pe50.pres_temp_zone = ZONE_NONE;
+		info->pe50.pres_temp_zone = ZONE_NONE_PE50;
 	} else {
 		info->pe50.temp_zones = NULL;
 		info->pe50.num_temp_zones = 0;
-		pr_err("[%s]pe50 temp zones is not set\n", __func__);
+		chr_err("[%s]pe50 temp zones is not set\n", __func__);
 	}
 
 	if (of_find_property(node, "pe50,pe50-ffc-zones", &byte_len)) {
 		if ((byte_len / sizeof(u32)) % 3) {
-			pr_err("DT error wrong pe50 ffc zones\n");
+			chr_err("DT error wrong pe50 ffc zones\n");
 			return -ENODEV;
 		}
 
@@ -3021,12 +3021,12 @@ static int parse_pe50_dt(struct mtk_charger *info, struct device *dev)
 				(u32 *)info->pe50.ffc_zones,
 				byte_len / sizeof(u32));
 		if (rc < 0) {
-			pr_err("Couldn't read pe50 ffc zones rc = %d\n", rc);
+			chr_err("Couldn't read pe50 ffc zones rc = %d\n", rc);
 			return rc;
 		}
 
 		for (i = 0; i < info->pe50.num_ffc_zones; i++) {
-			pr_err("FFC:Zone %d,Temp %d,Volt %d,Ich %d", i,
+			chr_err("FFC:Zone %d,Temp %d,Volt %d,Ich %d", i,
 				 info->pe50.ffc_zones[i].temp,
 				 info->pe50.ffc_zones[i].ffc_max_mv,
 				 info->pe50.ffc_zones[i].ffc_chg_iterm);
@@ -3045,11 +3045,11 @@ static int parse_pe50_dt(struct mtk_charger *info, struct device *dev)
 
 	info->pe50.wls_switch_en = of_get_named_gpio(node, "pe50,mux_wls_switch_en", 0);
 	if(!gpio_is_valid(info->pe50.wls_switch_en))
-		pr_err("pe50 wls_switch_en is %d invalid\n", info->pe50.wls_switch_en );
+		chr_err("pe50 wls_switch_en is %d invalid\n", info->pe50.wls_switch_en );
 
 	info->pe50.wls_boost_en = of_get_named_gpio(node, "pe50,mux_wls_boost_en", 0);
 	if(!gpio_is_valid(info->pe50.wls_boost_en))
-		pr_err("pe50 wls_boost_en is %d invalid\n", info->pe50.wls_boost_en);
+		chr_err("pe50 wls_boost_en is %d invalid\n", info->pe50.wls_boost_en);
 
 	info->pe50.enable_charging_limit =
 		of_property_read_bool(node, "pe50,enable-charging-limit");
@@ -3102,7 +3102,7 @@ static int parse_pe50_dt(struct mtk_charger *info, struct device *dev)
 
 	if (of_find_property(node, "pe50,typec-ntc-table", &byte_len)) {
 		if ((byte_len / sizeof(u32)) % 2) {
-			pr_err("[%s]DT error wrong pe50 typec ntc table, byte_len = %d\n",
+			chr_err("[%s]DT error wrong pe50 typec ntc table, byte_len = %d\n",
 				__func__, byte_len);
 			return -ENODEV;
 		}
@@ -3121,14 +3121,14 @@ static int parse_pe50_dt(struct mtk_charger *info, struct device *dev)
 				(u32 *)info->pe50.typec_ntc_table,
 				byte_len / sizeof(u32));
 		if (rc < 0) {
-			pr_err("[%s]Couldn't read pe50 typec ntc table rc = %d\n", __func__, rc);
+			chr_err("[%s]Couldn't read pe50 typec ntc table rc = %d\n", __func__, rc);
 			return rc;
 		}
-		pr_info("[%s]pe50 typec ntc table: Num: %d\n",
+		chr_info("[%s]pe50 typec ntc table: Num: %d\n",
 				__func__,
 				info->pe50.num_typec_ntc_table);
 		for (i = 0; i < info->pe50.num_typec_ntc_table; i++) {
-			pr_info("[%s]pe50 typec ntc table: Temp: %d, Res: %d \n",
+			chr_info("[%s]pe50 typec ntc table: Temp: %d, Res: %d \n",
 				__func__,
 				info->pe50.typec_ntc_table[i].Temp,
 				info->pe50.typec_ntc_table[i].TemperatureR);
@@ -3136,7 +3136,7 @@ static int parse_pe50_dt(struct mtk_charger *info, struct device *dev)
 	} else {
 		info->pe50.typec_ntc_table = NULL;
 		info->pe50.num_typec_ntc_table = 0;
-		pr_err("[%s]pe50 typec ntc table is not set\n", __func__);
+		chr_err("[%s]pe50 typec ntc table is not set\n", __func__);
 	}
 #endif
 
@@ -3151,9 +3151,9 @@ static int chg_reboot(struct notifier_block *nb,
 	union power_supply_propval val;
 	int rc;
 
-	pr_info("chg Reboot\n");
+	chr_info("chg Reboot\n");
 	if (!info) {
-		pr_info("called before chip valid!\n");
+		chr_info("called before chip valid!\n");
 		return NOTIFY_DONE;
 	}
 
@@ -3175,10 +3175,10 @@ static int chg_reboot(struct notifier_block *nb,
 				msleep(100);
 				rc = pe50_get_prop_from_charger(info,
 					POWER_SUPPLY_PROP_ONLINE, &val);
-				pr_info("Wait for VBUS to decay\n");
+				chr_info("Wait for VBUS to decay\n");
 			}
 
-			pr_info("VBUS UV wait 1 sec!\n");
+			chr_info("VBUS UV wait 1 sec!\n");
 			/* Delay 1 sec to allow more VBUS decay */
 			msleep(1000);
 			break;
@@ -3199,12 +3199,12 @@ static ssize_t factory_image_mode_store(struct device *dev,
 
 	r = kstrtoul(buf, 0, &mode);
 	if (r) {
-		pr_err("[%s]Invalid factory image mode value = %lu\n", __func__, mode);
+		chr_err("[%s]Invalid factory image mode value = %lu\n", __func__, mode);
 		return -EINVAL;
 	}
 
 	if (!pe50_info) {
-		pr_err("[%s]pe50_info not valid\n", __func__);
+		chr_err("[%s]pe50_info not valid\n", __func__);
 		return -ENODEV;
 	}
 
@@ -3220,7 +3220,7 @@ static ssize_t factory_image_mode_show(struct device *dev,
 	int state;
 
 	if (!pe50_info) {
-		pr_err("[%s]pe50_info not valid\n", __func__);
+		chr_err("[%s]pe50_info not valid\n", __func__);
 		return -ENODEV;
 	}
 
@@ -3240,7 +3240,7 @@ static ssize_t factory_charge_upper_show(struct device *dev,
 	int state;
 
 	if (!pe50_info) {
-		pr_err("[%s]pe50_info not valid\n", __func__);
+		chr_err("[%s]pe50_info not valid\n", __func__);
 		return -ENODEV;
 	}
 
@@ -3262,12 +3262,12 @@ static ssize_t force_demo_mode_store(struct device *dev,
 
 	r = kstrtoul(buf, 0, &mode);
 	if (r) {
-		pr_err("[%s]Invalid demo  mode value = %lu\n", __func__, mode);
+		chr_err("[%s]Invalid demo  mode value = %lu\n", __func__, mode);
 		return -EINVAL;
 	}
 
 	if (!pe50_info) {
-		pr_err("[%s]pe50_info not valid\n", __func__);
+		chr_err("[%s]pe50_info not valid\n", __func__);
 		return -ENODEV;
 	}
 	pe50_info->pe50.chrg_taper_cnt = 0;
@@ -3287,7 +3287,7 @@ static ssize_t force_demo_mode_show(struct device *dev,
 	int state;
 
 	if (!pe50_info) {
-		pr_err("[%s]pe50_info not valid\n", __func__);
+		chr_err("[%s]pe50_info not valid\n", __func__);
 		return -ENODEV;
 	}
 
@@ -3309,12 +3309,12 @@ static ssize_t force_max_chrg_temp_store(struct device *dev,
 
 	r = kstrtoul(buf, 0, &mode);
 	if (r) {
-		pr_err("[%s]Invalid max temp value = %lu\n", __func__, mode);
+		chr_err("[%s]Invalid max temp value = %lu\n", __func__, mode);
 		return -EINVAL;
 	}
 
 	if (!pe50_info) {
-		pr_err("[%s]pe50_info not valid\n", __func__);
+		chr_err("[%s]pe50_info not valid\n", __func__);
 		return -ENODEV;
 	}
 
@@ -3333,7 +3333,7 @@ static ssize_t force_max_chrg_temp_show(struct device *dev,
 	int state;
 
 	if (!pe50_info) {
-		pr_err("[%s]pe50_info not valid\n", __func__);
+		chr_err("[%s]pe50_info not valid\n", __func__);
 		return -ENODEV;
 	}
 
@@ -3369,19 +3369,19 @@ void pe50_init(struct mtk_charger *info)
 
 	rc = parse_pe50_dt(info, &info->pdev->dev);
 	if (rc < 0)
-		pr_info("[%s]Error getting pe50 dt items rc = %d\n",__func__, rc);
+		chr_info("[%s]Error getting pe50 dt items rc = %d\n",__func__, rc);
 
 	if(gpio_is_valid(info->pe50.wls_switch_en)) {
 		rc  = devm_gpio_request_one(&info->pdev->dev, info->pe50.wls_switch_en,
 				  GPIOF_OUT_INIT_LOW, "mux_wls_switch_en");
 		if (rc  < 0)
-			pr_err(" [%s] Failed to request wls_switch_en gpio, ret:%d", __func__, rc);
+			chr_err(" [%s] Failed to request wls_switch_en gpio, ret:%d", __func__, rc);
 	}
 	if(gpio_is_valid(info->pe50.wls_boost_en)) {
 		rc  = devm_gpio_request_one(&info->pdev->dev, info->pe50.wls_boost_en,
 				  GPIOF_OUT_INIT_LOW, "mux_wls_boost_en");
 		if (rc  < 0)
-			pr_err(" [%s] Failed to request wls_boost_en gpio, ret:%d", __func__, rc);
+			chr_err(" [%s] Failed to request wls_boost_en gpio, ret:%d", __func__, rc);
 	}
 	info->pe50.batt_health = POWER_SUPPLY_HEALTH_GOOD;
 
@@ -3390,29 +3390,29 @@ void pe50_init(struct mtk_charger *info)
 	info->pe50.chg_reboot.priority = 1;
 	rc = register_reboot_notifier(&info->pe50.chg_reboot);
 	if (rc)
-		pr_err("SMB register for reboot failed\n");
+		chr_err("SMB register for reboot failed\n");
 
 	rc = device_create_file(&info->pdev->dev,
 				&dev_attr_force_demo_mode);
 	if (rc) {
-		pr_err("[%s]couldn't create force_demo_mode\n", __func__);
+		chr_err("[%s]couldn't create force_demo_mode\n", __func__);
 	}
 
 	rc = device_create_file(&info->pdev->dev,
 				&dev_attr_force_max_chrg_temp);
 	if (rc) {
-		pr_err("[%s]couldn't create force_max_chrg_temp\n", __func__);
+		chr_err("[%s]couldn't create force_max_chrg_temp\n", __func__);
 	}
 
 	rc = device_create_file(&info->pdev->dev,
 				&dev_attr_factory_image_mode);
 	if (rc)
-		pr_err("[%s]couldn't create factory_image_mode\n", __func__);
+		chr_err("[%s]couldn't create factory_image_mode\n", __func__);
 
 	rc = device_create_file(&info->pdev->dev,
 				&dev_attr_factory_charge_upper);
 	if (rc)
-		pr_err("[%s]couldn't create factory_charge_upper\n", __func__);
+		chr_err("[%s]couldn't create factory_charge_upper\n", __func__);
 
 	info->pe50.init_done = true;
 }
@@ -3425,24 +3425,24 @@ static int pe50_find_colder_temp_zone(int pres_zone, int vbat,
 	int colder_zone;
 	int target_zone;
 
-	if (pres_zone == ZONE_HOT)
+	if (pres_zone == ZONE_HOT_PE50)
 		colder_zone = num_zones - 1;
-	else if (pres_zone == ZONE_COLD ||
-	  zones[pres_zone].temp_c == zones[ZONE_FIRST].temp_c)
-		return ZONE_COLD;
+	else if (pres_zone == ZONE_COLD_PE50 ||
+	  zones[pres_zone].temp_c == zones[ZONE_FIRST_PE50].temp_c)
+		return ZONE_COLD_PE50;
 	else {
-		for (i = pres_zone - 1; i >= ZONE_FIRST; i--) {
+		for (i = pres_zone - 1; i >= ZONE_FIRST_PE50; i--) {
 			if (zones[pres_zone].temp_c > zones[i].temp_c) {
 				colder_zone = i;
 				break;
 			}
 		}
 		if (i < 0)
-			return ZONE_COLD;
+			return ZONE_COLD_PE50;
 	}
 
 	target_zone = colder_zone;
-	for (i = ZONE_FIRST; i < colder_zone; i++) {
+	for (i = ZONE_FIRST_PE50; i < colder_zone; i++) {
 		if (zones[colder_zone].temp_c == zones[i].temp_c) {
 			target_zone = i;
 			if (vbat < zones[i].norm_mv)
@@ -3461,11 +3461,11 @@ static int pe50_find_hotter_temp_zone(int pres_zone, int vbat,
 	int hotter_zone;
 	int target_zone;
 
-	if (pres_zone == ZONE_COLD)
-		hotter_zone = ZONE_FIRST;
-	else if (pres_zone == ZONE_HOT ||
+	if (pres_zone == ZONE_COLD_PE50)
+		hotter_zone = ZONE_FIRST_PE50;
+	else if (pres_zone == ZONE_HOT_PE50 ||
 	    zones[pres_zone].temp_c == zones[num_zones - 1].temp_c)
-		return ZONE_HOT;
+		return ZONE_HOT_PE50;
 	else {
 		for (i = pres_zone + 1; i < num_zones; i++) {
 			if (zones[pres_zone].temp_c < zones[i].temp_c) {
@@ -3474,7 +3474,7 @@ static int pe50_find_hotter_temp_zone(int pres_zone, int vbat,
 			}
 		}
 		if (i >= num_zones)
-			return ZONE_HOT;
+			return ZONE_HOT_PE50;
 	}
 
 	target_zone = hotter_zone;
@@ -3495,11 +3495,11 @@ static int pe50_refresh_temp_zone(int pres_zone, int vbat,
 	int i;
 	int target_zone;
 
-	if (pres_zone == ZONE_COLD || pres_zone == ZONE_HOT)
+	if (pres_zone == ZONE_COLD_PE50 || pres_zone == ZONE_HOT_PE50)
 		return pres_zone;
 
 	target_zone = pres_zone;
-	for (i = ZONE_FIRST; i < num_zones; i++) {
+	for (i = ZONE_FIRST_PE50; i < num_zones; i++) {
 		if (zones[pres_zone].temp_c == zones[i].temp_c) {
 			target_zone = i;
 			if (vbat < zones[i].norm_mv)
@@ -3522,7 +3522,7 @@ static void pe50_find_temp_zone(struct mtk_charger *info, int temp_c, int vbat_m
 	int colder_t, colder_fcc;
 
 	if (!info) {
-		pr_err("called before chg valid!\n");
+		chr_err("called before chg valid!\n");
 		return;
 	}
 
@@ -3542,7 +3542,7 @@ static void pe50_find_temp_zone(struct mtk_charger *info, int temp_c, int vbat_m
 			max_temp = zones[num_zones - 1].temp_c;
 	}
 
-	if (prev_zone == ZONE_NONE && zones) {
+	if (prev_zone == ZONE_NONE_PE50 && zones) {
 		for (i = num_zones - 1; i >= 0; i--) {
 			if (temp_c >= zones[i].temp_c) {
 				info->pe50.pres_temp_zone =
@@ -3554,20 +3554,20 @@ static void pe50_find_temp_zone(struct mtk_charger *info, int temp_c, int vbat_m
 			}
 		}
 		if (temp_c < MIN_TEMP_C)
-			info->pe50.pres_temp_zone = ZONE_COLD;
+			info->pe50.pres_temp_zone = ZONE_COLD_PE50;
 		else
 			info->pe50.pres_temp_zone =
-					pe50_find_hotter_temp_zone(ZONE_COLD,
+					pe50_find_hotter_temp_zone(ZONE_COLD_PE50,
 							vbat_mv,
 							zones,
 							num_zones);
 		return;
 	}
 
-	if (prev_zone == ZONE_COLD) {
+	if (prev_zone == ZONE_COLD_PE50) {
 		if (temp_c >= MIN_TEMP_C + HYSTERISIS_DEGC) {
 			if (!num_zones)
-				info->pe50.pres_temp_zone = ZONE_FIRST;
+				info->pe50.pres_temp_zone = ZONE_FIRST_PE50;
 			else
 				info->pe50.pres_temp_zone =
 					pe50_find_hotter_temp_zone(prev_zone,
@@ -3575,10 +3575,10 @@ static void pe50_find_temp_zone(struct mtk_charger *info, int temp_c, int vbat_m
 							zones,
 							num_zones);
 		}
-	} else if (prev_zone == ZONE_HOT) {
+	} else if (prev_zone == ZONE_HOT_PE50) {
 		if (temp_c <=  max_temp - HYSTERISIS_DEGC) {
 			if (!num_zones)
-				info->pe50.pres_temp_zone = ZONE_FIRST;
+				info->pe50.pres_temp_zone = ZONE_FIRST_PE50;
 			else
 				info->pe50.pres_temp_zone =
 					pe50_find_colder_temp_zone(prev_zone,
@@ -3595,7 +3595,7 @@ static void pe50_find_temp_zone(struct mtk_charger *info, int temp_c, int vbat_m
 						vbat_mv,
 						zones,
 						num_zones);
-		if (hotter_zone == ZONE_HOT) {
+		if (hotter_zone == ZONE_HOT_PE50) {
 			hotter_fcc = 0;
 			hotter_t = zones[prev_zone].temp_c;
 		} else {
@@ -3603,7 +3603,7 @@ static void pe50_find_temp_zone(struct mtk_charger *info, int temp_c, int vbat_m
 			hotter_t = zones[prev_zone].temp_c;
 		}
 
-		if (colder_zone == ZONE_COLD) {
+		if (colder_zone == ZONE_COLD_PE50) {
 			colder_fcc = 0;
 			colder_t = MIN_TEMP_C;
 		} else {
@@ -3618,9 +3618,9 @@ static void pe50_find_temp_zone(struct mtk_charger *info, int temp_c, int vbat_m
 			colder_t -= HYSTERISIS_DEGC;
 
 		if (temp_c < MIN_TEMP_C)
-			info->pe50.pres_temp_zone = ZONE_COLD;
+			info->pe50.pres_temp_zone = ZONE_COLD_PE50;
 		else if (temp_c >= max_temp)
-			info->pe50.pres_temp_zone = ZONE_HOT;
+			info->pe50.pres_temp_zone = ZONE_HOT_PE50;
 		else if (temp_c >= hotter_t)
 			info->pe50.pres_temp_zone = hotter_zone;
 		else if (temp_c < colder_t)
@@ -3633,15 +3633,15 @@ static void pe50_find_temp_zone(struct mtk_charger *info, int temp_c, int vbat_m
 							num_zones);
 	} else {
 		if (temp_c < MIN_TEMP_C)
-			info->pe50.pres_temp_zone = ZONE_COLD;
+			info->pe50.pres_temp_zone = ZONE_COLD_PE50;
 		else if (temp_c >= max_temp)
-			info->pe50.pres_temp_zone = ZONE_HOT;
+			info->pe50.pres_temp_zone = ZONE_HOT_PE50;
 		else
-			info->pe50.pres_temp_zone = ZONE_FIRST;
+			info->pe50.pres_temp_zone = ZONE_FIRST_PE50;
 	}
 
 	if (prev_zone != info->pe50.pres_temp_zone) {
-		pr_info("[C:%s]: temp zone switch %x -> %x\n",
+		chr_info("[C:%s]: temp zone switch %x -> %x\n",
 			__func__,
 			prev_zone,
 			info->pe50.pres_temp_zone);
@@ -3680,7 +3680,7 @@ static int pe50_get_ffc_fv(struct mtk_charger *info, int temp_c)
 
 	info->pe50.chrg_iterm = zone->ffc_chg_iterm;
 	ffc_max_fv = zone->ffc_max_mv;
-	pr_info("FFC temp zone %d, fv %d mV, chg iterm %d mA\n",
+	chr_info("FFC temp zone %d, fv %d mV, chg iterm %d mA\n",
 		  ((i > 0)? (i - 1) : 0), ffc_max_fv, info->pe50.chrg_iterm);
 
 	return ffc_max_fv;
@@ -3696,7 +3696,7 @@ static bool pe50_has_current_tapered(struct mtk_charger *info,
 	bool devchg1_en = false;
 
 	if (!info) {
-		pr_err("[%s]called before info valid!\n", __func__);
+		chr_err("[%s]called before info valid!\n", __func__);
 		return false;
 	}
 
@@ -3711,7 +3711,7 @@ static bool pe50_has_current_tapered(struct mtk_charger *info,
 	else {
 		rc = charger_dev_get_charging_current(info->chg1_dev, &allowed_fcc);
 		if (rc < 0) {
-			pr_err("[%s]can't get charging current!\n", __func__);
+			chr_err("[%s]can't get charging current!\n", __func__);
 		} else
 			allowed_fcc = allowed_fcc /1000;
 
@@ -3771,7 +3771,7 @@ static void pe50_charger_check_status(struct mtk_charger *info)
 	rc = pe50_get_prop_from_battery(info,
 				POWER_SUPPLY_PROP_VOLTAGE_NOW, &val);
 	if (rc < 0) {
-		pr_err("[%s]Error getting Batt Voltage rc = %d\n", __func__, rc);
+		chr_err("[%s]Error getting Batt Voltage rc = %d\n", __func__, rc);
 		goto end_check;
 	} else
 		batt_mv = val.intval / 1000;
@@ -3779,7 +3779,7 @@ static void pe50_charger_check_status(struct mtk_charger *info)
 	rc = pe50_get_prop_from_battery(info,
 				POWER_SUPPLY_PROP_CURRENT_NOW, &val);
 	if (rc < 0) {
-		pr_err("[%s]Error getting Batt Current rc = %d\n", __func__, rc);
+		chr_err("[%s]Error getting Batt Current rc = %d\n", __func__, rc);
 		goto end_check;
 	} else
 		batt_ma = val.intval / 1000;
@@ -3787,7 +3787,7 @@ static void pe50_charger_check_status(struct mtk_charger *info)
 	rc = pe50_get_prop_from_battery(info,
 				POWER_SUPPLY_PROP_CAPACITY, &val);
 	if (rc < 0) {
-		pr_err("[%s]Error getting Batt Capacity rc = %d\n", __func__, rc);
+		chr_err("[%s]Error getting Batt Capacity rc = %d\n", __func__, rc);
 		goto end_check;
 	} else
 		batt_soc = val.intval;
@@ -3795,7 +3795,7 @@ static void pe50_charger_check_status(struct mtk_charger *info)
 	rc = pe50_get_prop_from_battery(info,
 				POWER_SUPPLY_PROP_TEMP, &val);
 	if (rc < 0) {
-		pr_err("[%s]Error getting Batt Temperature rc = %d\n", __func__, rc);
+		chr_err("[%s]Error getting Batt Temperature rc = %d\n", __func__, rc);
 		goto end_check;
 	} else
 		batt_temp = val.intval / 10;
@@ -3803,7 +3803,7 @@ static void pe50_charger_check_status(struct mtk_charger *info)
 	rc = pe50_get_prop_from_charger(info,
 				POWER_SUPPLY_PROP_ONLINE, &val);
 	if (rc < 0) {
-		pr_err("[%s]Error getting charger online rc = %d\n", __func__, rc);
+		chr_err("[%s]Error getting charger online rc = %d\n", __func__, rc);
 		goto end_check;
 	} else
 		charger_present = val.intval;
@@ -3811,12 +3811,12 @@ static void pe50_charger_check_status(struct mtk_charger *info)
 	usb_mv = get_vbus(info);
 
 
-	pr_info("[%s]batt=%d mV, %d mA, %d C, USB= %d mV\n", __func__,
+	chr_info("[%s]batt=%d mV, %d mA, %d C, USB= %d mV\n", __func__,
 		batt_mv, batt_ma, batt_temp, usb_mv);
 
 	if (!pe50->temp_zones) {
-		pr_err("[%s]temp_zones is NULL\n", __func__);
-		pr_info("[%s]EFFECTIVE: FV = %d, CDIS = %d, FCC = %d, "
+		chr_err("[%s]temp_zones is NULL\n", __func__);
+		chr_info("[%s]EFFECTIVE: FV = %d, CDIS = %d, FCC = %d, "
 		"USBICL = %d, DEMO_DISCHARG = %d\n", __func__,
 		pe50->target_fv,
 		pe50->chg_disable,
@@ -3863,7 +3863,7 @@ static void pe50_charger_check_status(struct mtk_charger *info)
 		rc = pe50_get_prop_from_battery(info,
 					POWER_SUPPLY_PROP_CYCLE_COUNT, &val);
 		if (rc < 0) {
-			pr_err("[%s]Error getting battery cycle count rc = %d\n", __func__, rc);
+			chr_err("[%s]Error getting battery cycle count rc = %d\n", __func__, rc);
 		} else {
 			batt_cv_delata = pe50_get_batt_cv_delata_by_cycle(val.intval);
 			if( batt_cv_delata > 0)
@@ -3881,18 +3881,18 @@ static void pe50_charger_check_status(struct mtk_charger *info)
 		pr_warn("Factory Mode/Image so Limiting Charging!!!\n");
 
 	if (!charger_present) {
-		pe50->pres_chrg_step = STEP_NONE_N;
-	} else if ((pe50->pres_temp_zone == ZONE_HOT) ||
-		   (pe50->pres_temp_zone == ZONE_COLD) ||
+		pe50->pres_chrg_step = STEP_NONE_PE50;
+	} else if ((pe50->pres_temp_zone == ZONE_HOT_PE50) ||
+		   (pe50->pres_temp_zone == ZONE_COLD_PE50) ||
 		   (pe50->charging_limit_modes == CHARGING_LIMIT_RUN)) {
-		info->pe50.pres_chrg_step = STEP_STOP;
+		info->pe50.pres_chrg_step = STEP_STOP_PE50;
 	} else if (pe50->demo_mode) {
 		bool voltage_full;
 		static int demo_full_soc = 100;
 		static int usb_suspend = 0;
 
-		pe50->pres_chrg_step = STEP_DEMO;
-		pr_info("[%s]Battery in Demo Mode charging Limited %dper\n",
+		pe50->pres_chrg_step = STEP_DEMO_PE50;
+		chr_info("[%s]Battery in Demo Mode charging Limited %dper\n",
 				__func__, pe50->demo_mode);
 
 		voltage_full = ((usb_suspend == 0) &&
@@ -3916,102 +3916,102 @@ static void pe50_charger_check_status(struct mtk_charger *info)
 		if (usb_suspend)
 			charger_dev_set_input_current(info->chg1_dev, 0);
 
-		pr_info("Charge Demo Mode:us = %d, vf = %d, dfs = %d,bs = %d\n",
+		chr_info("Charge Demo Mode:us = %d, vf = %d, dfs = %d,bs = %d\n",
 				usb_suspend, voltage_full, demo_full_soc, batt_soc);
-	} else if (pe50->pres_chrg_step == STEP_NONE_N) {
+	} else if (pe50->pres_chrg_step == STEP_NONE_PE50) {
 		if (zone->norm_mv && ((batt_mv + 2 * HYST_STEP_MV) >= zone->norm_mv)) {
 			if (zone->fcc_norm_ma)
-				pe50->pres_chrg_step = STEP_NORMMAL;
+				pe50->pres_chrg_step = STEP_NORM_PE50;
 			else
-				pe50->pres_chrg_step = STEP_STOP;
+				pe50->pres_chrg_step = STEP_STOP_PE50;
 		} else
-			pe50->pres_chrg_step = STEP_MAX;
-	} else if (pe50->pres_chrg_step == STEP_STOP) {
+			pe50->pres_chrg_step = STEP_MAX_PE50;
+	} else if (pe50->pres_chrg_step == STEP_STOP_PE50) {
 		if (batt_temp > COOL_TEMP)
 			stop_recharge_hyst = 2 * HYST_STEP_MV;
 		else
 			stop_recharge_hyst = 5 * HYST_STEP_MV;
 		if (zone->norm_mv && ((batt_mv + stop_recharge_hyst) >= zone->norm_mv)) {
 			if (zone->fcc_norm_ma)
-				pe50->pres_chrg_step = STEP_NORMMAL;
+				pe50->pres_chrg_step = STEP_NORM_PE50;
 			else
-				pe50->pres_chrg_step = STEP_STOP;
-		} else
-			pe50->pres_chrg_step = STEP_MAX;
-	}else if (pe50->pres_chrg_step == STEP_MAX) {
+				pe50->pres_chrg_step = STEP_STOP_PE50;
+		} else {
+			pe50->pres_chrg_step = STEP_MAX_PE50;
+		}
+	} else if (pe50->pres_chrg_step == STEP_MAX_PE50) {
 		if (!zone->norm_mv) {
 			/* No Step in this Zone */
 			pe50->chrg_taper_cnt = 0;
 			if ((batt_mv + HYST_STEP_MV) >= max_fv_mv)
-				pe50->pres_chrg_step = STEP_NORMMAL;
+				pe50->pres_chrg_step = STEP_NORM_PE50;
 			else
-				pe50->pres_chrg_step = STEP_MAX;
+				pe50->pres_chrg_step = STEP_MAX_PE50;
 		} else if ((batt_mv + HYST_STEP_MV) < zone->norm_mv) {
 			pe50->chrg_taper_cnt = 0;
-			pe50->pres_chrg_step = STEP_MAX;
-		} else if (!zone->fcc_norm_ma)
-			pe50->pres_chrg_step = STEP_FLOAT;
-		else if (pe50_has_current_tapered(info, batt_ma,
+			pe50->pres_chrg_step = STEP_MAX_PE50;
+		} else if (!zone->fcc_norm_ma) {
+			pe50->pres_chrg_step = STEP_FLOAT_PE50;
+		} else if (pe50_has_current_tapered(info, batt_ma,
 						 zone->fcc_norm_ma)) {
 			pe50->chrg_taper_cnt = 0;
-			pe50->pres_chrg_step = STEP_NORMMAL;
+			pe50->pres_chrg_step = STEP_NORM_PE50;
 		}
-	} else if (pe50->pres_chrg_step == STEP_NORMMAL) {
+	} else if (pe50->pres_chrg_step == STEP_NORM_PE50) {
 		if (!zone->fcc_norm_ma)
-			pe50->pres_chrg_step = STEP_FLOAT;
+			pe50->pres_chrg_step = STEP_FLOAT_PE50;
 		else if ((batt_mv + HYST_STEP_MV) < zone->norm_mv) {
 			pe50->chrg_taper_cnt = 0;
-			pe50->pres_chrg_step = STEP_MAX;
+			pe50->pres_chrg_step = STEP_MAX_PE50;
 		}
-		else if ((batt_mv + HYST_STEP_MV/2) < max_fv_mv) {
+		else if ((batt_mv + HYST_STEP_MV / 2) < max_fv_mv) {
 			pe50->chrg_taper_cnt = 0;
-			pe50->pres_chrg_step = STEP_NORMMAL;
+			pe50->pres_chrg_step = STEP_NORM_PE50;
 		} else if (pe50_has_current_tapered(info, batt_ma,
 						   pe50->chrg_iterm)) {
-			pe50->pres_chrg_step = STEP_FULLLY;
+			pe50->pres_chrg_step = STEP_FULL_PE50;
 		}
-	} else if (pe50->pres_chrg_step == STEP_FULLLY) {
+	} else if (pe50->pres_chrg_step == STEP_FULL_PE50) {
 		if (batt_soc <= 99 || batt_mv < (max_fv_mv - HYST_STEP_MV * 2)) {
 			pe50->chrg_taper_cnt = 0;
-			pe50->pres_chrg_step = STEP_NORMMAL;
+			pe50->pres_chrg_step = STEP_NORM_PE50;
 		}
-	} else if (pe50->pres_chrg_step == STEP_FLOAT) {
+	} else if (pe50->pres_chrg_step == STEP_FLOAT_PE50) {
 		if ((zone->fcc_norm_ma) ||
 		    ((batt_mv + HYST_STEP_MV) < zone->norm_mv))
-			pe50->pres_chrg_step = STEP_MAX;
+			pe50->pres_chrg_step = STEP_MAX_PE50;
 		else if (pe50_has_current_tapered(info, batt_ma,
 				   pe50->chrg_iterm))
-			pe50->pres_chrg_step = STEP_STOP;
-
+			pe50->pres_chrg_step = STEP_STOP_PE50;
 	}
 
 	/* Take State actions */
 	switch (pe50->pres_chrg_step) {
-	case STEP_FLOAT:
-	case STEP_MAX:
+	case STEP_FLOAT_PE50:
+	case STEP_MAX_PE50:
 		if (!zone->norm_mv)
 			target_fv = max_fv_mv + pe50->vfloat_comp_mv;
 		else
 			target_fv = zone->norm_mv + pe50->vfloat_comp_mv;
 		target_fcc = zone->fcc_max_ma;
 		break;
-	case STEP_FULLLY:
+	case STEP_FULL_PE50:
 		target_fv = max_fv_mv;
 		target_fcc = -EINVAL;
 		break;
-	case STEP_NORMMAL:
+	case STEP_NORM_PE50:
 		target_fv = max_fv_mv + pe50->vfloat_comp_mv;
 		target_fcc = zone->fcc_norm_ma;
 		break;
-	case STEP_NONE_N:
+	case STEP_NONE_PE50:
 		target_fv = max_fv_mv;
 		target_fcc = zone->fcc_norm_ma;
 		break;
-	case STEP_STOP:
+	case STEP_STOP_PE50:
 		target_fv = max_fv_mv;
 		target_fcc = -EINVAL;
 		break;
-	case STEP_DEMO:
+	case STEP_DEMO_PE50:
 		target_fv = DEMO_MODE_VOLTAGE;
 		target_fcc = zone->fcc_max_ma;
 		break;
@@ -4025,28 +4025,29 @@ static void pe50_charger_check_status(struct mtk_charger *info)
 
 	pe50->target_fcc = ((target_fcc >= 0) ? (target_fcc * 1000) : 0);
 
-	if (info->pe50.pres_temp_zone == ZONE_HOT) {
+	if (info->pe50.pres_temp_zone == ZONE_HOT_PE50) {
 		info->pe50.batt_health = POWER_SUPPLY_HEALTH_OVERHEAT;
-	} else if (info->pe50.pres_temp_zone == ZONE_COLD) {
+	} else if (info->pe50.pres_temp_zone == ZONE_COLD_PE50) {
 		info->pe50.batt_health = POWER_SUPPLY_HEALTH_COLD;
 	} else if (batt_temp >= WARM_TEMP) {
-		if (info->pe50.pres_chrg_step == STEP_STOP)
+		if (info->pe50.pres_chrg_step == STEP_STOP_PE50)
 			info->pe50.batt_health = POWER_SUPPLY_HEALTH_OVERHEAT;
 		else
 			info->pe50.batt_health = POWER_SUPPLY_HEALTH_GOOD;
 	} else if (batt_temp <= COOL_TEMP) {
-		if (info->pe50.pres_chrg_step == STEP_STOP)
+		if (info->pe50.pres_chrg_step == STEP_STOP_PE50)
 			info->pe50.batt_health = POWER_SUPPLY_HEALTH_COLD;
 		else
 			info->pe50.batt_health = POWER_SUPPLY_HEALTH_GOOD;
-	} else
+	} else {
 		info->pe50.batt_health = POWER_SUPPLY_HEALTH_GOOD;
+	}
 
-	pr_info("[%s]FV %d mV, FCC %d mA\n",
+	chr_info("[%s]FV %d mV, FCC %d mA\n",
 		 __func__, target_fv, target_fcc);
-	pr_info("[%s]Step State = %s\n", __func__,
+	chr_err("[%s]Step State = %s\n", __func__,
 		stepchg_str[(int)pe50->pres_chrg_step]);
-	pr_info("[%s]EFFECTIVE: FV = %d, CDIS = %d, FCC = %d, "
+	chr_info("[%s]EFFECTIVE: FV = %d, CDIS = %d, FCC = %d, "
 		"USBICL = %d, DEMO_DISCHARG = %d\n",
 		__func__,
 		pe50->target_fv,
@@ -4054,7 +4055,7 @@ static void pe50_charger_check_status(struct mtk_charger *info)
 		pe50->target_fcc,
 		pe50->target_usb,
 		pe50->demo_discharging);
-	pr_info("[%s]adaptive charging:disable_ibat = %d, "
+	chr_info("[%s]adaptive charging:disable_ibat = %d, "
 		"disable_ichg = %d, enable HZ = %d, "
 		"charging disable = %d\n",
 		__func__,
@@ -4268,6 +4269,17 @@ static void charger_check_status(struct mtk_charger *info)
 #endif /* CONFIG_FACTORY_BUILD*/
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
+
+/* TN Begin modified by xinjun.lu/860715 20240814 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	if (info->pe50.pres_chrg_step == STEP_STOP_PE50)
+		charging = false;
+	if (info->pe50.demo_discharging)
+		charging = false;
+	if (info->pe50.adaptive_charging_disable_ibat)
+		charging = false;
+#endif
+/* TN End modified by xinjun.lu/860715 20240814 CR/EKLAMU-202 */
 
 stop_charging:
 	mtk_battery_notify_check(info);
@@ -5028,7 +5040,7 @@ static int ffc_bat_check_chg_done(struct mtk_charger *info)
 
 	bat_psy = power_supply_get_by_name("battery");
 	if (IS_ERR_OR_NULL(bat_psy)) {
-		pr_info("[%s] get bat_psy fail !!!", __func__);
+		chr_info("[%s] get bat_psy fail !!!", __func__);
 		return -EINVAL;
 	}
 
@@ -5047,7 +5059,7 @@ static int ffc_bat_check_chg_done(struct mtk_charger *info)
 		ret = power_supply_get_property(chg_psy,
 				POWER_SUPPLY_PROP_ONLINE, &prop);
 		if (ret < 0) {
-			pr_err("[%s]Error getting charger online ret = %d\n", __func__, ret);
+			chr_err("[%s]Error getting charger online ret = %d\n", __func__, ret);
 			return -EINVAL;
 		} else
 			charger_present = prop.intval;
@@ -5056,7 +5068,7 @@ static int ffc_bat_check_chg_done(struct mtk_charger *info)
 	ret = power_supply_get_property(bat_psy,
 			POWER_SUPPLY_PROP_VOLTAGE_NOW, &prop);
 	if (ret < 0) {
-		pr_err("[%s]Error getting Batt Volt ret = %d\n", __func__, ret);
+		chr_err("[%s]Error getting Batt Volt ret = %d\n", __func__, ret);
 		return -EINVAL;
 	} else
 		batt_mv = prop.intval / 1000;//uV to mV
@@ -5064,7 +5076,7 @@ static int ffc_bat_check_chg_done(struct mtk_charger *info)
 	ret = power_supply_get_property(bat_psy,
 			POWER_SUPPLY_PROP_CURRENT_NOW, &prop);
 	if (ret < 0) {
-		pr_err("[%s]Error getting Batt Curr now ret = %d\n", __func__, ret);
+		chr_err("[%s]Error getting Batt Curr now ret = %d\n", __func__, ret);
 		return -EINVAL;
 	} else
 		batt_ma = prop.intval / 1000;// uA to mA
@@ -5072,7 +5084,7 @@ static int ffc_bat_check_chg_done(struct mtk_charger *info)
 	ret = power_supply_get_property(bat_psy,
 			POWER_SUPPLY_PROP_CAPACITY, &prop);
 	if (ret < 0) {
-		pr_err("[%s]Error getting Batt Capacity ret = %d\n", __func__, ret);
+		chr_err("[%s]Error getting Batt Capacity ret = %d\n", __func__, ret);
 		return -EINVAL;
 	} else
 		batt_soc = prop.intval;
@@ -5080,12 +5092,12 @@ static int ffc_bat_check_chg_done(struct mtk_charger *info)
 	ret = power_supply_get_property(bat_psy,
 			POWER_SUPPLY_PROP_TEMP, &prop);
 	if (ret < 0) {
-		pr_err("[%s]Error getting Batt Temp ret = %d\n", __func__, ret);
+		chr_err("[%s]Error getting Batt Temp ret = %d\n", __func__, ret);
 		return -EINVAL;
 	} else
 		batt_temp = prop.intval / 10;
 
-	pr_info("[%s] charger_present = %d batt_mv = %d mV batt_ma = %d mA,batt_soc = %d batt_temp = %d C\n",
+	chr_info("[%s] charger_present = %d batt_mv = %d mV batt_ma = %d mA,batt_soc = %d batt_temp = %d C\n",
 				__func__, charger_present, batt_mv, batt_ma, batt_soc, batt_temp);
 
 	usb_mv = get_vbus(info);
@@ -5114,7 +5126,7 @@ static int ffc_bat_check_chg_done(struct mtk_charger *info)
 		}
 	}
 
-	pr_info("[%s] info->pres_chrg_step = %d target_mv = %d\n", __func__, info->pres_chrg_step, target_mv);
+	chr_info("[%s] info->pres_chrg_step = %d target_mv = %d\n", __func__, info->pres_chrg_step, target_mv);
 	return 0;
 }
 #endif
@@ -5750,7 +5762,7 @@ static int mtk_charger_enable_power_path(struct mtk_charger *info,
 		goto out;
 	}
 
-	pr_info("%s: enable power path = %d\n", __func__, en);
+	chr_info("%s: enable power path = %d\n", __func__, en);
 	ret = charger_dev_enable_powerpath(chg_dev, en);
 out:
 	mutex_unlock(&info->pp_lock[idx]);
