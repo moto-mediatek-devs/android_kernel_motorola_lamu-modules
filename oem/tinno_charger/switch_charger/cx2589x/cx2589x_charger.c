@@ -1416,6 +1416,13 @@ static void charger_detect_work_func(struct work_struct *work)
 		cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB_DCP;
 		break;
 
+	case CX2589x_NON_STANDARD:
+		pr_info("CX2589x charger type: NON STANDARD\n");
+		cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
+		cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_SDP;
+		cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB;
+		break;
+
 	case CX2589x_UNKNOWN:
 		pr_info("CX2589x charger type: UNKNOWN\n");
 		cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
