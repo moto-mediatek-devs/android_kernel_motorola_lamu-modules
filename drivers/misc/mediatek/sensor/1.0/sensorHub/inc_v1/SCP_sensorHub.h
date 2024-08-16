@@ -158,12 +158,13 @@ struct proximity_vec_t {
 	int32_t oneshot;
 };
 
-//TN modified by db/ 20240719  begin
+//TN modified by ll/ 20240814  begin
 struct light_vec_t {
+	uint32_t als_lux;
 	uint32_t als_raw_data;
-	uint32_t ir_data;
+	uint32_t ir_clr_data;
 };
-//TN modified by db/ 20240719  end
+//TN modified by db/ 20240814  end
 
 struct relative_humidity_vec_t {
 	int32_t relative_humidity;

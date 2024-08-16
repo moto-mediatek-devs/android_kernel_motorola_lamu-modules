@@ -32,9 +32,9 @@ static long alsps_factory_unlocked_ioctl(struct file *file, unsigned int cmd,
 	long err = 0;
 	void __user *ptr = (void __user *)arg;
 	int data = 0;
-//TN modified by db/ 20240719  begin
-	int data_t[2] = {0, 0};
-//TN modified by db/ 20240719  end
+//TN modified by ll/ 20240814  begin
+	int data_t[3] = {0, 0};
+//TN modified by ll/ 20240814  end
 	uint32_t enable = 0;
 	int threshold_data[2] = {0, 0};
 	int als_cali = 0;

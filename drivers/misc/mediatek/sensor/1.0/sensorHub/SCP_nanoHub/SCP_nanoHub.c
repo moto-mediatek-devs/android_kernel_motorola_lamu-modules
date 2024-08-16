@@ -1509,17 +1509,20 @@ int sensor_get_data_from_hub(uint8_t sensorType,
 		data->accelerometer_t.z = data_t->accelerometer_t.z;
 		data->accelerometer_t.status = data_t->accelerometer_t.status;
 		break;
-//TN modified by db/ 20240719  begin
+//TN modified by ll/ 20240814  begin
 	case ID_LIGHT:
 		data->time_stamp = data_t->time_stamp;
+		data->light_t.als_lux = data_t->light_t.als_lux;
 		data->light_t.als_raw_data = data_t->light_t.als_raw_data;
-		data->light_t.ir_data = data_t->light_t.ir_data;
+		data->light_t.ir_clr_data = data_t->light_t.ir_clr_data;
 		break;
-//TN modified by db/ 20240719  end
+//TN modified by ll/ 20240814  end
 	case ID_PROXIMITY:
 		data->time_stamp = data_t->time_stamp;
 		data->proximity_t.steps = data_t->proximity_t.steps;
 		data->proximity_t.oneshot = data_t->proximity_t.oneshot;
+		pr_err("ll steps:%d oneshot:%d!\n",data_t->proximity_t.steps, data_t->proximity_t.oneshot);
+		pr_err("ll value[0]:%d value[1]:%d!\n",data_t->data[0], data_t->data[1]);
 		break;
 	case ID_PRESSURE:
 		data->time_stamp = data_t->time_stamp;

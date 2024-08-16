@@ -36,6 +36,7 @@ struct alspshub_ipi_data {
 	u16		als;
 	u8		ps;
 	int		ps_cali;
+    int     als_cali_ret;
 	atomic_t	als_cali;
 	atomic_t	ps_thd_val_high;
 	atomic_t	ps_thd_val_low;
@@ -53,6 +54,9 @@ static int ps_get_data(int *value, int *status);
 
 static int alspshub_local_init(void);
 static int alspshub_local_remove(void);
+static int alshub_factory_get_data(int *data);
+static int alshub_factory_enable_sensor(bool enable_disable, int64_t sample_periods_ms);
+
 static int alspshub_init_flag = -1;
 static struct alsps_init_info alspshub_init_info = {
 	.name = "alsps_hub",
@@ -237,16 +241,41 @@ static int pshub_factory_enable_calibration(void);
 static ssize_t test_alscali_store(struct device_driver *ddri, const char *buf,
 			       size_t tCount)
 {
-	int enable = 0, ret = 0;
+    int enable = 0, ret = 0;
+    struct alspshub_ipi_data *obj = obj_ipi_data;
 
-	ret = kstrtoint(buf, 10, &enable);
-	if (ret != 0) {
-		pr_debug("kstrtoint fail\n");
-		return 0;
-	}
-	if (enable == 1)
-		alshub_factory_enable_calibration();
-	return tCount;
+    ret = kstrtoint(buf, 10, &enable);
+    if (ret != 0) 
+    {
+        pr_debug("kstrtoint fail\n");
+        return 0;
+    }
+    WRITE_ONCE(obj->als_cali_ret, 0);
+    if (enable == 1)
+    {
+        ret = alshub_factory_enable_calibration();
+    }
+
+    if (0 != ret)
+    {
+        WRITE_ONCE(obj->als_cali_ret, ret);
+    }
+    else
+    {
+        WRITE_ONCE(obj->als_cali_ret, 1);
+    }
+    
+    return tCount;
+}
+
+static ssize_t test_alscali_show(struct device_driver *ddri, char *buf)
+{
+    int res = 0;
+    int ret = 0;
+    struct alspshub_ipi_data *obj = obj_ipi_data;
+    ret = READ_ONCE(obj->als_cali_ret);
+    res = snprintf(buf, PAGE_SIZE,"%d\n", ret);
+    return res;
 }
 
 static ssize_t test_pscali_store(struct device_driver *ddri, const char *buf,
@@ -295,6 +324,76 @@ static ssize_t rearalstrace_store(struct device_driver *ddri,
 	return count;
 }
 
+/* +20240815 ll add mtk sensor 1.0 alsp sensor test cali node start */
+static ssize_t test_alsenable_store(struct device_driver *ddri, const char *buf,
+                                          size_t tCount)
+{
+    int enable = 0, ret = 0;
+
+    ret = kstrtoint(buf, 10, &enable);
+    if (ret != 0) 
+    {
+        pr_debug("kstrtoint fail\n");
+        return 0;
+    }
+    if (0 != enable && 1 != enable)
+    {
+        pr_debug("value fail\n");
+        return 0;
+    }
+    ret = alshub_factory_enable_sensor(enable, 200);
+    return tCount;
+}
+                                          
+static ssize_t test_alsenable_show(struct device_driver *ddri, char *buf)
+{
+    int res = 0;
+    int enable = -1;
+    struct alspshub_ipi_data *obj = obj_ipi_data;
+    enable = READ_ONCE(obj->als_factory_enable);
+    res = snprintf(buf, PAGE_SIZE,"%u\n", enable);
+    return res;
+}
+
+static ssize_t test_alsgetcali_show(struct device_driver *ddri, char *buf)
+{
+    int res = 0;
+    int32_t als_cali;
+    struct alspshub_ipi_data *obj = obj_ipi_data;
+    als_cali = atomic_read(&obj->als_cali);
+    res = snprintf(buf, PAGE_SIZE,"%u\n", als_cali);
+    return res;
+}
+
+static ssize_t test_alsgetch_show(struct device_driver *ddri, char *buf)
+{
+    int res = 0;
+    uint32_t lux = 0;
+    uint32_t raw = 0;
+    uint32_t ir  = 0;
+    uint32_t clr = 0;
+    int   enable = 0;
+    int      ret = 0;
+    uint32_t data[3] = {0, 0, 0};
+    struct alspshub_ipi_data *obj = obj_ipi_data;
+    enable = READ_ONCE(obj->als_factory_enable);
+    if(enable)
+    {
+        ret = alshub_factory_get_data(data);
+        if (!ret)
+        {
+            lux = data[0];
+            raw = data[1];
+            ir  = data[2] & 0xFFFF;
+            clr = (data[2] >> 16) & 0xFFFF;
+        }
+    }
+    
+    res = snprintf(buf, PAGE_SIZE,"%u %u %u %u\n", lux, raw, ir, clr);
+    return res;
+}
+/* +20240815 ll add mtk sensor 1.0 alsp sensor test cali node end */
+
 static DRIVER_ATTR_RO(als);
 static DRIVER_ATTR_RO(ps);
 static DRIVER_ATTR_RO(alslv);
@@ -303,7 +402,11 @@ static DRIVER_ATTR_RW(trace);
 static DRIVER_ATTR_RO(reg);
 static DRIVER_ATTR_RW(rearalstrace);
 /* +20240709 db add mtk sensor 1.0 alsp sensor test cali node start */
-static DRIVER_ATTR_WO(test_alscali);
+static DRIVER_ATTR_RW(test_alsenable);
+static DRIVER_ATTR_RW(test_alscali);
+static DRIVER_ATTR_RO(test_alsgetcali);
+static DRIVER_ATTR_RO(test_alsgetch);
+
 static DRIVER_ATTR_WO(test_pscali);
 static struct driver_attribute *alspshub_attr_list[] = {
 	&driver_attr_als,
@@ -313,8 +416,11 @@ static struct driver_attribute *alspshub_attr_list[] = {
 	&driver_attr_alsval,
 	&driver_attr_reg,
 	&driver_attr_rearalstrace,
- 	&driver_attr_test_alscali,
+	&driver_attr_test_alsenable,
+	&driver_attr_test_alscali,
 	&driver_attr_test_pscali,
+	&driver_attr_test_alsgetcali,
+	&driver_attr_test_alsgetch
 };
 /* +20240709 db add mtk sensor 1.0 alsp sensor test cali node end */
 
@@ -503,20 +609,23 @@ static int alshub_factory_enable_sensor(bool enable_disable,
 	mutex_unlock(&alspshub_mutex);
 	return 0;
 }
-//TN modified by db/ 20240719  begin
+//TN modified by ll/ 20240814  begin
 static int alshub_factory_get_data(int *data)
 {
-	int err = 0;
-	struct data_unit_t data_t;
+    int err = 0;
+    struct data_unit_t data_t;
 
-	err = sensor_get_data_from_hub(ID_LIGHT, &data_t);
-	if (err < 0)
-		return -1;
-    data[0] = data_t.light_t.als_raw_data;
-    data[1] = data_t.light_t.ir_data;
-	return 0;
+    err = sensor_get_data_from_hub(ID_LIGHT, &data_t);
+    if (err < 0)
+    {
+        return -1;
+    }
+    data[0] = data_t.light_t.als_lux;
+    data[1] = data_t.light_t.als_raw_data;
+    data[2] = data_t.light_t.ir_clr_data;
+    return 0;
 }
-//TN modified by db/ 20240719  end
+//TN modified by ll/ 20240814 end
 
 static int alshub_factory_get_raw_data(int32_t *data)
 {
