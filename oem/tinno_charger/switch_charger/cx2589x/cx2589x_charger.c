@@ -351,13 +351,13 @@ __maybe_unused static int cx2589x_get_prechrg_curr(struct cx2589x_device *cx)
 
 /*
 Termination Current Limit
-0000 每 0101: 40mA 每 335mA, step=59mA
-0110 每 1011: 400mA 每 725mA, step=65mA
+0000 - 0101: 40mA - 335mA, step=59mA
+0110 - 1011: 400mA - 725mA, step=65mA
 ITERM > 725mA is not defined
 Default: 217mA (0011)
-0000 每 40mA, 0001 每 99mA, 0010 每 158mA, 0011 每 217mA
-0100 每 276mA, 0101 每 335mA, 0110 每 400mA, 0111 每 465mA
-1000 每 530mA, 1001 每 595mA, 1010 每 660mA, 1011 每 725mA
+0000 - 40mA, 0001 - 99mA, 0010 - 158mA, 0011 - 217mA
+0100 - 276mA, 0101 - 335mA, 0110 - 400mA, 0111 - 465mA
+1000 - 530mA, 1001 - 595mA, 1010 - 660mA, 1011 - 725mA
 */
 static int cx2589x_set_term_curr(struct charger_device *chg_dev, u32 uA)
 {
@@ -383,15 +383,15 @@ static int cx2589x_set_term_curr(struct charger_device *chg_dev, u32 uA)
 
 /*
 Precharge Current Limit
-0000 每 0101: 52mA 每 337mA, step=57mA
-0110 每 1011: 401mA 每 721mA, step=64mA
+0000 - 0101: 52mA - 337mA, step=57mA
+0110 - 1011: 401mA - 721mA, step=64mA
 IPRECHG > 721mA is not defined.
 Default: 109mA (0001)
-0000 每 52mA, 0001 每 109mA, 0010 每 166mA, 0011 每 223mA
-0100 每 280mA, 0101 每 337mA, 0110 每 401mA, 0111 每 465mA
-1000 每 529mA, 1001 每 593mA, 1010 每 657mA, 1011 每 721mA
+0000 - 52mA, 0001 - 109mA, 0010 - 166mA, 0011 - 223mA
+0100 - 280mA, 0101 - 337mA, 0110 - 401mA, 0111 - 465mA
+1000 - 529mA, 1001 - 593mA, 1010 - 657mA, 1011 - 721mA
 */
-static int cx2589x_set_prechrg_curr(struct cx2589x_device *cx, int uA)
+__maybe_unused static int cx2589x_set_prechrg_curr(struct cx2589x_device *cx, int uA)
 {
 	u8 reg_val;
 
@@ -1706,10 +1706,6 @@ static int cx2589x_hw_init(struct cx2589x_device *cx)
 
 	ret = cx2589x_set_ichrg_curr(s_chg_dev_otg,
 			bat_info.constant_charge_current_max_ua);
-	if (ret)
-		goto err_out;
-
-	ret = cx2589x_set_prechrg_curr(cx, 256000);
 	if (ret)
 		goto err_out;
 
