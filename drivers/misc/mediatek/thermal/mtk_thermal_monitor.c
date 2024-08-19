@@ -2053,6 +2053,9 @@ static int __init thermal_monitor_init(void)
 		mtkthermal_init();
 		mtk_thermal_platform_init();
 		mtk_cooler_shutdown_init();
+		/*TN Begin modified by libei.guo/860712 20240819/EKLAMU-1871*/
+		mtk_cooler_backlight_init();
+		/*TN end modified by libei.guo/860712 20240819/EKLAMU-1871*/
 		mtk_cooler_kshutdown_init();
 		mtk_cooler_atm_init();
 		mtk_cooler_dtm_init();
@@ -2095,6 +2098,9 @@ static void __exit thermal_monitor_exit(void)
 	mtkthermal_exit();
 	mtk_thermal_platform_exit();
 	mtk_cooler_shutdown_exit();
+	/*TN Begin modified by libei.guo/860712 20240819/EKLAMU-1871*/
+	mtk_cooler_backlight_exit();
+	/*TN end modified by libei.guo/860712 20240819/EKLAMU-1871*/
 	mtk_cooler_kshutdown_exit();
 	mtk_cooler_atm_exit();
 	mtk_cooler_dtm_exit();
