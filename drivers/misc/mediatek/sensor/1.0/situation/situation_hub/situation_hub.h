@@ -60,4 +60,18 @@
 #include "rear_flk/rearflk_hub.h"
 #endif
 
+/*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end*/
+#if IS_ENABLED(CONFIG_MTK_FLIPTWIST_HUB)
+#include "flip_twist/flip_twist.h"
+#endif
+
+#if IS_ENABLED(CONFIG_MTK_CHOPCHOP_HUB)
+#include "chop_chop/chop_chop.h"
+#endif
+
+#if IS_ENABLED(CONFIG_MTK_SIGMOVE_HUB)
+#include "sig_move/sig_move.h"
+#endif
+/*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end*/
+
 #endif

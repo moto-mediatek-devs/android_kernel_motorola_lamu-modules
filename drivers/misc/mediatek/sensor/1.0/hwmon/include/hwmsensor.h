@@ -72,8 +72,14 @@
 #define SENSOR_TYPE_REAR_ALS                           73
 #define SENSOR_TYPE_REAR_FLICKER                       74
 
+/*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 start*/
+#define SENSOR_TYPE_FLIP_TWIST                         75
+#define SENSOR_TYPE_CHOP_CHOP                          76
+#define SENSOR_TYPE_SIGNIFICANT_MOVE                   77
+/*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end*/
+
 /* end sensor type */
-#define SENSOR_TYPE_MAX_NUM                            SENSOR_TYPE_REAR_FLICKER
+#define SENSOR_TYPE_MAX_NUM                            SENSOR_TYPE_SIGNIFICANT_MOVE
 #define SENSOR_TYPE_MAX_NUM_PLUS_ONE                   (SENSOR_TYPE_MAX_NUM + 1)
 // +20240617 wnn add mtk sensor 1.0 flicker support end
 
@@ -149,10 +155,15 @@
 // +20240617 wnn add mtk sensor 1.0 flicker support start
 #define ID_REAR_ALS             (ID_BASE + SENSOR_TYPE_REAR_ALS -1)
 #define ID_REAR_FLICKER         (ID_BASE + SENSOR_TYPE_REAR_FLICKER - 1)
+/*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 start*/
+#define ID_FLIP_TWIST           (ID_BASE + SENSOR_TYPE_FLIP_TWIST - 1)
+#define ID_CHOP_CHOP            (ID_BASE + SENSOR_TYPE_CHOP_CHOP - 1)
+#define ID_SIGNIFICANT_MOVE     (ID_BASE + SENSOR_TYPE_SIGNIFICANT_MOVE - 1)
 
 /* end sensor ID */
-#define ID_SENSOR_MAX_HANDLE    (ID_REAR_FLICKER)
+#define ID_SENSOR_MAX_HANDLE    (ID_SIGNIFICANT_MOVE)
 // -20240617 wnn add mtk sensor 1.0 flicker support end
+/*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end*/
 #define ID_SENSOR_MAX_HANDLE_PLUS_ONE    (ID_SENSOR_MAX_HANDLE + 1)
 
 #if (ID_SENSOR_MAX_HANDLE_PLUS_ONE != SENSOR_TYPE_MAX_NUM)

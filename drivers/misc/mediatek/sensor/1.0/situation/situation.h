@@ -32,6 +32,11 @@ enum situation_index_table {
 	sar,
 	rearals,
 	rearflk,
+/*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 start*/
+	flip_twist,
+	chopchop,
+	sig_mov,
+/*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end*/
 	max_situation_support,
 };
 

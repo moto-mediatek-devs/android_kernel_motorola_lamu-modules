@@ -59,6 +59,20 @@ static int __init situation_hub_init(void)
 	rearflk_init();
 #endif
 
+//TN Begin modified by bingtai.zou/860558 20220823 EKFOGO4G-1550 END
+#if IS_ENABLED(CONFIG_MTK_FLIPTWIST_HUB)
+	flip_twist_hub_init();
+#endif
+
+#if IS_ENABLED(CONFIG_MTK_CHOPCHOP_HUB)
+	chop_chop_hub_init();
+#endif
+
+#if IS_ENABLED(CONFIG_MTK_SIGMOVE_HUB)
+	sig_move_hub_init();
+#endif
+/*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end*/
+
 	return 0;
 }
 
@@ -115,6 +129,20 @@ static void __exit situation_hub_exit(void)
 #if IS_ENABLED(CONFIG_MTK_REAR_FLK_HUB)
 	rearflk_exit();
 #endif
+
+/*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 start*/
+#if IS_ENABLED(CONFIG_MTK_FLIPTWIST_HUB)
+	flip_twist_hub_exit();
+#endif
+
+#if IS_ENABLED(CONFIG_MTK_CHOPCHOP_HUB)
+	chop_chop_hub_exit();
+#endif
+
+#if IS_ENABLED(CONFIG_MTK_SIGMOVE_HUB)
+	sig_move_hub_exit();
+#endif
+/*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end*/
 
 }
 

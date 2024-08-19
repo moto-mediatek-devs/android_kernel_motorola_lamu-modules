@@ -872,7 +872,20 @@ static void SCP_sensorHub_init_sensor_state(void)
 
        mSensorState[SENSOR_TYPE_REAR_FLICKER].sensorType = SENSOR_TYPE_REAR_FLICKER;
        mSensorState[SENSOR_TYPE_REAR_FLICKER].timestamp_filter = false;
-// -20240617 wnn add mtk sensor 1.0 flicker support end
+/*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 start*/
+	mSensorState[SENSOR_TYPE_FLIP_TWIST].sensorType = SENSOR_TYPE_FLIP_TWIST;
+	mSensorState[SENSOR_TYPE_FLIP_TWIST].rate = SENSOR_RATE_ONESHOT;
+	mSensorState[SENSOR_TYPE_FLIP_TWIST].timestamp_filter = false;
+
+	mSensorState[SENSOR_TYPE_CHOP_CHOP].sensorType = SENSOR_TYPE_CHOP_CHOP;
+	mSensorState[SENSOR_TYPE_CHOP_CHOP].rate = SENSOR_RATE_ONESHOT;
+	mSensorState[SENSOR_TYPE_CHOP_CHOP].timestamp_filter = false;
+
+	mSensorState[SENSOR_TYPE_SIGNIFICANT_MOVE].sensorType = SENSOR_TYPE_SIGNIFICANT_MOVE;
+	mSensorState[SENSOR_TYPE_SIGNIFICANT_MOVE].rate = SENSOR_RATE_ONESHOT;
+	mSensorState[SENSOR_TYPE_SIGNIFICANT_MOVE].timestamp_filter = false;
+/*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end*/
+
 }
 
 static void init_sensor_config_cmd(struct ConfigCmd *cmd,
@@ -1721,6 +1734,23 @@ int sensor_get_data_from_hub(uint8_t sensorType,
 		data->time_stamp = data_t->time_stamp;
 		data->rearflk = data_t->rearflk;
 		break;
+/*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 start*/
+	case ID_FLIP_TWIST:
+		data->time_stamp = data_t->time_stamp;
+		data->gesture_data_t.probability =
+		data_t->gesture_data_t.probability;
+		break;
+	case ID_CHOP_CHOP:
+		data->time_stamp = data_t->time_stamp;
+		data->gesture_data_t.probability =
+		data_t->gesture_data_t.probability;
+		break;
+       case ID_SIGNIFICANT_MOVE:
+		data->time_stamp = data_t->time_stamp;
+		data->gesture_data_t.probability =
+		data_t->gesture_data_t.probability;
+	    break;
+/*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end*/
 	default:
 		err = -1;
 		break;

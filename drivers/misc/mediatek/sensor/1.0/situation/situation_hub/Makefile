@@ -18,3 +18,8 @@ situationhub-$(CONFIG_MTK_FLAT_HUB) += flat/flat.o
 situationhub-$(CONFIG_MTK_SAR_HUB) += sar/sarhub.o sar/sar_factory.o
 situationhub-$(CONFIG_MTK_REAR_ALS_HUB) += rear_als/rearals_hub.o rear_als/rearals_factory.o
 situationhub-$(CONFIG_MTK_REAR_FLK_HUB) += rear_flk/rearflk_hub.o rear_flk/rearflk_factory.o
+#TN Begin modified by jiawei.zou 20220825 EKLAMU-207 start
+situationhub-$(CONFIG_MTK_FLIPTWIST_HUB) += flip_twist/flip_twist.o
+situationhub-$(CONFIG_MTK_CHOPCHOP_HUB) += chop_chop/chop_chop.o
+situationhub-$(CONFIG_MTK_SIGMOVE_HUB) += sig_move/sig_move.o
+#TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end
