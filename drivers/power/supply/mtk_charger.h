@@ -740,6 +740,8 @@ struct mtk_charger {
 	int disable_thermal_current_limit;
 	struct power_supply  *qc_phy_psy;
 	int ext_chr_type;
+	bool battery_protection_mode;
+	bool is_over_bpm_max_soc;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 	//struct pe50_charger_cfg pe50;

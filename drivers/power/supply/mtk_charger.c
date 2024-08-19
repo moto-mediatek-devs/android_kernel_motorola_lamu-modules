@@ -136,7 +136,12 @@ static char *stepchg_str[] = {
 static bool first_insert = true;
 #endif
 /* TN End modified by xinjun.lu/860715 20240808 CR/EKLAMU-202 */
-
+/* TN Begin modified by jirui.li/860702 20240814 CR/EKLAMU-1339 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+#define BATTERY_PROTECT_MAX_SOC		80
+#define BATTERY_PROTECT_MIN_SOC		20
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by jirui.li/860702 20240814 CR/EKLAMU-1339 */
 #ifdef MODULE
 static char __chg_cmdline[COMMAND_LINE_SIZE];
 static char *chg_cmdline = __chg_cmdline;
@@ -1870,6 +1875,33 @@ static ssize_t disable_thermal_current_limit_store(struct device *dev,
 static DEVICE_ATTR_RW(disable_thermal_current_limit);
 /* TN End modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
 
+/* TN Begin modified by jirui.li/860702 20240814 CR/EKLAMU-1339 */
+static ssize_t battery_protection_mode_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct mtk_charger *pinfo = dev->driver_data;
+
+	chr_info("%s:%d\n", __func__, pinfo->battery_protection_mode);
+	return sprintf(buf, "%d\n", pinfo->battery_protection_mode);
+}
+static ssize_t battery_protection_mode_store(struct device *dev , struct device_attribute *attr , const char *buf, size_t size)
+{
+	struct mtk_charger *pinfo = dev->driver_data;
+	int temp;
+
+	if (kstrtoint(buf, 10, &temp) == 0) {
+		chr_info("%s %s battery_protection\n", __func__, temp ? "enable" : "disable");
+		if (temp == 0){
+			pinfo->battery_protection_mode = false;
+		} else if (temp == 1) {
+			pinfo->battery_protection_mode = true;
+		}
+	} else {
+		chr_err("%s: format error!\n", __func__);
+	}
+        return size;
+}
+static DEVICE_ATTR_RW(battery_protection_mode);
+/* TN End modified by jirui.li/860702 20240814 CR/EKLAMU-1339 */
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 
@@ -4182,6 +4214,29 @@ static void charger_check_status(struct mtk_charger *info)
 #endif /* CONFIG_OEM_TINNO_CHARGER && CONFIG_FACTORY_BUILD */
 /* TN End modified by jirui.li/860702 20240722 CR/EKLAMU-620 */
 
+/* TN Begin modified by jirui.li/860702 20240814 CR/EKLAMU-1339 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	if (info->battery_protection_mode) {
+		if (uisoc >= BATTERY_PROTECT_MAX_SOC) {
+			chr_info("limit battery soc to %d, disable charger\n", BATTERY_PROTECT_MAX_SOC);
+			info->is_over_bpm_max_soc = true;
+			charging = false;
+			goto stop_charging;
+		} else if (uisoc <= BATTERY_PROTECT_MIN_SOC) {
+			chr_info("soc below %d, disable bpm and start charging\n", BATTERY_PROTECT_MIN_SOC);
+			info->is_over_bpm_max_soc = false;
+		} else {
+			if (info->is_over_bpm_max_soc) {
+				chr_info("soc drop to %d - %d,stop charging!!\n", BATTERY_PROTECT_MIN_SOC, BATTERY_PROTECT_MAX_SOC);
+				charging = false;
+				goto stop_charging;
+			} else {
+				chr_info("soc first in %d - %d,start charging!!\n", BATTERY_PROTECT_MIN_SOC, BATTERY_PROTECT_MAX_SOC);
+			}
+		}
+	}
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by jirui.li/860702 20240814 CR/EKLAMU-1339 */
 	info->setting.vbat_mon_en = true;
 	if (info->enable_sw_jeita == true || info->enable_vbat_mon != true ||
 	    info->batpro_done == true)
@@ -5517,6 +5572,11 @@ static int mtk_charger_setup_files(struct platform_device *pdev)
 	ret = device_create_file(&(pdev->dev), &dev_attr_disable_thermal_current_limit);
 	if (ret)
 		goto _out;
+/* TN Begin modified by jirui.li/860702 20240814 CR/EKLAMU-1339 */
+	ret = device_create_file(&(pdev->dev), &dev_attr_battery_protection_mode);
+	if (ret)
+		goto _out;
+/* TN End modified by jirui.li/860702 20240814 CR/EKLAMU-1339 */
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 
@@ -6282,6 +6342,8 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	info->enable_hiz = false;
 	info->enable_charger = true;
 	info->disable_thermal_current_limit = 0;
+	info->battery_protection_mode = false;
+	info->is_over_bpm_max_soc = false;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 
