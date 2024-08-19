@@ -1893,7 +1893,7 @@ static int sgm4154x_parse_dt(struct sgm4154x_device *sgm)
 	return 0;
 }
 
-static int sgm4154x_enable_vbus(struct regulator_dev *rdev)
+__maybe_unused static int sgm4154x_enable_vbus(void)
 {
 	int ret = 0;
 	struct sgm4154x_device *sgm = charger_get_data(s_chg_dev_otg);
@@ -1904,7 +1904,7 @@ static int sgm4154x_enable_vbus(struct regulator_dev *rdev)
 	return ret;
 }
 
-static int sgm4154x_disable_vbus(struct regulator_dev *rdev)
+__maybe_unused static int sgm4154x_disable_vbus(void)
 {
 	int ret = 0;
 	struct sgm4154x_device *sgm = charger_get_data(s_chg_dev_otg);
@@ -1915,7 +1915,7 @@ static int sgm4154x_disable_vbus(struct regulator_dev *rdev)
 	return ret;
 }
 
-static int sgm4154x_is_enabled_vbus(struct regulator_dev *rdev)
+__maybe_unused static int sgm4154x_is_enabled_vbus(struct regulator_dev *rdev)
 {
 	u8 temp = 0;
 	int ret = 0;
@@ -2150,6 +2150,7 @@ static int sgm4154x_get_property(struct charger_device *chg_dev,
 	return ret;
 }
 
+#if 0
 static struct regulator_ops sgm4154x_vbus_ops = {
 	.enable = sgm4154x_enable_vbus,
 	.disable = sgm4154x_disable_vbus,
@@ -2183,6 +2184,7 @@ static int sgm4154x_vbus_regulator_register(struct sgm4154x_device *sgm)
 
 	return ret;
 }
+#endif
 
 static struct charger_ops sgm4154x_chg_ops = {
 	.dump_registers = sgm4154x_dump_register,
@@ -2478,11 +2480,7 @@ static int sgm4154x_driver_probe(struct i2c_client *client,
 
 	ret = sgm4154x_create_device_node(&(client->dev));
 
-	//OTG setting
-	//sgm4154x_set_otg_voltage(s_chg_dev_otg, 5000000); //5V
-	//sgm4154x_set_otg_current(s_chg_dev_otg, 1200000); //1.2A
-
-	ret = sgm4154x_vbus_regulator_register(sgm);
+	//ret = sgm4154x_vbus_regulator_register(sgm);
 
 	//schedule_delayed_work(&sgm->charge_monitor_work, msecs_to_jiffies(100));
 
@@ -2506,7 +2504,7 @@ static int sgm4154x_charger_remove(struct i2c_client *client)
 
 	//cancel_delayed_work_sync(&sgm->charge_monitor_work);
 
-	regulator_unregister(sgm->otg_rdev);
+	//regulator_unregister(sgm->otg_rdev);
 
 	power_supply_unregister(sgm->charger);
 

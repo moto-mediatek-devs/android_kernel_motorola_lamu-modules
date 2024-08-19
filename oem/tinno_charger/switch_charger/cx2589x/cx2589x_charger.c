@@ -1813,7 +1813,7 @@ static int cx2589x_parse_dt(struct cx2589x_device *cx)
 	return 0;
 }
 
-static int cx2589x_enable_vbus(struct regulator_dev *rdev)
+static int cx2589x_enable_vbus(void)
 {
 	int ret = 0;
 	u8 val;
@@ -1843,7 +1843,7 @@ static int cx2589x_enable_vbus(struct regulator_dev *rdev)
 	return ret;
 }
 
-static int cx2589x_disable_vbus(struct regulator_dev *rdev)
+static int cx2589x_disable_vbus(void)
 {
 	int ret = 0;
 	struct cx2589x_device *cx = charger_get_data(s_chg_dev_otg);
@@ -1861,7 +1861,8 @@ static int cx2589x_disable_vbus(struct regulator_dev *rdev)
 	return ret;
 }
 
-static int cx2589x_is_enabled_vbus(struct regulator_dev *rdev)
+
+__maybe_unused static int cx2589x_is_enabled_vbus(struct regulator_dev *rdev)
 {
 	u8 temp = 0;
 	int ret = 0;
@@ -1914,9 +1915,9 @@ static int cx2589x_enable_otg(struct charger_device *chg_dev, bool en)
 
 	pr_info("en = %d\n", en);
 	if (en) {
-		ret = cx2589x_enable_vbus(NULL);
+		ret = cx2589x_enable_vbus();
 	} else {
-		ret = cx2589x_disable_vbus(NULL);
+		ret = cx2589x_disable_vbus();
 	}
 
 	return ret;
@@ -1972,6 +1973,7 @@ static int cx2589x_set_boost_current_limit(struct charger_device *chg_dev, u32 u
 	return ret;
 }
 
+#if 0
 static struct regulator_ops cx2589x_vbus_ops = {
 	.enable = cx2589x_enable_vbus,
 	.disable = cx2589x_disable_vbus,
@@ -1992,7 +1994,6 @@ static int cx2589x_vbus_regulator_register(struct cx2589x_device *cx)
 {
 	struct regulator_config config = {};
 	int ret = 0;
-
 	/* otg regulator */
 	config.dev = cx->dev;
 	config.driver_data = cx;
@@ -2007,6 +2008,7 @@ static int cx2589x_vbus_regulator_register(struct cx2589x_device *cx)
 
 	return ret;
 }
+#endif
 
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
 static int cx2589x_enable_dpdm_hiz(struct charger_device *chg_dev)
@@ -2348,11 +2350,7 @@ static int cx2589x_driver_probe(struct i2c_client *client,
 
 	ret = cx2589x_create_device_node(&(client->dev));
 
-	//OTG setting
-	//cx2589x_set_otg_voltage(s_chg_dev_otg, 5000000); //5V
-	//cx2589x_set_otg_current(s_chg_dev_otg, 1200000); //1.2A
-
-	ret = cx2589x_vbus_regulator_register(cx);
+	//ret = cx2589x_vbus_regulator_register(cx);
 
 	//pr_info("run charge_detect_delayed_work\n");
 
@@ -2390,7 +2388,7 @@ static int cx2589x_charger_remove(struct i2c_client *client)
 	struct cx2589x_device *cx = i2c_get_clientdata(client);
 
 	cancel_delayed_work_sync(&cx->charge_monitor_work);
-	regulator_unregister(cx->otg_rdev);
+	//regulator_unregister(cx->otg_rdev);
 	power_supply_unregister(cx->charger);
 	cx2589x_destory_device_node(cx->dev);
 	mutex_destroy(&cx->lock);
