@@ -422,7 +422,7 @@ static void txd_panel_init(struct txd *ctx)
 	txd_dcs_write_seq_static(ctx,0x83,0xB8);
 	txd_dcs_write_seq_static(ctx,0x84,0x02);
 	txd_dcs_write_seq_static(ctx,0xFF,0x98,0x83,0x00);
-	txd_dcs_write_seq_static(ctx,0x51,0x07,0xFF);
+	txd_dcs_write_seq_static(ctx,0x51,0x00,0x00);
 	txd_dcs_write_seq_static(ctx,0x53,0x2C);
 	txd_dcs_write_seq_static(ctx,0x55,0x01);
 	txd_dcs_write_seq_static(ctx,0x35,0x00);
@@ -461,6 +461,7 @@ static int txd_unprepare(struct drm_panel *panel)
 	is_suspend = 1;
 
 	txd_dcs_write_seq_static(ctx, 0xAC,0x0A,0x00);
+	msleep(3);
 	txd_dcs_write_seq_static(ctx, 0x28);
 	msleep(20);
 	txd_dcs_write_seq_static(ctx, 0x10);
@@ -605,7 +606,7 @@ static int txd_prepare(struct drm_panel *panel)
 	gpiod_set_value(ctx->bias_pos, 1);
 	devm_gpiod_put(ctx->dev, ctx->bias_pos);
 
-	udelay(2 * 1000);
+	udelay(5 * 1000);
 
 	ctx->bias_neg = devm_gpiod_get_index(ctx->dev,
 		"bias", 1, GPIOD_OUT_HIGH);
@@ -664,9 +665,9 @@ static int txd_enable(struct drm_panel *panel)
 #define VFP_90 (296)
 
 
-#define HFP (20)
+#define HFP (120)
 #define HSA (12)
-#define HBP (20)
+#define HBP (104)
 #define HAC (720)
 
 #define FPS (60)
@@ -766,7 +767,7 @@ static int txd_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 }
 
 static struct mtk_panel_params ext_params = {
-	.pll_clk = 456,
+	.pll_clk = 560,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,
 	.lcm_esd_check_table[0] = {
@@ -774,6 +775,7 @@ static struct mtk_panel_params ext_params = {
 		.count = 1,
 		.para_list[0] = 0x9c,
 	},
+	.ssc_enable = 0,
 /* 	.dyn = {
 		.switch_en = 1,
 		.pll_clk = 465,
@@ -782,7 +784,7 @@ static struct mtk_panel_params ext_params = {
 };
 
 static struct mtk_panel_params ext_params_90hz = {
-	.pll_clk = 456,
+	.pll_clk = 560,
 	// .vfp_low_power = 300,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,
@@ -791,7 +793,7 @@ static struct mtk_panel_params ext_params_90hz = {
 		.count = 1,
 		.para_list[0] = 0x9c,
 	},
-
+	.ssc_enable = 0,
 /* 	.dyn = {
 		.switch_en = 1,
 		.pll_clk = 465,
