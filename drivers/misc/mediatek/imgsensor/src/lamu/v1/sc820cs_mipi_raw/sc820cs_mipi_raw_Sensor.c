@@ -59,8 +59,8 @@ static struct imgsensor_info_struct imgsensor_info = {
 		.framelength = 2500,
 		.startx = 0,
 		.starty = 0,
-		.grabwindow_width = 1632,
-		.grabwindow_height = 1224,
+		.grabwindow_width = 3264,
+		.grabwindow_height = 2448,
 		.mipi_data_lp2hs_settle_dc = 85,
 		.mipi_pixel_rate = 264000000,
 		.max_framerate = 300,
@@ -168,7 +168,7 @@ static struct imgsensor_struct imgsensor = {
 
 /* Sensor output window information */
 static struct SENSOR_WINSIZE_INFO_STRUCT imgsensor_winsize_info[8] ={
-	{ 3264, 2448, 0, 0, 3264, 2448, 1632, 1224, 0, 0, 1632, 1224, 0, 0, 1632, 1224},	/* Preview */
+	{ 3264, 2448, 0, 0, 3264, 2448, 3264, 2448, 0, 0, 3264, 2448, 0, 0, 3264, 2448},	/* Preview */
 	{ 3264, 2448, 0, 0, 3264, 2448, 3264, 2448, 0, 0, 3264, 2448, 0, 0, 3264, 2448},	/* capture */
 	{ 3264, 2448, 0, 306,   3264, 1836, 3264, 1836, 0, 0, 3264, 1836,  0,  0, 3264, 1836},	/* normal video */
 	{ 3264, 2448, 0, 0, 3264, 2448, 3264, 2448, 0, 0, 3264, 2448, 0, 0, 3264, 2448},	/* slim video */
@@ -499,7 +499,7 @@ kal_uint16 addr_data_pair_init_w1sc820cswidely[] = {
 0x37f9,0x80,
 0x36e9,0x24,
 0x37f9,0x24,
-0x301f,0x0e,
+0x301f,0x01,
 0x3205,0xc7,
 0x3211,0x04,
 0x3270,0x00,
@@ -583,6 +583,7 @@ kal_uint16 addr_data_pair_init_w1sc820cswidely[] = {
 0x3942,0x00,
 0x3943,0x63,
 0x3944,0x5f,
+0x3c04,0x01,
 0x3e00,0x01,
 0x3e01,0x38,
 0x3e02,0x00,
@@ -724,6 +725,7 @@ write_cmos_sensor8(0x3941,0x00);
 write_cmos_sensor8(0x3942,0x00);
 write_cmos_sensor8(0x3943,0x63);
 write_cmos_sensor8(0x3944,0x5f);
+write_cmos_sensor8(0x3c04,0x01);
 write_cmos_sensor8(0x3e00,0x01);
 write_cmos_sensor8(0x3e01,0x38);
 write_cmos_sensor8(0x3e02,0x00);
@@ -765,7 +767,7 @@ write_cmos_sensor8(0x57aa,0xeb);
 #if MULTI_WRITE
 kal_uint16 addr_data_pair_preview_w1sc820cswidely[] = {
 	//0x0100,0x00,
-	0x301f,0x04,
+	0x301f,0x01,
 	0x3200,0x00,
 	0x3201,0x00,
 	0x3202,0x00,
@@ -773,35 +775,35 @@ kal_uint16 addr_data_pair_preview_w1sc820cswidely[] = {
 	0x3204,0x0c,
 	0x3206,0x09,
 	0x3207,0x9f,
-	0x3208,0x06,
-	0x3209,0x60,
-	0x320a,0x04,
-	0x320b,0xc8,
+	0x3208,0x0c,
+	0x3209,0xc0,
+	0x320a,0x09,
+	0x320b,0x90,
 	0x3210,0x00,
 	0x3212,0x00,
-	0x3213,0x04,
-	0x3215,0x31,
-	0x3220,0x01,
-	0x5000,0x4e,
-	0x5900,0xf1,
-	0x5901,0x04,
+	0x3213,0x08,
+	0x3215,0x11,
+	0x3220,0x00,
+	0x5000,0x0e,
+	0x5900,0x01,
+	0x5901,0x00,
 };
 #endif
 
 static void preview_setting(void)
 {
-	
+
 #if MULTI_WRITE
      w1sc820cswidely_table_write_cmos_sensor(
          addr_data_pair_preview_w1sc820cswidely,
          sizeof(addr_data_pair_preview_w1sc820cswidely)/
          sizeof(kal_uint16));
-		 
+
 #else
 	/*V02P08_20210628*/
 
 	//write_cmos_sensor8(0x0100,0x00);
-	write_cmos_sensor8(0x301f,0x04);
+	write_cmos_sensor8(0x301f,0x01);
 	write_cmos_sensor8(0x3200,0x00);
 	write_cmos_sensor8(0x3201,0x00);
 	write_cmos_sensor8(0x3202,0x00);
@@ -809,26 +811,25 @@ static void preview_setting(void)
 	write_cmos_sensor8(0x3204,0x0c);
 	write_cmos_sensor8(0x3206,0x09);
 	write_cmos_sensor8(0x3207,0x9f);
-	write_cmos_sensor8(0x3208,0x06);
-	write_cmos_sensor8(0x3209,0x60);
-	write_cmos_sensor8(0x320a,0x04);
-	write_cmos_sensor8(0x320b,0xc8);
+	write_cmos_sensor8(0x3208,0x0c);
+	write_cmos_sensor8(0x3209,0xc0);
+	write_cmos_sensor8(0x320a,0x09);
+	write_cmos_sensor8(0x320b,0x90);
 	write_cmos_sensor8(0x3210,0x00);
 	write_cmos_sensor8(0x3212,0x00);
-	write_cmos_sensor8(0x3213,0x04);
-	write_cmos_sensor8(0x3215,0x31);
-	write_cmos_sensor8(0x3220,0x01);
-	write_cmos_sensor8(0x5000,0x4e);
-	write_cmos_sensor8(0x5900,0xf1);
-	write_cmos_sensor8(0x5901,0x04);
-
+	write_cmos_sensor8(0x3213,0x08);
+	write_cmos_sensor8(0x3215,0x11);
+	write_cmos_sensor8(0x3220,0x00);
+	write_cmos_sensor8(0x5000,0x0e);
+	write_cmos_sensor8(0x5900,0x01);
+    write_cmos_sensor8(0x5901,0x00);
 
 #endif
 }
 
 #if MULTI_WRITE
 kal_uint16 addr_data_pair_capture_fps_w1sc820cswidely[] = {
-	
+
 	0x0100,0x00,
 	0x301f,0x01,
 	0x3200,0x00,
