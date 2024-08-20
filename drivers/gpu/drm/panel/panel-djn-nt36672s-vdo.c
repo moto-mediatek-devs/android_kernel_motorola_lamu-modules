@@ -38,10 +38,10 @@
 #include "../../../../oem/devinfo/dev_info.h"
 #endif
 
-//#define TINNO_LCM_OEM_CONFIG
+#define TINNO_LCM_OEM_CONFIG
 #if defined(TINNO_LCM_OEM_CONFIG)
-#include <focaltech_core.h>
-int gesture_mode = -1;
+int djn_gesture_mode = -1;
+EXPORT_SYMBOL(djn_gesture_mode);
 #endif
 
 int nt36672s_lcd_id = 0;
@@ -668,9 +668,8 @@ static int djn_unprepare(struct drm_panel *panel)
 	ctx->prepared = false;
 
 #ifdef TINNO_LCM_OEM_CONFIG
-	gesture_mode = fts_lcd_gesture_control();
-	if(gesture_mode) {
-		pr_info("nt36672s Skip Power Control !\n", __func__);
+	if(djn_gesture_mode) {
+		pr_info("nt36672s Skip Power Control !\n");
 		return 0;
 	}
 #endif
@@ -743,8 +742,7 @@ static int djn_prepare(struct drm_panel *panel)
 		return 0;
 
 #ifdef TINNO_LCM_OEM_CONFIG
-	gesture_mode = fts_lcd_gesture_control();
-	if(gesture_mode) {
+	if(djn_gesture_mode) {
 		udelay(10000);
 		djn_panel_init(ctx);
 		ret = ctx->error;
@@ -758,7 +756,7 @@ static int djn_prepare(struct drm_panel *panel)
 		djn_panel_get_data(ctx);
 #endif
 	is_suspend = 0;
-	pr_info("ft8057s Skip Power Control !\n", __func__);
+	pr_info("nt36672s Skip Power Control !\n");
 	return ret;
 	}
 	else
@@ -1438,7 +1436,7 @@ static void djn_shutdown(struct mipi_dsi_device *dsi)
 	ctx->error = 0;
 	ctx->prepared = false;
 
-/* 	if(gesture_mode) {
+	if(djn_gesture_mode) {
 		pr_info("%s + ! nt36672s gesture on !\n", __func__);
 
 #if defined(CONFIG_RT5081_PMU_DSV) || defined(CONFIG_MT6370_PMU_DSV)
@@ -1491,7 +1489,7 @@ static void djn_shutdown(struct mipi_dsi_device *dsi)
 
 		//djn_disable(&ctx->panel);
 		pr_info("%s - ! nt36672s gesture on !\n", __func__);
-	} */
+	}
 }
 #endif
 

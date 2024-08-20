@@ -121,6 +121,7 @@ const uint16_t gesture_key_array[] = {
 	KEY_POWER,  //GESTURE_SLIDE_DOWN
 	KEY_POWER,  //GESTURE_SLIDE_LEFT
 	KEY_POWER,  //GESTURE_SLIDE_RIGHT
+	KEY_U,  //GESTURE_SINGLE_CLICK
 };
 #endif
 
@@ -892,6 +893,231 @@ static int8_t nvt_cmd_store(uint8_t cmd)
 	return 0;
 }
 
+static int32_t nvt_cmd_ext_store(uint8_t cmd, uint8_t subcmd)
+{
+    int32_t i, retry = 5;
+    uint8_t buf[4] = {0};
+
+    //---set xdata index to EVENT BUF ADDR---
+    nvt_set_page(ts->mmap->EVENT_BUF_ADDR);
+
+    for (i = 0; i < retry; i++) {
+		if (buf[1] != cmd) {
+			//---set cmd status---
+			buf[0] = EVENT_MAP_HOST_CMD;
+			buf[1] = cmd;
+			buf[2] = subcmd;
+			CTP_SPI_WRITE(ts->client, buf, 3);
+		}
+
+        msleep(20);
+
+        //---read cmd status---
+        buf[0] = EVENT_MAP_HOST_CMD;
+        buf[1] = 0xFF;
+        CTP_SPI_READ(ts->client, buf, 2);
+        if (buf[1] == 0x00)
+            break;
+    }
+
+    if (i == retry) {
+        NVT_ERR("send Cmd 0x%02X 0x%02X failed, buf[1]=0x%02X\n", cmd, subcmd, buf[1]);
+        return -1;
+    } else {
+        NVT_LOG("send Cmd 0x%02X 0x%02X success, tried %d times\n", cmd, subcmd, i);
+    }
+
+    return 0;
+}
+
+#define NVT_GESTURE_ON(flag)      (flag[0] == '3')
+#define NVT_DOUBLE_TAP_ON(flag)   (flag[0] == '2')
+#define NVT_SINGLE_TAP_ON(flag)   (flag[0] == '1')
+#define NVT_GESTURE_OFF(flag)     (flag[0] == '0')
+#define NVT_GESTURE_JUDGE(flag)   (flag[0] != '0')
+
+struct nvt_gesture_cmds{
+	int cmd;
+	int subcmd;
+};
+#define GESTURE_DISABLE             0
+#define GESTURE_SINGLE              1
+#define GESTURE_DOUBLE              2
+#define GESTURE_SINGLE_DOUBLE       3
+static struct nvt_gesture_cmds tianma_nvt_gesture_cmds[4] = {
+	{0x7B, 0x00},// Sort by the command above
+	{0x7B, 0x01},
+	{0x7B, 0x02},
+	{0x7B, 0x03},
+};
+static struct nvt_gesture_cmds djn_nvt_gesture_cmds[4] = {
+	{0x7B, 0x01},
+	{0x7B, 0x02},
+	{0x7B, 0x04},
+	{0x7B, 0x03},
+};
+
+int nvt_apply_gesture_type(void)
+{
+	int id = 0;
+	int ret = 0;
+	NVT_LOG("Write gesture %d cmd to reg !\n", ts->gesture_tpye);
+	struct nvt_gesture_cmds *iterator;
+
+	id = nt36672s_lcd_id | nt36528a_lcd_id;
+	if(id == 0x0093)
+		iterator = djn_nvt_gesture_cmds;
+	else if(id == 0x0101)
+		iterator = tianma_nvt_gesture_cmds;
+	else
+		return -EINVAL;
+
+	if (ts->gesture_tpye == GESTURE_DISABLE){
+		NVT_LOG("Write gesture GESTURE_DISABLE cmd to reg !\n");
+	}else if (ts->gesture_tpye == GESTURE_SINGLE){
+		NVT_LOG("Write gesture GESTURE_SINGLE cmd to reg !\n");
+	}else if (ts->gesture_tpye == GESTURE_DOUBLE){
+		NVT_LOG("Write gesture GESTURE_DOUBLE cmd to reg !\n");
+	}else if (ts->gesture_tpye == GESTURE_SINGLE_DOUBLE){
+		NVT_LOG("Write gesture GESTURE_SINGLE_DOUBLE cmd to reg !\n");
+	}else{
+		NVT_ERR("error gesture_tpye %d!\n", ts->gesture_tpye);
+		return -EINVAL;
+	}
+
+	ret = nvt_cmd_ext_store(iterator[ts->gesture_tpye].cmd, iterator[ts->gesture_tpye].subcmd);
+
+	if(ret < 0)
+		NVT_ERR("error ! nvt_cmd_ext_store ret = %d\n", ret);
+
+	return ret;
+}
+
+#define USER_STR_BUFF		PAGE_SIZE
+static unsigned char g_user_buf[USER_STR_BUFF] = {0};
+static ssize_t tp_gesture_mode_read(struct file *filp, char __user *buff, size_t size, loff_t *pos)
+{
+	u32 len = 0;
+	NVT_LOG("++\n");
+
+	if (*pos != 0)
+		return 0;
+
+	if (mutex_lock_interruptible(&ts->lock)) {
+		return -ERESTARTSYS;
+	}
+	memset(g_user_buf, 0, USER_STR_BUFF * sizeof(unsigned char));
+	len += snprintf(g_user_buf + len, USER_STR_BUFF - len,
+						"%d\n", ts->gesture_tpye);
+	if (copy_to_user((char *)buff, g_user_buf, len))
+		NVT_ERR("Failed to copy data to user space\n");
+	*pos += len;
+
+	mutex_unlock(&ts->lock);
+	NVT_LOG("--\n");
+	return len;
+}
+
+extern int nvt_gesture_mode;
+extern int djn_gesture_mode;
+static ssize_t tp_gesture_mode_write(struct file *filp, const char *buff, size_t size, loff_t *pos)
+{
+	char cmd[256] = { 0 };
+
+	if ((size) > sizeof(cmd)) {
+		NVT_ERR("ERROR! input length is larger than local buffer\n");
+		return -1;
+	}
+	if (mutex_lock_interruptible(&ts->lock)) {
+		return -ERESTARTSYS;
+	}
+	if (buff != NULL) {
+		if (copy_from_user(cmd, buff, size)) {
+			NVT_ERR("Failed to copy data from user space\n");
+			size = -1;
+			goto out;
+		}
+	}
+
+	if (NVT_GESTURE_ON(cmd)) {
+		ts->gesture_tpye = GESTURE_SINGLE_DOUBLE;
+	} else if (NVT_DOUBLE_TAP_ON(cmd)) {
+		ts->gesture_tpye = GESTURE_DOUBLE;
+	} else if (NVT_SINGLE_TAP_ON(cmd)) {
+		ts->gesture_tpye = GESTURE_SINGLE;
+	} else if (NVT_GESTURE_OFF(cmd)) {
+		ts->gesture_tpye = GESTURE_DISABLE;
+	} else {
+		NVT_ERR("error cmd %s!\n", cmd);
+		goto out;
+	}
+	nvt_gesture_mode = (NVT_GESTURE_JUDGE(cmd)) ? 1:0;
+	djn_gesture_mode = (NVT_GESTURE_JUDGE(cmd)) ? 1:0;
+	nvt_apply_gesture_type();
+	NVT_LOG("ts_data->gesture_tpye = %d\n", ts->gesture_tpye);
+out:
+	mutex_unlock(&ts->lock);
+	return size;
+}
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 6, 0)
+typedef struct {
+	char *name;
+	struct proc_dir_entry *node;
+	struct proc_ops *fops;
+	bool isCreated;
+} proc_node;
+#else
+typedef struct {
+	char *name;
+	struct proc_dir_entry *node;
+	struct file_operations *fops;
+	bool isCreated;
+} proc_node;
+#endif
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 6, 0)
+static struct proc_ops proc_tp_gesture_mode_fops = {
+	.proc_read = tp_gesture_mode_read,
+	.proc_write = tp_gesture_mode_write,
+	.proc_lseek = default_llseek,
+};
+#else
+static struct file_operations proc_tp_gesture_mode_fops = {
+	.read = tp_gesture_mode_read,
+	.write = tp_gesture_mode_write,
+	.llseek = default_llseek,
+};
+#endif
+
+static proc_node tp_info_proc[] = {
+	{"tp_gesture_mode", NULL, &proc_tp_gesture_mode_fops, false},
+};
+
+static void touch_info_node_init(void)
+{
+	int i = 0;
+	if (!touch_info_dir) {
+		touch_info_dir = proc_mkdir("touch_info", NULL);
+	}
+	if (!touch_info_dir) {
+		NVT_ERR("Can not create touch_info_dir\n");
+		return;
+	}
+	NVT_LOG("touch_info_node_init\n");
+	for (; i < ARRAY_SIZE(tp_info_proc); i++) {
+		tp_info_proc[i].node = proc_create(tp_info_proc[i].name, 0644,
+					touch_info_dir, tp_info_proc[i].fops);
+		if (tp_info_proc[i].node == NULL) {
+			tp_info_proc[i].isCreated = false;
+			NVT_ERR("Failed to create %s under /proc\n", tp_info_proc[i].name);
+		} else {
+			tp_info_proc[i].isCreated = true;
+			NVT_LOG("Succeed to create %s under /proc\n", tp_info_proc[i].name);
+		}
+	}
+}
+
 int8_t nvt_charge_mode(bool plugin)
 {
 	int8_t ret = -1;
@@ -1192,6 +1418,7 @@ static void nvt_flash_proc_deinit(void)
 #define GESTURE_SLIDE_DOWN      22
 #define GESTURE_SLIDE_LEFT      23
 #define GESTURE_SLIDE_RIGHT     24
+#define GESTURE_SINGLE_CLICK    25
 /* customized gesture id */
 #define DATA_PROTOCOL           30
 
@@ -1273,6 +1500,10 @@ void nvt_ts_wakeup_gesture_report(uint8_t gesture_id, uint8_t *data)
 		case GESTURE_SLIDE_RIGHT:
 			NVT_LOG("Gesture : Slide RIGHT.\n");
 			keycode = gesture_key_array[12];
+			break;
+		case GESTURE_SINGLE_CLICK:
+			NVT_LOG("Gesture : Single Click.\n");
+			keycode = gesture_key_array[13];
 			break;
 		default:
 			break;
@@ -2193,6 +2424,7 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 #endif
 
 	NVT_LOG("start\n");
+	touch_info_dir = NULL;
 
 #if NEED_SELECT_VENDOR
 	int lcd_id = nt36672s_lcd_id | nt36528a_lcd_id;
@@ -2536,7 +2768,7 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 	nvt_charger_init();
 #endif
 #endif
-
+	touch_info_node_init();
 	
 #if FW_STATUS_REPORT
 	/* clear nvt fw debug info */

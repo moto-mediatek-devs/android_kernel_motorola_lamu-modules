@@ -106,7 +106,7 @@ static int32_t *RawData_PenRingX_DiffMax = NULL;
 static int32_t *RawData_PenRingY_DiffMin = NULL;
 static int32_t *RawData_PenRingY_DiffMax = NULL;
 
-static struct proc_dir_entry *touch_info_dir;
+struct proc_dir_entry *touch_info_dir;
 static struct proc_dir_entry *NVT_proc_selftest_entry = NULL;
 static int8_t nvt_mp_test_result_printed = 0;
 static uint8_t fw_ver = 0;
@@ -2499,8 +2499,10 @@ return:
 int32_t nvt_mp_proc_init(void)
 {
 	// NVT_proc_selftest_entry = proc_create("nvt_selftest", 0444, NULL, &nvt_selftest_fops);
-	struct proc_dir_entry *touch_info_dir;
-	touch_info_dir = proc_mkdir("touch_info", NULL);
+	//struct proc_dir_entry *touch_info_dir;
+	if (!touch_info_dir) {
+		touch_info_dir = proc_mkdir("touch_info", NULL);
+	}
 	if (!touch_info_dir) {
 		NVT_ERR("Can not create touch_info_dir\n");
 		return -ENOMEM;

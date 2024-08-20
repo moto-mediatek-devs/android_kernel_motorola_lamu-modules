@@ -883,6 +883,8 @@ int32_t nvt_update_firmware(char *firmware_name)
 	/* write back customized command */
 	nvt_charge_mode(ts->charger_plugin);
 
+	nvt_apply_gesture_type();
+
 download_fail:
 	if (!IS_ERR_OR_NULL(bin_map)) {
 		kfree(bin_map);

@@ -261,6 +261,9 @@ struct nvt_ts_data {
 	uint32_t chip_ver_trim_addr;
 	uint32_t swrst_sif_addr;
 	uint32_t crc_err_flag_addr;
+
+	int gesture_tpye;
+
 #ifdef CONFIG_MTK_SPI
 	struct mt_chip_conf spi_ctrl;
 #endif
@@ -317,6 +320,7 @@ typedef enum {
 
 //---extern structures---
 extern struct nvt_ts_data *ts;
+extern struct proc_dir_entry *touch_info_dir;
 
 //---extern functions---
 int32_t CTP_SPI_READ(struct spi_device *client, uint8_t *buf, uint16_t len);
@@ -337,6 +341,7 @@ int32_t nvt_check_fw_status(void);
 int32_t nvt_set_page(uint32_t addr);
 int32_t nvt_wait_auto_copy(void);
 int32_t nvt_write_addr(uint32_t addr, uint8_t data);
+int nvt_apply_gesture_type(void);
 int8_t nvt_charge_mode(bool plugin);
 #if NVT_TOUCH_ESD_PROTECT
 extern void nvt_esd_check_enable(uint8_t enable);
