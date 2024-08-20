@@ -830,13 +830,4 @@ extern int ovt_tcm_set_func_roate_horizontal_level_en_state(unsigned short value
 int  charger_module_init(void);
 #endif
 
-#define CONFIG_OVT_SET_BY_LCD 1
-#if IS_ENABLED(CONFIG_OVT_SET_BY_LCD)
-extern int td4160_lcd_id;
-extern int td4376_lcd_id;
-extern int lcd_id;
-extern int td4376_panel_tprst_set(int level);
-extern int dijin_panel_tprst_set(int level);
-extern int ovt_lcd_set_tprst_gpio(int lvl);
-#endif
 #endif

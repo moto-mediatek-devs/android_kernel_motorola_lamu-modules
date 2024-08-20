@@ -39,7 +39,8 @@
 
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
 #include "../../devinfo/dev_info.h"
-int lcd_id = 0x0000;
+extern int td4160_lcd_id;
+extern int td4376_lcd_id;
 struct ovt_tcm_hcd *onmivision_tcm_hcd;
 #endif
 
@@ -2381,7 +2382,6 @@ static int ovt_tcm_config_gpio(struct ovt_tcm_hcd *tcm_hcd)
 		}
 	}
 
-#if !IS_ENABLED(CONFIG_OVT_SET_BY_LCD)
 	if (bdata->reset_gpio >= 0) {
 		retval = ovt_tcm_set_gpio(tcm_hcd, bdata->reset_gpio,
 				true, 1, !bdata->reset_on_state);
@@ -2391,33 +2391,24 @@ static int ovt_tcm_config_gpio(struct ovt_tcm_hcd *tcm_hcd)
 			goto err_set_gpio_reset;
 		}
 	}
-#endif
 
 	if (bdata->power_gpio >= 0) {
 		gpio_set_value(bdata->power_gpio, bdata->power_on_state);
 		msleep(bdata->power_delay_ms);
 	}
 
-#if IS_ENABLED(CONFIG_OVT_SET_BY_LCD)
-	ovt_lcd_set_tprst_gpio(bdata->reset_on_state);
-	msleep(bdata->reset_active_ms);
-	ovt_lcd_set_tprst_gpio(!bdata->reset_on_state);
-	msleep(bdata->reset_delay_ms);
-#else
 	if (bdata->reset_gpio >= 0) {
 		gpio_set_value(bdata->reset_gpio, bdata->reset_on_state);
 		msleep(bdata->reset_active_ms);
 		gpio_set_value(bdata->reset_gpio, !bdata->reset_on_state);
 		msleep(bdata->reset_delay_ms);
 	}
-#endif
+
 	return 0;
 
-#if !IS_ENABLED(CONFIG_OVT_SET_BY_LCD)
 err_set_gpio_reset:
 	if (bdata->power_gpio >= 0)
 		ovt_tcm_set_gpio(tcm_hcd, bdata->power_gpio, false, 0, 0);
-#endif
 
 err_set_gpio_power:
 	if (bdata->irq_gpio >= 0)
@@ -3305,11 +3296,6 @@ static int ovt_tcm_reset_and_reinit(struct ovt_tcm_hcd *tcm_hcd,
 #endif
 
 	if (hw) {
-#if IS_ENABLED(CONFIG_OVT_SET_BY_LCD)
-		ovt_lcd_set_tprst_gpio(bdata->reset_on_state);
-		msleep(bdata->reset_active_ms);
-		ovt_lcd_set_tprst_gpio(!bdata->reset_on_state);
-#else
 		if (bdata->reset_gpio < 0) {
 			LOGE(tcm_hcd->pdev->dev.parent,
 					"Hardware reset unavailable\n");
@@ -3319,7 +3305,6 @@ static int ovt_tcm_reset_and_reinit(struct ovt_tcm_hcd *tcm_hcd,
 		gpio_set_value(bdata->reset_gpio, bdata->reset_on_state);
 		msleep(bdata->reset_active_ms);
 		gpio_set_value(bdata->reset_gpio, !bdata->reset_on_state);
-#endif
 	} else {
 		retval = ovt_tcm_reset(tcm_hcd);
 		if (retval < 0) {
@@ -4278,9 +4263,8 @@ static int ovt_tcm_check_f35(struct ovt_tcm_hcd *tcm_hcd)
 	unsigned char fn_number;
 	int retry = 0;
 	const int retry_max = 10;
-#if !IS_ENABLED(CONFIG_OVT_SET_BY_LCD)
     const struct ovt_tcm_board_data *bdata = tcm_hcd->hw_if->bdata;
-#endif
+
 f35_boot_recheck:
 			retval = ovt_tcm_rmi_read(tcm_hcd,
 						PDT_END_ADDR,
@@ -4302,18 +4286,11 @@ f35_boot_recheck:
 							"Failed to find F$35, try_times = %d\n",
 							retry);
 				if (retry < retry_max) {
-					msleep(100);
-#if IS_ENABLED(CONFIG_OVT_SET_BY_LCD)
-					ovt_lcd_set_tprst_gpio(0);
-					msleep(5);
-					ovt_lcd_set_tprst_gpio(1);
-					msleep(5);
-#else
+					msleep(100);                   
                     gpio_set_value(bdata->reset_gpio, 0);
                     msleep(5);
-                    gpio_set_value(bdata->reset_gpio, 1);
+                    gpio_set_value(bdata->reset_gpio, 1);        
                     msleep(5);
-#endif
 					retry++;
 			goto f35_boot_recheck;
 				}
@@ -4468,27 +4445,19 @@ int  charger_module_init(void)
 }
 #endif
 #endif
-#if IS_ENABLED(CONFIG_OVT_SET_BY_LCD)
-int ovt_lcd_set_tprst_gpio(int lvl){
-	if(lcd_id == 0x000d)
-        return dijin_panel_tprst_set(lvl);
-	else if(lcd_id == 0x010d)
-        return td4376_panel_tprst_set(lvl);
-	else
-        return -1;
-}
 
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
 static int ovt_get_tp_info(char *buf, void *arg0)
 {
-	if(lcd_id == 0x000d)
+	int id = td4160_lcd_id | td4376_lcd_id;
+	if(id == 0x000d)
         return sprintf(buf,
         "%s-%s-%s-v0x%02x",
         "DIJIN",
         "P329A",
         "TD4160",
         onmivision_tcm_hcd->app_info.customer_config_id[15]);
-	else if(lcd_id == 0x010d)
+	else if(id == 0x010d)
         return sprintf(buf,
         "%s-%s-%s-v0x%02x",
         "TIANMA",
@@ -4499,7 +4468,6 @@ static int ovt_get_tp_info(char *buf, void *arg0)
         return sprintf(buf,
         "unknown TP");
 }
-#endif
 #endif
 
 static int ovt_tcm_probe(struct platform_device *pdev)
@@ -4513,10 +4481,6 @@ static int ovt_tcm_probe(struct platform_device *pdev)
 #ifdef CONFIG_DRMV
 	struct drm_panel *active_panel = tcm_get_panel();
 #endif
-#endif
-
-#if IS_ENABLED(CONFIG_OVT_SET_BY_LCD)
-	lcd_id = td4160_lcd_id | td4376_lcd_id;
 #endif
 	hw_if = pdev->dev.platform_data;
 	if (!hw_if) {
@@ -4891,10 +4855,8 @@ err_sysfs_create_dir:
 	if (bdata->power_gpio >= 0)
 		ovt_tcm_set_gpio(tcm_hcd, bdata->power_gpio, false, 0, 0);
 
-#if !IS_ENABLED(CONFIG_OVT_SET_BY_LCD)
 	if (bdata->reset_gpio >= 0)
 		ovt_tcm_set_gpio(tcm_hcd, bdata->reset_gpio, false, 0, 0);
-#endif
 
 err_config_gpio:
 	ovt_tcm_enable_regulator(tcm_hcd, false);
@@ -5013,10 +4975,8 @@ static int ovt_tcm_remove(struct platform_device *pdev)
 	if (bdata->power_gpio >= 0)
 		ovt_tcm_set_gpio(tcm_hcd, bdata->power_gpio, false, 0, 0);
 
-#if !IS_ENABLED(CONFIG_OVT_SET_BY_LCD)
 	if (bdata->reset_gpio >= 0)
 		ovt_tcm_set_gpio(tcm_hcd, bdata->reset_gpio, false, 0, 0);
-#endif
 
 	ovt_tcm_enable_regulator(tcm_hcd, false);
 
