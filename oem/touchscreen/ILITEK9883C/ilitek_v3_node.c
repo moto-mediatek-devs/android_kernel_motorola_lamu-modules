@@ -126,6 +126,11 @@ struct record_state {
 };
 
 static unsigned char g_user_buf[USER_STR_BUFF] = {0};
+static unsigned char delta_buf[DEBUG_DATA_FILE_SIZE] = {0};
+#define ILI_SPI_NAME_PRIMARY "primary"
+
+static struct class *touchscreen_class;
+static struct device *touchscreen_class_dev;
 
 int ili_str2hex(char *str)
 {
@@ -1789,7 +1794,7 @@ static ssize_t ilitek_node_change_list_read(struct file *filp, char __user *buff
 
 	len += snprintf(g_user_buf + len, USER_STR_BUFF - len, "============= Change list ==============\n");
 	len += snprintf(g_user_buf + len, USER_STR_BUFF - len, "[Drive version] = %s\n", DRIVER_VERSION);
-	/* len += snprintf(g_user_buf + len, USER_STR_BUFF - len, "[Patch] 202001-0001\n"); */
+	len += snprintf(g_user_buf + len, USER_STR_BUFF - len, "[Patch] 202001-0001\n");
 	len += snprintf(g_user_buf + len, USER_STR_BUFF - len, "========================================\n");
 
 	if (copy_to_user((char *)buff, g_user_buf, len))
@@ -4128,6 +4133,287 @@ proc_node iliproc[] = {
 };
 
 
+static char *mmi_kobject_get_path(struct kobject *kobj, gfp_t gfp_mask)
+{
+	char *path;
+	int len = 1;
+	struct kobject *parent = kobj;
+
+	do {
+		if (parent->name == NULL) {
+			len = 0;
+			break;
+		}
+		len += strlen(parent->name) + 1;
+		parent = parent->parent;
+	} while (parent);
+
+	if (len == 0)
+		return NULL;
+
+	path = kzalloc(len, gfp_mask);
+	if (!path)
+		return NULL;
+
+	--len;
+	for (parent = kobj; parent; parent = parent->parent) {
+		int cur = strlen(parent->name);
+		len -= cur;
+		memcpy(path + len, parent->name, cur);
+		*(path + --len) = '/';
+	}
+	pr_debug("kobject: '%s' (%p): %s: path = '%s'\n", kobj->name,
+		kobj, __func__, path);
+
+	return path;
+}
+
+#ifdef ILI_TOUCH_LAST_TIME
+static ssize_t timestamp_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	ktime_t last_ktime;
+	struct timespec64 last_ts;
+
+	last_ktime = ilits->last_event_time;
+	ilits->last_event_time = 0;
+
+	last_ts = ktime_to_timespec64(last_ktime);
+	return scnprintf(buf, PAGE_SIZE, "%lld.%ld\n", last_ts.tv_sec, last_ts.tv_nsec);
+}
+#endif
+
+static ssize_t path_show(struct device *pDevice, struct device_attribute *pAttr, char *pBuf)
+{
+	ssize_t blen;
+	const char *path;
+
+	//path = kobject_get_path(&ilits->spi->dev.kobj, GFP_KERNEL);
+	path = mmi_kobject_get_path(&ilits->spi->dev.kobj, GFP_KERNEL);
+	blen = scnprintf(pBuf, PAGE_SIZE, "%s\n", path ? path : "na");
+	kfree(path);
+
+	return blen;
+}
+
+/* Attribute: vendor (RO) */
+static ssize_t vendor_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	ILI_INFO("*** %s() vendor = %s ***\n", __func__, "ilitek");
+	return scnprintf(buf, PAGE_SIZE, "ilitek");
+}
+
+/* Attribute: ic_ver (RO) */
+static ssize_t ic_ver_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%s%x\n%s%d.%d.%.d.%d\n%s%d.%d.%d.%d\n",
+			"Product ID: ", ilits->chip->product_id,
+			"Build ID: ", ilits->chip->fw_ver >> 24, (ilits->chip->fw_ver >> 16) & 0xFF,
+			(ilits->chip->fw_ver >> 8) & 0xFF, ilits->chip->fw_ver & 0xFF,
+			"Config ID: ",
+			(ilits->chip->core_ver >> 24) & 0xFF, (ilits->chip->core_ver >> 16) & 0xFF,
+			(ilits->chip->core_ver >> 8) & 0xFF, ilits->chip->core_ver & 0xFF);
+}
+
+int ili_get_frame_log_capture(u8 *buf,u16 llen)
+{
+	int cdc_starIdx = 0;
+	int len =0;
+
+	u8 row, col =0;
+	int j =0;
+	u16 temp =0;
+	unsigned char *ptr;
+	if(!ilits->allow_capture)
+	{
+		ILI_DBG("not allow capture");
+	}
+	if (ilits->rib.nReportResolutionMode == POSITION_LOW_RESOLUTION) {
+		cdc_starIdx = P5_X_DEBUG_LOW_RESOLUTION_FINGER_DATA_LENGTH;
+	} else if (ilits->rib.nReportResolutionMode == POSITION_HIGH_RESOLUTION) {
+		cdc_starIdx = P5_X_DEBUG_HIGH_RESOLUTION_FINGER_DATA_LENGTH;
+	}
+	row = ilits->ych_num;
+	col = ilits->xch_num;
+
+	if(llen < cdc_starIdx+2*row*col)
+	{
+		ILI_ERR("data lens is not match\n");
+		return 0;
+	}
+
+	ptr = &buf[cdc_starIdx];
+
+	len += snprintf(delta_buf +len, DEBUG_DATA_FILE_SIZE - len, "======== Deltadata ========\n");
+
+	for (j = 0; j < col; j++)
+		len += snprintf(delta_buf +len, DEBUG_DATA_FILE_SIZE - len, "[X%d] ,", j);
+	for (j = 0; j < row * col; j++, ptr += 2) {
+		temp = (*ptr << 8) + *(ptr + 1);
+		if (j % col == 0)
+			len += snprintf(delta_buf +len, DEBUG_DATA_FILE_SIZE - len, "\n[Y%d] ,", (j / col));
+		if(temp & 0xF000)
+			len += snprintf(delta_buf +len, DEBUG_DATA_FILE_SIZE - len, "-%d, ", (0xFFFF - temp + 1));
+		else
+			len += snprintf(delta_buf +len, DEBUG_DATA_FILE_SIZE - len, "%d, ", temp);
+	}
+	len += snprintf(delta_buf +len, DEBUG_DATA_FILE_SIZE - len, "\n[X] ,");
+	for (j = 0; j < row + col; j++, ptr += 2) {
+		temp = (*ptr << 8) + *(ptr + 1);
+		if (j == col)
+			len += snprintf(delta_buf +len, DEBUG_DATA_FILE_SIZE - len, "\n[Y] ,");
+		if(temp & 0xF000)
+			len += snprintf(delta_buf +len, DEBUG_DATA_FILE_SIZE - len, "-%d, ", (0xFFFF - temp + 1));
+			else
+			len += snprintf(delta_buf +len, DEBUG_DATA_FILE_SIZE - len, "%d, ", temp);
+	}
+	ili_put_fifo_with_discard(delta_buf,len);
+
+	return len;
+}
+static int frame_log_capture_start(void)
+{
+	u8 data_type = 0;
+	int ret =0;
+	u8 cmd[2] = { 0 };
+
+	if (atomic_read(&ilits->tp_reset) == START) {
+		ILI_ERR("ignore request! tp reset atomic is START.\n");
+		return -EINVAL;
+	}
+	if (ilits->tp_suspend == true) {
+		ILI_ERR("tp is in sleep mode\n");
+		return -EINVAL;
+	}
+	data_type = P5_X_FW_SIGNAL_DATA_MODE;
+	if (ili_set_tp_data_len(DATA_FORMAT_DEBUG, false, &data_type) < 0) {
+		ILI_ERR("Failed to set tp data length\n");
+		ret = -EINVAL;
+		goto out;
+	}
+	mutex_lock(&ilits->touch_mutex);
+
+	if (ilits->chip->core_ver < CORE_VER_1700) {
+		cmd[0] = 0xFA;
+		cmd[1] = P5_X_FW_SIGNAL_DATA_MODE;
+		ret = ilits->wrapper(cmd, 2, NULL, 0, ON, OFF);
+		if(ret <0) {
+			ILI_ERR("write diff cmd fail\n");
+		}
+	}
+	mutex_unlock(&ilits->touch_mutex);
+	ilits->allow_capture= true;
+out:
+	return ret;
+}
+
+void frame_log_capture_stop(void)
+{
+	u8 data_type =0;
+	data_type = P5_X_FW_SIGNAL_DATA_MODE;
+	if (ili_set_tp_data_len(DATA_FORMAT_DEMO, false, &data_type) < 0)
+		ILI_ERR("Failed to set tp data length\n");
+
+	ilits->allow_capture= false;
+
+}
+static ssize_t ili_dbg_data_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%02x\n", 0x01);
+}
+
+static ssize_t ili_dbg_data_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	int ret = 0;
+	int value = 0;
+	if(!buf || count <=0)
+		return 0;
+
+	ret = sscanf(buf, "%d", &value);
+	if(ret < 0) {
+		ILI_INFO("Failed to convert value\n");
+		return -EINVAL;
+	}
+	ili_clear_kfifo();
+	if(value) {
+		ret = frame_log_capture_start();
+		if(ret) {
+			ILI_ERR("start debug mode error\n");
+		}
+	} else {
+		frame_log_capture_stop();
+	}
+	return count;
+}
+
+static struct device_attribute touchscreen_attributes[] = {
+	__ATTR_RO(path),
+	__ATTR_RO(vendor),
+	__ATTR_RO(ic_ver),
+#ifdef ILI_TOUCH_LAST_TIME
+	__ATTR_RO(timestamp),
+#endif
+	__ATTR(log_trigger, S_IRUGO | S_IWUSR | S_IWGRP, ili_dbg_data_show, ili_dbg_data_store),
+	__ATTR_NULL
+};
+
+int ilitek_sys_init(void)
+{
+	int i;
+	s32 ret = 0;
+	dev_t devno;
+	struct device_attribute *attrs = touchscreen_attributes;
+
+	ret = alloc_chrdev_region(&devno, 0, 1, ILI_SPI_NAME_PRIMARY);
+	if (ret) {
+		ILI_ERR ("can't allocate chrdev\n");
+		return ret;
+	} else {
+
+		/* set sysfs for firmware */
+		touchscreen_class = class_create("touchscreen");
+		if (IS_ERR(touchscreen_class)) {
+			ret = PTR_ERR(touchscreen_class);
+			touchscreen_class = NULL;
+			ILI_ERR("Failed to create touchscreen class!\n");
+			return ret;
+		}
+
+		touchscreen_class_dev = device_create(touchscreen_class, NULL, devno, NULL, ILI_SPI_NAME_PRIMARY);
+
+		pr_info(" touchscreen_class_dev = %p \n", touchscreen_class_dev);
+		if (IS_ERR(touchscreen_class_dev)) {
+			ret = PTR_ERR(touchscreen_class_dev);
+			touchscreen_class_dev = NULL;
+			ILI_ERR("Failed to create device(touchscreen_class_dev)!\n");
+			return ret;
+		}
+		ILI_INFO("Succeed to create device(touchscreen_class_dev)!\n");
+
+		for (i = 0; attrs[i].attr.name != NULL; ++i) {
+			ret = device_create_file(touchscreen_class_dev, &attrs[i]);
+			if (ret < 0)
+				goto device_destroy;
+		}
+	}
+
+	return ret;
+
+device_destroy:
+	for (--i; i >= 0; --i)
+		device_remove_file(touchscreen_class_dev, &attrs[i]);
+
+	touchscreen_class_dev = NULL;
+	class_unregister(touchscreen_class);
+	ILI_ERR("error creating touchscreen class\n");
+
+	return -ENODEV;
+}
+
+
 proc_node tp_info_proc[] = {
 	{"tp_selftest_result", NULL, &proc_show_selftest_result_fops, false},
 	{"tp_gesture_mode", NULL, &proc_tp_gesture_mode_fops, false},
@@ -4168,4 +4454,7 @@ void ili_node_init(void)
 			ILI_INFO("Succeed to create %s under /proc\n", iliproc[i].name);
 		}
 	}
+
+	ilitek_sys_init();
+	ili_log_capture_register_misc();
 }

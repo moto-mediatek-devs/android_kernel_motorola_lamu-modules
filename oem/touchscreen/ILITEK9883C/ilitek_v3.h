@@ -507,6 +507,17 @@ struct report_info_block {
 	u8 nReserved03		:8;
 };
 
+struct ili_debug_info{//Glove Hopping Charge NoiseWarning Rebase Bending GndUnstable Palm
+	u8 nGlove		    : 1;
+	u8 nHopping		    : 1;
+	u8 nCharge		    : 1;
+	u8 nNoiseWarning	: 1;
+	u8 nRebase		    : 1;
+	u8 nBending		    : 1;
+	u8 nGndUnstable  	: 1;
+	u8 nPalm			: 1;
+};
+
 struct file_buffer {
 	char *ptr;
 	char fname[128];
@@ -984,6 +995,7 @@ struct ilitek_pen_info {
 #define P5_X_FW_SIGNAL_DATA_MODE			0x03
 #define P5_X_FW_RAW_DATA_MODE				0x08
 #define P5_X_DEMO_PACKET_ID					0x5A
+#define P5_X_DEBUG_INFO_PACKET_ID           0xBB
 #define P5_X_DEMO_AXIS_PACKET_ID			0x5B
 #define P5_X_DEBUG_PACKET_ID				0xA7
 #define P5_X_DEBUG_AXIS_PACKET_ID			0xA8
@@ -1214,6 +1226,7 @@ struct ilitek_ts_data {
 	int gesture_demo_ctrl;
 	struct gesture_symbol ges_sym;
 	struct report_info_block rib;
+	struct ili_debug_info di;
 
 	u16 flash_mid;
 	u16 flash_devid;
@@ -1280,6 +1293,7 @@ struct ilitek_ts_data {
 	u8 *md_fw_ili;
 	char *mp_result;
 
+	bool allow_capture;
 	atomic_t irq_stat;
 	atomic_t tp_reset;
 	atomic_t ice_stat;
@@ -1305,6 +1319,7 @@ struct ilitek_ts_data {
 	void (*demo_debug_info[5])(u8 *, size_t);
 	int (*detect_int_stat)(bool status);
 	int (*ice_mode_ctrl)(bool enable, bool mcu, int mode);
+	ktime_t last_event_time;
 };
 extern struct ilitek_ts_data *ilits;
 
@@ -1425,6 +1440,9 @@ extern int ili_fw_upgrade(int op);
 
 /* Prototypes for tddi mp test */
 extern int ili_mp_test_main(char *apk, bool lcm_on);
+
+/* debug info for moto */
+extern void ili_report_touch_debug_info(u8 *buf);
 
 /* Prototypes for tddi core functions */
 extern int ili_touch_esd_gesture_flash(void);
@@ -1574,6 +1592,13 @@ extern int ili_ice_slave_write_register(u32 addr, u32 data, int len);
 
 extern void touch_info_node_init(void);
 int ili_write_reg(void);
+
+extern void ili_clear_kfifo(void);
+extern void ili_put_fifo_with_discard(char *log_buf, int len);
+extern int ili_log_capture_register_misc(void);
+extern int ili_log_capture_unregister_misc(void);
+extern int ili_get_frame_log_capture(u8 *buf,u16 len);
+extern void frame_log_capture_stop(void);
 
 static inline void ipio_kfree(void **mem)
 {
