@@ -98,6 +98,10 @@
 		vib_limit = <9>;
 		vib_vol= <9>;
 	};
+	dre_hbm_mide:dre_hbm_mide {
+		status = "okay";
+		compatible = "tinno,dre_mode";
+	};
 };
 
 &i2c0 {

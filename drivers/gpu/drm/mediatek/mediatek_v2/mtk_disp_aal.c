@@ -4077,6 +4077,8 @@ void disp_aal_set_dre_en(struct mtk_ddp_comp *comp, int enable)
 	if (enable && (func_flag == 0))
 		disp_aal_relay_control(comp, false);
 }
+// TN modified by zhikang.jiang/777566 20240820
+EXPORT_SYMBOL(disp_aal_set_dre_en);
 
 void disp_aal_debug(struct drm_crtc *crtc, const char *opt)
 {

@@ -80,3 +80,10 @@ config SND_SOC_AW87XXX
 
 source "$(KCONFIG_EXT_PREFIX)/oem/sensors/Kconfig"
 
+config OEM_DRE_MODE
+	tristate "dre mode"
+	depends on PROJECT_LAMU
+	default n
+	help
+	  support dre_mode
+
