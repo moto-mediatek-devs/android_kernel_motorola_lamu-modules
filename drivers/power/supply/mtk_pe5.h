@@ -187,7 +187,7 @@ struct pe50_algo_data {
 	int input_current_limit;
 	int cv_limit;
 	u32 start_soc_max;		/* algo start soc upper bound */
-/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+/* TN Begin modified by xinjun.lu/860715 20240820 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
 	u32 pe50_therm_fcc_limit;
 	u32 pe50_fcc_limit;
@@ -196,7 +196,10 @@ struct pe50_algo_data {
 	u32 pe50_max_ibat;
 	u32 pe50_therm_vol_thres;
 #endif
-/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	bool pe50_can_start_again;
+#endif
+/* TN End modified by xinjun.lu/860715 20240820 CR/EKLAMU-202 */
 };
 
 /* Setting from dtsi */
