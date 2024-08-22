@@ -1680,7 +1680,7 @@ static ssize_t cts_gesture_mode_write(struct file *filp, const char *buff, size_
 		}
 	}
 
-    if (buf[0] == 'Y' || buf[0] == 'y' || buf[0] == '1')
+    if (buf[0] == 'Y' || buf[0] == 'y' || buf[0] == '1' || buf[0] == '2' || buf[0] == '3')
         enable = 1;
 
     if (enable)
