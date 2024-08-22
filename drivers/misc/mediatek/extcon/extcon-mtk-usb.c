@@ -41,8 +41,13 @@ static struct charger_device *primary_dvchg = NULL;
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 #define BOOST_VOLTAGE_LIMIT		5200000
 #define BOOST_CURRENT_LIMIT		1875000
+/* TN Begin modified by jirui.li/860702 20240814 CR/EKLAMU-265 */
+static unsigned int cc_role = 0;
+static struct mtk_extcon_info *g_extcon;
+/* TN End modified by jirui.li/860702 20240814 CR/EKLAMU-265 */
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by jirui.li/860702 20240724 CR/EKLAMU-834 */
+
 #if IS_ENABLED(CONFIG_TCPC_CLASS)
 #include "tcpm.h"
 #endif
@@ -54,6 +59,7 @@ static const unsigned int usb_extcon_cable[] = {
 };
 
 /* TN Begin modified by xinjun.lu/860715 20240713 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 typedef enum {
 	CC1,
 	CC2,
@@ -76,10 +82,41 @@ static ssize_t cc_orient_show(struct device *dev, struct device_attribute *attr,
 
 static DEVICE_ATTR_RO(cc_orient);
 
+/* TN Begin modified by jirui.li/860702 20240814 CR/EKLAMU-265 */
+static ssize_t cc_role_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	int value = 0;
+	value = cc_role;
+	dev_info(dev, "%s enter\n", __func__);
+	return sprintf(buf, "%d\n", value);
+}
+static ssize_t cc_role_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+{
+	signed int temp;
+	dev_info(dev, "%s enter\n", __func__);
+	if (kstrtoint(buf, 10, &temp) == 0) {
+		if (temp == 0){
+			dev_info(dev, "%s write cc_role low\n", __func__);
+			cc_role = 0;
+			usb_role_switch_set_role(g_extcon->role_sw, g_extcon->c_role);
+		} else if (temp == 1) {
+			dev_info(dev, "%s write cc_role high\n", __func__);
+			cc_role = 1;
+			usb_role_switch_set_role(g_extcon->role_sw, USB_ROLE_HOST);
+		} else {
+			dev_info(dev, "%s buf is other number ! ! !\n", __func__);
+		}
+	}
+	return size;
+}
+static DEVICE_ATTR_RW(cc_role);
+
 static struct attribute *typec_attrs[] = {
 	&dev_attr_cc_orient.attr,
+	&dev_attr_cc_role.attr,
 	NULL,
 };
+/* TN End modified by jirui.li/860702 20240814 CR/EKLAMU-265 */
 
 static struct attribute_group typec_group = {
 	.attrs = typec_attrs,
@@ -96,6 +133,7 @@ static int extcon_create_typec_sysfs(struct device *dev)
 	}
 	return ret;
 }
+#endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by xinjun.lu/860715 20240713 CR/EKLAMU-202 */
 
 static void mtk_usb_extcon_update_role(struct work_struct *work)
@@ -140,9 +178,17 @@ static void mtk_usb_extcon_update_role(struct work_struct *work)
 		extcon_set_state_sync(extcon->edev,	EXTCON_USB, true);
 	}
 
+/* TN Begin modified by jirui.li/860702 20240814 CR/EKLAMU-265 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	/* usb role switch */
-	if (extcon->role_sw)
-		usb_role_switch_set_role(extcon->role_sw, new_dr);
+	if (extcon->role_sw) {
+		if (cc_role)
+			usb_role_switch_set_role(extcon->role_sw, USB_ROLE_HOST);
+		else
+			usb_role_switch_set_role(extcon->role_sw, new_dr);
+	}
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by jirui.li/860702 20240814 CR/EKLAMU-265 */
 
 	kfree(role);
 }
@@ -556,7 +602,9 @@ static int mtk_extcon_tcpc_notifier(struct notifier_block *nb,
 			mtk_usb_extcon_set_role(extcon, USB_ROLE_NONE);
 		}
 		/* TN Begin modified by xinjun.lu/860715 20240713 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 		typec_polarity = noti->typec_state.polarity;
+#endif /* CONFIG_OEM_TINNO_CHARGER */
 		/* TN End modified by xinjun.lu/860715 20240713 CR/EKLAMU-202 */
 		break;
 	case TCP_NOTIFY_DR_SWAP:
@@ -880,11 +928,18 @@ static int mtk_usb_extcon_probe(struct platform_device *pdev)
 	ret = mtk_usb_extcon_tcpc_init(extcon);
 	if (ret < 0)
 		dev_err(dev, "failed to init tcpc\n");
-	/* TN Begin modified by xinjun.lu/860715 20240713 CR/EKLAMU-202 */
+/* TN Begin modified by xinjun.lu/860715 20240713 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	extcon_create_typec_sysfs(extcon->dev);
-	/* TN End modified by xinjun.lu/860715 20240713 CR/EKLAMU-202 */
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by xinjun.lu/860715 20240713 CR/EKLAMU-202 */
 #endif
 
+/* TN Begin modified by jirui.li/860702 20240814 CR/EKLAMU-265 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	g_extcon = extcon;
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by jirui.li/860702 20240814 CR/EKLAMU-265 */
 	platform_set_drvdata(pdev, extcon);
 
 	return 0;
