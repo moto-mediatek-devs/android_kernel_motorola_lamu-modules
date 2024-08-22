@@ -2155,8 +2155,6 @@ static void hx9031as_input_deinit_abs(struct i2c_client *client)
 
 void debounce_timer_callback(struct timer_list *t)
 {
-    hx9031as_manual_offset_calibration_all_chs();
-    PRINT_INF("zjw Debounce_calibration_all ok.\n");
     debounce_flag = false;
 }
 
@@ -2169,6 +2167,7 @@ static int Debounce_calibration_all(void)
 	debounce_flag = true;
 	PRINT_INF("zjw Debounce_calibration_all enter debounce 11.\n");
 	mod_timer(&debounce_timer, jiffies + msecs_to_jiffies(1500));
+	hx9031as_manual_offset_calibration_all_chs();
 	return 0;
 }
 
