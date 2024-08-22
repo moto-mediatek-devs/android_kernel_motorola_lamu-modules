@@ -182,6 +182,9 @@ static struct intr_flag cp_intr_flag[] = {
 /************************************************************************/
 #define SGM41600S_DEVICE_ID				0x12
 #define SGM41600S_REGMAX				0xF4
+#define SGM41600S_REG_VALID				0x28
+#define SGM41600S_REG51					0x51
+#define SGM41600S_REG5E					0x5E
 #define SGM41600S_REG14					0x14
 #define SGM41600S_REG0D					0x0D
 #define SGM41600S_REG0F					0x0F
@@ -422,19 +425,19 @@ static const struct regmap_config sgm41600_regmap_config = {
 /************************************************************************/
 
 struct sgm41600_cfg_e {
-	int vbat_ovp_dis;
+	int vbat_ovp_en;
 	int vbat_ovp;
-	int ibat_ocp_dis;
+	int ibat_ocp_en;
 	int ibat_ocp;
-	int vac_ovp_dis;
+	int vac_ovp_en;
 	int vac_ovp;
-	int vbus_ovp_dis;
+	int vbus_ovp_en;
 	int vbus_ovp;
-	int vout_ovp_dis;
+	int vout_ovp_en;
 	int vout_ovp;
-	int ibus_ocp_dis;
+	int ibus_ocp_en;
 	int ibus_ocp;
-	int ibus_ucp_fall_dis;
+	int ibus_ucp_fall_en;
 	int ibus_ucp_fall;
 	int ibat_reg;
 	int vbat_reg;
@@ -446,7 +449,7 @@ struct sgm41600_cfg_e {
 	int vdrop_ovp_deg;
 	int vdrop_ovp;
 	int fsw_set;
-	int wdt_en;
+	int wdt_dis;
 	int wd_timeout;
 	int ibat_sns_r;
 	int mode;
@@ -611,10 +614,16 @@ __maybe_unused static int sgm41600_dump_reg(struct sgm41600_chip *sgm)
 	int i;
 	int val;
 
-	for (i = 0; i <= SGM41600S_REGMAX; i++) {
+	for (i = 0; i <= SGM41600S_REG_VALID; i++) {
 		ret = regmap_read(sgm->regmap, i, &val);
 		SGM_ERR("reg[0x%02x] = 0x%02x\n", i, val);
 	}
+
+	ret = regmap_read(sgm->regmap, SGM41600S_REG51, &val);
+	SGM_ERR("reg[0x%02x] = 0x%02x\n", SGM41600S_REG51, val);
+
+	ret = regmap_read(sgm->regmap, SGM41600S_REG5E, &val);
+	SGM_ERR("reg[0x%02x] = 0x%02x\n", SGM41600S_REG5E, val);
 
 	return ret;
 }
@@ -918,18 +927,20 @@ __maybe_unused static int sgm41600_init_device(struct sgm41600_chip *sgm)
 		enum sgm41600_fields field_id;
 		int conv_data;
 	} props[] = {
-		{BAT_OVP_EN, sgm->cfg.vbat_ovp_dis},
+		{BAT_OVP_EN, sgm->cfg.vbat_ovp_en},
 		{BAT_OVP, sgm->cfg.vbat_ovp},
-		{IBAT_OCP_EN, sgm->cfg.ibat_ocp_dis},
+		{IBAT_OCP_EN, sgm->cfg.ibat_ocp_en},
 		{IBAT_OCP, sgm->cfg.ibat_ocp},
-		{AC_OVP_EN, sgm->cfg.vac_ovp_dis},
+		{AC_OVP_EN, sgm->cfg.vac_ovp_en},
 		{AC_OVP, sgm->cfg.vac_ovp},
-		{BUS_OVP_EN, sgm->cfg.vbus_ovp_dis},
+		{BUS_OVP_EN, sgm->cfg.vbus_ovp_en},
 		{BUS_OVP, sgm->cfg.vbus_ovp},
-		{VOUT_OVP_EN, sgm->cfg.vout_ovp_dis},
+		{VOUT_OVP_EN, sgm->cfg.vout_ovp_en},
 		{VOUT_OVP, sgm->cfg.vout_ovp},
-		{IBUS_OCP_EN, sgm->cfg.ibus_ocp_dis},
+		{IBUS_OCP_EN, sgm->cfg.ibus_ocp_en},
 		{IBUS_OCP, sgm->cfg.ibus_ocp},
+		{IBUS_UCP_EN, sgm->cfg.ibus_ucp_fall_en},
+		{IBUS_UCP,   sgm->cfg.ibus_ucp_fall},
 
 		{IBAT_REG, sgm->cfg.ibat_reg},
 		{VBAT_REG, sgm->cfg.vbat_reg},
@@ -941,7 +952,7 @@ __maybe_unused static int sgm41600_init_device(struct sgm41600_chip *sgm)
 		{VDRP_OVP_DEG, sgm->cfg.vdrop_ovp_deg},
 		{VDRP_OVP, sgm->cfg.vdrop_ovp},
 		{FSW_SET, sgm->cfg.fsw_set},
-		{WDT_DIS, sgm->cfg.wdt_en},
+		{WDT_DIS, sgm->cfg.wdt_dis},
 		{WDT_TIMER, sgm->cfg.wd_timeout},
 		{IBAT_RSNS, sgm->cfg.ibat_sns_r},
 		{CHG_MODE, sgm->cfg.mode},
@@ -956,6 +967,8 @@ __maybe_unused static int sgm41600_init_device(struct sgm41600_chip *sgm)
 	for (i = 0; i < ARRAY_SIZE(props); i++) {
 		ret = sgm41600_field_write(sgm, props[i].field_id, props[i].conv_data);
 	}
+
+//	ret = sgm41600_field_write(sgm, FSW_DITHER_EN, 1);
 
 	if (sgm->mode == SGM41600S_SLAVE) {
 		//ret = sgm41600_field_write(sgm, VBUS_INRANGE_DET_DIS, 1);
@@ -1017,10 +1030,8 @@ static int mtk_sgm41600_enable_chg(struct charger_device *chg_dev, bool en)
 static int mtk_sgm41600_set_vbusovp(struct charger_device *chg_dev, u32 uV)
 {
 	struct sgm41600_chip *sgm = charger_get_data(chg_dev);
-	int mv;
-	mv = uV / 1000;
 
-	return sgm41600_set_busovp_th(sgm, mv);
+	return sgm41600_set_busovp_th(sgm, uV);
 }
 
 __maybe_unused static int mtk_sgm41600_set_mode(struct charger_device *chg_dev, u32 mode)
@@ -1043,10 +1054,8 @@ __maybe_unused static int mtk_sgm41600_set_mode(struct charger_device *chg_dev, 
 static int mtk_sgm41600_set_ibusocp(struct charger_device *chg_dev, u32 uA)
 {
 	struct sgm41600_chip *sgm = charger_get_data(chg_dev);
-	int ma;
-	ma = uA / 1000;
 
-	return sgm41600_set_busocp_th(sgm, ma);
+	return sgm41600_set_busocp_th(sgm, uA);
 }
 
 static int mtk_sgm41600_set_vbatovp(struct charger_device *chg_dev, u32 uV)
@@ -1054,7 +1063,7 @@ static int mtk_sgm41600_set_vbatovp(struct charger_device *chg_dev, u32 uV)
 	struct sgm41600_chip *sgm = charger_get_data(chg_dev);
 	int ret;
 
-	ret = sgm41600_set_batovp_th(sgm, uV / 1000);
+	ret = sgm41600_set_batovp_th(sgm, uV);
 	if (ret < 0)
 		return ret;
 
@@ -1066,7 +1075,7 @@ static int mtk_sgm41600_set_ibatocp(struct charger_device *chg_dev, u32 uA)
 	struct sgm41600_chip *sgm = charger_get_data(chg_dev);
 	int ret;
 
-	ret = sgm41600_set_batocp_th(sgm, uA / 1000);
+	ret = sgm41600_set_batocp_th(sgm, uA);
 	if (ret < 0)
 		return ret;
 
@@ -1131,7 +1140,7 @@ static int mtk_sgm41600_set_vbatovp_alarm(struct charger_device *chg_dev, u32 uV
 	struct sgm41600_chip *sgm = charger_get_data(chg_dev);
 	int ret;
 
-	ret = sgm41600_set_vbatovp_alarm(sgm, uV / 1000);
+	ret = sgm41600_set_vbatovp_alarm(sgm, uV);
 	if (ret < 0)
 		return ret;
 
@@ -1150,7 +1159,7 @@ static int mtk_sgm41600_set_vbusovp_alarm(struct charger_device *chg_dev, u32 uV
 	struct sgm41600_chip *sgm = charger_get_data(chg_dev);
 	int ret;
 
-	ret = sgm41600_set_vbusovp_alarm(sgm, uV / 1000);
+	ret = sgm41600_set_vbusovp_alarm(sgm, uV);
 	if (ret < 0)
 		return ret;
 
@@ -1537,19 +1546,19 @@ static int sgm41600_parse_dt(struct sgm41600_chip *sgm, struct device *dev)
 		char *name;
 		int *conv_data;
 	} props[] = {
-		{"sgm,sgm41600,vbat-ovp-dis", &(sgm->cfg.vbat_ovp_dis)},
+		{"sgm,sgm41600,vbat-ovp-en", &(sgm->cfg.vbat_ovp_en)},
 		{"sgm,sgm41600,vbat-ovp", &(sgm->cfg.vbat_ovp)},
-		{"sgm,sgm41600,ibat-ocp-dis", &(sgm->cfg.ibat_ocp_dis)},
+		{"sgm,sgm41600,ibat-ocp-en", &(sgm->cfg.ibat_ocp_en)},
 		{"sgm,sgm41600,ibat-ocp", &(sgm->cfg.ibat_ocp)},
-		{"sgm,sgm41600,vac-ovp-dis", &(sgm->cfg.vac_ovp_dis)},
+		{"sgm,sgm41600,vac-ovp-en", &(sgm->cfg.vac_ovp_en)},
 		{"sgm,sgm41600,vac-ovp", &(sgm->cfg.vac_ovp)},
-		{"sgm,sgm41600,vbus-ovp-dis", &(sgm->cfg.vbus_ovp_dis)},
+		{"sgm,sgm41600,vbus-ovp-en", &(sgm->cfg.vbus_ovp_en)},
 		{"sgm,sgm41600,vbus-ovp", &(sgm->cfg.vbus_ovp)},
-		{"sgm,sgm41600,vout-ovp-dis", &(sgm->cfg.vout_ovp_dis)},
+		{"sgm,sgm41600,vout-ovp-en", &(sgm->cfg.vout_ovp_en)},
 		{"sgm,sgm41600,vout-ovp", &(sgm->cfg.vout_ovp)},
-		{"sgm,sgm41600,ibus-ocp-dis", &(sgm->cfg.ibus_ocp_dis)},
+		{"sgm,sgm41600,ibus-ocp-en", &(sgm->cfg.ibus_ocp_en)},
 		{"sgm,sgm41600,ibus-ocp", &(sgm->cfg.ibus_ocp)},
-		{"sgm,sgm41600,ibus-ucp-fall-dis", &(sgm->cfg.ibus_ucp_fall_dis)},
+		{"sgm,sgm41600,ibus-ucp-fall-en", &(sgm->cfg.ibus_ucp_fall_en)},
 		{"sgm,sgm41600,ibus-ucp-fall", &(sgm->cfg.ibus_ucp_fall)},
 
 		{"sgm,sgm41600,ibat-reg", &(sgm->cfg.ibat_reg)},
@@ -1562,7 +1571,7 @@ static int sgm41600_parse_dt(struct sgm41600_chip *sgm, struct device *dev)
 		{"sgm,sgm41600,vdrop-ovp-deg", &(sgm->cfg.vdrop_ovp_deg)},
 		{"sgm,sgm41600,vdrop-ovp", &(sgm->cfg.vdrop_ovp)},
 		{"sgm,sgm41600,fsw-set", &(sgm->cfg.fsw_set)},
-		{"sgm,sgm41600,wdt-dis", &(sgm->cfg.wdt_en)},
+		{"sgm,sgm41600,wdt-dis", &(sgm->cfg.wdt_dis)},
 		{"sgm,sgm41600,wd-timeout", &(sgm->cfg.wd_timeout)},
 		{"sgm,sgm41600,ibat-sns-r", &(sgm->cfg.ibat_sns_r)},
 		{"sgm,sgm41600,mode", &(sgm->cfg.mode)},
