@@ -69,6 +69,18 @@ static int rearals_factory_enable_calibration(void)
 	return sensor_calibration_to_hub(ID_REAR_ALS);
 }
 
+/* +20240617 wnn add mtk sensor 1.0 flicker support start */
+void rearals_set_caliobj_offset(int32_t offset)
+{
+	struct rearals_ipi_data *obj = obj_ipi_data;
+	if (obj) {
+		pr_err("erals_set_caliobj_offset %d\n", offset);
+		obj->rearals_cali = offset;
+	}
+}
+EXPORT_SYMBOL(rearals_set_caliobj_offset);
+/* -20240617 wnn add mtk sensor 1.0 flicker support end */
+
 static int rearals_factory_get_cali(int32_t *offset)
 {
 //	int err = 0; //TN modified by jiawei.zou 20240802 for rearals_cali

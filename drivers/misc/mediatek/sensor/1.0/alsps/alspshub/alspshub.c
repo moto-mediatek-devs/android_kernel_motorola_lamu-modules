@@ -83,6 +83,10 @@ enum {
 	CMC_TRC_DEBUG = 0x8000,
 } CMC_TRC;
 
+/* +20240617 wnn add mtk sensor 1.0 flicker support start */
+extern void rearals_set_caliobj_offset(int32_t offset);
+/* -20240617 wnn add mtk sensor 1.0 flicker support end */
+
 long alspshub_read_ps(u8 *ps)
 {
 	long res;
@@ -907,12 +911,13 @@ static int als_set_cali(uint8_t *data, uint8_t count)
 /* +20240617 wnn add mtk sensor 1.0 flicker support start */
 static int rearals_set_cali(uint8_t *data, uint8_t count)
 {
-//	int32_t *buf = (int32_t *)data;
+	int32_t *buf = (int32_t *)data;
 //	struct alspshub_ipi_data *obj = obj_ipi_data;
 
 //	spin_lock(&calibration_lock);
 //	atomic_set(&obj->als_cali, buf[0]);
 //	spin_unlock(&calibration_lock);
+	rearals_set_caliobj_offset(buf[0]);
 	return sensor_cfg_to_hub(ID_REAR_ALS, data, count);
 }
 /* -20240617 wnn add mtk sensor 1.0 flicker support end */
