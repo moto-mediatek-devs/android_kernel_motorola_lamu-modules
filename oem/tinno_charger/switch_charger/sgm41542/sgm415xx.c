@@ -438,6 +438,8 @@ static int sgm4154x_set_ichrg_curr(struct charger_device *chg_dev, unsigned int 
 	u8 reg_val;
 	struct sgm4154x_device *sgm = charger_get_data(chg_dev);
 
+	pr_info("%d uA\n", uA);
+
 	if (uA < SGM4154x_ICHRG_I_MIN_uA)
 		uA = SGM4154x_ICHRG_I_MIN_uA;
 	else if ( uA > sgm->init_data.max_ichg)
@@ -611,6 +613,8 @@ static int sgm4154x_set_input_curr_lim(struct charger_device *chg_dev, unsigned 
 	u8 reg_val;
 	struct sgm4154x_device *sgm = charger_get_data(chg_dev);
 
+	pr_info("%d uA\n", iindpm);
+
 	if (iindpm < SGM4154x_IINDPM_I_MIN_uA ||
 		iindpm > SGM4154x_IINDPM_I_MAX_uA)
 		return -EINVAL;
@@ -783,6 +787,8 @@ static int sgm4154x_enable_charger(struct sgm4154x_device *sgm)
 {
 	int ret;
 
+	pr_info("enter\n");
+
 	ret = sgm4154x_update_bits(sgm, SGM4154x_CHRG_CTRL_1,
 			SGM4154x_CHRG_EN, SGM4154x_CHRG_EN);
 
@@ -792,6 +798,8 @@ static int sgm4154x_enable_charger(struct sgm4154x_device *sgm)
 static int sgm4154x_disable_charger(struct sgm4154x_device *sgm)
 {
 	int ret;
+
+	pr_info("enter\n");
 
 	ret = sgm4154x_update_bits(sgm, SGM4154x_CHRG_CTRL_1,
 			SGM4154x_CHRG_EN, 0);
@@ -1663,6 +1671,7 @@ static irqreturn_t sgm4154x_irq_handler_thread(int irq, void *private)
 	struct sgm4154x_device *sgm = private;
 	struct sgm4154x_state state;
 	bool prev_vbus_gd;
+	bool prev_online;
 	int ret = 0;
 
 	//lock wakelock
@@ -1676,8 +1685,17 @@ static irqreturn_t sgm4154x_irq_handler_thread(int irq, void *private)
 
 	mutex_lock(&sgm->lock);
 	prev_vbus_gd = sgm->state.vbus_gd;
+	prev_online = sgm->state.online;
 	sgm->state = state;
 	mutex_unlock(&sgm->lock);
+
+	if (!prev_online && sgm->state.online) {
+		pr_info("adapter/usb power good, limit input and charger current\n");
+		sgm4154x_set_input_curr_lim(sgm->chg_dev, 100000);
+		sgm4154x_set_ichrg_curr(sgm->chg_dev, 100000);
+		sgm4154x_enable_charger(sgm);
+		return IRQ_HANDLED;
+	}
 
 	if (!prev_vbus_gd && sgm->state.vbus_gd) {
 /*TN Begin modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/

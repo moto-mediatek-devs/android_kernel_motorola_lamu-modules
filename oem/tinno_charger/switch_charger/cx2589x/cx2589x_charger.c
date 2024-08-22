@@ -447,6 +447,8 @@ static int cx2589x_set_ichrg_curr(struct charger_device *chg_dev, unsigned int u
 	u8 reg_val;
 	struct cx2589x_device *cx = charger_get_data(chg_dev);
 
+	pr_info("%d uA\n", uA);
+
 	if (uA < CX2589x_ICHRG_I_MIN_uA)
 		uA = CX2589x_ICHRG_I_MIN_uA;
 	else if (uA > cx->init_data.max_ichg)
@@ -611,6 +613,8 @@ static int cx2589x_set_input_curr_lim(struct charger_device *chg_dev, unsigned i
 	int ret;
 	u8 reg_val;
 	struct cx2589x_device *cx = charger_get_data(chg_dev);
+
+	pr_info("%d uA\n", iindpm);
 
 	if (iindpm < CX2589x_IINDPM_I_MIN_uA)
 		iindpm = CX2589x_IINDPM_I_MIN_uA;
@@ -787,6 +791,8 @@ static int cx2589x_enable_charger(struct cx2589x_device *cx)
 {
 	int ret;
 
+	pr_info("enter\n");
+
 	ret = cx2589x_update_bits(cx, CX2589x_REG_03, CX2589x_CHRG_EN, CX2589x_CHRG_EN);
 
 	return ret;
@@ -799,7 +805,7 @@ static int cx2589x_disable_charger(struct cx2589x_device *cx)
 	ret = cx2589x_set_input_curr_lim(s_chg_dev_otg, 100000);
 	ret = cx2589x_set_ichrg_curr(s_chg_dev_otg, 128000);
 
-	pr_info("disable charger enter\n");
+	pr_info("enter\n");
 
 	ret = cx2589x_update_bits(cx, CX2589x_REG_03, CX2589x_CHRG_EN, 0);
 
@@ -1537,6 +1543,7 @@ static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
 	struct cx2589x_device *cx = private;
 	struct cx2589x_state state;
 	bool prev_vbus_gd;
+	bool prev_online;
 	int ret = 0;
 
 	pr_info("enter\n");
@@ -1549,8 +1556,17 @@ static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
 
 	mutex_lock(&cx->lock);
 	prev_vbus_gd = cx->state.vbus_gd;
+	prev_online = cx->state.online;
 	cx->state = state;
 	mutex_unlock(&cx->lock);
+
+	if (!prev_online && cx->state.online) {
+		pr_info("adapter/usb power good, limit input and charger current\n");
+		cx2589x_set_input_curr_lim(cx->chg_dev, 100000);
+		cx2589x_set_ichrg_curr(cx->chg_dev, 100000);
+		cx2589x_enable_charger(cx);
+		return IRQ_HANDLED;
+	}
 
 	if (!prev_vbus_gd && cx->state.vbus_gd) {
 #if 0
