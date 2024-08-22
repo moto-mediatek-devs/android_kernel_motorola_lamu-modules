@@ -2810,11 +2810,33 @@ static int reset_set(struct mtk_battery *gm,
 	return 0;
 }
 
+/*TN Begin modified by hao.jia/809321 20240821 CR/EKLAMU-784*/
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_OEM_DEVINFO)
+static int bat_health_get(struct mtk_battery *gm,
+	struct mtk_battery_sysfs_field_info *attr,
+	int *val)
+{
+	if (oem_pcba_charge_power() == CHARGE_POWER_18W) {
+		*val = gm->bat_cycle_thr * 10 / RATED_BAT_CAP_5200_MAH;
+	} else {
+		*val = gm->bat_cycle_thr * 10 / RATED_BAT_CAP_6000_MAH;
+	}
+
+	return 0;
+}
+#endif /* CONFIG_OEM_TINNO_CHARGER && CONFIG_OEM_DEVINFO */
+/*TN End modified by hao.jia/809321 20240821 CR/EKLAMU-784*/
+
 static ssize_t bat_sysfs_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct power_supply *psy;
 	struct mtk_battery *gm;
+/*TN Begin modified by hao.jia/809321 20240821 CR/EKLAMU-784*/
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	struct mtk_gauge *gauge;
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/*TN End modified by hao.jia/809321 20240821 CR/EKLAMU-784*/
 	struct mtk_battery_sysfs_field_info *battery_attr;
 	int val;
 	ssize_t ret;
@@ -2824,7 +2846,14 @@ static ssize_t bat_sysfs_store(struct device *dev,
 		return ret;
 
 	psy = dev_get_drvdata(dev);
+/*TN Begin modified by hao.jia/809321 20240821 CR/EKLAMU-784*/
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	gauge = (struct mtk_gauge *)power_supply_get_drvdata(psy);
+	gm = gauge->gm;
+#else
 	gm = (struct mtk_battery *)power_supply_get_drvdata(psy);
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/*TN End modified by hao.jia/809321 20240821 CR/EKLAMU-784*/
 
 	battery_attr = container_of(attr,
 		struct mtk_battery_sysfs_field_info, attr);
@@ -2839,12 +2868,24 @@ static ssize_t bat_sysfs_show(struct device *dev,
 {
 	struct power_supply *psy;
 	struct mtk_battery *gm;
+/*TN Begin modified by hao.jia/809321 20240821 CR/EKLAMU-784*/
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	struct mtk_gauge *gauge;
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/*TN End modified by hao.jia/809321 20240821 CR/EKLAMU-784*/
 	struct mtk_battery_sysfs_field_info *battery_attr;
 	int val = 0;
 	ssize_t count;
 
 	psy = dev_get_drvdata(dev);
+/*TN Begin modified by hao.jia/809321 20240821 CR/EKLAMU-784*/
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	gauge = (struct mtk_gauge *)power_supply_get_drvdata(psy);
+	gm = gauge->gm;
+#else
 	gm = (struct mtk_battery *)power_supply_get_drvdata(psy);
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/*TN End modified by hao.jia/809321 20240821 CR/EKLAMU-784*/
 
 	battery_attr = container_of(attr,
 		struct mtk_battery_sysfs_field_info, attr);
@@ -2877,6 +2918,11 @@ static struct mtk_battery_sysfs_field_info battery_sysfs_field_tbl[] = {
 	BAT_SYSFS_FIELD_WO(reset, BAT_PROP_FG_RESET),
 	BAT_SYSFS_FIELD_RW(log_level, BAT_PROP_LOG_LEVEL),
 	BAT_SYSFS_FIELD_WO(wakeup_fg, BAT_PROP_WAKEUP_FG_ALGO),
+/*TN Begin modified by hao.jia/809321 20240821 CR/EKLAMU-784*/
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	BAT_SYSFS_FIELD_RO(bat_health, BAT_PROP_HEALTH),
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/*TN End modified by hao.jia/809321 20240821 CR/EKLAMU-784*/
 };
 
 static struct attribute *
@@ -2892,10 +2938,24 @@ static void battery_sysfs_init_attrs(void)
 	battery_sysfs_attrs[limit] = NULL; /* Has additional entry for this */
 }
 
+/*TN Begin modified by hao.jia/809321 20240821 CR/EKLAMU-784*/
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+static const struct attribute_group battery_sysfs_attr_group = {
+	.attrs = battery_sysfs_attrs,
+};
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/*TN End modified by hao.jia/809321 20240821 CR/EKLAMU-784*/
+
 static int battery_sysfs_create_group(struct mtk_battery *gm)
 {
 	battery_sysfs_init_attrs();
+/*TN Begin modified by hao.jia/809321 20240821 CR/EKLAMU-784*/
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	return sysfs_create_group(&gm->gauge->psy->dev.kobj, &battery_sysfs_attr_group);
+#else
 	return 0;
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/*TN End modified by hao.jia/809321 20240821 CR/EKLAMU-784*/
 }
 
 /* ============================================================ */
