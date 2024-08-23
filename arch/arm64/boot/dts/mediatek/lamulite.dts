@@ -324,8 +324,8 @@
 	#size-cells = <0>;
 
 	panel1@0 {
-		compatible = "boe,icnl9922c,vdo";
-		reg = <0>;
+		compatible = "txd,ili9883c,vdo";
+		reg = <1>;
 
 		vddio-gpios = <&pio 12 0>;
 		reset-gpios = <&pio 45 0>;
@@ -342,12 +342,11 @@
 	};
 
 	panel2@0 {
-		compatible = "tm,td4376,vdo";
-		reg = <2>;
+		compatible = "tianma,nt36528a,vdo";
+		reg = <4>;
 
 		vddio-gpios = <&pio 12 0>;
 		reset-gpios = <&pio 45 0>;
-		tprst-gpios = <&pio 36 0>;
 		bl-enable-gpios = <&pio 37 0>;
 		bias-gpios = <&pio 20 0>,
 		<&pio 151 0>;
@@ -361,8 +360,8 @@
 	};
 
 	panel3@0 {
-		compatible = "djn,nt36672s,vdo";
-		reg = <3>;
+		compatible = "dijin,td4160,vdo";
+		reg = <5>;
 
 		vddio-gpios = <&pio 12 0>;
 		reset-gpios = <&pio 45 0>;
