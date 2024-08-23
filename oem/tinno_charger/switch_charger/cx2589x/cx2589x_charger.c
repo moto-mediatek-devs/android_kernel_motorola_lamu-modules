@@ -1179,7 +1179,7 @@ static int cx2589x_charger_get_property(struct power_supply *psy,
 		break;
 
 	case POWER_SUPPLY_PROP_TYPE:
-		val->intval = cx->chg_type;
+		val->intval = cx2589x_power_supply_desc.type;
 		break;
 
 	case POWER_SUPPLY_PROP_USB_TYPE:
