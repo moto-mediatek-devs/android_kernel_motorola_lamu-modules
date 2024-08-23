@@ -577,6 +577,9 @@ int ili_core_spi_setup(int num)
 	ilits->spi->bits_per_word = 8;
 	ilits->spi->max_speed_hz = freq[num];
 
+	ilits->spi->cs_setup.value = 200;
+	ilits->spi->cs_setup.unit = 0;
+
 	if (spi_setup(ilits->spi) < 0) {
 		ILI_ERR("Failed to setup spi device\n");
 		return -ENODEV;
