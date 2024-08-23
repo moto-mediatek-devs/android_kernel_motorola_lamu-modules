@@ -42,6 +42,7 @@
 #define ENABLE_SYS_ZEROFLASH true
 
 /*#define FW_IMAGE_NAME "omnivision/hdl_firmware.img"*/
+#define FW_TEST_IMAGE_NAME "hdl_firmware_test.img"
 #define FW_IMAGE_NAME "hdl_firmware.img"
 #define MODULE_VENDOR_1 "dijin"
 #define MODULE_VENDOR_2 "tianma"
@@ -525,15 +526,15 @@ extern int td4160_lcd_id;
 extern int td4376_lcd_id;
 int lcd_id = 0;
 
-char* omnivision_get_fw_image_name(int id) {
+char* omnivision_get_fw_image_name(int id, const char* img_name) {
     static char name[50];
 
     if (id == 0x000d) {
-        sprintf(name, "%s_%s", MODULE_VENDOR_1, FW_IMAGE_NAME);
+        sprintf(name, "%s_%s", MODULE_VENDOR_1, img_name);
     } else if (id == 0x010d) {
-        sprintf(name, "%s_%s", MODULE_VENDOR_2, FW_IMAGE_NAME);
+        sprintf(name, "%s_%s", MODULE_VENDOR_2, img_name);
     } else {
-        strcpy(name, FW_IMAGE_NAME);
+        strcpy(name, img_name);
 	pr_err("%s unknow lcd_id,id is %d\n",__func__,id);
     }
     pr_info("omnivision_tcm fw name is %s\n",name);
@@ -555,7 +556,11 @@ static int zeroflash_get_fw_image(void)
 
 	lcd_id = td4160_lcd_id | td4376_lcd_id;
 
-	strcpy(fw_image_name, omnivision_get_fw_image_name(lcd_id));
+	if (tcm_hcd->b_is_doing_test_flag) {
+		strcpy(fw_image_name, omnivision_get_fw_image_name(lcd_id, FW_TEST_IMAGE_NAME));
+	} else {
+		strcpy(fw_image_name, omnivision_get_fw_image_name(lcd_id, FW_IMAGE_NAME));
+	}
 /*add by yating.zhu@tinno.com for select fw end*/
 	if (zeroflash_hcd->fw_entry != NULL) {
 		release_firmware(zeroflash_hcd->fw_entry);

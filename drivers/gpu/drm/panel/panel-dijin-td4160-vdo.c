@@ -38,10 +38,10 @@
 #include "../../../../oem/devinfo/dev_info.h"
 #endif
 
-//#define TINNO_LCM_OEM_CONFIG
+#define TINNO_LCM_OEM_CONFIG
 #if defined(TINNO_LCM_OEM_CONFIG)
-#include <focaltech_core.h>
-int gesture_mode = -1;
+int td4160_gesture_mode = -1;
+EXPORT_SYMBOL(td4160_gesture_mode);
 #endif
 
 int td4160_lcd_id = 0;
@@ -292,9 +292,8 @@ static int dijin_unprepare(struct drm_panel *panel)
 	ctx->prepared = false;
 
 #ifdef TINNO_LCM_OEM_CONFIG
-	gesture_mode = fts_lcd_gesture_control();
-	if(gesture_mode) {
-		pr_info("td4160 Skip Power Control !\n", __func__);
+	if(td4160_gesture_mode) {
+		pr_info("td4160 Skip Power Control !\n");
 		return 0;
 	}
 #endif
@@ -367,8 +366,7 @@ static int dijin_prepare(struct drm_panel *panel)
 		return 0;
 
 #ifdef TINNO_LCM_OEM_CONFIG
-	gesture_mode = fts_lcd_gesture_control();
-	if(gesture_mode) {
+	if(td4160_gesture_mode) {
 		udelay(10000);
 		dijin_panel_init(ctx);
 		ret = ctx->error;
@@ -382,7 +380,7 @@ static int dijin_prepare(struct drm_panel *panel)
 		dijin_panel_get_data(ctx);
 #endif
 	is_suspend = 0;
-	pr_info("ft8057s Skip Power Control !\n", __func__);
+	pr_info("td4160 Skip Power Control !\n");
 	return ret;
 	}
 	else
@@ -479,11 +477,11 @@ static int dijin_enable(struct drm_panel *panel)
 	return 0;
 }
 
-#define HFP (36)
+#define HFP (32)
 #define HSA (4)
-#define HBP (36)
+#define HBP (32)
 #define VFP_60 (1080)
-#define VFP_90 (300)
+#define VFP_90 (180)
 #define VSA (4)
 #define VBP (32)
 #define VAC (1604)
@@ -586,13 +584,14 @@ static int dijin_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 
 static struct mtk_panel_params ext_params = {
 	.pll_clk = 390,
-	.cust_esd_check = 0,
-	.esd_check_enable = 0,
+	.cust_esd_check = 1,
+	.esd_check_enable = 1,
 	.lcm_esd_check_table[0] = {
 		.cmd = 0x0a,
 		.count = 1,
 		.para_list[0] = 0x9c,
 	},
+	.ssc_enable = 0,
 /* 	.dyn = {
 		.switch_en = 1,
 		.pll_clk = 465,
@@ -601,7 +600,7 @@ static struct mtk_panel_params ext_params = {
 };
 
  static struct mtk_panel_params ext_params_90hz = {
-	.pll_clk = 454,
+	.pll_clk = 390,
 	// .vfp_low_power = 300,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,
@@ -610,6 +609,7 @@ static struct mtk_panel_params ext_params = {
 		.count = 1,
 		.para_list[0] = 0x9c,
 	},
+	.ssc_enable = 0,
 /* 	.dyn = {
 		.switch_en = 1,
 		.pll_clk = 465,
@@ -1063,7 +1063,7 @@ static void dijin_shutdown(struct mipi_dsi_device *dsi)
 	ctx->error = 0;
 	ctx->prepared = false;
 
-/* 	if(gesture_mode) {
+	if(td4160_gesture_mode) {
 		pr_info("%s + ! td4160 gesture on !\n", __func__);
 
 #if defined(CONFIG_RT5081_PMU_DSV) || defined(CONFIG_MT6370_PMU_DSV)
@@ -1116,7 +1116,7 @@ static void dijin_shutdown(struct mipi_dsi_device *dsi)
 
 		//dijin_disable(&ctx->panel);
 		pr_info("%s - ! td4160 gesture on !\n", __func__);
-	} */
+	}
 }
 #endif
 

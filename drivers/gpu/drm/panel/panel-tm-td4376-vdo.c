@@ -38,10 +38,10 @@
 #include "../../../../oem/devinfo/dev_info.h"
 #endif
 
-//#define TINNO_LCM_OEM_CONFIG
+#define TINNO_LCM_OEM_CONFIG
 #if defined(TINNO_LCM_OEM_CONFIG)
-#include <focaltech_core.h>
-int gesture_mode = -1;
+int td4376_gesture_mode = -1;
+EXPORT_SYMBOL(td4376_gesture_mode);
 #endif
 
 int td4376_lcd_id = 0;
@@ -316,12 +316,11 @@ static int td4376_unprepare(struct drm_panel *panel)
 	ctx->prepared = false;
 
 	pr_info("%s ennnter +\n", __func__);
-	return 0;
+	// return 0;
 
 #ifdef TINNO_LCM_OEM_CONFIG
-	gesture_mode = fts_lcd_gesture_control();
-	if(gesture_mode) {
-		pr_info("td4376 Skip Power Control !\n", __func__);
+	if(td4376_gesture_mode) {
+		pr_info("td4376 Skip Power Control !\n");
 		return 0;
 	}
 #endif
@@ -394,8 +393,7 @@ static int td4376_prepare(struct drm_panel *panel)
 		return 0;
 
 #ifdef TINNO_LCM_OEM_CONFIG
-	gesture_mode = fts_lcd_gesture_control();
-	if(gesture_mode) {
+	if(td4376_gesture_mode) {
 		udelay(10000);
 		td4376_panel_init(ctx);
 		ret = ctx->error;
@@ -409,7 +407,7 @@ static int td4376_prepare(struct drm_panel *panel)
 		td4376_panel_get_data(ctx);
 #endif
 	is_suspend = 0;
-	pr_info("ft8057s Skip Power Control !\n", __func__);
+	pr_info("ft8057s Skip Power Control !\n");
 	return ret;
 	}
 	else
@@ -441,7 +439,7 @@ static int td4376_prepare(struct drm_panel *panel)
 	gpiod_set_value(ctx->reset_gpio, 0);
 	udelay(5 * 1000);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
-
+#endif
 #if defined(CONFIG_RT5081_PMU_DSV) || defined(CONFIG_MT6370_PMU_DSV)
 	td4376_panel_bias_enable();
 #else
@@ -466,7 +464,6 @@ static int td4376_prepare(struct drm_panel *panel)
 	}
 	gpiod_set_value(ctx->bias_neg, 1);
 	devm_gpiod_put(ctx->dev, ctx->bias_neg);
-#endif
 #endif
 
 	udelay(10000);
@@ -1092,13 +1089,13 @@ static void td4376_shutdown(struct mipi_dsi_device *dsi)
 	ctx->error = 0;
 	ctx->prepared = false;
 
-/* 	if(gesture_mode) {
+	if(td4376_gesture_mode) {
 		pr_info("%s + ! td4376 gesture on !\n", __func__);
 
 #if defined(CONFIG_RT5081_PMU_DSV) || defined(CONFIG_MT6370_PMU_DSV)
 		td4376_panel_bias_disable();
 #else
-#if 0
+#if 1
 		ctx->reset_gpio =
 			devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
 		if (IS_ERR(ctx->reset_gpio)) {
@@ -1145,7 +1142,7 @@ static void td4376_shutdown(struct mipi_dsi_device *dsi)
 
 		//td4376_disable(&ctx->panel);
 		pr_info("%s - ! td4376 gesture on !\n", __func__);
-	} */
+	}
 }
 #endif
 

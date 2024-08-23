@@ -56,6 +56,7 @@ enum touch_status {
 enum gesture_id {
 	NO_GESTURE_DETECTED = 0,
 	GESTURE_DOUBLE_TAP = 0X01,
+	GESTURE_SINGLE_TAP = 0X1E,
 };
 
 enum touch_report_code {
@@ -513,6 +514,8 @@ static int touch_parse_report(void)
 			}
 			touch_data->gesture_id = data;
 			offset += bits;
+			LOGE(tcm_hcd->pdev->dev.parent,
+				"gesture_id = %x\n", touch_data->gesture_id);
 			break;
 		case TOUCH_FRAME_RATE:
 			bits = config_data[idx++];
@@ -725,14 +728,21 @@ static void touch_report(void)
 #endif
 
 #if WAKEUP_GESTURE
-	if (touch_data->gesture_id == GESTURE_DOUBLE_TAP &&
-			 tcm_hcd->in_suspend &&
+	if (tcm_hcd->in_suspend &&
 			 tcm_hcd->wakeup_gesture_enabled) {
 
-		input_report_key(touch_hcd->input_dev, KEY_WAKEUP, 1);
-		input_sync(touch_hcd->input_dev);
-		input_report_key(touch_hcd->input_dev, KEY_WAKEUP, 0);
-		input_sync(touch_hcd->input_dev);
+		if (touch_data->gesture_id == GESTURE_DOUBLE_TAP) {
+			input_report_key(touch_hcd->input_dev, KEY_WAKEUP, 1);
+			input_sync(touch_hcd->input_dev);
+			input_report_key(touch_hcd->input_dev, KEY_WAKEUP, 0);
+			input_sync(touch_hcd->input_dev);
+
+		} else if (touch_data->gesture_id == GESTURE_SINGLE_TAP) {
+			input_report_key(touch_hcd->input_dev, KEY_U, 1);
+			input_sync(touch_hcd->input_dev);
+			input_report_key(touch_hcd->input_dev, KEY_U, 0);
+			input_sync(touch_hcd->input_dev);
+		}
 	}
 #endif
 
@@ -964,6 +974,7 @@ static int touch_set_input_dev(void)
 
 #if WAKEUP_GESTURE
 	set_bit(KEY_WAKEUP, touch_hcd->input_dev->keybit);
+	set_bit(KEY_U, touch_hcd->input_dev->keybit);
 	input_set_capability(touch_hcd->input_dev, EV_KEY, KEY_WAKEUP);
 #endif
 
@@ -1339,7 +1350,7 @@ int touch_early_suspend(struct ovt_tcm_hcd *tcm_hcd)
 int touch_suspend(struct ovt_tcm_hcd *tcm_hcd)
 {
 	int retval;
-
+	unsigned short gesture_cmd = 0;
 	if (!touch_hcd)
 		return 0;
 
@@ -1359,9 +1370,22 @@ int touch_suspend(struct ovt_tcm_hcd *tcm_hcd)
 		retval = tcm_hcd->set_dynamic_config(tcm_hcd,
 				DC_IN_WAKEUP_GESTURE_MODE,
 				1);
+		if(tcm_hcd->wakeup_gesture_enabled == 1) {
+			gesture_cmd = 0x8000;//single tap
+		} else if(tcm_hcd->wakeup_gesture_enabled == 2) {
+			gesture_cmd = 0x0001;//double
+		} else if(tcm_hcd->wakeup_gesture_enabled == 3) {
+			gesture_cmd = 0x8001;//all
+		} else
+			LOGE(tcm_hcd->pdev->dev.parent,
+						"invalid gesture mode\n");
+
+		retval = tcm_hcd->set_dynamic_config(tcm_hcd,
+				0xFE,
+				gesture_cmd);
 		if (retval < 0) {
 			LOGE(tcm_hcd->pdev->dev.parent,
-					"Failed to enable wakeup gesture mode\n");
+					"Failed to enable wakeup gesture mode %hu\n", gesture_cmd);
 			return retval;
 		}
 	}

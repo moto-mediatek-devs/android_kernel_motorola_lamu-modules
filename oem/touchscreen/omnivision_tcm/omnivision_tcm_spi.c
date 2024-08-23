@@ -667,6 +667,8 @@ static int ovt_tcm_spi_probe(struct spi_device *spi)
 	hw_if.bus_io = &bus_io;
 
 	spi->bits_per_word = 8;
+	spi->cs_setup.value = 200;//6 us
+	spi->cs_setup.unit = 0;
 
 	retval = spi_setup(spi);
 	if (retval < 0) {

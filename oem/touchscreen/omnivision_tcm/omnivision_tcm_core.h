@@ -93,7 +93,7 @@ struct ovt_tcm_board_data {
 #define TOUCH_INPUT_NAME "omnivision_tcm_touch"
 #define TOUCH_INPUT_PHYS_PATH "omnivision_tcm/touch_input"
 
-#define WAKEUP_GESTURE (0)
+#define WAKEUP_GESTURE (1)
 
 #define SPEED_UP_RESUME 0
 
@@ -504,7 +504,8 @@ struct ovt_tcm_hcd {
 	bool irq_enabled;
 	bool in_hdl_mode;
 	bool is_detected;
-	bool wakeup_gesture_enabled;
+	int wakeup_gesture_enabled;
+	bool b_is_doing_test_flag;
     bool ovt_tcm_driver_removing;
 	unsigned char sensor_type;
 	unsigned char fb_ready;
@@ -647,6 +648,17 @@ struct ovt_tcm_hw_interface {
 	struct ovt_tcm_board_data *bdata;
 	const struct ovt_tcm_bus_io *bus_io;
 };
+
+extern struct proc_dir_entry *touch_info_dir;
+#define OVT_GESTURE_ON(flag)      (flag[0] == '3')
+#define OVT_DOUBLE_TAP_ON(flag)   (flag[0] == '2')
+#define OVT_SINGLE_TAP_ON(flag)   (flag[0] == '1')
+#define OVT_GESTURE_OFF(flag)     (flag[0] == '0')
+#define OVT_GESTURE_JUDGE(flag)   (flag[0] != '0')
+#define GESTURE_DISABLE             0
+#define GESTURE_SINGLE              1
+#define GESTURE_DOUBLE              2
+#define GESTURE_SINGLE_DOUBLE       3
 
 int ovt_tcm_bus_init(void);
 

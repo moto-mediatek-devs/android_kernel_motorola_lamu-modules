@@ -1617,7 +1617,13 @@ static int testing_do_testing(void)
 	unsigned int cols;
 	struct ovt_tcm_app_info *app_info;
 	struct ovt_tcm_hcd *tcm_hcd = testing_hcd->tcm_hcd;
-
+	tcm_hcd->b_is_doing_test_flag = true;
+	retval = tcm_hcd->reset_n_reinit(tcm_hcd, false, false);
+	if (IS_NOT_FW_MODE(tcm_hcd->id_info.mode)) {
+		LOGE(tcm_hcd->pdev->dev.parent, "can not update to test img\n");
+		error_count++;
+		goto exit;
+	}
 	app_info = &tcm_hcd->app_info;
 	rows = le2_to_uint(app_info->num_of_image_rows);
 	cols = le2_to_uint(app_info->num_of_image_cols);
@@ -1758,6 +1764,14 @@ static int testing_do_testing(void)
 #ifdef LIMIT_FROM_CSV_FILE
 sys_err:
 #endif
+
+exit:
+	tcm_hcd->b_is_doing_test_flag = false;
+	retval = tcm_hcd->reset_n_reinit(tcm_hcd, false, false);
+	if (IS_NOT_FW_MODE(tcm_hcd->id_info.mode)) {
+		LOGE(tcm_hcd->pdev->dev.parent, "can not update to normal img\n");
+	}
+
 	if (error_count) {
 		return -1;
 	}
@@ -2137,7 +2151,9 @@ static int testing_init(struct ovt_tcm_hcd *tcm_hcd)
 		goto err_sysfs_create_bin_file;
 	}
 
-	touch_info_dir = proc_mkdir("touch_info", NULL);
+	if (!touch_info_dir) {
+		touch_info_dir = proc_mkdir("touch_info", NULL);
+	}
 	if (!touch_info_dir) {
 		LOGE(tcm_hcd->pdev->dev.parent, "Can not create touch_info_dir\n");
 		return -ENOMEM;
