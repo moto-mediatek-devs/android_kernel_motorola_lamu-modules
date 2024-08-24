@@ -2049,15 +2049,29 @@ static kal_uint32 set_test_pattern_mode(kal_uint32 modes)
 	if (modes == 2) {//colorbar
 		write_cmos_sensor(0xfd, 0x00);
 		write_cmos_sensor(0xb6, 0x21);
-	} else if (modes == 5) {//black
-
+	} else if (modes == 5) {
+		//sensor enter black view
+		write_cmos_sensor(0xfd, 0x01);
+		write_cmos_sensor(0x21, 0x00);
+		write_cmos_sensor(0x22, 0x00);
+		write_cmos_sensor(0x01, 0x01);
+		write_cmos_sensor(0xfd, 0x07);
+		write_cmos_sensor(0x04, 0x00);
+		write_cmos_sensor(0x05, 0x00);
 	}
 
 	if ((modes != 2) && (imgsensor.test_pattern == 2)) {
 		write_cmos_sensor(0xfd, 0x00);
 		write_cmos_sensor(0xb6, 0x20);
 	} else if (modes != 5 && (imgsensor.test_pattern == 5)) {
-
+		//sensor out black view
+		write_cmos_sensor(0xfd, 0x01);
+		write_cmos_sensor(0x21, 0x02);
+		write_cmos_sensor(0x22, 0x00);
+		write_cmos_sensor(0x01, 0x01);
+		write_cmos_sensor(0xfd, 0x07);
+		write_cmos_sensor(0x04, 0x00);
+		write_cmos_sensor(0x05, 0x40);
 	}
 
 	spin_lock(&imgsensor_drv_lock);
