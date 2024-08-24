@@ -88,6 +88,9 @@ static int handle_to_index(int handle)
 	case ID_SIGNIFICANT_MOVE:
 		index = sig_mov;
 		break;
+	case ID_FLIP:
+		index = flip;
+		break;
 /*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end*/
 	default:
 		index = -1;

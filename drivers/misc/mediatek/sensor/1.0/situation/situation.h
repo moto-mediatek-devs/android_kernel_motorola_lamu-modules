@@ -36,6 +36,7 @@ enum situation_index_table {
 	flip_twist,
 	chopchop,
 	sig_mov,
+	flip,
 /*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end*/
 	max_situation_support,
 };

@@ -22,4 +22,5 @@ situationhub-$(CONFIG_MTK_REAR_FLK_HUB) += rear_flk/rearflk_hub.o rear_flk/rearf
 situationhub-$(CONFIG_MTK_FLIPTWIST_HUB) += flip_twist/flip_twist.o
 situationhub-$(CONFIG_MTK_CHOPCHOP_HUB) += chop_chop/chop_chop.o
 situationhub-$(CONFIG_MTK_SIGMOVE_HUB) += sig_move/sig_move.o
+situationhub-$(CONFIG_MTK_FLIP_HUB) += flip/flip.o
 #TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end

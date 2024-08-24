@@ -16,6 +16,7 @@ source "$(KCONFIG_EXT_PREFIX)drivers/misc/mediatek/sensor/1.0/situation/situatio
 source "$(KCONFIG_EXT_PREFIX)drivers/misc/mediatek/sensor/1.0/situation/situation_hub/flip_twist/Kconfig"
 source "$(KCONFIG_EXT_PREFIX)drivers/misc/mediatek/sensor/1.0/situation/situation_hub/chop_chop/Kconfig"
 source "$(KCONFIG_EXT_PREFIX)drivers/misc/mediatek/sensor/1.0/situation/situation_hub/sig_move/Kconfig"
+source "$(KCONFIG_EXT_PREFIX)drivers/misc/mediatek/sensor/1.0/situation/situation_hub/flip/Kconfig"
 #TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end
 
 config MTK_REAR_ALS_HUB

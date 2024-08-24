@@ -72,6 +72,10 @@
 #if IS_ENABLED(CONFIG_MTK_SIGMOVE_HUB)
 #include "sig_move/sig_move.h"
 #endif
+
+#if IS_ENABLED(CONFIG_MTK_FLIP_HUB)
+#include "flip/flip.h"
+#endif
 /*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end*/
 
 #endif
