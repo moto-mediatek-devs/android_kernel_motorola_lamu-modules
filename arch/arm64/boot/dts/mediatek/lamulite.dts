@@ -325,7 +325,7 @@
 
 	panel1@0 {
 		compatible = "txd,ili9883c,vdo";
-		reg = <1>;
+		reg = <0>;
 
 		vddio-gpios = <&pio 12 0>;
 		reset-gpios = <&pio 45 0>;
@@ -343,7 +343,7 @@
 
 	panel2@0 {
 		compatible = "tianma,nt36528a,vdo";
-		reg = <4>;
+		reg = <1>;
 
 		vddio-gpios = <&pio 12 0>;
 		reset-gpios = <&pio 45 0>;
@@ -361,7 +361,7 @@
 
 	panel3@0 {
 		compatible = "dijin,td4160,vdo";
-		reg = <5>;
+		reg = <2>;
 
 		vddio-gpios = <&pio 12 0>;
 		reset-gpios = <&pio 45 0>;

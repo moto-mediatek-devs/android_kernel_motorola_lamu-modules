@@ -343,7 +343,7 @@
 
 	panel2@0 {
 		compatible = "tm,td4376,vdo";
-		reg = <2>;
+		reg = <1>;
 
 		vddio-gpios = <&pio 12 0>;
 		reset-gpios = <&pio 45 0>;
@@ -362,7 +362,7 @@
 
 	panel3@0 {
 		compatible = "djn,nt36672s,vdo";
-		reg = <3>;
+		reg = <2>;
 
 		vddio-gpios = <&pio 12 0>;
 		reset-gpios = <&pio 45 0>;
