@@ -387,7 +387,7 @@ static int cts_get_tp_info(char *buf, void *arg0)
         return sprintf(buf,
         "%s-%s-%s-v0x%04x",
         "BOE",
-        "P329A",
+        "CHIPONE",
         "ICNL9922C",
         cts_fw_ver);
 }

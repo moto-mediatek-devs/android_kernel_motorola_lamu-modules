@@ -2373,14 +2373,14 @@ static int nvt_get_tp_info(char *buf, void *arg0)
         return sprintf(buf,
         "%s-%s-%s-v0x%02x",
         "DIJIN",
-        "P329A",
+        "NOVATEK",
         "NT36672S",
         ts->fw_ver);
 	else if(id == 0x0101)
         return sprintf(buf,
         "%s-%s-%s-v0x%02x",
         "TIANMA",
-        "P329A",
+        "NOVATEK",
         "NT36528A",
         ts->fw_ver);
 	else

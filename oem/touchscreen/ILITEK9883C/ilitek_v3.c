@@ -1478,11 +1478,11 @@ static void ili_update_tp_module_info(void)
 	{
 		if ((ilits->chip->fw_ver & 0xFF) == 0) {
 		return sprintf(buf, "%s-%s-%s-0X%02x\n",
-				"TXD", "P329A", "ILI9883C",
+				"TXD", "ILITEK", "ILI9883C",
 				(ilits->chip->fw_ver >> 8) & 0xFF);
 		} else {
 		return sprintf(buf, "%s-%s-%s-0X%02x.%x\n",
-				"TXD", "P329A", "ILI9883C",
+				"TXD", "ILITEK", "ILI9883C",
 				(ilits->chip->fw_ver >> 8) &
 				0xFF, ilits->chip->fw_ver & 0xFF);
 		}

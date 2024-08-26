@@ -4454,14 +4454,14 @@ static int ovt_get_tp_info(char *buf, void *arg0)
         return sprintf(buf,
         "%s-%s-%s-v0x%02x",
         "DIJIN",
-        "P329A",
+        "OMNIVISION",
         "TD4160",
         onmivision_tcm_hcd->app_info.customer_config_id[15]);
 	else if(id == 0x010d)
         return sprintf(buf,
         "%s-%s-%s-v0x%02x",
         "TIANMA",
-        "P329A",
+        "OMNIVISION",
         "TD4376",
         onmivision_tcm_hcd->app_info.customer_config_id[15]);
 	else
