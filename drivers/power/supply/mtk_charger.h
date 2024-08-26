@@ -75,8 +75,8 @@ struct charger_data;
 #define NON_STD_AC_CHARGER_CURRENT		1500000
 #define CHARGING_HOST_CHARGER_CURRENT		1500000
 #define JEITA_TEMP_ABOVE_T4_CURRENT		0
-#define JEITA_TEMP_T3_TO_T4_CURRENT		4000000
-#define JEITA_TEMP_T2_TO_T3_CURRENT		4000000
+#define JEITA_TEMP_T3_TO_T4_CURRENT		3600000
+#define JEITA_TEMP_T2_TO_T3_CURRENT		3600000
 #define JEITA_TEMP_T1_TO_T2_CURRENT		3000000
 #define JEITA_TEMP_T0_TO_T1_CURRENT		1000000
 #define JEITA_TEMP_BELOW_T0_CURRENT		0
@@ -85,12 +85,6 @@ struct charger_data;
 #if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
 #define HVDCP_CHARGER_CURRENT			3500000
 #define HVDCP_CHARGER_INPUT_CURRENT		3200000
-#define HVDCP_TEMP_ABOVE_T4_CURRENT		0
-#define HVDCP_TEMP_T3_TO_T4_CURRENT		4000000
-#define HVDCP_TEMP_T2_TO_T3_CURRENT		4000000
-#define HVDCP_TEMP_T1_TO_T2_CURRENT		3000000
-#define HVDCP_TEMP_T0_TO_T1_CURRENT		1000000
-#define HVDCP_TEMP_BELOW_T0_CURRENT		0
 #endif
 /* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 
@@ -299,12 +293,6 @@ struct charger_custom_data {
 /* TN End modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
 /* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
-	int hvdcp_temp_above_t4_icurrent;
-	int hvdcp_temp_t3_to_t4_icurrent;
-	int hvdcp_temp_t2_to_t3_icurrent;
-	int hvdcp_temp_t1_to_t2_icurrent;
-	int hvdcp_temp_t0_to_t1_icurrent;
-	int hvdcp_temp_below_t0_icurrent;
 	int hvdcp_charging_current_limit;
 	int hvdcp_input_current_limit;
 #endif
@@ -343,11 +331,6 @@ struct charger_data {
 /* TN Begin modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
 	int temp_charging_current_limit;
 /* TN End modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
-/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
-	int hvdcp_temp_charging_current_limit;
-#endif
-/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 };
 
 enum chg_data_idx_enum {

@@ -17,12 +17,6 @@
 &charger {
 	battery_cv = <4500000>;
 	max_charger_voltage = <11000000>;
-	hvdcp_temp_above_t4_icurrent = <0>;
-	hvdcp_temp_t3_to_t4_icurrent = <3600000>;
-	hvdcp_temp_t2_to_t3_icurrent = <3600000>;
-	hvdcp_temp_t1_to_t2_icurrent = <3600000>;
-	hvdcp_temp_t0_to_t1_icurrent = <1000000>;
-	hvdcp_temp_below_t0_icurrent = <0>;
 	hvdcp_input_current_limit = <3200000>;
 	hvdcp_charging_current_limit = <3600000>;
 	/* battery temperature protection */
@@ -45,8 +39,8 @@
 	jeita_temp_t0_to_t1_cv = <4200000>;
 	jeita_temp_below_t0_cv = <4040000>;
 	jeita_temp_above_t4_icurrent = <0>;
-	jeita_temp_t3_to_t4_icurrent = <4000000>;
-	jeita_temp_t2_to_t3_icurrent = <4000000>;
+	jeita_temp_t3_to_t4_icurrent = <3600000>;
+	jeita_temp_t2_to_t3_icurrent = <3600000>;
 	jeita_temp_t1_to_t2_icurrent = <3000000>;
 	jeita_temp_t0_to_t1_icurrent = <1000000>;
 	jeita_temp_below_t0_icurrent = <0>;

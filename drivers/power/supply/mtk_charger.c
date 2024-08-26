@@ -733,52 +733,6 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 	}
 
 #if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
-	if (of_property_read_u32(np, "hvdcp_temp_above_t4_icurrent", &val) >= 0)
-		info->data.hvdcp_temp_above_t4_icurrent = val;
-	else {
-		chr_err("use default hvdcp_temp_above_t4_icurrent:0\n");
-		info->data.hvdcp_temp_above_t4_icurrent = HVDCP_TEMP_ABOVE_T4_CURRENT;
-	}
-
-	if (of_property_read_u32(np, "hvdcp_temp_t3_to_t4_icurrent", &val) >= 0)
-		info->data.hvdcp_temp_t3_to_t4_icurrent = val;
-	else {
-		chr_err("use default hvdcp_temp_t3_to_t4_icurrent:%d\n",
-			HVDCP_CHARGER_CURRENT);
-		info->data.hvdcp_temp_t3_to_t4_icurrent = HVDCP_TEMP_T3_TO_T4_CURRENT;
-	}
-
-	if (of_property_read_u32(np, "hvdcp_temp_t2_to_t3_icurrent", &val) >= 0)
-		info->data.hvdcp_temp_t2_to_t3_icurrent = val;
-	else {
-		chr_err("use default hvdcp_temp_t2_to_t3_icurrent:%d\n",
-			HVDCP_CHARGER_CURRENT);
-		info->data.hvdcp_temp_t2_to_t3_icurrent = HVDCP_TEMP_T2_TO_T3_CURRENT;
-	}
-
-	if (of_property_read_u32(np, "hvdcp_temp_t1_to_t2_icurrent", &val) >= 0)
-		info->data.hvdcp_temp_t1_to_t2_icurrent = val;
-	else {
-		chr_err("use default hvdcp_temp_t1_to_t2_icurrent:%d\n",
-			HVDCP_CHARGER_CURRENT);
-		info->data.hvdcp_temp_t1_to_t2_icurrent = HVDCP_TEMP_T1_TO_T2_CURRENT;
-	}
-
-	if (of_property_read_u32(np, "hvdcp_temp_t0_to_t1_icurrent", &val) >= 0)
-		info->data.hvdcp_temp_t0_to_t1_icurrent = val;
-	else {
-		chr_err("use default hvdcp_temp_t0_to_t1_icurrent:%d\n",
-			HVDCP_CHARGER_CURRENT);
-		info->data.hvdcp_temp_t0_to_t1_icurrent = HVDCP_TEMP_T0_TO_T1_CURRENT;
-	}
-
-	if (of_property_read_u32(np, "hvdcp_temp_below_t0_icurrent", &val) >= 0)
-		info->data.hvdcp_temp_below_t0_icurrent = val;
-	else {
-		chr_err("use default hvdcp_temp_below_t0_icurrent:0\n");
-		info->data.hvdcp_temp_below_t0_icurrent = HVDCP_TEMP_BELOW_T0_CURRENT;
-	}
-
 	if (of_property_read_u32(np, "hvdcp_input_current_limit", &val) >= 0)
 		info->data.hvdcp_input_current_limit = val;
 	else {
@@ -786,7 +740,6 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 			HVDCP_CHARGER_INPUT_CURRENT);
 		info->data.hvdcp_input_current_limit = HVDCP_CHARGER_INPUT_CURRENT;
 	}
-
 	if (of_property_read_u32(np, "hvdcp_charging_current_limit", &val) >= 0)
 		info->data.hvdcp_charging_current_limit = val;
 	else {
@@ -794,7 +747,7 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 			HVDCP_CHARGER_CURRENT);
 		info->data.hvdcp_charging_current_limit = HVDCP_CHARGER_CURRENT;
 	}
-#endif
+#endif /* CONFIG_OEM_HVDCP_ALGO */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	if (of_property_read_u32(np, "eoc_current", &val) >= 0)
 		info->data.eoc_current = val;
@@ -932,10 +885,10 @@ void do_sw_jeita_state_machine(struct mtk_charger *info)
 	sw_jeita->charging = true;
 
 /* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	struct charger_data *pdata;
 	pdata = &info->chg_data[CHG1_SETTING];
-#endif
+#endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 
 	/* JEITA battery temp Standard */
@@ -1044,6 +997,7 @@ void do_sw_jeita_state_machine(struct mtk_charger *info)
 	}
 
 /* TN Begin modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	if (sw_jeita->sm == TEMP_ABOVE_T4)
 		pdata->temp_charging_current_limit = info->data.jeita_temp_above_t4_icurrent;
 	else if (sw_jeita->sm == TEMP_T3_TO_T4)
@@ -1059,26 +1013,8 @@ void do_sw_jeita_state_machine(struct mtk_charger *info)
 	else
 		pdata->temp_charging_current_limit = 0;
 	chr_err("[SW_JEITA] temp_curr:%d\n", pdata->temp_charging_current_limit);
+#endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
-/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
-	if (sw_jeita->sm == TEMP_ABOVE_T4)
-		pdata->hvdcp_temp_charging_current_limit = info->data.hvdcp_temp_above_t4_icurrent;
-	else if (sw_jeita->sm == TEMP_T3_TO_T4)
-		pdata->hvdcp_temp_charging_current_limit = info->data.hvdcp_temp_t3_to_t4_icurrent;
-	else if (sw_jeita->sm == TEMP_T2_TO_T3)
-		pdata->hvdcp_temp_charging_current_limit = info->data.hvdcp_temp_t2_to_t3_icurrent;
-	else if (sw_jeita->sm == TEMP_T1_TO_T2)
-		pdata->hvdcp_temp_charging_current_limit = info->data.hvdcp_temp_t1_to_t2_icurrent;
-	else if (sw_jeita->sm == TEMP_T0_TO_T1)
-		pdata->hvdcp_temp_charging_current_limit = info->data.hvdcp_temp_t0_to_t1_icurrent;
-	else if (sw_jeita->sm == TEMP_BELOW_T0)
-		pdata->hvdcp_temp_charging_current_limit = info->data.hvdcp_temp_below_t0_icurrent;
-	else
-		pdata->hvdcp_temp_charging_current_limit = 0;
-	chr_err("[SW_JEITA] hvdcp_temp_curr:%d\n", pdata->hvdcp_temp_charging_current_limit);
-#endif
-/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 
 	chr_err("[SW_JEITA]preState:%d newState:%d tmp:%d cv:%d\n",
 		sw_jeita->pre_sm, sw_jeita->sm, info->battery_temp,
