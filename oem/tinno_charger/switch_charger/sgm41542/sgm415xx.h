@@ -207,6 +207,9 @@
 /* REGISTER RESET*/
 #define SGM4151x_REG_RST		BIT(7)
 
+/* INPUT DET DONE */
+#define SGM4154x_INPUT_DET_DONE_MASK           BIT(7)
+
 struct sgm4154x_init_data {
 	u32 ichg;	/* charge current		*/
 	u32 ilim;	/* input current		*/
@@ -233,6 +236,7 @@ struct sgm4154x_state {
 	u8 health;
 	u8 chrg_fault;
 	u8 ntc_fault;
+	bool input_det_done;
 };
 
 struct sgm4154x_device {
@@ -264,9 +268,7 @@ struct sgm4154x_device {
 
 	struct delayed_work charge_detect_delayed_work;
 	struct delayed_work charge_monitor_work;
-/*TN Begin modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/
 	struct delayed_work retry_charger_detect_work;
-/*TN End modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/
 	struct notifier_block pm_nb;
 	bool sgm4154x_suspend_flag;
 
@@ -279,9 +281,7 @@ struct sgm4154x_device {
 	int batt_vol;
 	int batt_curr;
 	struct iio_channel *vbus;
-/*TN Begin modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/
 	int force_detect_count;
-/*TN End modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/
 };
 
 #endif /* _SGM4154x_CHARGER_H__ */

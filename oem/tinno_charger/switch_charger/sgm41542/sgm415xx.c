@@ -35,6 +35,8 @@
 #define PHY_MODE_BC11_CLR 2
 #endif
 
+extern void Charger_Detect_Init(void);
+extern void Charger_Detect_Release(void);
 #include "sgm415xx.h"
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
@@ -52,6 +54,10 @@
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
 #include <dev_info.h>
 #endif /* CONFIG_OEM_DEVINFO */
+
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+#include <tinno_charger.h>
+#endif /* CONFIG_OEM_TINNO_CHARGER */
 
 /**********************************************************
  *
@@ -664,6 +670,7 @@ static int sgm4154x_get_state(struct sgm4154x_device *sgm, struct sgm4154x_state
 {
 	u8 chrg_stat;
 	u8 fault;
+	u8 det_done;
 	u8 chrg_param_0, chrg_param_1, chrg_param_2;
 	int ret;
 
@@ -714,6 +721,13 @@ static int sgm4154x_get_state(struct sgm4154x_device *sgm, struct sgm4154x_state
 		return ret;
 	}
 	state->vbus_gd = !!(chrg_param_2 & SGM4154x_VBUS_GOOD);
+
+	ret = sgm4154x_read_reg(sgm, SGM4154x_INPUT_DET, &det_done);
+	if (ret) {
+		pr_err("read SGM4154x_INPUT_DET fail\n");
+		return ret;
+	}
+	state->input_det_done = !!(det_done & SGM4154x_INPUT_DET_DONE_MASK);
 
 	return 0;
 }
@@ -1356,7 +1370,7 @@ __maybe_unused static bool sgm4154x_state_changed(struct sgm4154x_device *sgm,
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-static int charger_detect_init(struct sgm4154x_device *sgm)
+__maybe_unused static int charger_detect_init(struct sgm4154x_device *sgm)
 {
 	struct phy *phy;
 	int ret;
@@ -1378,7 +1392,7 @@ static int charger_detect_init(struct sgm4154x_device *sgm)
 	return ret;
 }
 
-static int charger_detect_release(struct sgm4154x_device *sgm)
+__maybe_unused static int charger_detect_release(struct sgm4154x_device *sgm)
 {
 	struct phy *phy;
 	int ret;
@@ -1475,22 +1489,11 @@ out:
 /*TN Begin modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/
 static int sgm4154x_force_dpdm(struct sgm4154x_device *sgm)
 {
-	int ret;
-	u8 reg_val;
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-	charger_detect_init(sgm);
-#else
-	Charger_Detect_Init();
-#endif
-
-	ret = sgm4154x_read_reg(sgm, SGM4154x_CHRG_CTRL_7, &reg_val);
-	if (ret) {
-	    pr_err("read reg failed(%d)\n", ret);
-	}
+	pr_info("enter\n");
 
 	return sgm4154x_update_bits(sgm, SGM4154x_CHRG_CTRL_7,
-	        SGM4154x_FORCE_DPDM, reg_val | 0x80);
+	        SGM4154x_FORCE_DPDM, SGM4154x_FORCE_DPDM);
 }
 
 static void retry_charger_detect_work_func(struct work_struct *work)
@@ -1503,6 +1506,8 @@ static void retry_charger_detect_work_func(struct work_struct *work)
 		return;
 	}
 
+	Charger_Detect_Init();
+
 	ret = sgm4154x_force_dpdm(sgm);
 	if (ret < 0) {
 		pr_err("Cann't force dpdm\n");
@@ -1510,7 +1515,7 @@ static void retry_charger_detect_work_func(struct work_struct *work)
 	}
 
 	sgm->force_detect_count++;
-	schedule_delayed_work(&sgm->charge_detect_delayed_work, msecs_to_jiffies(300));
+	schedule_delayed_work(&sgm->charge_detect_delayed_work, msecs_to_jiffies(1000));
 
 	return;
 }
@@ -1593,71 +1598,56 @@ static void charger_detect_work_func(struct work_struct *work)
 
 	case SGM4154x_UNKNOWN:
 		pr_info("SGM4154x charger type: UNKNOWN\n");
-		sgm->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
+		sgm->chg_type = POWER_SUPPLY_TYPE_USB_OTHER;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
-		sgm->psy_usb_type = POWER_SUPPLY_USB_TYPE_SDP;
+		sgm->psy_usb_type = POWER_SUPPLY_TYPE_USB_OTHER;
 #endif
-		sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB;
-/*TN Begin modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/
+		sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_APPLE_BRICK_ID;
 		if (sgm->force_detect_count < 10) {
-			pr_info("SGM4154x charger type: UNKNOWN, retry bc12 count:%d\n", sgm->force_detect_count);
-			schedule_delayed_work(&sgm->retry_charger_detect_work, 100);
+			pr_info("SGM4154x charger type: UNKNOWN, retry bc1.2 count:%d\n", sgm->force_detect_count);
+			schedule_delayed_work(&sgm->retry_charger_detect_work, msecs_to_jiffies(100));
 		}
-/*TN End modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/
 		break;
 
 	case SGM4154x_NON_STANDARD:
 		pr_info("SGM4154x charger type: NON STANDARD\n");
-		sgm->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
+		sgm->chg_type = POWER_SUPPLY_TYPE_USB_OTHER;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
-		sgm->psy_usb_type = POWER_SUPPLY_USB_TYPE_SDP;
+		sgm->psy_usb_type = POWER_SUPPLY_TYPE_USB_OTHER;
 #endif
-		sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB;
-/*TN Begin modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/
+		sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_APPLE_BRICK_ID;
 		if (sgm->force_detect_count < 10) {
-			pr_info("SGM4154x charger type: NON STANDARD, retry bc12 count:%d\n", sgm->force_detect_count);
-			schedule_delayed_work(&sgm->retry_charger_detect_work, 100);
+			pr_info("SGM4154x charger type: NON STANDARD, retry bc1.2 count:%d\n", sgm->force_detect_count);
+			schedule_delayed_work(&sgm->retry_charger_detect_work, msecs_to_jiffies(100));
 		}
-/*TN End modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/
 		break;
 
 	default:
 		pr_info("SGM4154x charger type: default\n");
-		sgm->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
+		sgm->chg_type = POWER_SUPPLY_TYPE_USB_OTHER;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
-		sgm->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
+		sgm->psy_usb_type = POWER_SUPPLY_TYPE_USB_OTHER;
 #endif
-		sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB;
+		sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_APPLE_BRICK_ID;
 		if (sgm->force_detect_count < 10) {
-			pr_info("SGM4154x charger type: Default, retry bc12 count:%d\n", sgm->force_detect_count);
-			schedule_delayed_work(&sgm->retry_charger_detect_work, 100);
+			pr_info("SGM4154x charger type: Default, retry bc1.2 count:%d\n", sgm->force_detect_count);
+			schedule_delayed_work(&sgm->retry_charger_detect_work, msecs_to_jiffies(100));
 		}
-/*TN Begin modified by zhen.liu11/860655 20231007 CR/EKFOGO4G-1886*/
 		__pm_relax(sgm->charger_wakelock);
-/*TN End modified by zhen.liu11/860655 20231007 CR/EKFOGO4G-1886*/
 		//break;
 		return;
 	}
 
 	if (sgm->state.chrg_type == SGM4154x_USB_SDP || sgm->state.chrg_type == SGM4154x_USB_CDP) {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-		charger_detect_release(sgm);
-#else
 		Charger_Detect_Release();
-#endif
 	}
 
-	pr_info("Update: chg_type = %d, psy_usb_type = %d\n",
-				sgm->chg_type, sgm->psy_usb_type);
+	pr_info("Update: chg_type:%d, psy_usb_type:%d\n", sgm->chg_type, sgm->psy_usb_type);
 #endif
 	//sgm4154x_enable_charger(sgm);
 	sgm4154x_dump_register(sgm->chg_dev);
 
-/*TN Begin modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/
-#if 0
-err:
-#endif
-/*TN End modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/
+//err:
 	//release wakelock
 	power_supply_changed(sgm->charger);
 	pr_info("Relax wakelock\n");
@@ -1698,14 +1688,13 @@ static irqreturn_t sgm4154x_irq_handler_thread(int irq, void *private)
 	}
 
 	if (!prev_vbus_gd && sgm->state.vbus_gd) {
-/*TN Begin modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/
+		pr_info("adapter/usb inserted\n");
+		Charger_Detect_Init();
 		sgm->force_detect_count = 0;
 		allow_set_dp_dm_vol = true;
-/*TN End modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/
-		pr_info("adapter/usb inserted\n");
-/*TN Begin modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/
 	} else if (prev_vbus_gd && !sgm->state.vbus_gd) {
 		pr_info("adapter/usb removed\n");
+		Charger_Detect_Release();
 		sgm4154x_set_dpdm_hiz(sgm);
 		allow_set_dp_dm_vol = false;
 /*TN End modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/
@@ -2460,9 +2449,8 @@ static int sgm4154x_driver_probe(struct i2c_client *client,
 
 	INIT_DELAYED_WORK(&sgm->charge_detect_delayed_work, charger_detect_work_func);
 	//INIT_DELAYED_WORK(&sgm->charge_monitor_work, charger_monitor_work_func);
-/*TN Begin modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/
 	INIT_DELAYED_WORK(&sgm->retry_charger_detect_work, retry_charger_detect_work_func);
-/*TN End modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/
+
 	if (client->irq) {
 		ret = devm_request_threaded_irq(dev, client->irq, NULL,
 				sgm4154x_irq_handler_thread,
