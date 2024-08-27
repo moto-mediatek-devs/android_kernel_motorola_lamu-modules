@@ -1,4 +1,0 @@
-ifdef CONFIG_OEM_PANEL
-	obj-y += panel_boe_ili9883c_vdo/
-	obj-y += panel_djin_ft8057s_vdo/
-endif

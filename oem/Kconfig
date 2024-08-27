@@ -50,6 +50,13 @@ config OEM_LAMU_TOUCHSCREEN
 	help
 	  support oem_touch
 
+config OEM_LAMU_PANEL
+	tristate "oem panel"
+	depends on PROJECT_LAMU
+	default m
+	help
+	  support oem_panel
+
 config OEM_LAMU_FINGERPRINT
 	tristate "oem fingerprint"
 	depends on PROJECT_LAMU
