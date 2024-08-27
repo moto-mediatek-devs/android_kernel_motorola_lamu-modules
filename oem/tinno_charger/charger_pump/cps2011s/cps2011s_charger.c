@@ -1378,14 +1378,13 @@ static int cps2011s_ibusucpr_irq_handler(struct cps2011s_chip *chip)
 }
 
 //Antaiui <AI_BSP_CHG> <cps> <2021-03-01> modify For 2005R 30w fast charger end
-/*
 static int cps2011s_ibusocp_irq_handler(struct cps2011s_chip *chip)
 {
 	dev_info(chip->dev, "%s\n", __func__);
 	//cps2011s_set_notify(chip, cps2011s_NOTIFY_IBUSOCP);
 	return 0;
 }
-*/
+
 static int cps2011s_vbusovp_irq_handler(struct cps2011s_chip *chip)
 {
 	dev_info(chip->dev, "%s\n", __func__);
@@ -1632,17 +1631,17 @@ static const struct irq_map_desc cps2011s_irq_map_tbl[cps2011s_IRQIDX_MAX] = {
 				cps2011s_IRQIDX_IBUSUCPF),
 	cps2011s_IRQ_DESC_RS(ibusucpr, cps2011s_SF_INTFLAG1, 1,
 				cps2011s_IRQIDX_IBUSUCPR),
-	//cps2011s_IRQ_DESC_RS(ibusocp, cps2011s_SF_INTFLAG1, 2,
-				//cps2011s_IRQIDX_IBUSOCP),
-	cps2011s_IRQ_DESC_RS(vbusovp, cps2011s_SF_INTFLAG1, 2,
+	cps2011s_IRQ_DESC_RS(ibusocp, cps2011s_SF_INTFLAG1, 2,
+				cps2011s_IRQIDX_IBUSOCP),
+	cps2011s_IRQ_DESC_RS(vbusovp, cps2011s_SF_INTFLAG1, 3,
 				cps2011s_IRQIDX_VBUSOVP),
-	cps2011s_IRQ_DESC_RS(vdrovp, cps2011s_SF_INTFLAG1, 3,
+	cps2011s_IRQ_DESC_RS(vdrovp, cps2011s_SF_INTFLAG1, 4,
 				cps2011s_IRQIDX_VDROVP),
-	cps2011s_IRQ_DESC_RS(vbuspd, cps2011s_SF_INTFLAG1, 4,
+	cps2011s_IRQ_DESC_RS(vbuspd, cps2011s_SF_INTFLAG1, 5,
 				cps2011s_IRQIDX_VBUSPD),
-	cps2011s_IRQ_DESC_RS(vbusconpd, cps2011s_SF_INTFLAG1, 5,
+	cps2011s_IRQ_DESC_RS(vbusconpd, cps2011s_SF_INTFLAG1, 6,
 				cps2011s_IRQIDX_VBUSCONPD),
-	cps2011s_IRQ_DESC_RS(vbusconovp, cps2011s_SF_INTFLAG1, 6,
+	cps2011s_IRQ_DESC_RS(vbusconovp, cps2011s_SF_INTFLAG1, 7,
 				cps2011s_IRQIDX_VBUSCONOVP),
 	cps2011s_IRQ_DESC_RS(converocp, cps2011s_SF_INTFLAG2, 0,
 				cps2011s_IRQIDX_CONVOCP),
