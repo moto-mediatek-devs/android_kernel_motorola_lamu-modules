@@ -248,6 +248,11 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 	u32 val = 0;
 	struct device_node *boot_node = NULL;
 	struct tag_bootmode *tag = NULL;
+/* TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+	int byte_len, i, rc;
+#endif
+/* TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 
 	boot_node = of_parse_phandle(dev->of_node, "bootmode", 0);
 	if (!boot_node)
@@ -760,6 +765,37 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 	chr_err("%s:eoc_current:%d\n", __func__, info->data.eoc_current);
 #endif
 /* TN End modified by xinjun.lu/860715 20240809 CR/EKLAMU-202 */
+
+/* TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+	if (of_find_property(np, "ffc-batt-zone", &byte_len)) {
+		if ((byte_len / sizeof(u32)) % 3) {
+			chr_err("%s: DT error wrong ffc bat zones\n", __func__);
+		}
+
+		info->ffc_zones = (struct ffc_bat_zone *)devm_kzalloc(dev, byte_len, GFP_KERNEL);
+
+		info->num_ffc_zones = byte_len / sizeof(struct ffc_bat_zone);
+
+		if (IS_ERR_OR_NULL(info->ffc_zones))
+			chr_err("%s: invalid num_ffc_zones!\n", __func__);
+
+		rc = of_property_read_u32_array(np, "ffc-batt-zone",
+					(u32 *)info->ffc_zones, byte_len / sizeof(u32));
+		if (rc < 0) {
+			chr_err("%s: Couldn't read ffc zones rc(%d)\n", __func__, rc);
+		}
+
+		for (i = 0; i < info->num_ffc_zones; i++) {
+			chr_info("%s: FFC Zone:%d, Temp:%d, Volt:%d, Ich:%d", __func__, i,
+					info->ffc_zones[i].temp,
+					info->ffc_zones[i].ffc_max_mv,
+					info->ffc_zones[i].ffc_chg_iterm);
+		}
+	} else
+		info->ffc_zones = NULL;
+#endif /* CONFIG_OEM_TURBO_CHARGER */
+/* TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 
 	/*	dual parallel battery*/
 	np = of_parse_phandle(dev->of_node, "current-selector", 0);

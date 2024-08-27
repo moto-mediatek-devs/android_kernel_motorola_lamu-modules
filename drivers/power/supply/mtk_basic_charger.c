@@ -235,27 +235,6 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		is_basic = true;
 
 	} else if (info->chr_type == POWER_SUPPLY_TYPE_USB_DCP) {
-/*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
-		if (!is_turbo_charger_ready) {
-			pdata->input_current_limit =
-				info->data.ac_charger_input_current;
-			pdata->charging_current_limit =
-				info->data.ac_charger_current;
-			if (info->config == DUAL_CHARGERS_IN_SERIES) {
-				pdata2->input_current_limit =
-					pdata->input_current_limit;
-				pdata2->charging_current_limit = 2000000;
-			}
-		} else {
-			chr_info("%s: turbo charger is working, limit the switch charger current\n", __func__);
-			pdata->input_current_limit = 500000;  // mA
-			pdata->charging_current_limit = 500000;  // mA
-		}
-
-		if (ffc_batt_full == true)
-			pdata->charging_current_limit = 100000; // mA
-#else
 		pdata->input_current_limit =
 			info->data.ac_charger_input_current;
 		pdata->charging_current_limit =
@@ -265,8 +244,6 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 				pdata->input_current_limit;
 			pdata2->charging_current_limit = 2000000;
 		}
-#endif /* CONFIG_OEM_TURBO_CHARGER */
-/*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 	} else if (info->chr_type == POWER_SUPPLY_TYPE_USB &&
 	    info->usb_type == POWER_SUPPLY_USB_TYPE_DCP) {
 		/* NONSTANDARD_CHARGER */
@@ -275,7 +252,7 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		pdata->charging_current_limit =
 			info->data.usb_charger_current;
 		is_basic = true;
-/* TN Begin modified by hao.jia/809321 20240729 CR/EKLAMU-202 */
+/* TN Begin modified by hao.jia/809321 20240823 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	} else if (info->chr_type == POWER_SUPPLY_TYPE_USB_QC3) {
 		/* QC3.0 Charger */
@@ -286,8 +263,24 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		pdata->charging_current_limit =
 			info->data.hvdcp_charging_current_limit;
 		is_basic = true;
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+	} else if (info->chr_type == POWER_SUPPLY_TYPE_USB_QC3P) {
+		/* QC3+ Charger */
+		if (is_turbo_charger_ready) {
+			chr_info("%s: turbo charge, limit input and charging current to 100mA\n", __func__);
+			pdata->input_current_limit = 100000;  // mA
+			pdata->charging_current_limit = 100000;  // mA
+		} else {
+			chr_info("%s: from turbo charge to basic charge, limit input and charging current to 2000mA\n", __func__);
+			pdata->input_current_limit = 2200000;  // mA
+			pdata->charging_current_limit = 2000000;  // mA
+		}
+
+		if (ffc_batt_full == true)
+			pdata->charging_current_limit = 100000; // mA
+#endif /* CONFIG_OEM_TURBO_CHARGER */
 #endif /* CONFIG_OEM_TINNO_CHARGER */
-/* TN End modified by hao.jia/809321 20240729 CR/EKLAMU-202 */
+/* TN End modified by hao.jia/809321 20240823 CR/EKLAMU-202 */
 	} else {
 		/*chr_type && usb_type cannot match above, set 500mA*/
 		pdata->input_current_limit =
@@ -365,7 +358,7 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 
 /* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
-	pdata->charging_current_limit = ((info->pe50.target_fcc < 0) ? 0 : info->pe50.target_fcc);
+	//pdata->charging_current_limit = ((info->pe50.target_fcc < 0) ? 0 : info->pe50.target_fcc);
 	chr_err("min_charging_current is too low, info->pe50.target_fcc %d %d\n",
 		pdata->charging_current_limit, info->pe50.target_fcc );
 	info->pe50.target_usb = pdata->input_current_limit;

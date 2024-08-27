@@ -1124,6 +1124,24 @@ static int cps2011s_enable_adc(struct cps2011s_chip *chip, bool enable)
 	return ret;
 }
 
+static int cps2011s_get_adc_enabled(struct cps2011s_chip *chip, bool *enable)
+{
+	int ret = 0;
+	u8 reg_val = 0;
+
+	ret = cps2011s_i2c_read8(chip, cps2011s_REG_ADCCTRL, &reg_val);
+	if (ret < 0) {
+		dev_err(chip->dev, "%s failed(%d)\n", __func__, ret);
+	} else {
+		*enable = !!reg_val;
+	}
+
+	dev_info(chip->dev, "%s: %d", __func__, *enable);
+
+	return ret;
+}
+
+
 static int cps2011s_enable_comparators(struct cps2011s_chip *chip, bool enable)
 {
 	int ret = 0;
@@ -1155,6 +1173,16 @@ static int mtk_cps2011s_enable_adc(struct charger_device *chg_dev, bool enable)
 
 	ret = cps2011s_enable_adc(chip, enable);
 	ret = cps2011s_enable_comparators(chip, enable);
+
+	return ret;
+}
+
+static int mtk_cps2011s_is_adc_enabled(struct charger_device *chg_dev, bool *enable)
+{
+	struct cps2011s_chip *chip = charger_get_data(chg_dev);
+	int ret = 0;
+
+	ret = cps2011s_get_adc_enabled(chip, enable);
 
 	return ret;
 }
@@ -1790,6 +1818,8 @@ static const struct charger_ops cps2011s_chg_ops = {
 	//.enable_wdt = cps2011s_enable_wdt,
 #if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
 	.enable_ovpgate = cps2011s_enable_ovpgate,
+	.enable_adc = mtk_cps2011s_enable_adc,
+	.is_adc_enabled = mtk_cps2011s_is_adc_enabled,
 #endif /* CONFIG_OEM_CHARGER_PUMP */
 /////////////////////////////////////////////////////////////
 	.set_vbatovp_alarm = cps2011s_set_vbatovp_alarm,
@@ -1802,9 +1832,6 @@ static const struct charger_ops cps2011s_chg_ops = {
 	.is_vbat_present = mtk_cps2011s_is_vbat_present,
 	.is_vbus_present = mtk_cps2011s_is_vbus_present,
 #endif /* CONFIG_OEM_TURBO_CHARGER */
-#if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
-	.enable_adc = mtk_cps2011s_enable_adc,
-#endif /* CONFIG_OEM_CHARGER_PUMP */
 	.is_vbuslowerr = cps2011s_is_vbuslowerr,
 	.get_adc_accuracy = cps2011s_get_adc_accuracy,
 };

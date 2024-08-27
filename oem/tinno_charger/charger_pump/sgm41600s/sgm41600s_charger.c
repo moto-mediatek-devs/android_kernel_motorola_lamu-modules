@@ -906,6 +906,23 @@ static int sgm41600_is_vbus_present(struct sgm41600_chip *sgm, bool *present)
 }
 #endif /* CONFIG_OEM_TURBO_CHARGER */
 
+static int sgm41600_get_adc_enabld(struct sgm41600_chip *sgm, bool *enable)
+{
+	int ret;
+	int val;
+
+	ret = sgm41600_field_read(sgm, ADC_EN, &val);
+	if (ret < 0) {
+		return ret;
+	}
+
+	SGM_INFO("%d", val);
+
+	*enable = (bool)val;
+
+	return ret;
+}
+
 #if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
 static int mtk_sgm41600_enable_adc(struct charger_device *chg_dev, bool enable)
 {
@@ -915,6 +932,17 @@ static int mtk_sgm41600_enable_adc(struct charger_device *chg_dev, bool enable)
 	SGM_INFO("%d", enable);
 
 	ret = sgm41600_enable_adc(sgm, enable);
+	return ret;
+}
+
+static int mtk_sgm41600_is_adc_enabled(struct charger_device *chg_dev, bool *enable)
+{
+	int ret;
+	struct sgm41600_chip *sgm = charger_get_data(chg_dev);
+
+	SGM_INFO("enter");
+
+	ret = sgm41600_get_adc_enabld(sgm, enable);
 	return ret;
 }
 #endif /* CONFIG_OEM_CHARGER_PUMP */
@@ -1203,6 +1231,7 @@ static const struct charger_ops sgm41600_chg_ops = {
 #endif /* CONFIG_OEM_TURBO_CHARGER */
 #if IS_ENABLED(CONFIG_OEM_CHARGER_PUMP)
 	.enable_adc = mtk_sgm41600_enable_adc,
+	.is_adc_enabled = mtk_sgm41600_is_adc_enabled,
 #endif /* CONFIG_OEM_CHARGER_PUMP */
 
 };

@@ -34,8 +34,8 @@
 #define DEFAULT_STEP_FIRST_CURR_COMP			0
 #define DEFAULT_TEMP_ZONES_NUM				6
 #define DEFAULT_THERMAL_MIN_LEVEL			1500000
-#define DEFAULT_CHARGING_CURR_MIN			1500000
-#define DEFAULT_SW_CURR_LIMITED				500000
+#define DEFAULT_CHARGING_CURR_MIN			2000000
+#define DEFAULT_SW_CURR_LIMITED				100000
 #define DEFAULT_TURBO_VOLT_COMP				200000
 #define THERMAL_NOT_LIMIT				-1
 #define THERMAL_TUNNING_CURR				40000
@@ -74,19 +74,19 @@ extern int turbo_charger_get_log_level(void);
 #define TURBO_CHARGER_DBG(fmt, ...) \
 	do { \
 		if (turbo_charger_get_log_level() >= TURBO_CHARGER_DBG_LEVEL) \
-			pr_info("[TURBO_CHARGER]%s " fmt, __func__, ##__VA_ARGS__); \
+			pr_info("[TURBO_CHARGER]%s: " fmt, __func__, ##__VA_ARGS__); \
 	} while (0)
 
 #define TURBO_CHARGER_INFO(fmt, ...) \
 	do { \
 		if (turbo_charger_get_log_level() >= TURBO_CHARGER_INFO_LEVEL) \
-			pr_info("[TURBO_CHARGER]%s " fmt, __func__, ##__VA_ARGS__); \
+			pr_info("[TURBO_CHARGER]%s: " fmt, __func__, ##__VA_ARGS__); \
 	} while (0)
 
 #define TURBO_CHARGER_ERR(fmt, ...) \
 	do { \
 		if (turbo_charger_get_log_level() >= TURBO_CHARGER_ERR_LEVEL) \
-			pr_info("[TURBO_CHARGER]%s " fmt, __func__, ##__VA_ARGS__); \
+			pr_info("[TURBO_CHARGER]%s: " fmt, __func__, ##__VA_ARGS__); \
 	} while (0)
 
 struct turbo_charger_config {
@@ -116,6 +116,7 @@ struct sw_device {
 
 struct cp_device {
 	bool	charge_enabled;
+	bool    adc_enabled;
 
 	bool	batt_pres;
 	bool	vbus_pres;
@@ -250,7 +251,6 @@ struct turbo_charger_algo_info {
 	u32				batt_curr_boost;
 	u32				batt_ovp_limit;
 	u32				step_first_current_comp;
-	u32				not_rerun_aicl;
 	bool				turbo_charger_cc_loop_stage;
 	int				pl_chrg_vbatt_min;
 	u32				thermal_min_level;
@@ -283,10 +283,7 @@ struct turbo_charger_algo_info {
 	struct	delayed_work		turbo_charger_work;
 	struct	mutex			turbo_charger_lock;
 	struct	notifier_block		reboot_notifier;
-	bool				usb_changed;
-	/*TN Begin modify vbus ovp by rongxing.li/860682 20231208 CR/EKFOGO4G-8986*/
 	int				total_count;
-	/*TN End modify vbus ovp by rongxing.li/860682 20231208 CR/EKFOGO4G-8986*/
 	bool			qc_phy_z350;
 	bool			qc_phy_wt6670f;
 };
