@@ -316,7 +316,7 @@ static int td4376_unprepare(struct drm_panel *panel)
 	ctx->prepared = false;
 
 	pr_info("%s ennnter +\n", __func__);
-	return 0;
+	// return 0;
 
 #ifdef TINNO_LCM_OEM_CONFIG
 	if(td4376_gesture_mode) {
@@ -439,7 +439,7 @@ static int td4376_prepare(struct drm_panel *panel)
 	gpiod_set_value(ctx->reset_gpio, 0);
 	udelay(5 * 1000);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
-
+#endif
 #if defined(CONFIG_RT5081_PMU_DSV) || defined(CONFIG_MT6370_PMU_DSV)
 	td4376_panel_bias_enable();
 #else
@@ -464,7 +464,6 @@ static int td4376_prepare(struct drm_panel *panel)
 	}
 	gpiod_set_value(ctx->bias_neg, 1);
 	devm_gpiod_put(ctx->dev, ctx->bias_neg);
-#endif
 #endif
 
 	udelay(10000);
