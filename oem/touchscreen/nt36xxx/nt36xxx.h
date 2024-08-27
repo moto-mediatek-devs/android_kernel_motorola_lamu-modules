@@ -169,7 +169,7 @@ extern char mp_firmware_name[50];
 #define	CMD_ENTER_COMMON_USB_PLUGIN		0x53
 
 //---ESD Protect.---
-#define NVT_TOUCH_ESD_PROTECT 0
+#define NVT_TOUCH_ESD_PROTECT 1
 #define NVT_TOUCH_ESD_CHECK_PERIOD 1500	/* ms */
 #define NVT_TOUCH_WDT_RECOVERY 1
 
@@ -321,7 +321,9 @@ typedef enum {
 //---extern structures---
 extern struct nvt_ts_data *ts;
 extern struct proc_dir_entry *touch_info_dir;
-
+#if NVT_TOUCH_ESD_PROTECT
+extern struct delayed_work nvt_esd_check_work;
+#endif
 //---extern functions---
 int32_t CTP_SPI_READ(struct spi_device *client, uint8_t *buf, uint16_t len);
 int32_t CTP_SPI_WRITE(struct spi_device *client, uint8_t *buf, uint16_t len);
