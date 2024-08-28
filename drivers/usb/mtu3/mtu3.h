@@ -69,6 +69,8 @@ struct mtu3_request;
 
 #define DP_SWITCH_MSK 1
 
+#define U2_LPM_LOCK_TIMEOUT 500
+
 /**
  * IP TRUNK version
  * from 0x1003 version, USB3 Gen2 is supported, two changes affect driver:
@@ -164,6 +166,12 @@ enum mtu3_power_state {
 	MTU3_STATE_SUSPEND,
 	MTU3_STATE_RESUME,
 	MTU3_STATE_OFFLOAD,
+};
+
+enum mtu3_u2_lpm_mode {
+	MTU3_U2_LPM_DEFAULT = 0,
+	MTU3_U2_LPM_REJECT,
+	MTU3_U2_LPM_ACCEPT,
 };
 
 enum mtu3_plat_type {
@@ -377,7 +385,9 @@ struct ssusb_mtk {
 	bool smc_req;
 	bool host_dev;
 	bool is_suspended;
-	enum usb_device_speed host_dev_speed;
+	bool ls_slp_quirk;
+	bool ldm_resp_delay;
+	int ls_slp_bypass;
 };
 
 /**
@@ -485,6 +495,8 @@ struct mtu3 {
 
 	unsigned u3_lpm:1;
 	unsigned u3_u1gou2:1;
+	enum mtu3_u2_lpm_mode u2_lpm_reject;
+	struct timer_list lpm_timer;
 
 	const char *usb_psy_name;
 	struct power_supply *usb_psy;
@@ -567,9 +579,11 @@ void ssusb_set_ux_exit_lfps(struct ssusb_mtk *ssusb);
 void ssusb_set_polling_scdlfps_time(struct ssusb_mtk *ssusb);
 void ssusb_set_txdeemph(struct ssusb_mtk *ssusb);
 void ssusb_set_noise_still_tr(struct ssusb_mtk *ssusb);
+void ssusb_set_ldm_resp_delay(struct ssusb_mtk *ssusb);
 void ssusb_vsvoter_set(struct ssusb_mtk *ssusb);
 void ssusb_vsvoter_clr(struct ssusb_mtk *ssusb);
-enum usb_device_speed ssusb_host_get_speed(struct ssusb_mtk *ssusb);
+void ssusb_set_host_low_speed_bypass(struct ssusb_mtk *ssusb);
+void ssusb_clear_host_low_speed_bypass(struct ssusb_mtk *ssusb);
 struct usb_request *mtu3_alloc_request(struct usb_ep *ep, gfp_t gfp_flags);
 void mtu3_free_request(struct usb_ep *ep, struct usb_request *req);
 void mtu3_req_complete(struct mtu3_ep *mep,
@@ -594,6 +608,7 @@ void mtu3_gadget_disconnect(struct mtu3 *mtu);
 
 int mtu3_gadget_vbus_draw(struct usb_gadget *g, unsigned int mA);
 int mtu3_is_usb_pd(struct mtu3 *mtu);
+void mtu3_gadget_u2_lpm_lock(struct mtu3 *mtu, unsigned int timeout_ms);
 
 int mtu3_device_enable(struct mtu3 *mtu);
 void mtu3_device_disable(struct mtu3 *mtu);

@@ -67,6 +67,7 @@ mediatek-drm-y := mtk_drm_drv.o \
 		  mtk_disp_ovl_blender.o \
 		  mtk_disp_ovl_outproc.o \
 		  mtk_disp_vdisp_ao.o \
+		  mtk_disp_splitter.o \
 
 #ccflags-y += -DDRM_CMDQ_DISABLE
 #mediatek-drm-y += mtk_cmdq_dummy.o
@@ -117,8 +118,11 @@ endif
 
 ifeq ($(CONFIG_DRM_MEDIATEK_EDPTX_AUTO_SUPPORT), m)
 mediatek-drm-y += mtk_drm_edp/mtk_dvo.o
-mediatek-drm-y += mtk_drm_edp/mtk_drm_edp_phy.o
-obj-$(CONFIG_DRM_MEDIATEK_EDPTX_AUTO_SUPPORT) += mtk_drm_edp/mtk_drm_edp.o
+mtk-drm-edp-y += mtk_drm_edp/mtk_drm_edp_phy.o
+mtk-drm-edp-y += mtk_drm_edp/mtk_drm_edp.o
+obj-$(CONFIG_DRM_MEDIATEK_EDPTX_AUTO_SUPPORT) += mtk-drm-edp.o
+#ccflags-y += -DEDPTX_DEBUG
+#ccflags-y += -DEDPTX_ANDROID_SUPPORT
 endif
 
 ifneq ($(findstring $(CONFIG_DRM_MEDIATEK_CEC), y m),)
@@ -204,6 +208,10 @@ ccflags-y += -DSHARE_WROT_SRAM
 endif
 
 ccflags-$(CONFIG_MTK_CMDQ_MBOX_EXT) += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/cmdq/mailbox
+
+ifneq ($(filter y m, $(CONFIG_MTK_LCM_PHYSICAL_ROTATION_HW)),)
+ccflags-y += -DMTK_LCM_PHYSICAL_ROTATION_HW
+endif
 
 #ccflags-y += -DDRM_MMPATH
 #ccflags-y += -DNOT_SUPPORT_CABC_HW

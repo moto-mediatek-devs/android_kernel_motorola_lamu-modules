@@ -56,11 +56,20 @@ uint32_t audio_get_dsp_id(const uint8_t task)
 	case TASK_SCENE_MUSIC:
 	case TASK_SCENE_FAST:
 	case TASK_SCENE_SPATIALIZER:
+	case TASK_SCENE_DYNAMIC:
 #if !IS_ENABLED(CONFIG_SND_SOC_MTK_AUTO_AUDIO_DSP)
 	case TASK_SCENE_FM_ADSP:
 #endif
 	case TASK_SCENE_BLECALLDL:
+		dsp_id = AUDIO_OPENDSP_USE_HIFI3_A;
+		break;
 	case TASK_SCENE_VOIP:
+#if IS_ENABLED(CONFIG_ADSP_VOIP_LEGACY)
+		dsp_id = AUDIO_OPENDSP_USE_HIFI3_B;
+#else
+		dsp_id = AUDIO_OPENDSP_USE_HIFI3_A;
+#endif
+		break;
 	case TASK_SCENE_ECHO_REF_DL:
 	case TASK_SCENE_USB_DL:
 	case TASK_SCENE_USB_UL:

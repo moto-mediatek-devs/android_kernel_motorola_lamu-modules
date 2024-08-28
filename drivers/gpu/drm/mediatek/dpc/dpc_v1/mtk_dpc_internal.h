@@ -268,6 +268,8 @@ extern int mtk_dprec_logger_pr(unsigned int type, char *fmt, ...);
 #define DPC_MMINFRA_OFF_MML_MASK                         BIT(6)
 #define DPC_INFRA_OFF_MML_MASK                           BIT(7)
 
+#define DPC_DT_MML_SKIP_RDONE                            BIT(4)
+
 #define VOTE_SET 1
 #define VOTE_CLR 0
 
@@ -388,6 +390,13 @@ enum mtk_dpc_state {
 	DPC_STATE_OFF,
 };
 
+struct mtk_dpc_pm_user {
+	char name[128];
+	int count;
+	int max;
+	bool valid;
+};
+
 struct mtk_dpc_dt_usage {
 	s16 index;
 	enum mtk_dpc_sp_type sp;		/* start point */
@@ -408,6 +417,7 @@ struct mtk_dpc {
 	struct device *dev;
 	struct device *pd_dev;
 	struct notifier_block pm_nb;
+	struct notifier_block vcp_nb;
 	int disp_irq;
 	int mml_irq;
 	unsigned int vidle_mask;
@@ -417,6 +427,7 @@ struct mtk_dpc {
 	void __iomem *sys_va[DPC_SYS_REGS_CNT];
 	struct cmdq_client *cmdq_client;
 	atomic_t dpc_en_cnt;
+	atomic_t vcp_is_alive;
 	bool skip_force_power;
 	spinlock_t skip_force_power_lock;
 	wait_queue_head_t dpc_state_wq;
@@ -437,6 +448,7 @@ struct mtk_dpc {
 	unsigned int mmdvfs_settings_count;
 	unsigned int *mmdvfs_settings_addr;
 	unsigned int mtcmos_mask;
+	unsigned int skip_rdone;
 	unsigned int (*get_sys_status)(enum dpc_sys_status_id, unsigned int *status);
 };
 

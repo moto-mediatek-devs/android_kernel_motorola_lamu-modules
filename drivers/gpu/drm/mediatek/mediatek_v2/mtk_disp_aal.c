@@ -1409,6 +1409,12 @@ static void disp_aal_sof_handle_by_cpu(struct mtk_ddp_comp *comp)
 	AALIRQ_LOG("[SRAM] dre_config(%d) in SOF\n",
 			atomic_read(&aal_data->dre_config));
 	pm_ret = mtk_vidle_pq_power_get(__func__);
+	if (pm_ret < 0) {
+		CRTC_MMP_EVENT_END(0, aal_sof_thread, 0, 0xe);
+		mtk_drm_trace_end();
+		AALERR("pm get error %d\n",pm_ret);
+		return;
+	}
 	mutex_lock(&aal_data->primary_data->clk_lock);
 	first_frame = atomic_read(&aal_data->first_frame);
 	if (atomic_read(&aal_data->is_clock_on) != 1) {
@@ -2391,6 +2397,9 @@ static int disp_aal_set_clarity_reg(struct mtk_ddp_comp *comp,
 static int disp_aal_act_eventctl(struct mtk_ddp_comp *comp, void *data)
 {
 	struct mtk_disp_aal *aal_data = comp_to_aal(comp);
+	struct mtk_drm_crtc *mtk_crtc = comp->mtk_crtc;
+	struct drm_crtc *crtc = &mtk_crtc->base;
+	struct mtk_drm_private *priv = crtc->dev->dev_private;
 	int ret = 0;
 	unsigned int events = *(unsigned int *)data;
 	int enable = !!(events & AAL_EVENT_EN);
@@ -2401,14 +2410,20 @@ static int disp_aal_act_eventctl(struct mtk_ddp_comp *comp, void *data)
 	AALFLOW_LOG("0x%x\n", events);
 	CRTC_MMP_MARK(0, aal_event_ctl, events, 0);
 	delay_trigger = atomic_read(&aal_data->primary_data->force_delay_check_trig);
-	if (enable)
-		mtk_crtc_check_trigger(comp->mtk_crtc, delay_trigger, true);
+	if (priv->data->mmsys_id == MMSYS_MT6768 || priv->data->mmsys_id == MMSYS_MT6761) {
+		if(enable && (enable != aal_data->primary_data->pre_enable))
+			mtk_crtc_check_trigger(comp->mtk_crtc, delay_trigger, true);
+	} else {
+		if(enable)
+			mtk_crtc_check_trigger(comp->mtk_crtc, delay_trigger, true);
+	}
 
 #if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
 	disp_aal_set_interrupt(comp, enable, NULL);
 #endif
 
 	atomic_set(&aal_data->primary_data->event_en, enable);
+	aal_data->primary_data->pre_enable = enable;
 
 	if (bypass) {
 		disp_aal_relay_control(comp, true);
@@ -3107,6 +3122,7 @@ static void disp_aal_primary_data_init(struct mtk_ddp_comp *comp)
 	aal_data->primary_data->ess_en_cmd_id = 0;
 	aal_data->primary_data->led_type = TYPE_FILE;
 	aal_data->primary_data->relay_state = 0x0 << PQ_FEATURE_DEFAULT;
+	aal_data->primary_data->pre_enable = 0;
 
 #ifdef CONFIG_LEDS_BRIGHTNESS_CHANGED
 	if (comp->id == DDP_COMPONENT_AAL0)

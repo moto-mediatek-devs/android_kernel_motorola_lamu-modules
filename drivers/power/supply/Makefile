@@ -9,6 +9,8 @@ subdir-ccflags-y += -Wno-unused-but-set-variable
 
 ifeq ($(CONFIG_CHARGER_SGM41516D),m)
 obj-$(CONFIG_CHARGER_SGM41516D) += mtk_charger_framework.o charger_class.o adapter_class.o mtk_charger_algorithm_class.o mtk_ufcs_adapter.o sgm41516d.o mtk_chg_det.o
+else ifeq ($(CONFIG_CHARGER_BQ25601),m)
+obj-$(CONFIG_CHARGER_BQ25601) += mtk_charger_framework.o charger_class.o adapter_class.o mtk_charger_algorithm_class.o mtk_ufcs_adapter.o
 else
 obj-$(CONFIG_MTK_CHARGER) += mtk_charger_framework.o mtk_pd_charging.o charger_class.o adapter_class.o mtk_charger_algorithm_class.o mtk_pd_adapter.o mtk_ufcs_adapter.o
 endif
@@ -67,3 +69,4 @@ obj-$(CONFIG_CHARGER_RT9758)	+= rt9758-charger.o
 obj-$(CONFIG_UFCS_CLASS)	+= ufcs/
 
 obj-$(CONFIG_CHARGER_BQ2589X)	+= bq2589x_charger.o
+obj-$(CONFIG_CHARGER_BQ25601) += bq25601.o

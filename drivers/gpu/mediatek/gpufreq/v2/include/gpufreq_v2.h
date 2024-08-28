@@ -132,28 +132,31 @@ enum gpufreq_test_mode {
 };
 
 enum gpufreq_config_target {
-	CONFIG_TARGET_INVALID   = -1,
-	CONFIG_TEST_MODE        = 0,
-	CONFIG_STRESS_TEST      = 1,
-	CONFIG_MARGIN           = 2,
-	CONFIG_GPM1             = 3,
-	CONFIG_GPM3             = 4,
-	CONFIG_DFD              = 5,
-	CONFIG_IMAX_GPU         = 6,
-	CONFIG_IMAX_STACK       = 7,
-	CONFIG_IMAX_SRAM        = 8,
-	CONFIG_PMAX_STACK       = 9,
-	CONFIG_DYN_GPU          = 10,
-	CONFIG_DYN_STACK        = 11,
-	CONFIG_DYN_SRAM_GPU     = 12,
-	CONFIG_DYN_SRAM_STACK   = 13,
-	CONFIG_IPS              = 14,
-	CONFIG_FAKE_MTCMOS_CTRL = 15,
-	CONFIG_MCUETM_CLK       = 16,
-	CONFIG_PTP3             = 17,
-	CONFIG_MFG2_BEFORE_OFF  = 18,
-	CONFIG_DEVAPC_HANDLE    = 19,
-	CONFIG_GPU_PROFILING    = 20,
+	CONFIG_TARGET_INVALID        = -1,
+	CONFIG_TEST_MODE             = 0,
+	CONFIG_STRESS_TEST           = 1,
+	CONFIG_MARGIN                = 2,
+	CONFIG_GPM1                  = 3,
+	CONFIG_GPM3                  = 4,
+	CONFIG_DFD                   = 5,
+	CONFIG_IMAX_GPU              = 6,
+	CONFIG_IMAX_STACK            = 7,
+	CONFIG_IMAX_SRAM             = 8,
+	CONFIG_PMAX_STACK            = 9,
+	CONFIG_DYN_GPU               = 10,
+	CONFIG_DYN_STACK             = 11,
+	CONFIG_DYN_SRAM_GPU          = 12,
+	CONFIG_DYN_SRAM_STACK        = 13,
+	CONFIG_IPS                   = 14,
+	CONFIG_FAKE_MTCMOS_CTRL      = 15,
+	CONFIG_MCUETM_CLK            = 16,
+	CONFIG_PTP3                  = 17,
+	CONFIG_MFG2_BEFORE_OFF       = 18,
+	CONFIG_DEVAPC_HANDLE         = 19,
+	CONFIG_GPU_PROFILING         = 20,
+	CONFIG_AP_IMPL_BOUNDARY      = 100, /* implement on AP */
+	CONFIG_WB_TEST_ONCE          = 101,
+	CONFIG_WB_MFG1_SLAVE_STRESS  = 102,
 };
 
 enum gpufreq_config_value {
@@ -166,8 +169,10 @@ enum gpufreq_config_value {
 	STRESS_RANDOM      = 4,
 	STRESS_TRAVERSE    = 5,
 	STRESS_MAX_MIN     = 6,
-	PTP3_SAFE_MARGIN   = 7,
-	DATA_UPDATE        = 8,
+	STRESS_ASCENDING   = 7,
+	STRESS_DESCENDING  = 8,
+	PTP3_SAFE_MARGIN   = 9,
+	DATA_UPDATE        = 10,
 };
 
 enum gpufreq_chip_type {
@@ -425,8 +430,10 @@ struct gpufreq_preoc_info {
 };
 
 struct gpufreq_slt2_bmodel {
+	unsigned int vgpu_h1;
 	unsigned int vgpu_h;
 	unsigned int vgpu_l;
+	unsigned int vstack_h1;
 	unsigned int vstack_h;
 	unsigned int vstack_l;
 };
@@ -479,6 +486,8 @@ struct gpufreq_shared_status {
 	unsigned int lkg_ht_info_gpu;
 	unsigned int lkg_ht_info_stack;
 	unsigned int lkg_ht_info_sram;
+	unsigned int dac_low_vgpu;
+	unsigned int dac_low_vstack;
 	unsigned int cur_ceiling;
 	unsigned int cur_floor;
 	unsigned int cur_c_limiter;
@@ -498,6 +507,7 @@ struct gpufreq_shared_status {
 	unsigned int sb_version;
 	unsigned int ptp_version;
 	unsigned int dbg_version;
+	unsigned int kdbg_version;
 	unsigned int gpm1_mode;
 	unsigned int gpm3_mode;
 	unsigned int dfd_mode;
@@ -657,6 +667,7 @@ int gpufreq_get_oppidx_by_freq(enum gpufreq_target target, unsigned int freq);
 unsigned int gpufreq_get_leakage_power(enum gpufreq_target target, unsigned int volt);
 unsigned int gpufreq_get_dynamic_power(enum gpufreq_target target,
 	unsigned int freq, unsigned int volt);
+int gpufreq_get_cur_temperature(void);
 int gpufreq_set_limit(enum gpufreq_target target,
 	enum gpuppm_limiter limiter, int ceiling_info, int floor_info);
 int gpufreq_get_cur_limit_idx(enum gpufreq_target target,enum gpuppm_limit_type limit);

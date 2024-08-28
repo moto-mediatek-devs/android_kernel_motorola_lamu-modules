@@ -1046,6 +1046,9 @@ enum mtk_ddp_io_cmd {
 	DSI_LTPO_VDO_SET,
 	DSI_LTPO_VDO_UPDATE,
 	DSI_GET_PANEL_VBLANK_PERIOD_US,
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+	SET_CRTC_ID,
+#endif
 };
 
 enum mtk_ddp_comp_apsrc_crtc_id {
@@ -1232,6 +1235,7 @@ struct mtk_ddp_comp {
 	bool in_scaling_path;
 	struct mtk_ddp_comp *bind_comp;
 	int pm_ret;
+	u32 doze_bypass;
 };
 
 static inline void mtk_ddp_comp_config_overhead(struct mtk_ddp_comp *comp,

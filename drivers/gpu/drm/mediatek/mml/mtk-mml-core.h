@@ -199,7 +199,7 @@ extern int mml_trace;
 	mml_trace_begin_tid(current->tgid, fmt, ##args)
 
 #define mml_trace_end() \
-	mml_tracing_mark_write("E\n")
+	mml_tracing_mark_write("E|%d\n", current->tgid)
 
 #define mml_trace_c(tag, c) \
 	mml_tracing_mark_write("C|%d|%s|%d\n", current->tgid, tag, c)
@@ -679,6 +679,12 @@ enum mml_dump_buf_t {
 };
 #endif
 
+enum mml_adaptor_type {
+	MML_ADAPTOR_DRM,
+	MML_ADAPTOR_DLE,
+	MML_ADAPTOR_M2M,
+};
+
 struct mml_task {
 	struct list_head entry;
 	struct mml_job job;
@@ -689,6 +695,7 @@ struct mml_task {
 	struct timespec64 end_time;
 	struct dma_fence *fence;
 	enum mml_task_state state;
+	enum mml_adaptor_type adaptor_type;
 	struct kref ref;
 	struct mml_task_pipe pipe[MML_PIPE_CNT];
 	u32 wrot_crc_idx[MML_PIPE_CNT];
@@ -719,6 +726,7 @@ struct mml_task {
 	/* mml pq task */
 	struct mml_pq_task *pq_task;
 
+	bool done;
 	bool err;
 	bool dump_full;
 

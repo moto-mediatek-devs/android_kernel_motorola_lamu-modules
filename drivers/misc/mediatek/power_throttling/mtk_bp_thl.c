@@ -66,10 +66,11 @@ void register_bp_thl_notify(
 	}
 	bpcb_tb[prio_val].bpcb = bp_cb;
 	pr_info("[%s] prio_val=%d\n", __func__, prio_val);
-	if (bp_thl_data->bp_thl_lv == 1) {
-		pr_info("[%s] level 1 happen\n", __func__);
-		if (bp_cb != NULL)
-			bp_cb(BATTERY_PERCENT_LEVEL_1);
+
+	if (bp_thl_data->bp_thl_lv > BATTERY_PERCENT_LEVEL_0 &&
+		bp_thl_data->bp_thl_lv < BATTERY_PERCENT_LEVEL_NUM &&
+		bpcb_tb[prio_val].bpcb) {
+		bp_cb(bp_thl_data->bp_thl_lv);
 	}
 }
 EXPORT_SYMBOL(register_bp_thl_notify);
@@ -300,8 +301,8 @@ static void soc_handler(struct work_struct *work)
 	if (ret)
 		return;
 	temp = val.intval / 10;
-	if (soc > 100 || soc <= 0) {
-		pr_info("%s:%d return\n", __func__, __LINE__);
+	if (soc > 100 || soc < 0) {
+		pr_info("%s:%d soc:%d return\n", __func__, __LINE__, soc);
 		return;
 	}
 
@@ -478,12 +479,6 @@ static int parse_soc_limit_table(struct device *dev, struct bp_thl_priv *priv)
 		soc_default_setting(dev, priv);
 		goto out;
 	}
-#if SOC_DEBUG_LOG
-	pr_info("num=%d temp_max_s=%d soc_max_s=%d\n", num, priv->temp_max_stage, priv->soc_max_stage);
-	for (i = 0; i < num; i++)
-		pr_info("soc-throttle-level[%d]=%d\n", i, priv->throttle_table[i]);
-#endif
-
 out:
 	return 0;
 }

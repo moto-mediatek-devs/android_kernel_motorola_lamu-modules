@@ -29,6 +29,10 @@
 	#address-cells = <2>;
 	#size-cells = <2>;
 
+	mgm: mgm {
+		compatible = "arm,physical-memory-group-manager";
+	};
+
 aliases {
 		i2c0 = &i2c0;
 		i2c1 = &i2c1;
@@ -271,7 +275,7 @@ aliases {
 				<1>, /*MTK_DRM_OPT_ESD_CHECK_SWITCH*/
 				<1>, /*MTK_DRM_OPT_PRESENT_FENCE*/
 				<0>, /*MTK_DRM_OPT_RDMA_UNDERFLOW_AEE*/
-				<1>, /*MTK_DRM_OPT_DSI_UNDERRUN_AEE*/
+				<0>, /*MTK_DRM_OPT_DSI_UNDERRUN_AEE*/
 				<1>, /*MTK_DRM_OPT_HRT*/
 				<1>, /*MTK_DRM_OPT_HRT_MODE*/
 				<0>, /*MTK_DRM_OPT_DELAYED_TRIGGER*/
@@ -403,6 +407,7 @@ aliases {
 			reg = <0 0x1400f000 0 0x1000>;
 			interrupts = <GIC_SPI 233 IRQ_TYPE_LEVEL_HIGH 0>;
 			clocks = <&mmsys_config CLK_MM_DISP_COLOR0>;
+			doze-bypass = <1>;
 		};
 
 		disp_ccorr0: disp_ccorr0@14010000 {
@@ -416,6 +421,7 @@ aliases {
 			ccorr-linear-per-pipe = <0x01>;
 			ccorr-prim-force-linear = <0x0>;
 			ccorr-linear = <1>;
+			doze-bypass = <0x10001>;
 		};
 
 		disp_aal0: disp_aal0@14011000 {
@@ -426,6 +432,7 @@ aliases {
 			clocks = <&mmsys_config CLK_MM_DISP_AAL0>;
 			mtk-aal-support = <1>;
 			mtk-dre30-support = <0>;
+			doze-bypass = <0x10001>;
 		};
 
 		disp_gamma0: disp_gamma0@14012000 {
@@ -3728,6 +3735,7 @@ transparent_hugepage=never";
 	mali: mali@13040000 {
 		compatible = "mediatek,mali", "arm,mali-valhall";
 		reg = <0 0x13040000 0 0x4000>;
+		physical-memory-group-manager = <&mgm>;
 		interrupts =
 			<GIC_SPI 274 IRQ_TYPE_LEVEL_HIGH 0>,
 			<GIC_SPI 275 IRQ_TYPE_LEVEL_HIGH 0>,

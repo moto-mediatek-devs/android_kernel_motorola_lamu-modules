@@ -3193,11 +3193,16 @@ static void clear_layer(struct drm_mtk_layering_info *disp_info,
 
 		if (mtk_has_layer_cap(c, MTK_DISP_CLIENT_CLEAR_LAYER)) {
 			*scn_decision_flag |= SCN_CLEAR;
-			if ((*scn_decision_flag & SCN_IDLE)) {
+			DDPMSG("%s add hrt weight\n", __func__);
+			if (priv->data->need_emi_eff)
+				disp_info->hrt_weight += (400 * 10000) / default_emi_eff;
+			else
+				disp_info->hrt_weight += 400;
+			if ((di == 0) && get_layering_opt(LYE_OPT_OVL_BW_MONITOR)) {
 				if (priv->data->need_emi_eff)
-					disp_info->hrt_weight += (400 * 10000) / default_emi_eff;
+					sum_overlap_w_of_bwm += (400 * 10000) / default_emi_eff;
 				else
-					disp_info->hrt_weight += 400;
+					sum_overlap_w_of_bwm += 400;
 			}
 		}
 
@@ -3348,7 +3353,11 @@ static int _dispatch_lye_blob_idx(struct drm_mtk_layering_info *disp_info,
 		if ((priv->data->mmsys_id == MMSYS_MT6768 ||
 			priv->data->mmsys_id == MMSYS_MT6765 ||
 			priv->data->mmsys_id == MMSYS_MT6761 ||
-			priv->data->mmsys_id == MMSYS_MT6877) &&
+			priv->data->mmsys_id == MMSYS_MT6877 ||
+			priv->data->mmsys_id == MMSYS_MT6781 ||
+			priv->data->mmsys_id == MMSYS_MT6833 ||
+			priv->data->mmsys_id == MMSYS_MT6853 ||
+			priv->data->mmsys_id == MMSYS_MT6885) &&
 			mtk_has_layer_cap(layer_info, MTK_DISP_RSZ_LAYER) &&
 			comp_state.comp_id != DDP_COMPONENT_OVL0_2L &&
 			comp_state.comp_id != DDP_COMPONENT_OVL1_2L) {
@@ -3407,7 +3416,7 @@ static int _dispatch_lye_blob_idx(struct drm_mtk_layering_info *disp_info,
 				} else {
 					/* for both IR and DL */
 					layer_info->layer_caps &= ~DISP_MML_CAPS_MASK;
-					layer_info->layer_caps |= MTK_MML_DISP_MDP_LAYER;
+					layer_info->layer_caps |= query_transition_mode(mml_decouple2);
 					disp_info->disp_caps[disp_idx] |= MTK_NEED_REPAINT;
 				}
 			}
@@ -3427,7 +3436,7 @@ static int _dispatch_lye_blob_idx(struct drm_mtk_layering_info *disp_info,
 			if ((comp_state.comp_id != last_comp) || (comp_state.lye_id != last_lye)) {
 				DDPMSG("MML IR layer changed\n");
 				layer_info->layer_caps &= ~DISP_MML_CAPS_MASK;
-				layer_info->layer_caps |= MTK_MML_DISP_MDP_LAYER;
+				layer_info->layer_caps |= query_transition_mode(mml_decouple2);
 				disp_info->disp_caps[disp_idx] |= MTK_NEED_REPAINT;
 			}
 		}
@@ -4193,7 +4202,8 @@ static int RPO_rule(struct drm_crtc *crtc,
 
 		if (mtk_has_layer_cap(c, MTK_MDP_RSZ_LAYER) &&
 			(private->data->mmsys_id != MMSYS_MT6897)
-			&& (private->data->mmsys_id != MMSYS_MT6991))
+			&& (private->data->mmsys_id != MMSYS_MT6991)
+			&& (private->data->mmsys_id != MMSYS_MT6899))
 			continue;
 
 		if (scale_cnt >= l_rule_info->rpo_scale_num)
@@ -4392,6 +4402,7 @@ static void check_is_mml_layer(const int disp_idx,
 	unsigned int mml_duration = 0, fps = 0;
 	int mml_multi_layer = 0;
 	int mml_decouple2 = 0;
+	struct drm_display_mode *mode = NULL;
 
 	mml_decouple2 = (mtk_drm_get_mml_mode_caps() & MTK_MML_DISP_DECOUPLE2_LAYER?1:0);
 	mml_multi_layer =  (mtk_drm_get_mml_hw_caps() & MML_HW_MULTI_LAYER?1:0);
@@ -4464,7 +4475,9 @@ static void check_is_mml_layer(const int disp_idx,
 	}
 
 	if (priv->data->skip_trans && !bypass_skip_trans) {
-		fps = drm_mode_vrefresh(&crtc->state->adjusted_mode);
+		mode = mtk_drm_crtc_avail_disp_mode(crtc, disp_info->disp_mode_idx[0]);
+		//fps = drm_mode_vrefresh(&crtc->state->adjusted_mode);
+		fps = drm_mode_vrefresh(mode);
 		if (fps == 0) {
 			DDPPR_ERR("%s invalid vrefresh %u\n", __func__, fps);
 			fps = 60;

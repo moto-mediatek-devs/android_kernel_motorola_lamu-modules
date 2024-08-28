@@ -369,6 +369,7 @@ void mtk_smi_common_ostdl_set(struct device *dev, const u32 port, bool is_write,
 	if (val) {
 		if (is_other_ostd_existed(orig_val, !is_write))
 			write_val |= BIT(OSTDL_EN);
+		write_val &= ~((MASK_7) << (is_write ? WR_LIMIT_LSB : RD_LIMIT_LSB));
 		write_val |= (val & MASK_7) << (is_write ? WR_LIMIT_LSB : RD_LIMIT_LSB);
 	} else {
 		write_val &= ~BIT(OSTDL_EN);
@@ -2411,9 +2412,9 @@ mtk_smi_larb_mt6899_default_bwl[MTK_LARB_NR_MAX][SMI_LARB_PORT_NR_MAX] = {
 	 0x1, 0x1,}, /* LARB19 */
 	{0x1, 0x1, 0x1, 0x1, 0x1, 0x1,}, /* LARB20 */
 	{0x1, 0x1, 0x1, 0x1, 0x1,}, /* LARB21 */
-	{0x12, 0x23, 0x1, 0x12, 0x1, 0x1, 0x1, 0x12, 0x1, 0x1,
+	{0x12, 0x23, 0x1, 0x12, 0x1, 0x1, 0x1, 0x12, 0x23, 0x1,
 	 0x6, 0x4, 0x12, 0x1, 0x4,}, /* LARB22 */
-	{0x12, 0x23, 0x1, 0x1, 0x1, 0x1, 0x1, 0x12, 0x1, 0x1,
+	{0x12, 0x23, 0x1, 0x1, 0x1, 0x1, 0x1, 0x12, 0x23, 0x1,
 	 0x1, 0x4, 0x1, 0x1, 0x4,}, /* LARB23 */
 	{}, /* LARB24 */
 	{0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1,}, /* LARB25 */
@@ -2473,9 +2474,9 @@ mtk_smi_larb_mt6899_bwl[MTK_LARB_NR_MAX][SMI_LARB_PORT_NR_MAX] = {
 	 0x4, 0x1,}, /* LARB19 */
 	{0x10, 0x30, 0x10, 0x30, 0x10, 0x30,}, /* LARB20 */
 	{0x30, 0x30, 0x30, 0xa, 0xa,}, /* LARB21 */
-	{0x12, 0x23, 0x1, 0x12, 0x1, 0x1, 0x1, 0x12, 0x1, 0x1,
+	{0x12, 0x23, 0x1, 0x12, 0x1, 0x1, 0x1, 0x12, 0x23, 0x1,
 	 0x6, 0x4, 0x12, 0x1, 0x4,}, /* LARB22 */
-	{0x12, 0x23, 0x1, 0x1, 0x1, 0x1, 0x1, 0x12, 0x1, 0x1,
+	{0x12, 0x23, 0x1, 0x1, 0x1, 0x1, 0x1, 0x12, 0x23, 0x1,
 	 0x1, 0x4, 0x1, 0x1, 0x4,}, /* LARB23 */
 	{}, /* LARB24 */
 	{0x2, 0x8, 0x2, 0x8, 0x6, 0x6, 0x3, 0x3, 0x3, 0x1,}, /* LARB25 */
@@ -2696,17 +2697,28 @@ static struct mtk_smi_reg_pair
 mtk_smi_larb_mt6877_misc[MTK_LARB_NR_MAX][SMI_LARB_MISC_NR] = {
 	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},},
 	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},},
-	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},},
-	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},},
-	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},},
-	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},},
-	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},},
-	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},},
-	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},},
-	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},},
-	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},},
-	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},},
-	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},},
+	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},
+		{SMI_LARB_DISABLE_ULTRA, 0xffffffff},},
+	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},
+		{SMI_LARB_DISABLE_ULTRA, 0xffffffff},},
+	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},
+		{SMI_LARB_DISABLE_ULTRA, 0xffffffff},},
+	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},
+		{SMI_LARB_DISABLE_ULTRA, 0xffffffff},},
+	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},
+		{SMI_LARB_DISABLE_ULTRA, 0xffffffff},},
+	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},
+		{SMI_LARB_DISABLE_ULTRA, 0xffffffff},},
+	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},
+		{SMI_LARB_DISABLE_ULTRA, 0xffffffff},},
+	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},
+		{SMI_LARB_DISABLE_ULTRA, 0xffffffff},},
+	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},
+		{SMI_LARB_DISABLE_ULTRA, 0xffffffff},},
+	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},
+		{SMI_LARB_DISABLE_ULTRA, 0xffffffff},},
+	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},
+		{SMI_LARB_DISABLE_ULTRA, 0xffffffff},},
 	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},},
 	{{SMI_LARB_CMD_THRT_CON, 0x370256}, {SMI_LARB_SW_FLAG, 0x1},},
 	{{SMI_LARB_CMD_THRT_CON, 0x300256}, {SMI_LARB_SW_FLAG, 0x1},},
@@ -5025,7 +5037,7 @@ mtk_smi_common_mt6899_misc[MTK_COMMON_NR_MAX][SMI_COMMON_MISC_NR] = {
 	{{SMI_L1LEN, 0xb}, {SMI_BUS_SEL, 0x1101}, {SMI_M4U_TH, 0x6100610},
 	 {SMI_FIFO_TH1, 0x506090a}, {SMI_FIFO_TH2, 0x506090a}, {SMI_DCM, 0x4f1},
 	 {SMI_DUMMY, 0x1},}, /* COMM1 */
-	{{SMI_L1LEN, 0x2}, {SMI_BUS_SEL, 0x100}, {SMI_DCM, 0x4f1},
+	{{SMI_L1LEN, 0x2}, {SMI_BUS_SEL, 0x511}, {SMI_DCM, 0x4f1},
 	 {SMI_DUMMY, 0x1},}, /* COMM2 */
 	{{SMI_L1LEN, 0xa}, {SMI_PREULTRA_MASK1, 0x2105}, {SMI_DUMMY, 0x1},}, /* COMM3 */
 	{{SMI_L1LEN, 0xa}, {SMI_PREULTRA_MASK1, 0x2105}, {SMI_DUMMY, 0x1},}, /* COMM4 */
@@ -5038,7 +5050,7 @@ mtk_smi_common_mt6899_misc[MTK_COMMON_NR_MAX][SMI_COMMON_MISC_NR] = {
 	{{SMI_L1LEN, 0xa}, {SMI_PREULTRA_MASK1, 0x2105}, {SMI_DUMMY, 0x1},}, /* COMM11 */
 	{{SMI_L1LEN, 0xa}, {SMI_PREULTRA_MASK1, 0x2105}, {SMI_DUMMY, 0x1},}, /* COMM12 */
 	{{SMI_L1LEN, 0xa}, {SMI_PREULTRA_MASK1, 0x2105}, {SMI_DUMMY, 0x1},}, /* COMM13 */
-	{{SMI_L1LEN, 0xa}, {SMI_PREULTRA_MASK1, 0x2105}, {SMI_DUMMY, 0x1},}, /* COMM14 */
+	{{SMI_L1LEN, 0x2}, {SMI_PREULTRA_MASK1, 0x2105}, {SMI_DUMMY, 0x1},}, /* COMM14 */
 	{}, /* COMM15 */
 	{}, /* COMM16 */
 	{}, /* COMM17 */

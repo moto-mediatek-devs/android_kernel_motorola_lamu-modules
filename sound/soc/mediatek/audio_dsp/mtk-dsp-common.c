@@ -25,14 +25,14 @@
 //#define DEBUG_VERBOSE
 
 #include "mtk-sp-spk-amp.h"
-#if IS_ENABLED(CONFIG_MTK_SLBC)
+#if IS_ENABLED(CONFIG_MTK_SLBC) && !IS_ENABLED(CONFIG_ADSP_SLB_LEGACY)
 #include "slbc_ops.h"
 #endif
 
 static int adsp_standby_flag;
 static struct wait_queue_head waitq;
 
-#if IS_ENABLED(CONFIG_MTK_SLBC)
+#if IS_ENABLED(CONFIG_MTK_SLBC) && !IS_ENABLED(CONFIG_ADSP_SLB_LEGACY)
 static int slc_counter;
 #endif
 
@@ -67,6 +67,7 @@ static char *dsp_task_name[AUDIO_TASK_DAI_NUM] = {
 	[AUDIO_TASK_MDDL_ID]         = "mddl",
 	[AUDIO_TASK_MDUL_ID]         = "mdul",
 	[AUDIO_TASK_SPATIALIZER_ID]  = "spatializer",
+	[AUDIO_TASK_DYNAMIC_ID]      = "dynamic",
 	[AUDIO_TASK_CALLDL_ID]       = "calldl",
 	[AUDIO_TASK_CALLUL_ID]       = "callul",
 #if IS_ENABLED(CONFIG_MTK_ADSP_AUTO_HFP_CLIENT_SUPPORT)
@@ -133,6 +134,7 @@ static int dsp_task_scence[AUDIO_TASK_DAI_NUM] = {
 	[AUDIO_TASK_MDDL_ID]        = TASK_SCENE_MD_DL,
 	[AUDIO_TASK_MDUL_ID]        = TASK_SCENE_MD_UL,
 	[AUDIO_TASK_SPATIALIZER_ID] = TASK_SCENE_SPATIALIZER,
+	[AUDIO_TASK_DYNAMIC_ID]     = TASK_SCENE_DYNAMIC,
 	[AUDIO_TASK_CALLDL_ID]      = TASK_SCENE_PHONE_CALL_SUB,
 	[AUDIO_TASK_CALLUL_ID]      = TASK_SCENE_PHONE_CALL,
 #if IS_ENABLED(CONFIG_MTK_ADSP_AUTO_HFP_CLIENT_SUPPORT)
@@ -172,7 +174,7 @@ static int dsp_task_scence[AUDIO_TASK_DAI_NUM] = {
 #endif
 };
 
-#if IS_ENABLED(CONFIG_MTK_SLBC)
+#if IS_ENABLED(CONFIG_MTK_SLBC) && !IS_ENABLED(CONFIG_ADSP_SLB_LEGACY)
 static int adsp_gid = -1;
 static struct slbc_gid_data slbc_gid_adsp_data = {
 	.sign = 0x0,
@@ -219,7 +221,7 @@ void *get_dsp_base(void)
 }
 EXPORT_SYMBOL(get_dsp_base);
 
-#if IS_ENABLED(CONFIG_MTK_SLBC)
+#if IS_ENABLED(CONFIG_MTK_SLBC) && !IS_ENABLED(CONFIG_ADSP_SLB_LEGACY)
 void set_slc_counter(int cnt)
 {
 	if (cnt)

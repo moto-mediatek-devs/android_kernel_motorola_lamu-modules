@@ -73,6 +73,9 @@
 #define IF_ONE
 #endif
 
+#define HBM_BYPASS_PQ 0x10000
+#define DOZE_BYPASS_PQ 0x1
+
 /* TODO: BW report module should not hardcode */
 enum DISP_PMQOS_SLOT {
 	DISP_PMQOS_OVL0_BW = 0,
@@ -887,7 +890,7 @@ struct mtk_crtc_se_plane {
 	struct mtk_plane_state state;
 };
 
-#define MTK_FB_SE_NUM 2
+#define MTK_FB_SE_NUM 3
 
 enum DISP_SE_STATE {
 	DISP_SE_IDLE,
@@ -1089,13 +1092,19 @@ struct mtk_drm_crtc {
 	struct task_struct *trigger_event_task;
 	struct task_struct *trigger_delay_task;
 	struct task_struct *trig_cmdq_task;
+	struct task_struct *repaint_task;
 	atomic_t trig_event_act;
 	atomic_t trig_delay_act;
 	atomic_t delayed_trig;
 	atomic_t cmdq_trig;
+	atomic_t repaint_act;
 	wait_queue_head_t trigger_delay;
 	wait_queue_head_t trigger_event;
 	wait_queue_head_t trigger_cmdq;
+	wait_queue_head_t repaint_event;
+
+	atomic_t fence_change;
+	atomic_t mml_trigger;
 
 	unsigned int avail_modes_num;
 	struct drm_display_mode *avail_modes;
@@ -1246,6 +1255,8 @@ struct mtk_drm_crtc {
 	enum DISP_SE_STATE se_state;
 
 	bool is_plane0_updated;
+
+	struct mutex sol_lock;
 };
 
 enum BL_GAMMA_GAIN {
@@ -1391,7 +1402,7 @@ void mtk_crtc_restore_plane_setting(struct mtk_drm_crtc *mtk_crtc);
 bool mtk_crtc_set_status(struct drm_crtc *crtc, bool status);
 int mtk_crtc_attach_addon_path_comp(struct drm_crtc *crtc,
 	const struct mtk_addon_module_data *module_data, bool is_attach);
-void mtk_crtc_connect_addon_module(struct drm_crtc *crtc);
+void mtk_crtc_connect_addon_module(struct drm_crtc *crtc, bool skip_cwb);
 void mtk_crtc_disconnect_addon_module(struct drm_crtc *crtc);
 int mtk_crtc_gce_flush(struct drm_crtc *crtc, void *gce_cb, void *cb_data,
 			struct cmdq_pkt *cmdq_handle);
@@ -1488,7 +1499,7 @@ void _mtk_crtc_atmoic_addon_module_connect(
 				      struct drm_crtc *crtc,
 				      unsigned int ddp_mode,
 				      struct mtk_lye_ddp_state *lye_state,
-				      struct cmdq_pkt *cmdq_handle);
+				      struct cmdq_pkt *cmdq_handle, bool skip_cwb);
 void _mtk_crtc_atmoic_addon_module_disconnect(
 	struct drm_crtc *crtc, unsigned int ddp_mode,
 	struct mtk_lye_ddp_state *lye_state, struct cmdq_pkt *cmdq_handle);
@@ -1640,5 +1651,7 @@ void mtk_drm_crtc_exdma_path_setting_reset_without_cmdq(struct mtk_drm_crtc *mtk
 
 void mtk_crtc_gce_event_config(struct drm_crtc *crtc);
 void mtk_crtc_vdisp_ao_config(struct drm_crtc *crtc);
+void mml_cmdq_pkt_init(struct drm_crtc *crtc, struct cmdq_pkt *cmdq_handle);
+struct mtk_ddp_comp *mtk_disp_get_wdma_comp_by_scn(struct drm_crtc *crtc, enum addon_scenario scn);
 
 #endif /* MTK_DRM_CRTC_H */

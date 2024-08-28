@@ -482,39 +482,37 @@ static void mtk_disp_get_channel_bw_of_pq(struct mtk_drm_crtc *mtk_crtc,
 			subcomm_bw_sum[2], subcomm_bw_sum[3], type, ret);
 }
 
-static void mtk_disp_get_channel_bw_of_iwb(struct mtk_drm_crtc *mtk_crtc,
-		unsigned int *subcomm_bw_sum, unsigned int size, enum CHANNEL_TYPE type)
+static void mtk_disp_get_channel_bw_of_wdma(struct mtk_drm_crtc *mtk_crtc, unsigned int *subcomm_bw_sum,
+		unsigned int size, enum CHANNEL_TYPE type, enum addon_scenario scn)
 {
 	unsigned int crtc_idx = drm_crtc_index(&mtk_crtc->base);
 	struct drm_crtc *crtc = &mtk_crtc->base;
-	const struct mtk_addon_scenario_data *addon_data = NULL;
-	const struct mtk_addon_module_data *addon_module = NULL;
-	const struct mtk_addon_path_data *path_data = NULL;
 	struct mtk_drm_private *priv = mtk_crtc->base.dev->dev_private;
 	struct mtk_larb_port_bw port_bw;
 	struct mtk_ddp_comp *comp = NULL;
 	int ret = 0;
+	struct mtk_crtc_state *mtk_crtc_state = to_mtk_crtc_state(crtc->state);
 
 	if (!priv || IS_ERR_OR_NULL(priv->data->update_channel_bw_by_larb) ||
 		IS_ERR_OR_NULL(subcomm_bw_sum))
 		return;
 
-	if (!mtk_drm_helper_get_opt(priv->helper_opt, MTK_DRM_OPT_IDLEMGR_BY_WB) ||
-		mtk_drm_helper_get_opt(priv->helper_opt, MTK_DRM_OPT_IDLEMGR_BY_REPAINT))
+	if (scn == IDLE_WDMA_WRITE_BACK &&
+		(!mtk_drm_helper_get_opt(priv->helper_opt, MTK_DRM_OPT_IDLEMGR_BY_WB) ||
+		mtk_drm_helper_get_opt(priv->helper_opt, MTK_DRM_OPT_IDLEMGR_BY_REPAINT)))
 		return;
 
 	comp = mtk_ddp_comp_request_output(mtk_crtc);
 	/* only vdo panel support IWB*/
-	if (!comp || mtk_dsi_is_cmd_mode(comp))
+	if (!comp || (scn == IDLE_WDMA_WRITE_BACK && mtk_dsi_is_cmd_mode(comp)))
 		return;
 
-	addon_data = mtk_addon_get_scenario_data(__func__, crtc, IDLE_WDMA_WRITE_BACK);
-	if (!addon_data)
+	if (scn == WDMA_WRITE_BACK && !mtk_crtc_state->prop_val[CRTC_PROP_OUTPUT_ENABLE])
 		return;
 
-	addon_module = &addon_data->module_data[0];
-	path_data = mtk_addon_module_get_path(addon_module->module);
-	comp = priv->ddp_comp[path_data->path[path_data->path_len - 1]];
+	comp = mtk_disp_get_wdma_comp_by_scn(crtc, scn);
+	if (!comp)
+		return;
 
 	port_bw.larb_id = -1;
 	port_bw.bw = 0;
@@ -525,9 +523,9 @@ static void mtk_disp_get_channel_bw_of_iwb(struct mtk_drm_crtc *mtk_crtc,
 					size, type);
 
 	if (size >= 4)
-		DDPQOS("%s, crtc:%d, IWB channel BW:%u,%u,%u,%u type:%d ret:%d\n",
-			__func__, crtc_idx, subcomm_bw_sum[0], subcomm_bw_sum[1],
-			subcomm_bw_sum[2], subcomm_bw_sum[3], type, ret);
+		DDPQOS("%s, crtc:%d, wdma:%u scn:%d channel BW:%u,%u,%u,%u type:%d ret:%d\n",
+			__func__, crtc_idx, comp->id, scn, subcomm_bw_sum[0],
+			subcomm_bw_sum[1], subcomm_bw_sum[2], subcomm_bw_sum[3], type, ret);
 }
 
 static void __mtk_disp_get_channel_hrt_bw_by_scope(struct mtk_drm_crtc *mtk_crtc,
@@ -537,6 +535,7 @@ static void __mtk_disp_get_channel_hrt_bw_by_scope(struct mtk_drm_crtc *mtk_crtc
 	unsigned int ovl_bw = 0, i;
 	unsigned int bw_base = mtk_drm_primary_frame_bw(&mtk_crtc->base);
 	unsigned int subcomm_bw_sum[BW_CHANNEL_NR] = { 0 };
+	struct mtk_drm_private *priv = mtk_crtc->base.dev->dev_private;
 
 	if (size < BW_CHANNEL_NR)
 		return;
@@ -563,8 +562,12 @@ static void __mtk_disp_get_channel_hrt_bw_by_scope(struct mtk_drm_crtc *mtk_crtc
 					ARRAY_SIZE(subcomm_bw_sum), CHANNEL_HRT_RW);
 
 	if (crtc_idx == 0 && (scope & CHANNEL_BW_OF_WDMA_IWB))
-		mtk_disp_get_channel_bw_of_iwb(mtk_crtc, subcomm_bw_sum,
-					ARRAY_SIZE(subcomm_bw_sum), CHANNEL_HRT_RW);
+		mtk_disp_get_channel_bw_of_wdma(mtk_crtc, subcomm_bw_sum,
+					ARRAY_SIZE(subcomm_bw_sum), CHANNEL_HRT_RW, IDLE_WDMA_WRITE_BACK);
+
+	if (priv->data->mmsys_id == MMSYS_MT6899 && crtc_idx == 0 && (scope & CHANNEL_BW_OF_WDMA_CWB))
+		mtk_disp_get_channel_bw_of_wdma(mtk_crtc, subcomm_bw_sum,
+					ARRAY_SIZE(subcomm_bw_sum), CHANNEL_HRT_RW, WDMA_WRITE_BACK);
 
 	for (i = 0 ; i < BW_CHANNEL_NR ; i++)
 		result[i] = subcomm_bw_sum[i];
@@ -1353,12 +1356,13 @@ int mtk_disp_hrt_cond_change_cb(struct notifier_block *nb, unsigned long value,
 {
 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(dev_crtc);
 	unsigned int hrt_idx;
+	bool locked = true;
 
-	DDP_MUTEX_LOCK(&mtk_crtc->lock, __func__, __LINE__);
+	DDP_MUTEX_LOCK_CONDITION(&mtk_crtc->lock, __func__, __LINE__, mtk_crtc->enabled);
 
 	/* No need to repaint when display suspend */
 	if (!mtk_crtc->enabled) {
-		DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
+		DDP_MUTEX_UNLOCK_CONDITION(&mtk_crtc->lock, __func__, __LINE__, mtk_crtc->enabled);
 
 		return 0;
 	}
@@ -1370,26 +1374,26 @@ int mtk_disp_hrt_cond_change_cb(struct notifier_block *nb, unsigned long value,
 		DDPINFO("CAM trigger repaint\n");
 		hrt_idx = _layering_rule_get_hrt_idx(drm_crtc_index(dev_crtc));
 		hrt_idx++;
-		DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
+		DDP_MUTEX_UNLOCK_CONDITION(&mtk_crtc->lock, __func__, __LINE__, mtk_crtc->enabled);
 		mtk_disp_hrt_repaint_blocking(hrt_idx);
 		mtk_disp_mmqos_bw_repaint(dev_crtc->dev->dev_private);
-		DDP_MUTEX_LOCK(&mtk_crtc->lock, __func__, __LINE__);
+		locked = false;
 		break;
 	case BW_THROTTLE_END: /* CAM off */
 		DDPMSG("DISP BW Throttle end\n");
 		/* TODO: switch DC */
-		DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
+		DDP_MUTEX_UNLOCK_CONDITION(&mtk_crtc->lock, __func__, __LINE__, mtk_crtc->enabled);
 
 		/* bw repaint might hold all crtc's mutex, need unlock current mutex first */
 		mtk_disp_mmqos_bw_repaint(dev_crtc->dev->dev_private);
-
-		DDP_MUTEX_LOCK(&mtk_crtc->lock, __func__, __LINE__);
+		locked = false;
 		break;
 	default:
 		break;
 	}
 
-	DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
+	if (locked)
+		DDP_MUTEX_UNLOCK_CONDITION(&mtk_crtc->lock, __func__, __LINE__, mtk_crtc->enabled);
 
 	return 0;
 }

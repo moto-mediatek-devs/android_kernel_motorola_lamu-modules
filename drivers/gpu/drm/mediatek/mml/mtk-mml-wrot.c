@@ -351,6 +351,7 @@ struct wrot_data {
 	u8 rb_swap;		/* WA: version for rb channel swap behavior */
 	bool yuv_pending;	/* WA: enable wrot yuv422/420 pending zero */
 	bool stash;		/* enable stash prefetch with leading time */
+	bool ir_sram_bw;		/* sram channel bw */
 };
 
 static const struct wrot_data mt6983_wrot_data = {
@@ -402,6 +403,19 @@ static const struct wrot_data mt6991_wrot_data = {
 	.px_per_tick = 2,
 	.yuv_pending = true,
 	.stash = true,
+};
+
+static const struct wrot_data mt6899_wrot_data = {
+	.reg = wrot_mt6989,
+	.fifo = 256,
+	.tile_width = 512,
+	.sram_size = 512 * 1024,
+	.read_mode = MML_PQ_SOF_MODE,
+	.px_per_tick = 2,
+	/* .rb_swap = 2 */
+	.px_per_tick = 2,
+	.yuv_pending = true,
+	.ir_sram_bw = true,
 };
 
 struct mml_comp_wrot {
@@ -488,6 +502,8 @@ struct wrot_frame_data {
 	u32 datasize;		/* qos data size in bytes */
 	u32 stash_srt_bw;
 	u32 stash_hrt_bw;
+	u16 tile_last_x;
+	u16 tile_last_y;
 
 	struct {
 		bool eol:1;	/* tile is end of current line */
@@ -775,7 +791,7 @@ static s32 wrot_prepare(struct mml_comp *comp, struct mml_task *task,
 
 	out_crop.left = 0;
 	out_crop.top = 0;
-	if (wrot->data->yuv_pending) {
+	if (wrot->data->yuv_pending && cfg->info.mode != MML_MODE_RACING) {
 		out_crop.width = wrot_frm->compose.width;
 		out_crop.height = wrot_frm->compose.height;
 		if (MML_FMT_H_SUBSAMPLE(dest->data.format) &&
@@ -932,8 +948,8 @@ static s32 wrot_tile_prepare(struct mml_comp *comp, struct mml_task *task,
 	data->wrot.enable_x_crop = wrot_frm->en_x_crop;
 	data->wrot.enable_y_crop = wrot_frm->en_y_crop;
 	data->wrot.crop = wrot_frm->out_crop;
-	data->wrot.yuv_pending = wrot->data->yuv_pending;
-	if (wrot->data->yuv_pending) {
+	data->wrot.yuv_pending = (wrot->data->yuv_pending && cfg->info.mode != MML_MODE_RACING);
+	if (wrot->data->yuv_pending && cfg->info.mode != MML_MODE_RACING) {
 		func->full_size_x_in = wrot_frm->compose.width;
 		func->full_size_y_in = wrot_frm->compose.height;
 		func->full_size_x_out = wrot_frm->compose.width;
@@ -2155,7 +2171,7 @@ static s32 wrot_config_tile(struct mml_comp *comp, struct mml_task *task,
 	}
 
 	/* round up target footprint size for internal buffer and output */
-	if (wrot->data->yuv_pending) {
+	if (wrot->data->yuv_pending && cfg->info.mode != MML_MODE_RACING) {
 		if (dest->rotate == MML_ROT_90 || dest->rotate == MML_ROT_270) {
 			if (MML_FMT_H_SUBSAMPLE(dest->data.format)) {
 				wrot_tar_xsize = round_up(wrot_tar_xsize, 2);
@@ -2198,16 +2214,17 @@ static s32 wrot_config_tile(struct mml_comp *comp, struct mml_task *task,
 	 */
 
 	/* qos accumulate tile pixel */
-	if (dest->rotate == MML_ROT_0 || dest->rotate == MML_ROT_180) {
+	if (wrot_frm->tile_last_x < tile->out.xe) {
 		wrot_frm->max_size.width += wrot_tar_xsize;
-		wrot_frm->max_size.height = wrot_tar_ysize;
-	} else {
-		wrot_frm->max_size.width += wrot_tar_ysize;
-		wrot_frm->max_size.height = wrot_tar_xsize;
+		wrot_frm->tile_last_x = tile->out.xe;
+	}
+	if (wrot_frm->tile_last_y < tile->out.ye) {
+		wrot_frm->max_size.height += wrot_tar_ysize;
+		wrot_frm->tile_last_y = tile->out.ye;
 	}
 
 	/* no bandwidth for racing mode since wrot write to sram */
-	if (cfg->info.mode != MML_MODE_RACING) {
+	if (cfg->info.mode != MML_MODE_RACING || wrot->data->ir_sram_bw) {
 		/* calculate qos for later use */
 		plane = MML_FMT_PLANE(dest->data.format);
 		wrot_frm->datasize += mml_color_get_min_y_size(dest->data.format,
@@ -2257,8 +2274,9 @@ static s32 wrot_config_tile(struct mml_comp *comp, struct mml_task *task,
 		}
 	}
 
-	mml_msg("%s min block width: %u min buf line num: %u",
-		__func__, setting.main_blk_width, setting.main_buf_line_num);
+	mml_msg("%s min block width:%u min buf line num:%u dvfs size %u %u",
+		__func__, setting.main_blk_width, setting.main_buf_line_num,
+		wrot_frm->max_size.width, wrot_frm->max_size.height);
 
 	return 0;
 }
@@ -2432,6 +2450,13 @@ static s32 wrot_post(struct mml_comp *comp, struct mml_task *task,
 	dvfs_cache_log(cache, comp, "wrot");
 
 	wrot_backup_crc(comp, task, ccfg);
+
+	if (task->config->info.mode == MML_MODE_RACING) {
+		u16 event = task->config->info.disp_done_event;
+
+		if (event)
+			cmdq_pkt_wfe(task->pkts[ccfg->pipe], event);
+	}
 
 	mml_msg("%s pipe %hhu eol %u", __func__, ccfg->pipe, wrot_frm->wdone_cnt);
 	return 0;
@@ -3046,11 +3071,11 @@ const struct of_device_id mml_wrot_driver_dt_match[] = {
 	},
 	{
 		.compatible = "mediatek,mt6899-mml0_wrot",
-		.data = &mt6989_wrot_data,
+		.data = &mt6899_wrot_data,
 	},
 	{
 		.compatible = "mediatek,mt6899-mml1_wrot",
-		.data = &mt6989_wrot_data,
+		.data = &mt6899_wrot_data,
 	},
 	{
 		.compatible = "mediatek,mt6989-mml_wrot",

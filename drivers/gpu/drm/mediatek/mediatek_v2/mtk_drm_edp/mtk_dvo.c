@@ -32,6 +32,10 @@
 #include "../mtk_drm_drv.h"
 #include "../mtk_drm_crtc.h"
 #include "../mtk_drm_ddp_comp.h"
+#include "../mtk_disp_pmqos.h"
+#include "../mtk_dump.h"
+
+#define DVO_COLOR_BAR					0
 
 /* DVO INPUT default value is 1T2P */
 #define MTK_DVO_INPUT_MODE				2
@@ -120,6 +124,7 @@ struct mtk_dvo {
 	struct pinctrl_state *pins_dvo;
 	u32 output_fmt;
 	int refcount;
+	bool pclk_enable;
 };
 
 static inline struct mtk_dvo *bridge_to_dvo(struct drm_bridge *b)
@@ -380,6 +385,8 @@ static void mtk_dvo_sodi_setting(struct mtk_dvo *dvo, struct drm_display_mode *m
 	u64 sodi_high_rem = 0, sodi_low_rem = 0, tmp = 0;
 	u64 sodi_high = 0, sodi_low = 0;
 
+	mtk_drm_set_mmclk_by_pixclk(&dvo->ddp_comp.mtk_crtc->base,
+						mode->clock, __func__);
 	mmsys_clk = mtk_drm_get_mmclk(&dvo->ddp_comp.mtk_crtc->base, __func__) / 1000000;
 	if (!mmsys_clk) {
 		pr_info("[eDPTX] mmclk is zero, use default value\n");
@@ -534,6 +541,7 @@ static void mtk_dvo_power_off(struct mtk_dvo *dvo)
 	clk_disable_unprepare(dvo->engine_clk);
 	clk_disable_unprepare(dvo->tvd_clk);
 	clk_disable_unprepare(dvo->pixel_clk);
+	dvo->pclk_enable = false;
 	clk_disable_unprepare(dvo->hf_fdvo_clk);
 }
 
@@ -551,10 +559,12 @@ static int mtk_dvo_power_on(struct mtk_dvo *dvo)
 		goto err_hf_fdvo;
 	}
 
-	ret = clk_prepare_enable(dvo->pixel_clk);
-	if (ret) {
-		dev_info(dvo->dev, "Failed to enable pixel clock: %d\n", ret);
-		goto err_pixel;
+	if (!dvo->pclk_enable) {
+		ret = clk_prepare_enable(dvo->pixel_clk);
+		if (ret) {
+			dev_info(dvo->dev, "Failed to enable pixel clock: %d\n", ret);
+			goto err_pixel;
+		}
 	}
 
 	/* set DVO switch 26Mhz crystal */
@@ -607,8 +617,8 @@ static int mtk_dvo_set_display_mode(struct mtk_dvo *dvo,
 	drm_display_mode_to_videomode(mode, &vm);
 
 	pr_notice("[eDPTX] vm.pixelclock=%lu\n", vm.pixelclock);
-	pr_notice("[eDPTX] vm.hactive=%d vm.hfront_porch=%d vm.hback_porch=%d vm.vsync_len=%d\n",
-			vm.hactive, vm.hfront_porch, vm.hback_porch, vm.vsync_len);
+	pr_notice("[eDPTX] vm.hactive=%d vm.hfront_porch=%d vm.hback_porch=%d vm.hsync_len=%d\n",
+			vm.hactive, vm.hfront_porch, vm.hback_porch, vm.hsync_len);
 
 	pr_notice("[eDPTX] vm.vactive=%d vm.vfront_porch=%d vm.vback_porch=%d vm.vsync_len=%d\n",
 			vm.vactive, vm.vfront_porch, vm.vback_porch, vm.vsync_len);
@@ -736,8 +746,6 @@ static u32 *mtk_dvo_bridge_atomic_get_output_bus_fmts(struct drm_bridge *bridge,
 	u32 *output_fmts;
 
 	*num_output_fmts = 0;
-
-	pr_info("[eDPTX] %s\n", __func__);
 	if (!dvo->conf->output_fmts) {
 		dev_info(dvo->dev, "output_fmts should not be null\n");
 		return NULL;
@@ -775,8 +783,10 @@ static u32 *mtk_dvo_bridge_atomic_get_input_bus_fmts(struct drm_bridge *bridge,
 	*num_input_fmts = 1;
 	input_fmts[0] = MEDIA_BUS_FMT_RGB888_1X24;
 
+#ifdef EDPTX_DEBUG
 	pr_info("[eDPTX] %s num_input_fmts:%d input_fmts:0x%04x\n",
 			__func__, *num_input_fmts, input_fmts[0]);
+#endif
 
 	return input_fmts;
 }
@@ -796,16 +806,20 @@ static int mtk_dvo_bridge_atomic_check(struct drm_bridge *bridge,
 		dvo->color_depth = display_info->bpc;
 	else
 		dvo->color_depth = 8;
-
+#ifdef EDPTX_DEBUG
 	pr_info("[eDPTX] %s+ bridge_state out_bus_format:0x%04x\n", __func__, out_bus_format);
+#endif
+
 	if (out_bus_format == MEDIA_BUS_FMT_FIXED)
 		if (dvo->conf->num_output_fmts)
 			out_bus_format = dvo->conf->output_fmts[0];
 
+#ifdef EDPTX_DEBUG
 	dev_info(dvo->dev, "[eDPTX] %s input format 0x%04x, output format 0x%04x\n",
 		__func__,
 		bridge_state->input_bus_cfg.format,
 		out_bus_format);
+#endif
 
 	dvo->output_fmt = out_bus_format;
 	dvo->bit_num = MTK_DVO_OUT_BIT_NUM_8BITS;
@@ -829,6 +843,7 @@ static int mtk_dvo_bridge_attach(struct drm_bridge *bridge,
 	if (ret)
 		dev_info(dvo->dev, "[eDPTX]Failed to enable pixel clock: %d\n", ret);
 
+	dvo->pclk_enable = true;
 	/* set DVO switch 26Mhz crystal */
 	clk_set_parent(dvo->pixel_clk, dvo->dvo_clk);
 
@@ -844,6 +859,9 @@ static int mtk_dvo_bridge_attach(struct drm_bridge *bridge,
 		dev_info(dvo->dev, "[eDPTX] Found bridge node: %pOF\n", dvo->next_bridge->of_node);
 		break;
 	}
+
+	if (!retry)
+		return -EINVAL;
 
 	ret = drm_bridge_attach(bridge->encoder, dvo->next_bridge,
 				 &dvo->bridge, flags);
@@ -891,6 +909,14 @@ static void mtk_dvo_bridge_enable(struct drm_bridge *bridge)
 
 	mtk_dvo_power_on(dvo);
 	mtk_dvo_set_display_mode(dvo, &dvo->mode);
+
+#if DVO_COLOR_BAR
+	mtk_dvo_mask(dvo, DVO_PATTERN_CTRL, PRE_PAT_EN, PRE_PAT_EN);
+	mtk_dvo_mask(dvo, DVO_PATTERN_CTRL, COLOR_BAR, PRE_PAT_SEL_MASK);
+	mtk_dvo_mask(dvo, DVO_PATTERN_CTRL, PRE_PAT_FORCE_ON, PRE_PAT_FORCE_ON);
+	mtk_dvo_mask(dvo, DVO_PATTERN_COLOR, PAT_G, PAT_G);
+#endif
+
 	mtk_dvo_enable(dvo, true);
 
 	dev_info(dvo->dev, "[eDPTX] %s-\n", __func__);
@@ -903,13 +929,15 @@ mtk_dvo_bridge_mode_valid(struct drm_bridge *bridge,
 {
 	struct mtk_dvo *dvo = bridge_to_dvo(bridge);
 
-	pr_info("[eDPTX] %s\n", __func__);
 	if (mode->clock > dvo->conf->max_clock_khz) {
 		pr_info("[eDPTX] Invalid mode mode->clock= %d\n", mode->clock);
 		return MODE_CLOCK_HIGH;
 	}
 
-	pr_info("[eDPTX] Valid mode mode->clock=%d\n", mode->clock);
+#ifdef EDPTX_DEBUG
+	pr_info("[eDPTX] %s mode->clock=%d\n", __func__, mode->clock);
+#endif
+
 	return MODE_OK;
 }
 
@@ -1022,6 +1050,15 @@ static int mtk_dvo_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		*base_bw = mtk_dvo_get_frame_hrt_bw_base_by_datarate(crtc, dvo);
 	}
 		break;
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+	case SET_CRTC_ID:
+	{
+		DDPMSG("%s set %s possible crtcs 0x%x\n", __func__,
+			mtk_dump_comp_str(comp), *(unsigned int *)params);
+		dvo->encoder.possible_crtcs = *(unsigned int *)params;
+	}
+		break;
+#endif
 	default:
 		break;
 	}

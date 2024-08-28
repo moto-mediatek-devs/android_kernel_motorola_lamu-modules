@@ -361,7 +361,7 @@
 				local-timer-stop;
 				entry-latency-us = <300>;
 				exit-latency-us = <1200>;
-				min-residency-us = <2600>;
+				min-residency-us = <4000>;
 			};
 			s2idle: s2idle {
 				compatible = "arm,idle-state";
@@ -387,7 +387,8 @@
 		logger-enable-states = "mcusysoff";
 		mcusys-cnt-chk = <1>;
 		irq-remain = <&edge_keypad &edge_mdwdt>,
-				<&level_btif_tx &level_btif_rx>;
+				<&level_btif_tx &level_btif_rx>,
+				<&level_dsi0>;
 
 		resource-ctrl = <&bus26m &infra &syspll>,
 				<&dram_s0 &dram_s1>;
@@ -428,6 +429,10 @@
 			level_btif_rx: level_btif_rx{
 				target = <&btif>;
 				value = <0 2 0 0>;
+			};
+			level_dsi0: level-dsi0 {
+				target = <&dsi0>;
+				value = <0 0 0 0>;
 			};
 		};
 
@@ -566,11 +571,7 @@
 			compatible = "mediatek,reserve-memory-sspm_share";
 			no-map;
 			status = "okay";
-#if defined(CONFIG_MTK_GMO_RAM_OPTIMIZE) || defined(CONFIG_MTK_MET_MEM_ALLOC)
-			size = <0 0x110000>; /* 1M + 64K */
-#else
 			size = <0 0x510000>; /* 5M + 64K */
-#endif
 			alignment = <0 0x10000>;
 			alloc-ranges = <0 0x40000000 0 0x60000000>;
 		};
@@ -1862,7 +1863,7 @@
 		};
 
 		mtk_dmabufheap_debug1: dmaheap_test1{
-			compatible = "mediatek, mtk_dmabufheap, iommu0";
+			compatible = "mediatek, mtk_dmabufheap, iommu1";
 			iommus = <&iommu0 M4U_PORT_L1_DISP_FAKE1>;
 		};
 
@@ -2020,6 +2021,11 @@
 			clock-names = "apb", "smi", "gals0", "gals1";
 		};
 
+		smi-test {
+			compatible = "mediatek,smi-testcase";
+			mediatek,larbs = <&smi_larb2>;
+		};
+
 		smi_larb2: smi-larb2@1b002000 {
 			compatible = "mediatek,smi_larb2", "mediatek,mt6781-smi-larb",
 					"mediatek,smi-larb";
@@ -2146,7 +2152,7 @@
 			clock-names = "apb", "smi", "gals0", "gals1";
 		};
 
-		smi_larb18: smi-larb18@1a011000 {
+		smi_larb18: smi-larb18@1a011000 {/* not exist */
 			compatible = "mediatek,smi_larb18", "mediatek,mt6781-smi-larb",
 					"mediatek,smi-larb";
 			mediatek,smi = <&smi_disp_common 0>;
@@ -2158,6 +2164,7 @@
 				 <&camsys_rawb CLK_CAM_RB_LARBX>,
 				 <&camsys_rawb CLK_CAM_RB_LARBX>;
 			clock-names = "apb", "smi", "gals0", "gals1";
+			skip-tcms-check;
 		};
 
 		smi_larb19: smi-larb19@1c10f000 {
@@ -2553,9 +2560,10 @@
 			dma-ranges = <0x1 0x0 0x1 0x0 0x1 0x0>;
 			mediatek,mailbox-gce = <&gce_mbox>;
 			mediatek,dec-gce-th-num = <1>; /* VDEC GCE HW THREAD NUM*/
-			mediatek,enc-gce-th-num = <1>; /* VDEC GCE HW THREAD NUM*/
+			mediatek,enc-gce-th-num = <2>; /* VDEC GCE HW THREAD NUM*/
 			mboxes = <&gce_mbox 7 0 CMDQ_THR_PRIO_1>,
 				<&gce_mbox 12 0 CMDQ_THR_PRIO_1>,
+				<&gce_mbox 23 0 CMDQ_THR_PRIO_1>,
 				<&gce_mbox_sec 12 0 CMDQ_THR_PRIO_1>;
 			gce-event-names = "venc_eof",
 				"venc_cmdq_pause_done",
@@ -2596,6 +2604,8 @@
 					<&gce_mbox CMDQ_EVENT_COUNT_SRAM_CLR_DONE>,
 					<&gce_mbox CMDQ_EVENT_GCE_CNT_OP_THRESHOLD>;
 			gce-gpr = <GCE_GPR_R10>, <GCE_GPR_R11>;
+			gce-norm-token = /bits/ 16 <CMDQ_SYNC_TOKEN_HISTOGRAM_VENC_WAIT>;
+			gce-sec-token = /bits/ 16 <CMDQ_SYNC_TOKEN_HISTOGRAM_VENC_SET>;
 		};
 
 		vcu-iommu-venc {
@@ -2833,30 +2843,38 @@
 			throughput-normal-max = <560000000>;
 			throughput-config-offset = <2>;
 			throughput-table =
-					<875967048 4 561 561 450000000 601>, /* H264 4k 30fps */
-					<875967048 5 855 855 364000000 325>, /* H264 1080p 60fps */
-					<875967048 6 962 962 364000000 289>, /* H264 720p 120fps */
-					<1129727304 2 427 427 450000000 189>, /* HEVC 4k 30fps */
-					<1129727304 4 855 855 364000000 140>, /* HEVC 1080p 60fps */
-					<1129727304 6 962 962 364000000 100>, /* HEVC 720p 120fps */
-					<892744264 2 427 427 450000000 189>, /* H265 4k 30fps */
-					<892744264 4 855 855 364000000 140 >, /* H265 1080p 60fps */
-					<892744264 6 962 962 364000000 100>, /* H265 720p 120fps */
-					<1179206984 2 427 427 560000000 189>, /* HEIF 4k 30fps*/
-					<1179206984 4 1711 1711 560000000 189>; /* HEIF 1080p 30fps*/
+				/* H.264 */
+				<875967048 1 1148 1148 364000000 88>, /* 720p30, LP */
+				<875967048 2 860 860 364000000 88>, /* 1080p30, LP */
+				<875967048 3 780 780 450000000 157>, /* 1080p60, LP */
+				<875967048 10 780 780 364000000 117>, /* 2K30, LP */
+				<875967048 17 1148 1148 450000000 157>, /* others, LP */
+				/* HEVC */
+				<1129727304 0 1148 1148 364000000 88>, /* 720p30, LP */
+				<1129727304 0 860 860 364000000 88>, /* 1080p30, LP */
+				<1129727304 2 780 780 450000000 157>, /* 1080p60, LP */
+				<1129727304 10 780 780 364000000 117>, /* 2K30, LP */
+				<1129727304 17 1148 1148 450000000 157>, /* others, LP */
+				/* H.265 */
+				<892744264 0 1148 1148 364000000 88>, /* 720p30, LP */
+				<892744264 0 860 860 364000000 88>, /* 1080p30, LP */
+				<892744264 2 780 780 450000000 157>, /* 1080p60, LP */
+				<892744264 10 780 780 364000000 117>, /* 2K30, LP */
+				<892744264 17 1148 1148 450000000 157>, /* others, LP */
+				/* HEIF */
+				<1179206984 0 1148 1148 364000000 88>, /* 720p30, LP */
+				<1179206984 0 860 860 364000000 88>, /* 1080p30, LP */
+				<1179206984 2 780 780 450000000 157>, /* 1080p60, LP */
+				<1179206984 10 780 780 364000000 117>, /* 2K30, LP */
+				<1179206984 17 1148 1148 450000000 157>; /* others, LP */
 			config-table =
-					<875967048 972000 4 4>, /* H264 4k 30fps */
-					<875967048 486000 5 5>, /* H264 1080p 60fps */
-					<875967048 432000 6 6>, /* H264 720p 120fps */
-					<1129727304 972000 2 2>, /* HEVC 4k 30fps */
-					<1129727304 486000 4 4>, /* HEVC 1080p 60fps */
-					<1129727304 432000 6 6>, /* HEVC 720p 120fps */
-					<892744264 972000 2 2>, /* H265 4k 30fps */
-					<892744264 486000 4 4>, /* H265 1080p 60fps */
-					<892744264 432000 6 6>, /* H265 720p 120fps */
-					<1179206984 972000 2 2>, /* HEIF 4k 30fps*/
-					<1179206984 486000 4 4>, /* HEIF 1080p 30fps*/
-					<1179206984 4294967295 9 7>;
+				<875967048 432000 1 1>, /* H264 720p 30fps */
+				<875967048 432000 2 2>, /* H264 1080p 30fps */
+				<875967048 486000 3 3>, /* H264 1080p 60fps */
+				<1129727304 486000 2 2>, /* HEVC 1080p 60fps */
+				<892744264 486000 2 2>, /* H265 1080p 60fps */
+				<1179206984 486000 0 0>, /* HEIF 1080p 30fps*/
+				<1179206984 4294967295 10 10>;
 			bandwidth-table =
 				<7 2 0>,
 				<7 1 150>,
@@ -3468,6 +3486,7 @@
 			pq-rb-event-lock = /bits/ 16 <CMDQ_SYNC_TOKEN_HISTOGRAM_MDP_WAIT>;
 			pq-rb-event-unlock = /bits/ 16 <CMDQ_SYNC_TOKEN_HISTOGRAM_MDP_SET>;
 		};
+
 		aie@1c001000 {
 			compatible = "mediatek,mt6781-aie", "mediatek,aie-hw2.0";
 			reg = <0 0x1c001000 0 0x1000>;
@@ -3482,14 +3501,15 @@
 				 <&ipesys CLK_IPE_LARB20>;
 			clock-names = "aie",
 				 "FDVT_CLK_IPE_LARB20";
-			#if defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 			mboxes = <&gce_mbox 14 0 CMDQ_THR_PRIO_1>,
 				 <&gce_mbox_sec 11 0 CMDQ_THR_PRIO_1>;
-			#else
-			mboxes = <&gce_mbox 14 0 CMDQ_THR_PRIO_1>;
-			#endif
 			fdvt_frame_done = <CMDQ_EVENT_FDVT_DONE>;
 			mediatek,larb = <&smi_larb20>;
+		};
+
+		mtk_iommu_fake_aie@0 {
+			compatible = "mediatek,mtk_iommu_fake_aie";
+			iommus = <&iommu0 M4U_PORT_L1_DISP_FAKE1>;
 		};
 
 		rsc@1c003000 {
@@ -3722,6 +3742,10 @@
 			     500 16 4 1 >;
 	};
 
+	pbm: pbm {
+		compatible = "mediatek,pbm";
+	};
+
 	mt_cpufreq: mt_cpufreq {
 		compatible = "mediatek,mt-cpufreq";
 		proc1-supply = <&mt_pmic_vproc11_buck_reg>;
@@ -3743,6 +3767,7 @@
 		#mbox-cells = <3>;
 		#gce-event-cells = <1>;
 		#gce-subsys-cells = <2>;
+		cpr-not-support-cookie;
 		default-tokens = /bits/ 16 <CMDQ_SYNC_TOKEN_GPR_SET_0>,
 				 /bits/ 16 <CMDQ_SYNC_TOKEN_GPR_SET_1>,
 				 /bits/ 16 <CMDQ_SYNC_TOKEN_GPR_SET_2>,
@@ -3750,6 +3775,8 @@
 				 /bits/ 16 <CMDQ_SYNC_TOKEN_GPR_SET_4>,
 				 /bits/ 16 <CMDQ_SYNC_RESOURCE_WROT0>,
 				 /bits/ 16 <CMDQ_SYNC_RESOURCE_WROT1>;
+		 mboxes = <&gce_mbox 16 CMDQ_NO_TIMEOUT CMDQ_THR_PRIO_1>;
+		 power-domains = <&scpsys MT6781_POWER_DOMAIN_DIS>;
 		 clocks = <&infracfg_ao INFRACFG_AO_GCE_CG>,
 			 <&infracfg_ao INFRACFG_AO_GCE_26M_CG>;
 		 clock-names = "gce", "gce-timer";
@@ -3767,11 +3794,11 @@
 	cmdq-test {
 		compatible = "mediatek,cmdq-test";
 		mediatek,gce = <&gce_mbox>;
-		mmsys_config = <&mmsys_config>;
+		mmsys-config = <&mmsys_config>;
 		mediatek,gce-subsys = <99>, <SUBSYS_1400XXXX>;
-		mboxes = <&gce_mbox_sec 11 0 CMDQ_THR_PRIO_1>;
-		token_user0 = /bits/ 16 <CMDQ_SYNC_TOKEN_USER_0>;
-		token_gpr_set4 = /bits/ 16 <CMDQ_SYNC_TOKEN_GPR_SET_4>;
+		mboxes = <&gce_mbox 10 0 CMDQ_THR_PRIO_1>;
+		token-user0 = /bits/ 16 <CMDQ_SYNC_TOKEN_USER_0>;
+		token-gpr-set4 = /bits/ 16 <CMDQ_SYNC_TOKEN_GPR_SET_4>;
 	};
 
 	ap_ccif2@1023c000 {
@@ -5327,6 +5354,7 @@
 		reg = <0 0x14009000 0 0x1000>;
 		interrupts = <GIC_SPI 301 IRQ_TYPE_LEVEL_HIGH 0>;
 		clocks = <&mmsys_config CLK_MM_DISP_COLOR0>;
+		doze-bypass = <1>;
 	};
 
 	reserved@1400a000 {
@@ -5345,6 +5373,7 @@
 		ccorr-linear-per-pipe = <0x01>;
 		ccorr-prim-force-linear = <0x0>;
 		ccorr-linear = <1>;
+		doze-bypass = <0x10001>;
 	};
 
 	disp_aal0: disp_aal0@1400c000 {
@@ -5356,6 +5385,7 @@
 		mtk-aal-support = <1>;
 		mtk-dre30-support = <0>;
 		mtk-cabc-no-support = <1>;
+		doze-bypass = <0x10001>;
 	};
 
 	disp_gamma0: disp_gamma0@1400d000 {
@@ -5676,7 +5706,7 @@
 		iris-recognition-size = <0 0x10000000>;
 		2d_fr-size = <0 0>;
 		tui-size = <0 0x4000000>;
-		wfd-size = <0 0x4000000>;
+		wfd-region-based-size = <0 0x4000000>;
 		prot-region-based-size = <0 0x8000000>;
 		ta-elf-size = <0 0x1000000>;
 		ta-stack-heap-size = <0 0x6000000>;

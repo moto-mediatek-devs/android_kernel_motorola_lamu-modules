@@ -34,6 +34,10 @@
 #include "ged_dcs.h"
 #include "ged_async.h"
 
+#if defined(MTK_GPU_BM_2)
+#include <gpu_bm.h>
+#endif /* MTK_GPU_BM_2 */
+
 #if !IS_ENABLED(CONFIG_MTK_LEGACY_THERMAL)
 //#include "thermal_interface.h"
 #endif
@@ -2534,6 +2538,8 @@ int get_api_sync_flag(void)
 {
 	return api_sync_flag;
 }
+EXPORT_SYMBOL(get_api_sync_flag);
+
 void set_api_sync_flag(int flag)
 {
 	unsigned int tmp_sysram_val = 0;
@@ -2556,12 +2562,25 @@ void set_api_sync_flag(int flag)
 			g_latest_api_sync_ts_ms = div_u64(cur_ts_us, 1000);
 		else
 			g_latest_api_sync_done_ts_us = cur_ts_us;
-	} else if (flag == 3) {
-		dcs_set_fix_num(8);
-		start_mewtwo_timer();
 	} else if (flag == 2) {
 		dcs_set_fix_num(0);
 		cancel_mewtwo_timer();
+	} else if (flag == 3) {
+		dcs_set_fix_num(8);
+		start_mewtwo_timer();
+	} else if (flag == 4) {
+		dcs_set_fix_num(6);
+		start_mewtwo_timer();
+	} else if (flag == 5) {
+		dcs_set_fix_num(4);
+		start_mewtwo_timer();
+	} else if (flag == 6 || flag == 7) {
+		if (api_sync_flag != flag)
+			api_sync_flag = flag;
+	} else if (flag == 8) {
+		MTKGPUQoS_mode_ratio(0);
+	} else if (flag == 9) {
+		MTKGPUQoS_mode_ratio(6080);
 #if !IS_ENABLED(CONFIG_MTK_LEGACY_THERMAL)
 	} else if ((flag & 0xFFFF0000) == 0x55660000) {
 		// pre-throttle cases

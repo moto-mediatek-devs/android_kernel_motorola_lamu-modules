@@ -193,8 +193,10 @@ int _mtk_esd_check_read(struct drm_crtc *crtc)
 		return -EINVAL;
 	}
 
-	if (mtk_drm_is_idle(crtc) && mtk_dsi_is_cmd_mode(output_comp))
-		return 0;
+	if (mtk_drm_is_idle(crtc) && mtk_dsi_is_cmd_mode(output_comp)) {
+		DDPINFO("[ESD%u]%s esd check in idle\n", index, __func__);
+		mtk_drm_idlemgr_kick(__func__, &mtk_crtc->base, index);
+	}
 
 	mtk_ddp_comp_io_cmd(output_comp, NULL, REQ_PANEL_EXT, &panel_ext);
 	if (unlikely(!(panel_ext && panel_ext->params))) {
@@ -491,6 +493,13 @@ static int mtk_drm_esd_recover(struct drm_crtc *crtc)
 	mtk_drm_trace_begin("esd recover");
 	mtk_drm_idlemgr_kick(__func__, &mtk_crtc->base, 0);
 
+	if (mtk_vidle_is_ff_enabled()) {
+		mtk_vidle_config_ff(false);
+		mtk_vidle_enable(false, priv);
+		if (!mtk_vidle_is_ff_enabled())
+			CRTC_MMP_MARK(index, leave_vidle, 0xe5d, 0);
+		CRTC_MMP_MARK(index, esd_recovery, 0, 0x11);
+	}
 	atomic_set(&mtk_crtc->esd_notice_status, 1);
 	wake_up_interruptible(&mtk_crtc->esd_notice_wq);
 

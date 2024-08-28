@@ -458,7 +458,7 @@
 				local-timer-stop;
 				entry-latency-us = <300>;
 				exit-latency-us = <1200>;
-				min-residency-us = <2600>;
+				min-residency-us = <4000>;
 			};
 			s2idle: s2idle {
 				compatible = "arm,idle-state";
@@ -785,7 +785,7 @@
 		svp-region-based-size = <0 0x10000000>;
 		2d_fr-size = <0 0x8000000>;
 		tui-size = <0 0x4000000>;
-		wfd-size = <0 0x4000000>;
+		wfd-region-based-size = <0 0x4000000>;
 		prot-region-based-size = <0 0x8000000>;
 		ta-elf-size = <0 0x1000000>;
 		ta-stack-heap-size = <0 0x6000000>;
@@ -1239,7 +1239,8 @@
 		};
 		sleep: sleep@10006000 {
 			compatible = "mediatek,sleep", "syscon";
-			reg = <0 0x10006000 0 0x100>;
+			reg = <0 0x10006000 0 0x1000>;
+			interrupts = <GIC_SPI 222 IRQ_TYPE_LEVEL_HIGH 0>;
 		};
 
 		srclken-ctrl@1000F800 {
@@ -1699,6 +1700,7 @@
 			#mbox-cells = <3>;
 			#gce-event-cells = <1>;
 			#gce-subsys-cells = <2>;
+			cpr-not-support-cookie;
 			default-tokens = /bits/ 16 <CMDQ_SYNC_TOKEN_GPR_SET_0>,
 				/bits/ 16 <CMDQ_SYNC_TOKEN_GPR_SET_1>,
 				/bits/ 16 <CMDQ_SYNC_TOKEN_GPR_SET_2>,
@@ -1706,6 +1708,8 @@
 				/bits/ 16 <CMDQ_SYNC_TOKEN_GPR_SET_4>,
 				/bits/ 16 <CMDQ_SYNC_RESOURCE_WROT0>,
 				/bits/ 16 <CMDQ_SYNC_RESOURCE_WROT1>;
+			mboxes = <&gce 11 CMDQ_NO_TIMEOUT CMDQ_THR_PRIO_1>;
+			power-domains = <&scpsys MT6853_POWER_DOMAIN_DISP>;
 			clocks = <&infracfg_ao_clk CLK_IFRAO_GCE>,
 				 <&infracfg_ao_clk CLK_IFRAO_GCE_26M_SET>;
 			clock-names = "gce", "gce-timer";
@@ -1723,14 +1727,14 @@
 		cmdq-test {
 			compatible = "mediatek,cmdq-test";
 			mediatek,gce = <&gce>;
-			mmsys_config = <&mmsys_config_clk>;
+			mmsys-config = <&mmsys_config_clk>;
 			mediatek,gce-subsys = <99>, <SUBSYS_1400XXXX>;
-			mboxes = <&gce 23 0 CMDQ_THR_PRIO_1>,
-				<&gce 22 CMDQ_NO_TIMEOUT CMDQ_THR_PRIO_1>,
-				<&gce 11 0 CMDQ_THR_PRIO_1>;
+			mboxes = <&gce 23 0 CMDQ_THR_PRIO_1>;
+				//<&gce 22 CMDQ_NO_TIMEOUT CMDQ_THR_PRIO_1>,
+				//<&gce 11 0 CMDQ_THR_PRIO_1>,
 				//<&gce_mbox_sec 11 0 CMDQ_THR_PRIO_1>;
-			token_user0 = /bits/ 16 <CMDQ_SYNC_TOKEN_USER_0>;
-			token_gpr_set4 = /bits/ 16 <CMDQ_SYNC_TOKEN_GPR_SET_4>;
+			token-user0 = /bits/ 16 <CMDQ_SYNC_TOKEN_USER_0>;
+			token-gpr-set4 = /bits/ 16 <CMDQ_SYNC_TOKEN_GPR_SET_4>;
 		};
 
 		dramc: dramc@10230000 {
@@ -2200,7 +2204,7 @@
 			#clock-cells = <1>;
 		};
 
-		spi0: spi@1100a000 {
+		spi0: spi0@1100a000 {
 			compatible = "mediatek,mt6765-spi";
 			mediatek,pad-select = <0>;
 			reg = <0 0x1100a000 0 0x100>;
@@ -2232,7 +2236,7 @@
 			clock-names = "btifc","apdmac";
 		};
 
-		spi1: spi@11010000 {
+		spi1: spi1@11010000 {
 			compatible = "mediatek,mt6765-spi";
 			mediatek,pad-select = <0>;
 			reg = <0 0x11010000 0 0x100>;
@@ -2243,7 +2247,7 @@
 			clock-names = "parent-clk", "sel-clk", "spi-clk";
 		};
 
-		spi2: spi@11012000 {
+		spi2: spi2@11012000 {
 			compatible = "mediatek,mt6765-spi";
 			mediatek,pad-select = <0>;
 			reg = <0 0x11012000 0 0x100>;
@@ -2254,7 +2258,7 @@
 			clock-names = "parent-clk", "sel-clk", "spi-clk";
 		};
 
-		spi3: spi@11013000 {
+		spi3: spi3@11013000 {
 			compatible = "mediatek,mt6765-spi";
 			mediatek,pad-select = <0>;
 			reg = <0 0x11013000 0 0x100>;
@@ -2296,7 +2300,7 @@
 			mediatek,fifo_only;
 		};
 
-		spi4: spi@11018000 {
+		spi4: spi4@11018000 {
 			compatible = "mediatek,mt6765-spi";
 			mediatek,pad-select = <0>;
 			reg = <0 0x11018000 0 0x100>;
@@ -2307,7 +2311,7 @@
 			clock-names = "parent-clk", "sel-clk", "spi-clk";
 		};
 
-		spi5: spi@11019000 {
+		spi5: spi5@11019000 {
 			compatible = "mediatek,mt6765-spi";
 			mediatek,pad-select = <0>;
 			reg = <0 0x11019000 0 0x100>;
@@ -2318,7 +2322,7 @@
 			clock-names = "parent-clk", "sel-clk", "spi-clk";
 		};
 
-		spi6: spi@1101d000 {
+		spi6: spi6@1101d000 {
 			compatible = "mediatek,mt6765-spi";
 			mediatek,pad-select = <0>;
 			reg = <0 0x1101d000 0 0x100>;
@@ -2329,7 +2333,7 @@
 			clock-names = "parent-clk", "sel-clk", "spi-clk";
 		};
 
-		spi7: spi@1101e000 {
+		spi7: spi7@1101e000 {
 			compatible = "mediatek,mt6765-spi";
 			mediatek,pad-select = <0>;
 			reg = <0 0x1101e000 0 0x100>;
@@ -2591,6 +2595,7 @@
 			/* Reference clock control mode */
 			/* SW mode: 0, Half-HW mode: 1, HW mode: 2 */
 			mediatek,refclk_ctrl = <2>;
+			mediatek,ufs-qos;
 		};
 
 		efuse: efuse@11c10000 {
@@ -3328,6 +3333,7 @@
 			compatible = "mediatek,mt6853-smi-common", "syscon",
 					"mediatek,smi-common";
 			reg = <0 0x14002000 0 0x1000>;
+			mediatek,smi-supply = <&disp_smi_2x1_sub_common_u0 0 &disp_smi_2x1_sub_common_u1 0>;
 			mediatek,common-id = <0>;
 			operating-points-v2 = <&opp_table_disp>;
 			power-domains = <&scpsys MT6853_POWER_DOMAIN_DISP>;
@@ -3469,7 +3475,6 @@
 				"mediatek,smi-common", "syscon", "mediatek,smi-sub-common";
 			reg = <0 0x1401b000 0 0x1000>;
 			mediatek,common-id = <1>;
-			mediatek,smi-supply = <&smi_disp_common 0>;
 			power-domains = <&scpsys MT6853_POWER_DOMAIN_DISP>;
 			clocks = <&mmsys_config_clk CLK_MM_SMI_IOMMU>,
 				 <&mmsys_config_clk CLK_MM_SMI_IOMMU>,
@@ -3483,7 +3488,6 @@
 				"mediatek,smi-common", "syscon", "mediatek,smi-sub-common";
 			reg = <0 0x1401c000 0 0x1000>;
 			mediatek,common-id = <2>;
-			mediatek,smi-supply = <&smi_disp_common 0>;
 			power-domains = <&scpsys MT6853_POWER_DOMAIN_DISP>;
 			clocks = <&mmsys_config_clk CLK_MM_SMI_IOMMU>,
 				 <&mmsys_config_clk CLK_MM_SMI_IOMMU>,
@@ -3502,7 +3506,7 @@
 			compatible = "mediatek,mt6853-smi-common", "syscon",
 					"mediatek,smi-common", "mediatek,smi-sub-common";
 			reg = <0 0x1401e000 0 0x1000>;
-			mediatek,smi-supply = <&smi_disp_common 0>;
+			mediatek,smi-supply = <&img0_smi_2x1_sub_common 0>;
 			mediatek,common-id = <3>;
 			power-domains = <&scpsys MT6853_POWER_DOMAIN_DISP>;
 			clocks = <&mmsys_config_clk CLK_MM_SMI_COMMON>,
@@ -3617,7 +3621,7 @@
 		smi_larb9: smi-larb9@1502e000 {
 			compatible = "mediatek,smi_larb9",
 					"mediatek,mt6853-smi-larb", "mediatek,smi-larb";
-			mediatek,smi-supply = <&smi_disp_common 0>;
+			mediatek,smi-supply = <&img1_smi_2x1_sub_common 0>;
 			reg = <0 0x1502e000 0 0x1000>;
 			mediatek,larb-id = <9>;
 			power-domains = <&scpsys MT6853_POWER_DOMAIN_ISP>;
@@ -3751,7 +3755,7 @@
 		smi_larb11: smi-larb11@1582e000 {
 			compatible = "mediatek,smi_larb11",
 					"mediatek,mt6853-smi-larb", "mediatek,smi-larb";
-			mediatek,smi-supply = <&smi_disp_common 0>;
+			mediatek,smi-supply = <&img1_smi_2x1_sub_common 0>;
 			reg = <0 0x1582e000 0 0x1000>;
 			mediatek,larb-id = <11>;
 			power-domains = <&scpsys MT6853_POWER_DOMAIN_ISP2>;
@@ -4905,7 +4909,7 @@
 		smi_larb13: smi-larb13@1a001000 {
 			compatible = "mediatek,smi_larb13",
 					"mediatek,mt6853-smi-larb", "mediatek,smi-larb";
-			mediatek,smi-supply = <&smi_disp_common 0>;
+			mediatek,smi-supply = <&cam_smi_4x1_sub_common0 0>;
 			reg = <0 0x1a001000 0 0x1000>;
 			mediatek,larb-id = <13>;
 			power-domains = <&scpsys MT6853_POWER_DOMAIN_CAM>;
@@ -4919,7 +4923,7 @@
 		smi_larb14: smi-larb14@1a002000 {
 			compatible = "mediatek,smi_larb14",
 					"mediatek,mt6853-smi-larb", "mediatek,smi-larb";
-			mediatek,smi-supply = <&smi_disp_common 0>;
+			mediatek,smi-supply = <&cam_smi_3x1_sub_common1 0>;
 			reg = <0 0x1a002000 0 0x1000>;
 			mediatek,larb-id = <14>;
 			power-domains = <&scpsys MT6853_POWER_DOMAIN_CAM>;
@@ -4933,7 +4937,7 @@
 		smi_larb16: smi-larb16@1a00f000 {
 			compatible = "mediatek,smi_larb16",
 				"mediatek,mt6853-smi-larb", "mediatek,smi-larb";
-			mediatek,smi-supply = <&smi_disp_common 0>;
+			mediatek,smi-supply = <&cam_smi_3x1_sub_common1 0>;
 			reg = <0 0x1a00f000 0 0x1000>;
 			mediatek,larb-id = <16>;
 			power-domains = <&scpsys MT6853_POWER_DOMAIN_CAM_RAWA>;
@@ -4947,7 +4951,7 @@
 		smi_larb17: smi-larb17@1a010000 {
 			compatible = "mediatek,smi_larb17",
 				"mediatek,mt6853-smi-larb", "mediatek,smi-larb";
-			mediatek,smi-supply = <&smi_disp_common 0>;
+			mediatek,smi-supply = <&cam_smi_4x1_sub_common0 0>;
 			reg = <0 0x1a010000 0 0x1000>;
 			mediatek,larb-id = <17>;
 			power-domains = <&scpsys MT6853_POWER_DOMAIN_CAM_RAWB>;
@@ -5075,7 +5079,7 @@
 			compatible = "mediatek,mt6853-smi-common", "syscon",
 					"mediatek,smi-common", "mediatek,smi-sub-common";
 			reg = <0 0x1b00e000 0 0x1000>;
-			mediatek,smi-supply = <&smi_disp_common 0>;
+			mediatek,smi-supply = <&img0_smi_2x1_sub_common 0>;
 			mediatek,common-id = <5>;
 			power-domains = <&scpsys MT6853_POWER_DOMAIN_IPE>;
 			clocks = <&ipesys_clk CLK_IPE_SMI_SUBCOM>,
@@ -5089,7 +5093,7 @@
 			compatible = "mediatek,smi_larb20",
 				"mediatek,mt6853-smi-larb", "mediatek,smi-larb";
 			reg = <0 0x1b00f000 0 0x1000>;
-			mediatek,smi-supply = <&smi_disp_common 0>;
+			mediatek,smi-supply = <&ipe_smi_2x1_sub_common 0>;
 			mediatek,larb-id = <20>;
 			power-domains = <&scpsys MT6853_POWER_DOMAIN_IPE>;
 			clocks = <&ipesys_clk CLK_IPE_LARB20>,
@@ -5147,7 +5151,7 @@
 			compatible = "mediatek,smi_larb19",
 				"mediatek,mt6853-smi-larb", "mediatek,smi-larb";
 			reg = <0 0x1b10f000 0 0x1000>;
-			mediatek,smi-supply = <&smi_disp_common 0>;
+			mediatek,smi-supply = <&ipe_smi_2x1_sub_common 0>;
 			mediatek,larb-id = <19>;
 			power-domains = <&scpsys MT6853_POWER_DOMAIN_IPE>;
 			clocks = <&topckgen_clk CLK_TOP_DPE>,
@@ -5547,6 +5551,11 @@
 			clock-names = "MDP_COLOR0";
 		};
 
+		smi-test {
+			compatible = "mediatek,smi-testcase";
+			mediatek,larbs = <&smi_larb2>;
+		};
+
 		smi_larb2: smi-larb2@1f002000 {
 			compatible = "mediatek,smi_larb2",
 					"mediatek,mt6853-smi-larb", "mediatek,smi-larb";
@@ -5754,6 +5763,19 @@
 				<1>; /*MTK_DRM_OPT_SPHRT*/
 		};
 
+		disp_mtee_sec: disp_mtee_sec {
+			compatible = "mediatek,disp_mtee";
+
+			mediatek,mailbox-gce = <&gce>;
+			mboxes = <&gce_mbox_sec 8 0 CMDQ_THR_PRIO_3>,
+				<&gce_mbox_sec 9 0 CMDQ_THR_PRIO_3>,
+				<&gce_mbox_sec 9 0 CMDQ_THR_PRIO_3>;
+
+			gce-client-names = "CLIENT_SEC_CFG0",
+					"CLIENT_SEC_CFG1",
+					"CLIENT_SEC_CFG2";
+		};
+
 		disp_mutex0: disp_mutex@14001000 {
 			compatible = "mediatek,disp_mutex0",
 						"mediatek,mt6853-disp-mutex";
@@ -5838,6 +5860,7 @@
 			reg = <0 0x14009000 0 0x1000>;
 			interrupts = <GIC_SPI 259 IRQ_TYPE_LEVEL_HIGH 0>;
 			clocks = <&mmsys_config_clk CLK_MM_DISP_COLOR0>;
+			doze-bypass = <1>;
 		};
 
 		disp_ccorr1: disp_ccorr1@1400a000 {
@@ -5851,6 +5874,7 @@
 			ccorr-linear-per-pipe = <0x01>;
 			ccorr-prim-force-linear = <0x0>;
 			ccorr-linear = <0>;
+			doze-bypass = <0x10001>;
 		};
 
 		disp_ccorr0: disp_ccorr0@1400b000 {
@@ -5864,6 +5888,7 @@
 			ccorr-linear-per-pipe = <0x01>;
 			ccorr-prim-force-linear = <0x0>;
 			ccorr-linear = <1>;
+			doze-bypass = <0x10001>;
 		};
 
 		disp_aal0: disp_aal0@1400c000 {
@@ -5875,6 +5900,7 @@
 			mtk-aal-support = <1>;
 			mtk-dre30-support = <0>;
 			mtk-cabc-no-support = <1>;
+			doze-bypass = <0x10001>;
 		};
 
 		disp_gamma0: disp_gamma0@1400d000 {
@@ -6068,7 +6094,8 @@
 		irq-remain = <&edge_keypad &edge_mdwdt>,
 			     <&level_vpu_core0 &level_vpu_core1>,
 			     <&level_mali0 &level_mali1>,
-			     <&level_mali2 &level_mali3 &level_mali4>;
+			     <&level_mali2 &level_mali3 &level_mali4>,
+			     <&level_dsi0>;
 
 		resource-ctrl = <&bus26m &infra &syspll>,
 				<&dram_s0 &dram_s1>;
@@ -6130,6 +6157,10 @@
 			level_mali4: level_mali4 {
 				target = <&mali>;
 				value = <0 4 0 0>;
+			};
+			level_dsi0: level-dsi0 {
+				target = <&dsi0>;
+				value = <0 0 0 0>;
 			};
 		};
 		resource-ctrl-list {

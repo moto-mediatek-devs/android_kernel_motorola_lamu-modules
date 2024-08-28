@@ -370,6 +370,7 @@ static const char *const mtk_ddp_comp_stem[MTK_DDP_COMP_TYPE_MAX] = {
 	[MTK_DISP_DSC] = "dsc",
 	[MTK_DISP_VDCM] = "vdcm",
 	[MTK_DISP_MERGE] = "merge",
+	[MTK_DISP_SPLITTER] = "splitter",
 	[MTK_DISP_DPTX] = "dptx",
 	[MTK_DISP_RDMA_OUT_RELAY] = "rmda_out_relay",
 	[MTK_DISP_VIRTUAL] = "virtual",
@@ -1515,6 +1516,10 @@ static int mtk_ddp_iommu_callback(int port, dma_addr_t mva, void *data)
 			mtk_dump_analysis(comp);
 			mtk_dump_reg(comp);
 		} else {
+			if (mtk_ddp_comp_get_type(comp->id) == MTK_DISP_WDMA) {
+				mtk_dump_analysis(comp);
+				mtk_dump_reg(comp);
+			}
 			crtc = &mtk_crtc->base;
 			mtk_drm_crtc_mini_analysis(crtc);
 			mtk_drm_crtc_mini_dump(crtc);
@@ -1547,8 +1552,8 @@ static void mtk_ddp_comp_iommu_register(struct mtk_ddp_comp *comp)
 			mtk_iommu_register_fault_callback(
 						port, mtk_ddp_iommu_callback,
 						comp, false);
-		DDPINFO("%s, id:%s, register the %d port:0x%x\n",
-			__func__, mtk_dump_comp_str_id(comp->id), index, port);
+		DDPINFO("%s, id:%s-%u, register the %d port:0x%x\n",
+			__func__, mtk_dump_comp_str_id(comp->id), comp->id, index, port);
 		index++;
 	}
 }
@@ -1587,7 +1592,7 @@ int mtk_ddp_comp_init(struct device *dev, struct device_node *node,
 	struct platform_device *comp_pdev = NULL;
 	struct resource res;
 
-	DDPINFO("%s+\n", __func__);
+	DDPINFO("%s+ comp:%u\n", __func__, comp->id);
 
 	if (comp_id < 0 || comp_id >= DDP_COMPONENT_ID_MAX)
 		return -EINVAL;
@@ -1666,7 +1671,12 @@ int mtk_ddp_comp_init(struct device *dev, struct device_node *node,
 		mtk_ddp_ovl_iommu_register(comp);
 #endif
 
-	DDPINFO("%s-\n", __func__);
+	/*bit0: doze bypass pq; bit16:hbm bypass pq*/
+	comp->doze_bypass= 0;
+	if (of_property_read_u32(node, "doze-bypass", &comp->doze_bypass))
+		DDPINFO("%s, doze-bypass not define, use default:%d\n", __func__, comp->doze_bypass);
+
+	DDPINFO("%s- comp:%u\n", __func__, comp->id);
 
 	return 0;
 }
@@ -3307,6 +3317,7 @@ void mt6991_mtk_sodi_config(struct drm_device *drm, enum mtk_ddp_comp_id id,
 	} else
 		return;
 
+#if !IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	if (handle == NULL) {
 		if (priv->ovlsys1_regs) {
 			val = 0;
@@ -3342,6 +3353,24 @@ void mt6991_mtk_sodi_config(struct drm_device *drm, enum mtk_ddp_comp_id id,
 				OVLSYS_EXRDMA_PREULTRA_SEL1, val, ~0);
 		}
 	}
+#else
+	if (priv->ovlsys1_regs) {
+		val = 0;
+		SET_VAL_MASK(val, val_mask, 4, OVL_EXDMA3_SEL);
+		SET_VAL_MASK(val, val_mask, 4, OVL_EXDMA4_SEL);
+		SET_VAL_MASK(val, val_mask, 4, OVL_EXDMA5_SEL);
+		SET_VAL_MASK(val, val_mask, 4, OVL_EXDMA6_SEL);
+		if (handle == NULL) {
+			writel_relaxed(val, priv->ovlsys1_regs + OVLSYS_EXRDMA_ULTRA_SEL0);
+			writel_relaxed(val, priv->ovlsys1_regs + OVLSYS_EXRDMA_PREULTRA_SEL0);
+		} else {
+			cmdq_pkt_write(handle, NULL, priv->ovlsys1_regs_pa +
+				OVLSYS_EXRDMA_ULTRA_SEL0, val, ~0);
+			cmdq_pkt_write(handle, NULL, priv->ovlsys1_regs_pa +
+				OVLSYS_EXRDMA_PREULTRA_SEL0, val, ~0);
+		}
+	}
+#endif
 }
 
 void mt6895_mtk_sodi_config(struct drm_device *drm, enum mtk_ddp_comp_id id,
