@@ -732,9 +732,9 @@ static void touch_report(void)
 			 tcm_hcd->wakeup_gesture_enabled) {
 
 		if (touch_data->gesture_id == GESTURE_DOUBLE_TAP) {
-			input_report_key(touch_hcd->input_dev, KEY_WAKEUP, 1);
+			input_report_key(touch_hcd->input_dev, KEY_POWER, 1);
 			input_sync(touch_hcd->input_dev);
-			input_report_key(touch_hcd->input_dev, KEY_WAKEUP, 0);
+			input_report_key(touch_hcd->input_dev, KEY_POWER, 0);
 			input_sync(touch_hcd->input_dev);
 
 		} else if (touch_data->gesture_id == GESTURE_SINGLE_TAP) {
@@ -973,9 +973,10 @@ static int touch_set_input_dev(void)
 #endif
 
 #if WAKEUP_GESTURE
-	set_bit(KEY_WAKEUP, touch_hcd->input_dev->keybit);
+	set_bit(KEY_POWER, touch_hcd->input_dev->keybit);
 	set_bit(KEY_U, touch_hcd->input_dev->keybit);
-	input_set_capability(touch_hcd->input_dev, EV_KEY, KEY_WAKEUP);
+	input_set_capability(touch_hcd->input_dev, EV_KEY, KEY_POWER);
+	input_set_capability(touch_hcd->input_dev, EV_KEY, KEY_U);
 #endif
 
 	retval = touch_set_input_params();
