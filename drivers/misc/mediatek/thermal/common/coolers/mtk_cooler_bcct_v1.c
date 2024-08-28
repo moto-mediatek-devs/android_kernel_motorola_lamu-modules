@@ -22,6 +22,11 @@
 #include "mtk_disp_notify.h"
 #include <linux/fb.h>
 
+/*TN add begin by libei.guo/860712 20240821/EKLAMU-3328*/
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+#include "../../../../../../oem/devinfo/dev_info.h"
+#endif
+/*TN add end by libei.guo/860712 20240821/EKLAMU-3328*/
 
 static int cl_bcct_klog_on;
 
@@ -359,11 +364,19 @@ static int mtk_cooler_bcct_register_ltf(void)
 
 	chrlmt_register(&cl_bcct_chrlmt_handle);
 
+/*TN add begin by libei.guo/860712 20240821/EKLAMU-3328*/
 #if (MAX_NUM_INSTANCE_MTK_COOLER_BCCT == 3)
-	MTK_CL_BCCT_SET_LIMIT(1000, cl_bcct_state[0]);
-	MTK_CL_BCCT_SET_LIMIT(500, cl_bcct_state[1]);
-	MTK_CL_BCCT_SET_LIMIT(0, cl_bcct_state[2]);
+	if (oem_pcba_charge_power() == CHARGE_POWER_33W) {
+		MTK_CL_BCCT_SET_LIMIT(4500, cl_bcct_state[0]);
+		MTK_CL_BCCT_SET_LIMIT(3500, cl_bcct_state[1]);
+		MTK_CL_BCCT_SET_LIMIT(500, cl_bcct_state[2]);
+	} else {
+		MTK_CL_BCCT_SET_LIMIT(3200, cl_bcct_state[0]);
+		MTK_CL_BCCT_SET_LIMIT(2500, cl_bcct_state[1]);
+		MTK_CL_BCCT_SET_LIMIT(1000, cl_bcct_state[2]);
+	}
 #endif
+/*TN add end by libei.guo/860712 20240821/EKLAMU-3328*/
 
 	for (i = MAX_NUM_INSTANCE_MTK_COOLER_BCCT; i-- > 0;) {
 		char temp[20] = { 0 };
