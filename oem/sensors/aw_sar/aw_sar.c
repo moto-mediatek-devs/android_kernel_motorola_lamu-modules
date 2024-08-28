@@ -46,10 +46,16 @@ static int32_t aw_sar_get_chip_info(struct aw_sar *p_sar);
 static void aw_sar_sensor_free(struct aw_sar *p_sar);
 //TN modified by jiawei.zou 20240816 for earphone_plug cali BEGIN
 #define SAR_CALI_EVENT 0x63616c87
-struct aw_sar *global_sar = NULL;
 extern int register_sar_notifier(struct notifier_block *nb);
 extern int unregister_sar_notifier(struct notifier_block *nb);
 //TN modified by jiawei.zou 20240816 for earphone_plug cali END
+
+//TN modified by jiawei.zou 20240821 for add delay_cali BEGIN
+#include <linux/timer.h>
+static struct timer_list delay_timer;
+static bool delay_flag = false;
+static int Delay_calibration_all(struct aw_sar *p_sar);
+//TN modified by jiawei.zou 20240821 for add delay_cali END
 
 //Because disable/enable_irq api Therefore, IRQ is embedded
 void aw_sar_disable_irq(struct aw_sar *p_sar)
@@ -1979,6 +1985,24 @@ static void aw_sar_init_lock(struct aw_sar *p_sar)
 	p_sar->ret_val = AW_OK;
 }
 
+//TN modified by jiawei.zou 20240826 for add delay_cali BEGIN
+void delay_timer_callback(struct timer_list *t)
+{
+	pr_err("delay_timer_callback entering debounce reset.\n");
+	delay_flag = false;
+}
+
+static int Delay_calibration_all(struct aw_sar *p_sar)
+{
+	delay_flag = true;
+	AWLOGE(p_sar->dev," Delay_calibration_all enter debounce 11.\n");
+	msleep(1500);
+	aw_sar_aot(p_sar);
+	AWLOGE(p_sar->dev," Delay_calibration_all cali ok.\n");
+	return 0;
+}
+//TN modified by jiawei.zou 20240826 for add delay_cali End
+
 // AW_SAR_USB_PLUG_CAIL start
 static void aw_sar_ps_notify_callback_work(struct work_struct *work)
 {
@@ -1987,7 +2011,7 @@ static void aw_sar_ps_notify_callback_work(struct work_struct *work)
 
 	AWLOGD(p_sar->dev, "enter");
 
-	aw_sar_aot(p_sar);
+	Delay_calibration_all(p_sar);
 }
 
 static int aw_sar_ps_get_state(struct aw_sar *p_sar, struct power_supply *psy,
@@ -2043,6 +2067,11 @@ static int aw_sar_ps_notify_callback(struct notifier_block *self,
 				}
 		}
 		p_sar->ps_is_present = present;
+		mod_timer(&delay_timer, jiffies + msecs_to_jiffies(1500));
+		if(delay_flag){
+			AWLOGE(p_sar->dev," Delay_calibration_all entering debounce.\n");
+			return 0;
+		}
 		schedule_work(&p_sar->ps_notify_work);
 	}
 	return 0;
@@ -2268,7 +2297,7 @@ int aw_sar_event_handle(struct notifier_block *nb, unsigned long event, void *v)
 {
 	switch(event){
 		case SAR_CALI_EVENT:
-			aw_sar_aot(global_sar);
+			aw_sar_aot(p_class);
 			break;
 		default:
 			break;
@@ -2358,7 +2387,6 @@ static int32_t aw_sar_i2c_probe(struct i2c_client *i2c) //todo
 		ret = -AW_ERR;
 		goto err_malloc;
 	}
-	global_sar = p_sar;//TN modified by jiawei.zou 20240816 for earphone_plug cali
 	p_sar->dev = &i2c->dev;
 	p_sar->i2c = i2c;
 	i2c_set_clientdata(i2c, p_sar);
@@ -2386,6 +2414,7 @@ static int32_t aw_sar_i2c_probe(struct i2c_client *i2c) //todo
 
 	AWLOGD(&i2c->dev, "probe success!");
 	p_class = p_sar;
+	timer_setup(&delay_timer, delay_timer_callback, 0);//TN modified by jiawei.zou 20240821 for add delay_cali
 	ret = class_register(&sar_class); //debug fs path:/sys/class/sar/*
 	if (ret < 0) {
 		AWLOGE(&i2c->dev, "class_register failed\n");
@@ -2403,6 +2432,7 @@ err_malloc:
 //TN modified by jiawei.zou 20240816 for earphone_plug cali Begin
 	if (ret != 0) {
 		unregister_sar_notifier(&aw_sar_notifier);
+		del_timer_sync(&delay_timer);
 	}
 //TN modified by jiawei.zou 20240816 for earphone_plug cali End
 	return ret;
@@ -2433,7 +2463,7 @@ static void aw_sar_i2c_remove(struct i2c_client *i2c)
 	}
 
 	aw_sar_sensor_free(p_sar);
-
+	del_timer_sync(&delay_timer);
 	AWLOGI(p_sar->dev, "%s ok!", __func__);
 }
 

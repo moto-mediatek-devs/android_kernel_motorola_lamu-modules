@@ -56,6 +56,7 @@
 
 #include <linux/notifier.h>
 #include <linux/timer.h>
+#include <linux/delay.h>
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
 #include "../../devinfo/dev_info.h"
 #endif
@@ -111,7 +112,7 @@ static struct hx9031as_near_far_threshold1 hx9031as_ch_thres1[HX9031AS_CH_NUM] =
 	{ .thr_near = 640, .thr_far = 320 }, //ch0
 	{ .thr_near = 512, .thr_far = 480 },
 	{ .thr_near = 640, .thr_far = 640 },
-	{ .thr_near = 128, .thr_far = 96 },
+	{ .thr_near = 96, .thr_far = 96 },
 	{ .thr_near = 416, .thr_far = 384 },
 };
 
@@ -2152,31 +2153,30 @@ static void hx9031as_input_deinit_abs(struct i2c_client *client)
 }
 #endif
 
-
+//TN modified by jiawei.zou 20240826 for add delay_cali Begin
 void debounce_timer_callback(struct timer_list *t)
 {
+	PRINT_INF("zjw debounce_timer_callback enter reset debounce ok.\n");
     debounce_flag = false;
 }
 
 static int Debounce_calibration_all(void)
 {
-	if(debounce_flag){
-		PRINT_INF("zjw Debounce_calibration_all enter debounce.\n");
-		return 1;
-	}
 	debounce_flag = true;
 	PRINT_INF("zjw Debounce_calibration_all enter debounce 11.\n");
-	mod_timer(&debounce_timer, jiffies + msecs_to_jiffies(1500));
+	msleep(1500);
 	hx9031as_manual_offset_calibration_all_chs();
+	PRINT_ERR("zjw Debounce_calibration_all calibrated.\n");
 	return 0;
 }
+//TN modified by jiawei.zou 20240826 for add delay_cali End
 
 int sar_event_handle(struct notifier_block *nb, unsigned long event, void *v)
 {
 	switch(event){
 		case SAR_CALI_EVENT:
 			PRINT_INF("zjw sar_event_handle enter SAR_CALI_EVENT.\n");
-			Debounce_calibration_all();
+			hx9031as_manual_offset_calibration_all_chs();
 			break;
 		default:
 			break;
@@ -2239,6 +2239,11 @@ static int hx9031as_ps_notify_callback(struct notifier_block *self,
 				return 0;
 		}
 		hx9031as_pdata.ps_is_present = present;
+		mod_timer(&debounce_timer, jiffies + msecs_to_jiffies(1500));
+		if(debounce_flag){
+			PRINT_ERR("zjw Delay_calibration_all enter debounce.\n");
+			return 0;
+		}
 		schedule_work(&hx9031as_pdata.ps_notify_work);
 	}
 	return 0;
