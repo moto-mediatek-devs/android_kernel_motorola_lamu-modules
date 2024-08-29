@@ -5150,9 +5150,21 @@ static signed int WPE_probe(struct platform_device *pDev)
 		LOG_ERR("[ERROR] Unable to allocate WPE_devs\n");
 		return -ENOMEM;
 	}
+
 	WPE_devs = _wpe_dev;
 
+	if (WPE_devs == NULL || nr_WPE_devs <= 0) {
+		LOG_ERR("No device instances available\n");
+		return -EINVAL;
+	}
+
 	WPE_dev = &(WPE_devs[nr_WPE_devs - 1]);
+
+	if (!WPE_dev) {
+		LOG_ERR("WPE_dev is NULL\n");
+		return -EFAULT;
+	}
+
 	WPE_dev->dev = &pDev->dev;
 
 	/* iomap registers */

@@ -725,6 +725,26 @@ done:
 EXPORT_SYMBOL(gpufreq_get_dynamic_power);
 
 /***********************************************************************************
+ * Function Name      : gpufreq_get_cur_temperature
+ * Inputs             : -
+ * Outputs            : -
+ * Returns            : temper - Current temperature of GPU
+ * Description        : Query current temperature of GPU
+ ***********************************************************************************/
+int gpufreq_get_cur_temperature(void)
+{
+	int temper = -274;
+
+	if (g_shared_status)
+		temper = g_shared_status->temperature;
+	else
+		GPUFREQ_LOGE("null gpufreq shared memory (ENOENT)");
+
+	return temper;
+}
+EXPORT_SYMBOL(gpufreq_get_cur_temperature);
+
+/***********************************************************************************
  * Function Name      : gpufreq_power_control
  * Inputs             : power          - Target power state
  * Outputs            : -
@@ -1469,7 +1489,7 @@ int gpufreq_set_mfgsys_config(enum gpufreq_config_target target, enum gpufreq_co
 	int ret = GPUFREQ_SUCCESS;
 
 	/* implement on EB */
-	if (g_gpueb_support && g_gpufreq_ready) {
+	if (g_gpueb_support && g_gpufreq_ready && target < CONFIG_AP_IMPL_BOUNDARY) {
 		raw_spin_lock_irqsave(&gpufreq_ipi_lock, g_ipi_irq_flags);
 		send_msg.cmd_id = CMD_SET_MFGSYS_CONFIG;
 		send_msg.u.mfg_cfg.target = target;
@@ -1871,6 +1891,14 @@ static int gpufreq_gpueb_init(void)
 	struct gpufreq_ipi_data send_msg = {};
 	void __iomem *gpueb_gpr_addr = NULL;
 
+	/* power on GPUEB */
+	ret = gpueb_ctrl(GHPM_ON, MFG1_OFF, SUSPEND_POWER_ON);
+	if (unlikely(ret)) {
+		GPUFREQ_LOGE("fail to power on GPUEB (%d)", ret);
+		gpufreq_abort();
+		goto done;
+	}
+
 	/* init ipi channel */
 	g_ipi_channel = gpueb_get_send_PIN_ID_by_name("IPI_ID_GPUFREQ");
 	if (unlikely(g_ipi_channel < 0)) {
@@ -1885,6 +1913,7 @@ static int gpufreq_gpueb_init(void)
 	g_ipi_magic = readl(gpueb_gpr_addr);
 	if (unlikely(!g_ipi_magic)) {
 		GPUFREQ_LOGE("fail to init ipi magic number");
+		gpufreq_abort();
 		ret = GPUFREQ_EINVAL;
 		goto done;
 	}
@@ -1900,6 +1929,14 @@ static int gpufreq_gpueb_init(void)
 	if (unlikely(ret))
 		GPUFREQ_LOGE("fail to init gpufreq shared memory");
 	raw_spin_unlock_irqrestore(&gpufreq_ipi_lock, g_ipi_irq_flags);
+
+	/* power off GPUEB */
+	ret = gpueb_ctrl(GHPM_OFF, MFG1_OFF, SUSPEND_POWER_OFF);
+	if (unlikely(ret)) {
+		GPUFREQ_LOGE("fail to power off GPUEB (%d)", ret);
+		gpufreq_abort();
+		goto done;
+	}
 
 done:
 	return ret;

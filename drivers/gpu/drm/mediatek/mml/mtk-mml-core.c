@@ -729,7 +729,8 @@ static void dump_task(struct mml_task *task)
 		task->job.jobid,
 		cfg->info.mode,
 		cfg->disp_vdo ? "vdo" : "cmd",
-		ovlid_str(cfg->info.mode, cfg->info.ovlsys_id),
+		task->adaptor_type == MML_ADAPTOR_M2M ?
+			" m2m" : ovlid_str(cfg->info.mode, cfg->info.ovlsys_id),
 		cfg->info.act_time);
 	if (cfg->info.dest[0].pq_config.en_region_pq) {
 		get_frame_str(frame, sizeof(frame), &cfg->info.seg_map);
@@ -1055,6 +1056,7 @@ static void mml_core_qos_update_dpc(struct mml_frame_config *cfg, bool trigger)
 	struct mml_topology_cache *tp = mml_topology_get_cache(cfg->mml);
 	struct mml_task_pipe *task_pipe;
 	struct mml_task *task;
+	const struct mml_topology_path *path = cfg->path[0];
 	u32 srt_bw[mml_max_sys] = {0}, hrt_bw[mml_max_sys] = {0}, srt_bw_max = 0, hrt_bw_max = 0;
 	u32 stash_srt_bw[mml_max_sys] = {0}, stash_hrt_bw[mml_max_sys] = {0};
 	u32 dpc_dvfs_lv = 0;
@@ -1125,6 +1127,10 @@ static void mml_core_qos_update_dpc(struct mml_frame_config *cfg, bool trigger)
 
 	/* set dpc dvfs (mminfra, bus) */
 	mml_dpc_dvfs_set(dpc_dvfs_lv, true);
+	mml_dpc_dvfs_bw_set(path->mmlsys->id, hrt_bw_max);
+
+	if (path->mmlsys2)
+		mml_dpc_dvfs_bw_set(path->mmlsys2->id, hrt_bw_max);
 
 	/* and update in dvfs end case */
 	if (trigger)
@@ -1321,6 +1327,14 @@ static void mml_core_dvfs_begin(struct mml_task *task, u32 pipe)
 	/* note the running task not always current begin task */
 	task_pipe_tmp = list_first_entry_or_null(&path_clt->tasks,
 		typeof(*task_pipe_tmp), entry_clt);
+	while (task_pipe_tmp && task_pipe_tmp->task->done) {
+		if (task_pipe_tmp ==
+			list_last_entry(&path_clt->tasks, typeof(*task_pipe_tmp), entry_clt)) {
+			task_pipe_tmp = NULL;
+			break;
+		}
+		task_pipe_tmp = list_next_entry(task_pipe_tmp, entry_clt);
+	}
 	if (unlikely(!task_pipe_tmp))
 		goto done;
 	/* clear so that qos set api report max bw */
@@ -1429,6 +1443,16 @@ static void mml_core_dvfs_end(struct mml_task *task, u32 pipe)
 
 	task_pipe_cur = list_first_entry_or_null(&path_clt->tasks, typeof(*task_pipe_cur),
 		entry_clt);
+	/* find current item which still running */
+	while (task_pipe_cur && task_pipe_cur->task->done) {
+		if (task_pipe_cur ==
+			list_last_entry(&path_clt->tasks, typeof(*task_pipe_cur), entry_clt)) {
+			task_pipe_cur = NULL;
+			break;
+		}
+		task_pipe_cur = list_next_entry(task_pipe_cur, entry_clt);
+	}
+
 	if (task_pipe_cur) {
 		/* calculate remaining time to complete pixels */
 		max_pixel = task_pipe_cur->task->config->cache[pipe].max_tput_pixel;
@@ -1437,6 +1461,8 @@ static void mml_core_dvfs_end(struct mml_task *task, u32 pipe)
 		if (racing_mode) {
 			throughput = 0;
 			list_for_each_entry(task_pipe_tmp, &path_clt->tasks, entry_clt) {
+				if (task_pipe_tmp->task->done)
+					continue;
 				/* find the max between tasks on same client */
 				throughput = max(throughput, task_pipe_tmp->throughput);
 			}
@@ -1453,6 +1479,8 @@ static void mml_core_dvfs_end(struct mml_task *task, u32 pipe)
 
 		throughput = 0;
 		list_for_each_entry(task_pipe_tmp, &path_clt->tasks, entry_clt) {
+			if (task_pipe_tmp->task->done)
+				continue;
 			/* find the max throughput (frequency) between tasks on same client */
 			throughput = max(throughput, task_pipe_tmp->throughput);
 		}
@@ -1473,6 +1501,8 @@ done:
 			tmp_pipe = 0;
 		mml_core_qos_reset(task, tmp_pipe);
 		list_for_each_entry(task_pipe_tmp, &path_clt->tasks, entry_clt) {
+			if (task_pipe_tmp->task->done)
+				continue;
 			/* force all comp find max bw after reset */
 			mml_core_qos_calc(task_pipe_tmp->task, tmp_pipe, throughput);
 		}
@@ -1727,7 +1757,7 @@ static void core_taskdone(struct work_struct *work)
 #endif
 
 	/* dl mode fast on/off during hw run, so enable mminfra and except flow back */
-	if (mml_iscouple(cfg->info.mode)) {
+	if (!mml_isdc(cfg->info.mode)) {
 		mml_core_mminfra_enable(cfg->mml, 0, path->mmlsys);
 		mml_dpc_exc_keep_task(task, path);
 	}
@@ -1796,8 +1826,11 @@ static void core_taskdone_check(struct mml_task *task)
 
 	/* cnt can be 1 or 2, if dual on and count 2 means pipes done */
 	cnt = atomic_inc_return(&task->pipe_done);
-	if (!cfg->dual || cnt > 1)
+	mml_mmp(taskdone, MMPROFILE_FLAG_PULSE, task->job.jobid, ((cfg->dual << 16) | cnt));
+	if (!cfg->dual || cnt > 1) {
+		task->done = true;
 		kthread_queue_work(cfg->ctx_kt_done, &task->kt_work_done);
+	}
 }
 
 static void core_taskdone_cb(struct cmdq_cb_data data)
@@ -2052,6 +2085,9 @@ static void mml_core_stop_racing_pipe(struct mml_frame_config *cfg, u32 pipe, bo
 static s32 core_flush(struct mml_task *task, u32 pipe)
 {
 	struct mml_frame_config *cfg = task->config;
+	struct cmdq_client *tp_clt = cfg->path[pipe]->clt;
+	struct cmdq_client *rb_clt = mml_get_cmdq_clt(cfg->mml,
+		pipe + GCE_THREAD_START);
 	int i, ret;
 	struct cmdq_pkt *pkt = task->pkts[pipe];
 
@@ -2060,6 +2096,14 @@ static s32 core_flush(struct mml_task *task, u32 pipe)
 	mml_trace_ex_begin("%s", __func__);
 
 	core_enable(task, pipe);
+
+	if (cfg->dpc) {
+		cmdq_check_thread_complete(tp_clt->chan);
+
+		if (cfg->info.mode == MML_MODE_DDP_ADDON ||
+		    cfg->info.mode == MML_MODE_DIRECT_LINK)
+			cmdq_check_thread_complete(rb_clt->chan);
+	}
 
 	/* before flush, wait buffer fence being signaled */
 	task->wait_fence_time[pipe] = sched_clock();
@@ -2162,20 +2206,9 @@ static void core_config_pipe(struct mml_task *task, u32 pipe)
 {
 	s32 err;
 	struct mml_frame_config *cfg = task->config;
-	struct cmdq_client *tp_clt = cfg->path[pipe]->clt;
-	struct cmdq_client *rb_clt = mml_get_cmdq_clt(cfg->mml,
-		pipe + GCE_THREAD_START);
 
 	mml_trace_ex_begin("%s_%u_%u", __func__, pipe, task->job.jobid);
 	task->config_pipe_time[pipe] = sched_clock();
-
-	if (cfg->dpc) {
-		cmdq_check_thread_complete(tp_clt->chan);
-
-		if (cfg->info.mode == MML_MODE_DDP_ADDON ||
-		    cfg->info.mode == MML_MODE_DIRECT_LINK)
-			cmdq_check_thread_complete(rb_clt->chan);
-	}
 
 	err = core_config(task, pipe);
 	if (err < 0) {
@@ -2332,8 +2365,10 @@ static void core_config_task(struct mml_task *task)
 
 	cfg->task_ops->submit_done(task);
 
-	/* dl mode fast on/off during hw run, so disable mminfra and except flow */
-	if (mml_iscouple(cfg->info.mode)) {
+	/* The dl mode fast on/off during hw run, so disable mminfra and except flow
+	 * And addon mode has no taskdone flow, thus release mminfra here to avoid power leak.
+	 */
+	if (!mml_isdc(mode)) {
 		mml_dpc_exc_release_task(task, cfg->path[0]);
 		mml_core_mminfra_disable(cfg->mml, 0, cfg->path[0]->mmlsys);
 	}
@@ -2514,6 +2549,7 @@ void mml_core_submit_task(struct mml_frame_config *cfg, struct mml_task *task)
 {
 	/* reset to 0 in case reuse task */
 	atomic_set(&task->pipe_done, 0);
+	task->done = false;
 	if (task->state == MML_TASK_INITIAL)
 		core_update_config(cfg);
 

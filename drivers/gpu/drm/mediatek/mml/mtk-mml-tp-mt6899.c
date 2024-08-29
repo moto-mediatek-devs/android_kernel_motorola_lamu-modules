@@ -67,7 +67,7 @@ module_param(mml_opp_check, int, 0644);
 int mml_racing_rsz = 1;
 module_param(mml_racing_rsz, int, 0644);
 
-int mml_dpc;
+int mml_dpc = 1;
 module_param(mml_dpc, int, 0644);
 
 /* 0: off
@@ -1159,7 +1159,7 @@ static bool tp_support_dc2(void)
 
 static enum mml_hw_caps support_hw_caps(void)
 {
-	return MML_HW_ALPHARSZ | MML_HW_PQ_HDR | MML_HW_PQ_MATRIX |
+	return MML_HW_ALPHARSZ | MML_HW_PQ_HDR | MML_HW_PQ_MATRIX | MML_HW_MULTI_LAYER |
 		MML_HW_PQ_HDR10 | MML_HW_PQ_HDR10P | MML_HW_PQ_HLG | MML_HW_PQ_HDRVIVID |
 		MML_HW_PQ_FG;
 }
@@ -1178,7 +1178,7 @@ static const struct mml_topology_ops tp_ops_mt6899 = {
 static __init int mml_topology_ip_init(void)
 {
 	/* init hrt mode as max ostd */
-	mtk_mml_hrt_mode = MML_HRT_OSTD_MAX;
+	mtk_mml_hrt_mode = MML_HRT_ENABLE;
 
 	return mml_topology_register_ip(TOPOLOGY_PLATFORM, &tp_ops_mt6899);
 }

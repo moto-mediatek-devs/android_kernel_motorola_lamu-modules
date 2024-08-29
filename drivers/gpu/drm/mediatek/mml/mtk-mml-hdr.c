@@ -142,6 +142,14 @@ static const struct hdr_data mt6985_hdr_data = {
 	.rb_mode = RB_EOF_MODE,
 };
 
+static const struct hdr_data mt6899_mmlt_hdr_data = {
+	.min_tile_width = 16,
+	.cpr = {CMDQ_CPR_MML0_PQ0_ADDR, CMDQ_CPR_MML0_PQ1_ADDR},
+	.gpr = {CMDQ_GPR_R12, CMDQ_GPR_R14},
+	.reg_table = hdr_reg_table_mt6983,
+	.rb_mode = RB_EOF_MODE,
+};
+
 static const struct hdr_data mt6991_mmlt_hdr_data = {
 	.min_tile_width = 16,
 	.cpr = {CMDQ_CPR_MML0_PQ0_ADDR, CMDQ_CPR_MML0_PQ1_ADDR},
@@ -526,6 +534,19 @@ static s32 hdr_config_frame(struct mml_comp *comp, struct mml_task *task,
 			regs[i].mask, reuse, cache, &hdr_frm->reuse_reg);
 		mml_pq_msg("[hdr][config][%x] = %#x mask(%#x)",
 			regs[i].offset, regs[i].value, regs[i].mask);
+	}
+
+	// for debug ALPS09155466, will remove later :
+	// hdr_regs[HDR_TOP] value that bit 0 (hdr_en) should not be 0
+	if (result->hdr_reg_cnt > 1 &&
+		(regs[1].value & 0x1) == 0 &&
+		regs[1].offset == 0) {
+		mml_pq_err("%s:result_id[%llu] [regs][%x] = %#x mask(%#x)",
+			__func__, task->pq_task->comp_config.job_id,
+			regs[0].offset, regs[0].value, regs[0].mask);
+		mml_pq_err("%s:result_id[%llu] [regs][%x] = %#x mask(%#x)",
+			__func__, task->pq_task->comp_config.job_id,
+			regs[1].offset, regs[1].value, regs[1].mask);
 	}
 
 	if (mode == MML_MODE_MML_DECOUPLE || mode == MML_MODE_MML_DECOUPLE2) {
@@ -958,6 +979,7 @@ static s32 hdr_reconfig_frame(struct mml_comp *comp, struct mml_task *task,
 
 	regs = result->hdr_regs;
 	curve = result->hdr_curve;
+
 	if (mode == MML_MODE_MML_DECOUPLE || mode == MML_MODE_MML_DECOUPLE2) {
 		val_idx = 0;
 		for (i = 0; i < hdr_frm->reuse_reg.idx; i++)
@@ -977,6 +999,19 @@ static s32 hdr_reconfig_frame(struct mml_comp *comp, struct mml_task *task,
 		memcpy(hdr->gain_curve, &curve[0], sizeof(u32)*HDR_CURVE_NUM);
 		queue_work(hdr->hdr_curve_wq, &hdr->hdr_curve_task);
 		hdr_hist_ctrl(comp, task, ccfg, result);
+	}
+
+	// for debug ALPS09155466, will remove later :
+	// hdr_regs[HDR_TOP] value that bit 0 (hdr_en) should not be 0
+	if (result->hdr_reg_cnt > 1 &&
+		(regs[1].value & 0x1) == 0 &&
+		regs[1].offset == 0) {
+		mml_pq_err("%s:result_id[%llu] [regs][%x] = %#x mask(%#x)",
+			__func__, task->pq_task->comp_config.job_id,
+			regs[0].offset, regs[0].value, regs[0].mask);
+		mml_pq_err("%s:result_id[%llu] [regs][%x] = %#x mask(%#x)",
+			__func__, task->pq_task->comp_config.job_id,
+			regs[1].offset, regs[1].value, regs[1].mask);
 	}
 
 	mml_pq_msg("%s is_hdr_need_readback[%d]",
@@ -1868,7 +1903,7 @@ const struct of_device_id mml_hdr_driver_dt_match[] = {
 	},
 	{
 		.compatible = "mediatek,mt6899-mml0_hdr",
-		.data = &mt6991_mmlt_hdr_data,
+		.data = &mt6899_mmlt_hdr_data,
 	},
 	{
 		.compatible = "mediatek,mt6899-mml1_hdr",

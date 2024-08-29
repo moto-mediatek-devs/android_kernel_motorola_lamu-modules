@@ -967,16 +967,6 @@ static void mtk_ovl_update_hrt_usage(struct mtk_drm_crtc *mtk_crtc,
 		}
 
 		if (ext_lye_id == 0) {
-			if ((plane_state->mml_mode == MML_MODE_RACING) ||
-				(plane_state->mml_mode == MML_MODE_DIRECT_LINK)) {
-				DDPINFO("%s,ignore mml m:%d-%d,crtc:%u,ovl:%u,l:%u,fmt:0x%x,bpp:%u\n",
-					__func__, plane_state->mml_mode,
-					plane_state->pending.mml_mode,
-					crtc_idx, comp->id, (unsigned int)(phy_id + lye_id),
-					fmt, mtk_crtc->usage_ovl_fmt[(phy_id + lye_id)]);
-				return;
-			}
-
 			mtk_crtc->usage_ovl_fmt[(phy_id + lye_id)] = mtk_get_format_bpp(fmt);
 			mtk_crtc->usage_ovl_compr[(phy_id + lye_id)] =
 					plane_state->prop_val[PLANE_PROP_COMPRESS];
@@ -1363,6 +1353,8 @@ static void mtk_ovl_reset(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle)
 	DDPINFO("%s+ %s\n", __func__, mtk_dump_comp_str(comp));
 	cmdq_pkt_write(handle, comp->cmdq_base,
 			comp->regs_pa + DISP_REG_OVL_RST, BIT(0) | BIT(28), ~0);
+	cmdq_pkt_write(handle, comp->cmdq_base,
+			comp->regs_pa + DISP_REG_OVL_RST, 0, ~0);
 	cmdq_pkt_write(handle, comp->cmdq_base,
 			comp->regs_pa + DISP_REG_OVL_RST, 0, ~0);
 	DDPINFO("%s-\n", __func__);
@@ -2566,7 +2558,10 @@ static void _ovl_common_config(struct mtk_ddp_comp *comp, unsigned int idx,
 	if (params && params->rotate == MTK_PANEL_ROTATE_180)
 		if (drm_crtc_index(&comp->mtk_crtc->base) == 0)
 			rotate = 1;
-
+#ifdef MTK_LCM_PHYSICAL_ROTATION_HW
+	if (drm_crtc_index(&comp->mtk_crtc->base) == 0)
+		rotate = 1;
+#endif
 	if (rotate)
 		offset = (src_x + dst_w) * mtk_drm_format_plane_cpp(fmt, 0) +
 			 (src_y + dst_h - 1) * pitch - 1;
@@ -2803,7 +2798,10 @@ static void mtk_ovl_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
 	if (params && params->rotate == MTK_PANEL_ROTATE_180)
 		if (drm_crtc_index(crtc) == 0)
 			rotate = 1;
-
+#ifdef MTK_LCM_PHYSICAL_ROTATION_HW
+	if (drm_crtc_index(&comp->mtk_crtc->base) == 0)
+		rotate = 1;
+#endif
 	if (state->comp_state.comp_id) {
 		lye_idx = state->comp_state.lye_id;
 		ext_lye_idx = state->comp_state.ext_lye_id;
@@ -3079,8 +3077,10 @@ static void mtk_ovl_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
 
 		if (mtk_drm_helper_get_opt(priv->helper_opt, MTK_DRM_OPT_OVL_BW_MONITOR) &&
 			(crtc_idx == 0) && (pending->prop_val[PLANE_PROP_COMPRESS]) &&
-			(priv->data->mmsys_id != MMSYS_MT6989 &&
-			priv->data->mmsys_id != MMSYS_MT6899)) {
+			(priv->data->mmsys_id != MMSYS_MT6989) &&
+			((state->comp_state.layer_caps & MTK_HWC_UNCHANGED_LAYER) ||
+			(state->comp_state.layer_caps & MTK_HWC_INACTIVE_LAYER) ||
+			(state->comp_state.layer_caps & MTK_HWC_UNCHANGED_FBT_LAYER))) {
 			uint64_t key = 0;
 			int fbt_layer_id = -1;
 			unsigned long long temp_bw_old = temp_bw;
@@ -3230,7 +3230,10 @@ static bool compr_l_config_PVRIC_V3_1(struct mtk_ddp_comp *comp,
 	if (params && params->rotate == MTK_PANEL_ROTATE_180)
 		if (drm_crtc_index(&comp->mtk_crtc->base) == 0)
 			rotate = 1;
-
+#ifdef MTK_LCM_PHYSICAL_ROTATION_HW
+	if (drm_crtc_index(&comp->mtk_crtc->base) == 0)
+		rotate = 1;
+#endif
 	if (state->comp_state.comp_id) {
 		lye_idx = state->comp_state.lye_id;
 		ext_lye_idx = state->comp_state.ext_lye_id;
@@ -3534,7 +3537,10 @@ bool compr_l_config_AFBC_V1_2(struct mtk_ddp_comp *comp,
 	if (params && params->rotate == MTK_PANEL_ROTATE_180)
 		if (drm_crtc_index(&comp->mtk_crtc->base) == 0)
 			rotate = 1;
-
+#ifdef MTK_LCM_PHYSICAL_ROTATION_HW
+	if (drm_crtc_index(&comp->mtk_crtc->base) == 0)
+		rotate = 1;
+#endif
 	if (state->comp_state.comp_id) {
 		lye_idx = state->comp_state.lye_id;
 		ext_lye_idx = state->comp_state.ext_lye_id;

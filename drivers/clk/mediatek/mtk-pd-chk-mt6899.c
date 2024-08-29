@@ -15,6 +15,7 @@
 #include "clkchk-mt6899.h"
 #include "clk-fmeter.h"
 #include "clk-mt6899-fmeter.h"
+#include "mtk-scpsys.h"
 
 #define TAG				"[pdchk] "
 #define BUG_ON_CHK_ENABLE		0
@@ -605,8 +606,8 @@ struct subsys_cgs_check {
 
 struct subsys_cgs_check mtk_subsys_check[] = {
 	{MT6899_CHK_PD_PERI_AUDIO, PD_NULL, afe_swcgs, afe},
-	{MT6899_CHK_PD_DIS1, MT6899_CHK_PD_DISP_VCORE, dispsys_config_swcgs, mm},
-	{MT6899_CHK_PD_DISP_VCORE, MT6899_CHK_PD_MM_INFRA, dispsys1_config_swcgs, mm1},
+	{MT6899_CHK_PD_DIS0, MT6899_CHK_PD_DIS1, dispsys_config_swcgs, mm},
+	{MT6899_CHK_PD_DIS1, MT6899_CHK_PD_DISP_VCORE, dispsys1_config_swcgs, mm1},
 	{MT6899_CHK_PD_OVL0, MT6899_CHK_PD_DIS1, ovlsys_config_swcgs, ovl},
 	{MT6899_CHK_PD_ISP_MAIN, MT6899_CHK_PD_ISP_VCORE, imgsys_main_swcgs, img},
 	{MT6899_CHK_PD_ISP_DIP1, MT6899_CHK_PD_ISP_MAIN, dip_top_dip1_swcgs, dip_top_dip1},
@@ -740,6 +741,7 @@ static enum chk_sys_id debug_dump_id[] = {
 	mm_hwv,
 	hfrp,
 	hfrp_bus,
+	hfrp_mmbuck,
 	mminfra_hwvote,
 	chk_sys_num,
 };
@@ -984,6 +986,15 @@ static void check_mm_hwv_irq_sta(void)
 		debug_dump(MT6899_CHK_PD_NUM, 0);
 }
 
+static bool get_mtcmos_sw_state(struct generic_pm_domain *pd)
+{
+	struct scp_domain *scpd = container_of(pd, struct scp_domain, genpd);
+
+	if (scpd->is_on)
+		pr_notice("%s is %s\n", pd->name, scpd->is_on? "on" : "off");
+	return scpd->is_on;
+}
+
 /*
  * init functions
  */
@@ -1005,6 +1016,7 @@ static struct pdchk_ops pdchk_mt6899_ops = {
 	.is_suspend_retry_stop = pdchk_is_suspend_retry_stop,
 	.check_hwv_irq_sta = check_hwv_irq_sta,
 	.check_mm_hwv_irq_sta = check_mm_hwv_irq_sta,
+	.get_mtcmos_sw_state = get_mtcmos_sw_state,
 };
 
 static int pd_chk_mt6899_probe(struct platform_device *pdev)

@@ -27,6 +27,7 @@
 //#define CONFIG_MTK_DISP_NO_LK
 //#define DRM_BYPASS_PQ
 //#define DRM_OVL_SELF_PATTERN
+//#define MTK_DSI1_SUPPORT_DSC1
 
 #define MTK_DRM_FENCE_SUPPORT
 #if IS_ENABLED(CONFIG_MTK_CMDQ_MBOX_EXT)
@@ -96,6 +97,7 @@ struct mtk_mmsys_driver_data {
 	bool ovl_exdma_rule;
 	bool real_srt_ostdl;
 	bool skip_trans;
+	bool wb_skip_sec_buf;
 	void (*update_channel_hrt)(struct mtk_drm_crtc *mtk_crtc,
 			unsigned int bw_base, unsigned int channel_bw[]);
 	unsigned int (*get_channel_idx)(enum CHANNEL_TYPE type, unsigned int i);
@@ -209,6 +211,7 @@ struct mtk_drm_private {
 	atomic_t crtc_sf_present[MAX_CRTC];
 	atomic_t crtc_rel_present[MAX_CRTC];
 	ktime_t crtc_last_present_ts[MAX_CRTC];
+	ktime_t crtc_rel_present_ts[MAX_CRTC];
 
 	struct device_node *mutex_node;
 	struct device *mutex_dev;
@@ -496,6 +499,7 @@ extern struct platform_driver mtk_disp_spr_driver;
 extern struct platform_driver mtk_disp_oddmr_driver;
 extern struct lcm_fps_ctx_t lcm_fps_ctx[MAX_CRTC];
 extern struct platform_driver mtk_disp_merge_driver;
+extern struct platform_driver mtk_disp_splitter_driver;
 extern struct platform_driver mtk_dp_tx_driver;
 extern struct platform_driver mtk_dp_intf_driver;
 extern struct platform_driver mtk_disp_y2r_driver;
@@ -510,7 +514,6 @@ extern struct mtk_aod_scp_cb aod_scp_ipi;
 extern struct mtk_vdisp_funcs vdisp_func;
 extern struct mtk_drm_disp_mtee_cb disp_mtee_cb;
 #if IS_ENABLED(CONFIG_DRM_MEDIATEK_EDPTX_AUTO_SUPPORT)
-extern struct platform_driver mtk_dp_phy_driver;
 extern struct platform_driver mtk_dvo_driver;
 #endif
 

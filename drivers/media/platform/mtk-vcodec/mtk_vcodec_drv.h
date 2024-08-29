@@ -55,7 +55,7 @@
 #define MTK_VDEC_ALWAYS_ON_OP_RATE 135
 #define MTK_VENC_MONI_FRM_CNT 8 // Monitor 8 frames
 #define MTK_VCODEC_IPI_THREAD_PRIORITY 1
-#define MTK_VCODEC_MAX_MQ_NODE_CNT  6
+#define MTK_VCODEC_MAX_MQ_NODE_CNT 12
 
 #define MAX_CODEC_FREQ_STEP	10
 #define MTK_VDEC_PORT_NUM	64
@@ -923,6 +923,7 @@ struct mtk_vcodec_dev {
 	struct mtk_vcodec_pm pm;
 	struct notifier_block pm_notifier;
 	bool is_codec_suspending;
+	bool has_backup;
 	bool codec_stop_done;
 
 	int dec_cnt;

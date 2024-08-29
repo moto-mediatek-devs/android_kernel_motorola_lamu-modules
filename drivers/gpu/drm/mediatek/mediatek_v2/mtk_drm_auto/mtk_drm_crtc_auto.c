@@ -13,6 +13,25 @@
 
 #include "mtk_drm_ddp_comp_auto.h"
 #include "mtk_drm_crtc_auto.h"
+#include "../mtk_drm_drv.h"
+
+static struct drm_device *drm_dev;
+
+bool mtk_drm_crtc_layer_need_swap(struct mtk_drm_crtc *mtk_crtc)
+{
+	struct mtk_ddp_comp *output_comp;
+
+	/* dsi0 and dp_intf0 path, primary plane on the top of all plane
+	 * other path, primary plane at the bottom of all plane
+	 */
+	output_comp = mtk_ddp_comp_request_output(mtk_crtc);
+	if (output_comp &&
+	    (output_comp->id == DDP_COMPONENT_DSI0 ||
+	     output_comp->id == DDP_COMPONENT_DP_INTF0))
+		return true;
+	else
+		return false;
+}
 
 struct mtk_ddp_comp *mtk_crtc_get_comp_with_index(struct mtk_drm_crtc *mtk_crtc,
 						  struct mtk_plane_state *plane_state)
@@ -23,13 +42,15 @@ struct mtk_ddp_comp *mtk_crtc_get_comp_with_index(struct mtk_drm_crtc *mtk_crtc,
 
 	unsigned int i, j;
 	struct mtk_ddp_comp *comp;
-	struct mtk_ddp_comp *output_comp;
 
 	if (!plane) {
 		local_index = plane_state->comp_state.lye_id;
 	} else {
 
 		local_index = plane->index - base_plane->index;
+
+		if (mtk_drm_crtc_layer_need_swap(mtk_crtc))
+			local_index = mtk_crtc->layer_nr - 1 - local_index;
 
 		DDPINFO("%s plane index %d base %d\n", __func__, plane->index, base_plane->index);
 	}
@@ -245,4 +266,74 @@ void mtk_drm_crtc_init_layer_nr(struct mtk_drm_crtc *mtk_crtc, int pipe)
 
 	DDPINFO("%s crtc%d layer_nr %d\n", __func__, pipe, mtk_crtc->layer_nr);
 }
+
+void mtk_drm_crtc_dev_init(struct drm_device *dev)
+{
+	if (IS_ERR_OR_NULL(dev))
+		DDPMSG("%s, invalid dev\n", __func__);
+
+	drm_dev = dev;
+}
+
+static void mtk_drm_crtc_layer_off(struct mtk_drm_crtc *mtk_crtc,
+	struct cmdq_pkt *handle)
+{
+	unsigned int i, j;
+	struct mtk_ddp_comp *comp;
+
+	for_each_comp_in_cur_crtc_path(comp, mtk_crtc, i, j) {
+		if (mtk_ddp_comp_is_rdma(comp) && mtk_ddp_comp_is_virt(comp)) {
+			DDPMSG("%s crtc%d layer off %s\n",
+				__func__, drm_crtc_index(&mtk_crtc->base),
+				mtk_dump_comp_str(comp));
+			mtk_ddp_comp_stop(comp, handle);
+		}
+	}
+}
+
+void mtk_drm_crtc_vhost_layer_off(void)
+{
+	u32 i;
+	struct mtk_ddp_comp *comp;
+	struct mtk_drm_private *priv;
+	struct drm_crtc *crtc;
+	struct mtk_drm_crtc *mtk_crtc;
+	struct cmdq_pkt *cmdq_handle = NULL;
+
+	if (IS_ERR_OR_NULL(drm_dev)) {
+		DDPMSG("%s invalid drm dev\n", __func__);
+		return;
+	}
+
+	priv = drm_dev->dev_private;
+	if (IS_ERR_OR_NULL(priv)) {
+		DDPMSG("%s, invalid priv\n", __func__);
+		return;
+	}
+
+	DDPMSG("%s+\n", __func__);
+
+	for (i = 0; i < MAX_CRTC; i++) {
+		if (!priv->crtc[i])
+			continue;
+
+		mtk_crtc = to_mtk_crtc(priv->crtc[i]);
+		if (!mtk_crtc)
+			continue;
+
+		mtk_crtc_pkt_create(&cmdq_handle, &mtk_crtc->base,
+			mtk_crtc->gce_obj.client[CLIENT_CFG]);
+
+		mtk_drm_crtc_layer_off(mtk_crtc, cmdq_handle);
+
+		if (cmdq_handle) {
+			cmdq_pkt_flush(cmdq_handle);
+			cmdq_pkt_destroy(cmdq_handle);
+		}
+	}
+
+	DDPMSG("%s-\n", __func__);
+}
+EXPORT_SYMBOL(mtk_drm_crtc_vhost_layer_off);
+
 #endif

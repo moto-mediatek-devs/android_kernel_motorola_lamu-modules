@@ -2111,10 +2111,8 @@ static bool msdc_data_xfer_done(struct msdc_host *host, u32 events,
 
 		ret = readl_poll_timeout_atomic(host->base + MSDC_DMA_CTRL, val,
 						!(val & MSDC_DMA_CTRL_STOP), 1, 20000);
-		if (ret) {
+		if (ret)
 			dev_info(host->dev, "DMA stop timed out\n");
-			return false;
-		}
 
 		sdr_set_bits(host->base + MSDC_FIFOCS, MSDC_FIFOCS_CLR);
 		ret = readl_poll_timeout_atomic(host->base + MSDC_FIFOCS, val,

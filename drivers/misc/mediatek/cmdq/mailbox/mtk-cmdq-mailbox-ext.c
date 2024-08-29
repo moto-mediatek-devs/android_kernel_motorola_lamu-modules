@@ -124,16 +124,18 @@ struct cmdq_util_controller_fp *cmdq_util_controller;
 #define GCE_VM_ID_MAP2		0x5020
 #define GCE_VM_ID_MAP3		0x5024
 
+#define GCE_DDREN_BIT		(0)
+#define GCE_DDRSRC_BIT		(1)
+#define GCE_EMI_BIT			(2)
+
 #define CMDQ_JUMP_BY_OFFSET		0x10000000
 #define CMDQ_JUMP_BY_PA			0x10000001
 
 #define CMDQ_MIN_AGE_VALUE              (5)	/* currently disable age */
 #define CMDQ_INIT_BUF_SIZE		8484
 
-#define CMDQ_MMINFRA_VOTER_OFS	0x120
-#define CMDQ_MMINFRA_VOTER_GCED_MASK	BIT(7)
-#define CMDQ_MMINFRA_VOTER_GCEM_MASK	BIT(8)
-
+#define GCED_HWID				(0)
+#define GCEM_HWID				(1)
 
 #define CMDQ_DRIVER_NAME		"mtk_cmdq_mbox"
 
@@ -320,7 +322,6 @@ struct cmdq {
 	bool		err_irq;
 	void __iomem	*dram_pwr_base;
 	void __iomem	*mminfra_ao_base;
-	void __iomem	*mminfra_voter_base;
 	bool		error_irq_sw_req;
 	bool		gce_vm;
 	bool		spr3_timer;
@@ -328,7 +329,7 @@ struct cmdq {
 	struct device	*pd_mminfra_1;
 	struct device	*pd_mminfra_ao;
 	bool		gce_ddr_sel_wla;
-	bool		gce_mask_voter;
+	bool		gce_req_wa;
 	unsigned int	dbg3;
 	bool		gce_res_sw_mode;
 };
@@ -697,7 +698,7 @@ static void cmdq_mtcmos_by_fast(struct cmdq *cmdq, bool on)
 				cmdq_err("hwid:%hu usage:%d mminfra power not enable",
 					cmdq->hwid, usage);
 			ret = pm_runtime_put_sync(cmdq->pd_mminfra_1);
-			if (ret != 0)
+			if (ret < 0)
 				cmdq_err("pm_runtime_get_sync err:%d", ret);
 		} else if (usage < 0)
 			cmdq_err("hwid:%u usage:%d cannot below zero",
@@ -813,6 +814,35 @@ void cmdq_thread_set_spr(struct mbox_chan *chan, u8 id, u32 val)
 	cmdq_mtcmos_by_fast(cmdq, false);
 }
 EXPORT_SYMBOL(cmdq_thread_set_spr);
+
+static void cmdq_mbox_set_resource_req(u8 hwid, bool sw_mode, bool req_on, u8 req_bit)
+{
+	u32 val;
+	u32 req_sel = (0x1 << req_bit);
+	u32 req = (0x10000 << req_bit);
+
+	cmdq_log("%s in, hwid:%d sw_mode:%d on:%d req_bit:%d",
+		__func__, hwid, sw_mode, req_on, req_bit);
+
+	if (!g_cmdq[hwid]) {
+		cmdq_err("%s g_cmdq[%d] is NULL", __func__, hwid);
+		return;
+	}
+	val = readl(g_cmdq[hwid]->base + GCE_GCTL_VALUE);
+	if (sw_mode) {
+		if (req_on)
+			writel((val | req_sel) | req,
+				g_cmdq[hwid]->base + GCE_GCTL_VALUE);
+		else
+			writel((val | req_sel) & ~req,
+				g_cmdq[hwid]->base + GCE_GCTL_VALUE);
+	} else {
+		writel((val & ~req_sel) & ~req,
+			g_cmdq[hwid]->base + GCE_GCTL_VALUE);
+	}
+	val = readl(g_cmdq[hwid]->base + GCE_GCTL_VALUE);
+	cmdq_log("%s hwid:%d val:%#x", __func__, hwid, val);
+}
 
 static int cmdq_core_reset(struct cmdq *cmdq)
 {
@@ -3168,7 +3198,7 @@ static int cmdq_probe(struct platform_device *pdev)
 #if !IS_ENABLED(CONFIG_VIRTIO_CMDQ)
 	int port;
 #endif
-	u32 dram_pwr_pa, mminfra_ao_pa, mminfra_voter_pa;
+	u32 dram_pwr_pa, mminfra_ao_pa;
 
 	plat_data = (struct gce_plat *)of_device_get_match_data(dev);
 	if (!plat_data) {
@@ -3472,13 +3502,7 @@ static int cmdq_probe(struct platform_device *pdev)
 		}
 	}
 
-	if (of_property_read_bool(dev->of_node, "gce-mask-voter")) {
-		cmdq->gce_mask_voter = true;
-		if (!of_property_read_u32(dev->of_node, "mminfra-voter-base", &mminfra_voter_pa)) {
-			cmdq_msg("mminfra-voter-base:%#x", mminfra_voter_pa);
-			cmdq->mminfra_voter_base = ioremap(mminfra_voter_pa, 0x1000);
-		}
-	}
+	cmdq->gce_req_wa = of_property_read_bool(dev->of_node, "gce-req-wa");
 
 	if (cmdq->hwid == 0 && cmdq_print_debug)
 		cmdq_util_reserved_memory_lookup(dev);
@@ -3606,7 +3630,7 @@ void cmdq_mbox_enable(void *chan)
 		int ret;
 
 		ret = pm_runtime_get_sync(cmdq->pd_mminfra_1);
-		if (ret != 0)
+		if (ret < 0)
 			cmdq_err("pm_runtime_get_sync err:%d", ret);
 		if (mminfra_power_cb && !mminfra_power_cb())
 			cmdq_err("hwid:%hu usage:%d mminfra power not enable",
@@ -3628,7 +3652,7 @@ void cmdq_mbox_enable(void *chan)
 			int ret;
 
 			ret = pm_runtime_get_sync(cmdq->pd_mminfra_1);
-			if (ret != 0)
+			if (ret < 0)
 				cmdq_err("pm_runtime_get_sync err:%d", ret);
 			if (mminfra_power_cb && !mminfra_power_cb())
 				cmdq_err("hwid:%hu usage:%d mminfra power not enable",
@@ -3718,12 +3742,11 @@ void cmdq_mbox_enable(void *chan)
 				cmdq_util_get_bit_feature() &
 				CMDQ_LOG_FEAT_PERF);
 
-		if (cmdq->gce_mask_voter) {
-			writel(readl(cmdq->mminfra_voter_base + CMDQ_MMINFRA_VOTER_OFS) &
-				~(CMDQ_MMINFRA_VOTER_GCED_MASK),
-				cmdq->mminfra_voter_base + CMDQ_MMINFRA_VOTER_OFS);
-			cmdq_log("%s hwid:%d voter:%#x", __func__, cmdq->hwid,
-				readl(cmdq->mminfra_voter_base + CMDQ_MMINFRA_VOTER_OFS));
+		if (cmdq->gce_req_wa) {
+			cmdq_mbox_set_resource_req(GCED_HWID, true, true, GCE_DDREN_BIT);
+			cmdq_mbox_set_resource_req(GCEM_HWID, true, true, GCE_DDREN_BIT);
+			cmdq_mbox_set_resource_req(GCEM_HWID, true, true, GCE_DDRSRC_BIT);
+			cmdq_mbox_set_resource_req(GCEM_HWID, true, true, GCE_EMI_BIT);
 		}
 
 		cmdq_mtcmos_by_fast(cmdq, false);
@@ -3833,6 +3856,12 @@ void cmdq_mbox_disable(void *chan)
 		clk_disable_unprepare(cmdq->clock_timer);
 		clk_disable_unprepare(cmdq->clock);
 
+		if (cmdq->gce_req_wa) {
+			cmdq_mbox_set_resource_req(GCEM_HWID, true, false, GCE_DDREN_BIT);
+			cmdq_mbox_set_resource_req(GCEM_HWID, true, false, GCE_DDRSRC_BIT);
+			cmdq_mbox_set_resource_req(GCEM_HWID, true, false, GCE_EMI_BIT);
+			cmdq_mbox_set_resource_req(GCED_HWID, false, false, GCE_DDREN_BIT);
+		}
 		cmdq_mtcmos_by_fast(cmdq, false);
 
 		// power
@@ -3847,13 +3876,7 @@ void cmdq_mbox_disable(void *chan)
 				cmdq_err("pm_runtime_put_sync err:%d", ret);
 		}
 
-		if (cmdq->gce_mask_voter) {
-			writel(readl(cmdq->mminfra_voter_base + CMDQ_MMINFRA_VOTER_OFS) |
-				CMDQ_MMINFRA_VOTER_GCED_MASK | CMDQ_MMINFRA_VOTER_GCEM_MASK ,
-				cmdq->mminfra_voter_base + CMDQ_MMINFRA_VOTER_OFS);
-			cmdq_log("%s hwid:%d voter:%#x", __func__, cmdq->hwid,
-				readl(cmdq->mminfra_voter_base + CMDQ_MMINFRA_VOTER_OFS));
-		}
+
 
 		if (cmdq->fast_mtcmos)
 			cmdq_mtcmos_mminfra_ao(cmdq, false);

@@ -92,6 +92,7 @@ static bool mminfra_ao_base;
 static bool vcp_gipc;
 static bool no_sleep_pd_cb;
 static bool skip_apsrc;
+static bool has_infra_hfrp;
 static bool is_mminfra_shutdown;
 static bool mm_no_cg_ctrl;
 static bool mm_no_scmi;
@@ -524,8 +525,10 @@ static int mminfra_voter_mon(void *data)
 		return 0;
 	}
 
-	pr_notice("%s set mm pwr on\n", __func__);
-	pm_runtime_get(dbg->comm_dev[0]);
+	if (!has_infra_hfrp) {
+		pr_notice("%s set mm pwr on\n", __func__);
+		pm_runtime_get(dbg->comm_dev[0]);
+	}
 	voter_addr = ioremap(dbg->mm_voter_base, 0x4);
 	while (!kthread_should_stop()) {
 		val = readl(voter_addr);
@@ -559,7 +562,7 @@ static int mminfra_power_mon(void *data)
 	u32 val;
 	u32 cnt = 0;
 
-	if (mm_pwr_ver == mm_pwr_v2) {
+	if (mm_pwr_ver <= mm_pwr_v2) {
 		if (!dbg || !dbg->mm_mtcmos_base || !dbg->mm_mtcmos_mask) {
 			pr_notice("%s skip\n", __func__);
 			return 0;
@@ -812,11 +815,13 @@ MODULE_PARM_DESC(mminfra_log, "mminfra log");
 
 int mminfra_dbg_ut(const char *val, const struct kernel_param *kp)
 {
+#if IS_ENABLED(CONFIG_MTK_MMINFRA_DEBUG)
 	int ret, i;
 	unsigned int test_case, arg0, arg1, value;
 	void __iomem *mm_proc_mtcmos;
 	void __iomem *mmpc_src_addr;
 	void __iomem *addr;
+	void __iomem *test_base;
 	u32 *mmpc_rsc_user_num = dbg->mmpc_rsc_user;
 
 	ret = sscanf(val, "%u %u %u", &test_case, &arg0, &arg1);
@@ -882,11 +887,26 @@ int mminfra_dbg_ut(const char *val, const struct kernel_param *kp)
 			}
 		}
 		break;
+	case 3:
+		pr_notice("%s: write test index(%d)(%d)(%d)\n", __func__, test_case, arg0, arg1);
+		test_base = ioremap(arg0, 4);
+		writel(arg1, test_base);
+		value = readl_relaxed(test_base);
+		pr_notice("%s: read %x=0x%x\n", __func__, arg0, value);
+		iounmap(test_base);
+		break;
+	case 4:
+		pr_notice("%s: read test index(%d)(%d)(%d)\n", __func__, test_case, arg0, arg1);
+		test_base = ioremap(arg0, 4);
+		value = readl_relaxed(test_base);
+		pr_notice("%s: read %x=0x%x\n", __func__, arg0, value);
+		iounmap(test_base);
+		break;
 	default:
 		pr_notice("%s: wrong test_case(%d)\n", __func__, test_case);
 		break;
 	}
-
+#endif
 	return 0;
 }
 
@@ -1351,6 +1371,7 @@ static int mminfra_debug_probe(struct platform_device *pdev)
 	}
 
 	skip_apsrc = of_property_read_bool(node, "skip-apsrc");
+	has_infra_hfrp = of_property_read_bool(node, "has-infra-hfrp");
 
 	if (!of_property_read_u32(node, "vlp-base", &vlp_base_pa)) {
 		pr_notice("[mminfra] vlp_base_pa=%#x\n", vlp_base_pa);

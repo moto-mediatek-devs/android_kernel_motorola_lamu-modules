@@ -1674,7 +1674,31 @@ static void mdp_qos_init(struct platform_device *pdev, u32 thread_id)
 
 	/* for isp L9 and L11 */
 	MDP_ICC_GET(l9_img_imgi_d1);
-	//TODO fixme
+	MDP_ICC_GET(l9_img_imgbi_d1);
+	MDP_ICC_GET(l9_img_dmgi_d1);
+	MDP_ICC_GET(l9_img_depi_d1);
+	MDP_ICC_GET(l9_img_ice_d1);
+	MDP_ICC_GET(l9_img_smti_d1);
+	MDP_ICC_GET(l9_img_smto_d1);
+	MDP_ICC_GET(l9_img_smto_d2);
+	MDP_ICC_GET(l9_img_crz_d1);
+	MDP_ICC_GET(l9_img_img3o_d1);
+	MDP_ICC_GET(l9_img_vipi_d1);
+	MDP_ICC_GET(l9_img_smti_d5);
+	MDP_ICC_GET(l9_img_timgo_d1);
+	MDP_ICC_GET(l9_img_ufbc_w0);
+	MDP_ICC_GET(l9_img_ufbc_r0);
+	MDP_ICC_GET(l11_img_wpe_rdma0);
+	MDP_ICC_GET(l11_img_wpe_rdma1);
+	MDP_ICC_GET(l11_img_wpe_wdma);
+	MDP_ICC_GET(l11_img_mfb_rdma0);
+	MDP_ICC_GET(l11_img_mfb_rdma1);
+	MDP_ICC_GET(l11_img_mfb_rdma2);
+	MDP_ICC_GET(l11_img_mfb_rdma3);
+	MDP_ICC_GET(l11_img_mfb_rdma4);
+	MDP_ICC_GET(l11_img_mfb_rdma5);
+	MDP_ICC_GET(l11_img_mfb_wdma0);
+	MDP_ICC_GET(l11_img_mfb_wdma1);
 }
 
 static void *mdp_qos_get_path(u32 thread_id, u32 port)
@@ -1918,6 +1942,36 @@ static s32 mdp_get_rdma_idx(u32 eng_base)
 	return rdma_idx;
 }
 
+static u32 mdp_get_poll_gpr(u16 engine, u32 reg_addr)
+{
+	u32 gpr;
+
+	switch (engine) {
+	case ENGBASE_MDP_HDR0:
+	case ENGBASE_MDP_AAL0:
+	case ENGBASE_MDP_RSZ0:
+	case ENGBASE_MDP_TDSHP0:
+	case ENGBASE_MDP_COLOR0:
+	case ENGBASE_MDP_WROT0:
+		gpr = CMDQ_GPR_R12;
+		break;
+	case ENGBASE_MDP_RDMA1:
+	case ENGBASE_MDP_AAL1:
+	case ENGBASE_MDP_RSZ1:
+	case ENGBASE_MDP_TDSHP1:
+	case ENGBASE_MDP_WROT1:
+		gpr = CMDQ_GPR_R14;
+		break;
+	default:
+		CMDQ_ERR("%s engine not support:%hu reg_addr:%#x\n",
+			__func__, engine, reg_addr);
+		gpr = CMDQ_GPR_R12;
+		break;
+	}
+
+	return gpr;
+}
+
 bool mdp_eng_support_readback(u16 engine)
 {
 	return ((1ll << engine) & CMDQ_ENG_SUPPORT_READBACK_GROUP_BITS);
@@ -1944,6 +1998,7 @@ void cmdq_mdp_platform_function_setting(void)
 	pFunc->mdpIsModuleSuspend = mdp_is_mod_suspend;
 	pFunc->mdpDumpEngineUsage = mdp_dump_engine_usage;
 	pFunc->mdpIsEngineSupportReadback = mdp_eng_support_readback;
+	pFunc->mdpGetPollGpr = mdp_get_poll_gpr;
 
 	pFunc->mdpIsMtee = mdp_is_mtee;
 	pFunc->mdpIsIspImg = mdp_is_isp_img;

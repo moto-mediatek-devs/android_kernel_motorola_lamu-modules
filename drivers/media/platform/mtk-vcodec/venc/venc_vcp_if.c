@@ -92,6 +92,10 @@ static void handle_query_cap_ack_msg(struct venc_vcu_ipi_query_cap_ack *msg)
 		memcpy((void *)msg->ap_data_addr, data,
 			size * MTK_MAX_ENC_CODECS_SUPPORT);
 		break;
+	case GET_PARAM_VENC_CAP_COMMON:
+		size = sizeof(struct mtk_codec_capability);
+		memcpy((void *)msg->ap_data_addr, data, size);
+		break;
 	default:
 		break;
 	}
@@ -484,7 +488,7 @@ int vcp_enc_ipi_handler(void *arg)
 	struct venc_vsi *vsi = NULL;
 	struct mtk_vcodec_ctx *ctx;
 	int ret = 0;
-	struct mtk_vcodec_msg_node *mq_node;
+	struct mtk_vcodec_msg_node *mq_node = NULL;
 	struct venc_vcu_ipi_mem_op *shem_msg;
 	unsigned long flags;
 	struct list_head *p, *q;
@@ -513,6 +517,10 @@ int vcp_enc_ipi_handler(void *arg)
 	sched_setscheduler(current, SCHED_FIFO, &sched_p);
 
 	do {
+		if (mq_node != NULL)
+			venc_vcp_free_mq_node(dev, mq_node);
+
+		mq_node = NULL;
 		ret = wait_event_interruptible(dev->mq.wq, atomic_read(&dev->mq.cnt) > 0);
 		if (ret < 0) {
 			mtk_v4l2_debug(0, "wait event return %d (suspending %d)\n",
@@ -533,7 +541,6 @@ int vcp_enc_ipi_handler(void *arg)
 		   (struct venc_vcu_inst *)(unsigned long)msg->ap_inst_addr == NULL) {
 			mtk_v4l2_err(" msg invalid %lx (msg 0x%x)\n",
 				(unsigned long)msg, msg ? msg->msg_id : 0);
-			venc_vcp_free_mq_node(dev, mq_node);
 			continue;
 		}
 
@@ -564,7 +571,6 @@ int vcp_enc_ipi_handler(void *arg)
 					if (ret != IPI_ACTION_DONE)
 						mtk_v4l2_err("mtk_ipi_send fail %d", ret);
 				}
-				venc_vcp_free_mq_node(dev, mq_node);
 				continue;
 			}
 		}
@@ -596,7 +602,6 @@ int vcp_enc_ipi_handler(void *arg)
 				(unsigned long)vcu, (unsigned long)ctx, (unsigned long)inst);
 			mtk_vcodec_dump_ctx_list(dev, 0);
 			mutex_unlock(&dev->ctx_mutex);
-			venc_vcp_free_mq_node(dev, mq_node);
 			continue;
 		}
 		mutex_unlock(&dev->ctx_mutex);
@@ -605,7 +610,6 @@ int vcp_enc_ipi_handler(void *arg)
 			mtk_vcodec_err(vcu, " msg msg_id %X vcu abort %d %d\n",
 				msg->msg_id, vcu->daemon_pid, vcp_cmd_ex(VENC_FEATURE_ID, VCP_GET_GEN, "venc_srv"));
 			mutex_unlock(&ctx->ipi_use_lock);
-			venc_vcp_free_mq_node(dev, mq_node);
 			continue;
 		}
 		inst = container_of(vcu, struct venc_inst, vcu_inst);
@@ -749,7 +753,6 @@ return_venc_ipi_ack:
 		}
 		mtk_vcodec_debug(vcu, "- id=%X", msg->msg_id);
 		mutex_unlock(&ctx->ipi_use_lock);
-		venc_vcp_free_mq_node(dev, mq_node);
 	} while (!kthread_should_stop());
 	mtk_v4l2_debug_leave();
 
@@ -862,7 +865,7 @@ static int vcp_venc_notify_callback(struct notifier_block *this,
 	struct mtk_vcodec_ctx *ctx;
 	int timeout = 0;
 	struct venc_inst *inst = NULL;
-	bool need_ipi;
+	bool need_backup;
 
 	if (!mtk_vcodec_is_vcp(MTK_INST_ENCODER))
 		return 0;
@@ -911,10 +914,12 @@ static int vcp_venc_notify_callback(struct notifier_block *this,
 
 		// send backup ipi to vcp by dev_ctx if vcp has inst
 		mutex_lock(&dev->ctx_mutex);
-		need_ipi = has_valid_vcp_inst(dev);
+		need_backup = has_valid_vcp_inst(dev);
 		mutex_unlock(&dev->ctx_mutex);
-		if (need_ipi)
+		if (need_backup) {
 			venc_vcp_backup((struct venc_inst *)dev->dev_ctx.drv_handle);
+			dev->has_backup = true;
+		}
 
 		while (atomic_read(&dev->mq.cnt)) {
 			timeout += 20;
@@ -927,11 +932,10 @@ static int vcp_venc_notify_callback(struct notifier_block *this,
 	break;
 	case VCP_EVENT_RESUME:
 		// send backup ipi to vcp by dev_ctx if vcp has inst
-		mutex_lock(&dev->ctx_mutex);
-		need_ipi = has_valid_vcp_inst(dev);
-		mutex_unlock(&dev->ctx_mutex);
-		if (need_ipi)
+		if (dev->has_backup) {
 			venc_vcp_resume((struct venc_inst *)dev->dev_ctx.drv_handle);
+			dev->has_backup = false;
+		}
 		dev->is_codec_suspending = 0;
 		break;
 	}
@@ -1605,6 +1609,7 @@ static int venc_vcp_get_param(unsigned long handle,
 	switch (type) {
 	case GET_PARAM_VENC_CAP_FRAME_SIZES:
 	case GET_PARAM_VENC_CAP_SUPPORTED_FORMATS:
+	case GET_PARAM_VENC_CAP_COMMON:
 		memset(&msg, 0, sizeof(msg));
 		msg.msg_id = AP_IPIMSG_ENC_QUERY_CAP;
 		msg.id = type;

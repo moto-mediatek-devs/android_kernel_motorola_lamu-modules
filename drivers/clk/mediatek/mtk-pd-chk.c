@@ -168,16 +168,18 @@ static bool __is_mtcmos_on(int *pd_id, bool dump_en)
 	int valid = 0;
 
 	for (; *pd_id != PD_NULL; pd_id++) {
-		if (!pdchk_pd_is_on(*pd_id))
-			continue;
-
 		if (dump_en) {
 			/* dump devicelist belongs to current power domain */
 			if (pdchk_suspend_is_in_usage(pds[*pd_id]) > 0 || pdchk_get_mtcmos_sw_state(pds[*pd_id])) {
-				pr_notice("suspend warning[0m: %s is on\n", pds[*pd_id]->name);
+				/* HW state is on */
+				if (pdchk_pd_is_on(*pd_id)) {
+					pr_notice("suspend warning[0m: %s is on\n", pds[*pd_id]->name);
+					valid++;
+				} else {
+					pr_notice("suspend warning: %s is SW enabled\n", pds[*pd_id]->name);
+				}
 
 				pdchk_dump_enabled_power_domain(pds[*pd_id]);
-				valid++;
 			}
 		}
 	}
@@ -339,6 +341,20 @@ static void mtk_check_subsys_swcg(unsigned int id)
 }
 #endif
 
+#if IS_ENABLED(CONFIG_MTK_DUMP_CLK_REFCNT_BY_DEVICE)
+static void dump_subsys_clk_user_info(unsigned int id)
+{
+	struct pd_check_swcg *swcg;
+
+	swcg = get_subsys_cg(id);
+
+	while (swcg && swcg->c) {
+		dump_clk_user_info(__clk_get_hw(swcg->c));
+		swcg++;
+	}
+}
+#endif
+
 static void pdchk_trace_power_event(unsigned int id, unsigned int pwr_sta)
 {
 	if (pdchk_ops == NULL || pdchk_ops->trace_power_event == NULL)
@@ -378,6 +394,9 @@ static int mtk_pd_dbg_dump(struct notifier_block *nb,
 		if (pd_evt[nb->priority] == POWER_OFF_STA) {
 			/* dump devicelist belongs to current power domain */
 			pdchk_dump_enabled_power_domain(pds[nb->priority]);
+#if IS_ENABLED(CONFIG_MTK_DUMP_CLK_REFCNT_BY_DEVICE)
+			dump_subsys_clk_user_info(nb->priority);
+#endif
 			pd_debug_dump(nb->priority, PD_PWR_ON);
 		}
 		if (pd_evt[nb->priority] == POWER_ON_STA)
@@ -390,6 +409,9 @@ static int mtk_pd_dbg_dump(struct notifier_block *nb,
 		if (pd_evt[nb->priority] == POWER_ON_STA) {
 			/* dump devicelist belongs to current power domain */
 			pdchk_dump_enabled_power_domain(pds[nb->priority]);
+#if IS_ENABLED(CONFIG_MTK_DUMP_CLK_REFCNT_BY_DEVICE)
+			dump_subsys_clk_user_info(nb->priority);
+#endif
 			pd_debug_dump(nb->priority, PD_PWR_OFF);
 		}
 		if (pd_evt[nb->priority] == POWER_OFF_STA)

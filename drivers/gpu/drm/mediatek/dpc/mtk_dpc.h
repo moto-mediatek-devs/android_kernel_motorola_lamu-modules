@@ -36,6 +36,7 @@ enum mtk_vidle_voter_user {
 	DISP_VIDLE_FORCE_KEEP = 31,
 	DISP_VIDLE_USER_MASK = 0x1f,
 };
+#define MTK_DISP_DPC_VLP_MASK (0xFFFF8000)
 
 enum mtk_vidle_voter_status {
 	VOTER_PM_FAILED = -1,
@@ -117,7 +118,7 @@ struct dpc_funcs {
 
 	/* mtcmos and resource auto mode control */
 	void (*dpc_pause)(const enum mtk_dpc_subsys subsys, bool en);
-	void (*dpc_config)(const enum mtk_dpc_subsys subsys, bool en);
+	int (*dpc_config)(const enum mtk_dpc_subsys subsys, bool en);
 
 	/* exception power control */
 	int (*dpc_vidle_power_keep)(const enum mtk_vidle_voter_user);
@@ -149,6 +150,7 @@ struct dpc_funcs {
 	void (*dpc_clear_wfe_event)(struct cmdq_pkt *pkt, enum mtk_vidle_voter_user user, int event);
 	void (*dpc_mtcmos_vote)(const enum mtk_dpc_subsys subsys, const u8 thread, const bool en);
 	void (*dpc_analysis)(void);
+	void (*dpc_pm_analysis)(void);
 	void (*dpc_debug_cmd)(const char *opt);
 
 	/* V1 ONLY */

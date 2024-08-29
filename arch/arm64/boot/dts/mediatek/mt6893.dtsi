@@ -2345,38 +2345,37 @@ cpus {
 				<0 0x10806000 0 0x100>, /* MBOX0 base */
 				<0 0x10806100 0 0x4>, /* MBOX0 set */
 				<0 0x1080610c 0 0x4>, /* MBOX0 clr */
-				<0 0x10806104 0 0x4>, /* MBOX0 send */
-				<0 0x10806108 0 0x4>, /* MBOX0 recv */
 				<0 0x1080b050 0 0x4>, /* MBOX0 init */
 				<0 0x10807000 0 0x100>, /* MBOX1 base */
 				<0 0x10807100 0 0x4>, /* MBOX1 set */
 				<0 0x1080710c 0 0x4>, /* MBOX1 clr */
-				<0 0x10807104 0 0x4>, /* MBOX1 send */
-				<0 0x10807108 0 0x4>, /* MBOX1 recv */
 				<0 0x1080b054 0 0x4>, /* MBOX1 init */
 				<0 0x10808000 0 0x100>, /* MBOX2 base */
 				<0 0x10808100 0 0x4>, /* MBOX2 set */
 				<0 0x1080810c 0 0x4>, /* MBOX2 clr */
-				<0 0x10808104 0 0x4>, /* MBOX2 send */
-				<0 0x10808108 0 0x4>, /* MBOX2 recv */
 				<0 0x1080b058 0 0x4>, /* MBOX2 init */
 				<0 0x10809000 0 0x100>, /* MBOX3 base */
 				<0 0x10809100 0 0x4>, /* MBOX3 set */
 				<0 0x1080910c 0 0x4>, /* MBOX3 clr */
-				<0 0x10809104 0 0x4>, /* MBOX3 send */
-				<0 0x10809108 0 0x4>, /* MBOX3 recv */
-				<0 0x1080b05c 0 0x4>, /* MBOX3 init */
-				<0 0x10720180 0 0x4>; /* CLK cg */
-			reg-names = "cfg", "cfg_secure",
-				"mbox0_base", "mbox0_set", "mbox0_clr",
-				"mbox0_send", "mbox0_recv", "mbox0_init",
-				"mbox1_base", "mbox1_set", "mbox1_clr",
-				"mbox1_send", "mbox1_recv", "mbox1_init",
-				"mbox2_base", "mbox2_set", "mbox2_clr",
-				"mbox2_send", "mbox2_recv", "mbox2_init",
-				"mbox3_base", "mbox3_set", "mbox3_clr",
-				"mbox3_send", "mbox3_recv", "mbox3_init",
-				"clock_cg";
+				<0 0x1080b05c 0 0x4>; /* MBOX3 init */
+			reg-names = "cfg",
+				    "cfg_secure",
+				    "mbox0_base",
+				    "mbox0_set",
+				    "mbox0_clr",
+				    "mbox0_init",
+				    "mbox1_base",
+				    "mbox1_set",
+				    "mbox1_clr",
+				    "mbox1_init",
+				    "mbox2_base",
+				    "mbox2_set",
+				    "mbox2_clr",
+				    "mbox2_init",
+				    "mbox3_base",
+				    "mbox3_set",
+				    "mbox3_clr",
+				    "mbox3_init";
 
 			interrupts = <GIC_SPI 450 IRQ_TYPE_LEVEL_HIGH 0>, /* MBOX0 */
 				<GIC_SPI 451 IRQ_TYPE_LEVEL_HIGH 0>, /* MBOX1 */
@@ -2416,8 +2415,7 @@ cpus {
 		adsp_core0: adsp-core0@10820000 {
 			compatible = "mediatek,adsp_core_0";
 			status = "okay";
-			reg = <0 0x10800000 0 0x6000>, /* CFG */
-				<0 0x10840000 0 0x9000>, /* ITCM */
+			reg = <0 0x10840000 0 0x9000>, /* ITCM */
 				<0 0x10820000 0 0x8000>; /* DTCM */
 			system = <0 0x56000000 0 0x700000>;
 			interrupts = <GIC_SPI 444 IRQ_TYPE_LEVEL_HIGH 0>,
@@ -2425,14 +2423,13 @@ cpus {
 				<GIC_SPI 448 IRQ_TYPE_LEVEL_HIGH 0>;
 			mboxes = <&adsp_common 0>, /*channel 0*/
 				<&adsp_common 1>; /*channel 1*/
-			feature-control-bits = /bits/ 64 <0x000000000e703ff>;
+			feature-control-bits = /bits/ 64 <0x0000000002703ff>;
 		};
 
 		adsp_core1: adsp-core1@10850000 {
 			compatible = "mediatek,adsp_core_1";
 			status = "okay";
-			reg = <0 0x10800000 0 0x6000>, /* CFG */
-				<0 0x10870000 0 0x9000>, /* ITCM */
+			reg = <0 0x10870000 0 0x9000>, /* ITCM */
 				<0 0x10850000 0 0x8000>; /* DTCM */
 			system = <0 0x56700000 0 0x700000>;
 			interrupts = <GIC_SPI 445 IRQ_TYPE_LEVEL_HIGH 0>,
@@ -2952,10 +2949,10 @@ cpus {
 			pinctrl-19 = <&aud_gpio_i2s3_on>;
 		};
 
-		snd_scp_ultra: snd_scp_ultra {
-			compatible = "mediatek,snd_scp_ultra";
-			scp_ultra_dl_memif_id = <0x7>;
-			scp_ultra_ul_memif_id = <0xf>;
+		snd_scp_ultra: snd-scp-ultra {
+			compatible = "mediatek,snd-scp-ultra";
+			scp-ultra-dl-memif-id = <0x7>;
+			scp-ultra-ul-memif-id = <0xf>;
 		};
 
 		audio_sram@11212000 {
@@ -4016,6 +4013,7 @@ cpus {
 					 <&mdpsys CLK_MDP_SMI2>,
 					 <&mdpsys CLK_MDP_SMI2>;
 			clock-names = "apb", "smi", "gals0", "gals1";
+			skip-tcms-check;
 		};
 
 		smi_larb0: smi-larb0@14118000 {
@@ -6589,6 +6587,7 @@ cpus {
 			clocks = <&ipesys_clk CLK_IPE_SMI_SUBCOM>,
 					 <&ipesys_clk CLK_IPE_LARB19>;
 			clock-names = "apb", "smi";
+			skip-tcms-check;
 		};
 
 		mdpsys: mdpsys@1f000000 {
@@ -7028,7 +7027,7 @@ cpus {
 				"l11_img_mfb_wdma1";
 			mdp-opp = <&opp_table_mdp>;
 			isp-opp = <&opp_table_img>;
-			operating-points-v2 = <&opp_table_mdp>, <&opp_table_img>;
+			operating-points-v2 = <&opp_table_mdp>;
 			mdp-dvfsrc-vcore-supply = <&dvfsrc_vcore>;
 			isp-dvfsrc-vcore-supply = <&dvfsrc_vcore>;
 			dre30-hist-sram-start = /bits/ 16 <1536>;
@@ -7682,6 +7681,7 @@ cpus {
 			reg = <0 0x14007000 0 0x1000>;
 			interrupts = <GIC_SPI 257 IRQ_TYPE_LEVEL_HIGH 0>;
 			clocks = <&mmsys_config_clk CLK_MM_DISP_COLOR0>;
+			doze-bypass = <1>;
 		};
 
 		disp_ccorr0: disp-ccorr0@14008000 {
@@ -7694,7 +7694,8 @@ cpus {
 			ccorr-num-per-pipe = <1>;
 			ccorr-linear-per-pipe = <0x01>;
 			ccorr-prim-force-linear = <0x0>;
-			ccorr-linear = <1>;
+			ccorr-linear = <0>;
+			doze-bypass = <0x10001>;
 		};
 
 		disp_aal0: disp-aal0@14009000 {
@@ -7707,6 +7708,7 @@ cpus {
 			mtk-aal-support = <1>;
 			mtk-dre30-support = <0>;
 			mtk-cabc-no-support = <1>;
+			doze-bypass = <0x10001>;
 		};
 
 		disp_gamma0: disp-gamma0@1400a000 {
@@ -7916,6 +7918,7 @@ cpus {
 			reg = <0 0x14107000 0 0x1000>;
 			interrupts = <GIC_SPI 268 IRQ_TYPE_LEVEL_HIGH 0>;
 			clocks = <&mmsys_config_clk CLK_MM_DISP_COLOR1>;
+			doze-bypass = <1>;
 		};
 
 		disp_ccorr1: disp-ccorr1@14108000 {
@@ -7929,6 +7932,7 @@ cpus {
 			ccorr-linear-per-pipe = <0x01>;
 			ccorr-prim-force-linear = <0x0>;
 			ccorr-linear = <0>;
+			doze-bypass = <0x10001>;
 		};
 
 		disp_aal1: disp-aal1@14109000 {
@@ -7941,6 +7945,7 @@ cpus {
 			mtk-aal-support = <1>;
 			mtk-dre30-support = <0>;
 			mtk-cabc-no-support = <1>;
+			doze-bypass = <0x10001>;
 		};
 
 		disp_gamma1: disp-gamma1@1410a000 {
@@ -8240,25 +8245,25 @@ cpus {
 	/* feature : $enable $dl_mem $ul_mem $ref_mem $size */
 	snd_audio_dsp: snd-audio-dsp {
 		compatible = "mediatek,snd-audio-dsp";
-		mtk-dsp-voip = <0x0 0xffffffff 0xffffffff 0xffffffff 0x30000>;
-		mtk-dsp-primary = <0x0 0xffffffff 0xffffffff \
+		mtk-dsp-voip = <0x1f 0xffffffff 0xffffffff 0xffffffff 0x30000>;
+		mtk-dsp-primary = <0x5 0xffffffff 0xffffffff \
 				   0xffffffff 0x30000>;
-		mtk-dsp-offload = <0x0 0xffffffff 0xffffffff \
+		mtk-dsp-offload = <0x1d 0xffffffff 0xffffffff \
 				   0xffffffff 0x400000>;
-		mtk-dsp-deep = <0x0 0xffffffff 0xffffffff 0xffffffff 0x30000>;
-		mtk-dsp-playback = <0x0 0x4 0xffffffff 0x14 0x30000>;
-		mtk-dsp-music = <0x0 0xffffffff 0xffffffff 0xffffffff 0x0>;
-		mtk-dsp-capture1 = <0x0 0xffffffff 0xd 0x13 0x20000>;
-		mtk-dsp-a2dp = <0x0 0xffffffff 0xffffffff 0xffffffff 0x40000>;
-		mtk-dsp-bledl = <0x0 0xffffffff 0xffffffff 0xffffffff 0x30000>;
+		mtk-dsp-deep = <0x5 0xffffffff 0xffffffff 0xffffffff 0x30000>;
+		mtk-dsp-playback = <0x1 0x4 0xffffffff 0x14 0x30000>;
+		mtk-dsp-music = <0x1 0xffffffff 0xffffffff 0xffffffff 0x0>;
+		mtk-dsp-capture1 = <0x1 0xffffffff 0xd 0x13 0x20000>;
+		mtk-dsp-a2dp = <0x1 0xffffffff 0xffffffff 0xffffffff 0x40000>;
+		mtk-dsp-bledl = <0x1 0xffffffff 0xffffffff 0xffffffff 0x30000>;
 		mtk-dsp-dataprovider = <0x0 0xffffffff 0xf 0xffffffff 0x30000>;
-		mtk-dsp-call-final = <0x0 0x4 0x10 0x14 0x18000>;
-		mtk-dsp-fast = <0x0 0xffffffff 0xffffffff 0xffffffff 0x5000>;
-		mtk-dsp-ktv = <0x0 0x8 0x12 0xffffffff 0x10000>;
-		mtk-dsp-capture-raw = <0x0 0xffffffff 0xffffffff 0xffffffff 0x20000>;
-		mtk-dsp-fm = <0x0 0xffffffff 0x10 0xffffffff 0x10000>;
-		mtk-dsp-ver = <0x0>;
-		swdsp-smartpa-process-enable = <0x0>;
+		mtk-dsp-call-final = <0x5 0x4 0x10 0x14 0x18000>;
+		mtk-dsp-fast = <0x5 0xffffffff 0xffffffff 0xffffffff 0x5000>;
+		mtk-dsp-ktv = <0x1 0x8 0x12 0xffffffff 0x10000>;
+		mtk-dsp-capture-raw = <0x1 0xffffffff 0xffffffff 0xffffffff 0x20000>;
+		mtk-dsp-fm = <0x1 0xffffffff 0x10 0xffffffff 0x10000>;
+		mtk-dsp-ver = <0x1>;
+		swdsp-smartpa-process-enable = <0x5>;
 		mtk-dsp-mem-afe = <0x1 0x40000>;
 	};
 
@@ -8267,9 +8272,11 @@ cpus {
 	};
 
 	/* feature: $enable */
-	speech_usip_mem: speech_usip_mem {
-		compatible = "mediatek,speech_usip_mem";
-		adsp_phone_call_enh_enable = <0x3>;
+	speech_usip_mem: speech-usip-mem {
+		compatible = "mediatek,speech-usip-mem";
+		adsp-phone-call-enh-enable = <0x1>;
+		adsp-phone-call-hwif = <0x0>;
+		adsp-ble-phone-call-enable = <0x0>;
 	};
 
 	mt-soc-offload-common {
@@ -8294,7 +8301,8 @@ cpus {
 			<&level_mali0 &level_mali1 &level_mali2>,
 			<&level_mali3 &level_mali4>,
 			<&level_i2c0>,
-			<&level_btif_tx &level_btif_rx &level_bt>;
+			<&level_btif_tx &level_btif_rx &level_bt>,
+			<&level_dsi0>;
 
 		resource-ctrl = <&bus26m &infra &syspll>,
 				<&dram_s0 &dram_s1>;
@@ -8392,6 +8400,10 @@ cpus {
 			level_btif_rx: level_btif_rx {
 				target = <&btif>;
 				value = <0 2 0 0>;
+			};
+			level_dsi0: level-dsi0 {
+				target = <&dsi0>;
+				value = <0 0 0 0>;
 			};
 		};
 

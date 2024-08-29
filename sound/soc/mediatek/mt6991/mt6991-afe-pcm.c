@@ -79,6 +79,12 @@ static const struct snd_pcm_hardware mt6991_afe_hardware = {
 	.fifo_size = 0,
 };
 
+bool mt6991_is_vow_bargein_memif(int id)
+{
+	return (id == MT6991_BARGE_IN_MEMIF);
+}
+EXPORT_SYMBOL(mt6991_is_vow_bargein_memif);
+
 static int mt6991_fe_startup(struct snd_pcm_substream *substream,
 			     struct snd_soc_dai *dai)
 {
@@ -145,6 +151,10 @@ void mt6991_fe_shutdown(struct snd_pcm_substream *substream,
 		memif->irq_usage = -1;
 		memif->substream = NULL;
 	}
+	dev_info_ratelimited(afe->dev,
+			     "%s(), memif %s afe pm counter %d\n",
+			     __func__, memif->data->name,
+			     atomic_read(&afe->dev->power.usage_count));
 }
 
 int mt6991_fe_trigger(struct snd_pcm_substream *substream, int cmd,
@@ -2796,6 +2806,8 @@ static const struct snd_kcontrol_new memif_ul10_ch1_mix[] = {
 				    I_ADDA_UL_CH3, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("ADDA_UL_CH4", AFE_CONN038_0,
 				    I_ADDA_UL_CH4, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN3_CH1", AFE_CONN038_4,
+				    I_I2SIN3_CH1, 1, 0),
 };
 
 static const struct snd_kcontrol_new memif_ul10_ch2_mix[] = {
@@ -2807,6 +2819,8 @@ static const struct snd_kcontrol_new memif_ul10_ch2_mix[] = {
 				    I_ADDA_UL_CH3, 1, 0),
 	SOC_DAPM_SINGLE_AUTODISABLE("ADDA_UL_CH4", AFE_CONN039_0,
 				    I_ADDA_UL_CH4, 1, 0),
+	SOC_DAPM_SINGLE_AUTODISABLE("I2SIN3_CH2", AFE_CONN039_4,
+				    I_I2SIN3_CH2, 1, 0),
 };
 
 static const struct snd_kcontrol_new memif_ul24_ch1_mix[] = {
@@ -4360,10 +4374,12 @@ static const struct snd_soc_dapm_route mt6991_memif_routes[] = {
 	{"UL10_CH1", "ADDA_UL_CH1", "ADDA_UL_Mux"},
 	{"UL10_CH1", "ADDA_UL_CH2", "ADDA_UL_Mux"},
 	{"UL10_CH1", "ADDA_UL_CH3", "ADDA_CH34_UL_Mux"},
+	{"UL10_CH1", "I2SIN3_CH1", "I2SIN3"},
 	{"UL10_CH2", "ADDA_UL_CH1", "ADDA_UL_Mux"},
 	{"UL10_CH2", "ADDA_UL_CH2", "ADDA_UL_Mux"},
 	{"UL10_CH2", "ADDA_UL_CH3", "ADDA_CH34_UL_Mux"},
 	{"UL10_CH2", "ADDA_UL_CH4", "ADDA_CH34_UL_Mux"},
+	{"UL10_CH2", "I2SIN3_CH2", "I2SIN3"},
 
 	{"UL24", NULL, "UL24_CH1"},
 	{"UL24", NULL, "UL24_CH2"},

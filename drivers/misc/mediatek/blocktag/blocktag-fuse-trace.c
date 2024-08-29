@@ -115,84 +115,81 @@ struct hrtimer pstat_timer;
 
 static void fuse_pstat_inc(void)
 {
-	unsigned long flags;
+	guard(spinlock_irqsave)(&pstat.lock);
 
-	spin_lock_irqsave(&pstat.lock, flags);
 	pstat.accumulator++;
-	spin_unlock_irqrestore(&pstat.lock, flags);
+	if (!hrtimer_active(&pstat_timer))
+		hrtimer_start(&pstat_timer,
+			      ms_to_ktime(PERIODIC_STAT_MS),
+			      HRTIMER_MODE_REL);
 }
 
 static void clean_up_pstat(void)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&pstat.lock, flags);
+	guard(spinlock_irqsave)(&pstat.lock);
 	memset(&pstat, 0, sizeof(pstat));
-	spin_unlock_irqrestore(&pstat.lock, flags);
 }
 
 u64 btag_fuse_pstat_get_last(void)
 {
-	unsigned long flags;
-	u64 ret;
-
-	spin_lock_irqsave(&pstat.lock, flags);
-	ret = pstat.last_cnt;
-	spin_unlock_irqrestore(&pstat.lock, flags);
-
-	return ret;
+	guard(spinlock_irqsave)(&pstat.lock);
+	return pstat.last_cnt;
 }
 
 u64 btag_fuse_pstat_get_max(void)
 {
-	unsigned long flags;
-	u64 ret;
-
-	spin_lock_irqsave(&pstat.lock, flags);
-	ret = pstat.max_cnt;
-	spin_unlock_irqrestore(&pstat.lock, flags);
-
-	return ret;
+	guard(spinlock_irqsave)(&pstat.lock);
+	return pstat.max_cnt;
 }
 
 u64 btag_fuse_pstat_get_distribution(u32 idx)
 {
-	unsigned long flags;
-	u64 ret;
-
 	if (idx >= ARRAY_SIZE(pstat.distribution))
 		return 0;
 
-	spin_lock_irqsave(&pstat.lock, flags);
-	ret = pstat.distribution[idx];
-	spin_unlock_irqrestore(&pstat.lock, flags);
-
-	return ret;
+	guard(spinlock_irqsave)(&pstat.lock);
+	return pstat.distribution[idx];
 }
 
 static enum hrtimer_restart pstat_timer_fn(struct hrtimer *timer)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&pstat.lock, flags);
-	pstat.last_cnt = pstat.accumulator;
-	pstat.accumulator = 0;
-	pstat.distribution[fls(pstat.last_cnt)]++;
-	if (pstat.last_cnt > pstat.max_cnt)
-		pstat.max_cnt = pstat.last_cnt;
-	spin_unlock_irqrestore(&pstat.lock, flags);
+	scoped_guard(spinlock_irqsave, &pstat.lock) {
+		pstat.last_cnt = pstat.accumulator;
+		pstat.distribution[fls(pstat.last_cnt)]++;
+		if (pstat.accumulator) {
+			pstat.accumulator = 0;
+			if (pstat.last_cnt > pstat.max_cnt)
+				pstat.max_cnt = pstat.last_cnt;
+		} else {
+			return HRTIMER_NORESTART;
+		}
+	}
 
 	hrtimer_forward_now(timer, ms_to_ktime(PERIODIC_STAT_MS));
-
 	return HRTIMER_RESTART;
 }
 
 /*
  * Fuse tracer core
  */
+#define TEMP_PID_CNT 32768
+struct pid_fuse_stat_entry {
+	unsigned short req_cnt;
+	unsigned short tgid;
+};
 static struct btag_fuse_req_hist fuse_log;
 static struct btag_fuse_req_stat stat[FUSE_MAXOP];
 static u64 total_req_cnt;
+static struct pid_fuse_stat_entry *pid_fuse_stats;
+static unsigned short fuse_req_max_cnt;
+static unsigned short fuse_req_max_cnt_pid;
+#if IS_ENABLED(CONFIG_CGROUP_SCHED)
+static u64 total_top_cnt, prev_total_top_cnt;
+static u64 total_top_unlink_cnt, prev_total_top_unlink_cnt;
+#else
+static u64 prev_total_req_cnt;
+static u64 total_unlink_cnt, prev_total_unlink_cnt;
+#endif
 static DEFINE_SPINLOCK(stat_lock);
 
 static void btag_fuse_queue_request_and_unlock(void *data,
@@ -205,6 +202,9 @@ static void btag_fuse_queue_request_and_unlock(void *data,
 	struct btag_fuse_entry *e;
 	unsigned long flags;
 	unsigned int idx;
+#if IS_ENABLED(CONFIG_CGROUP_SCHED)
+	struct cgroup *grp;
+#endif
 
 	spin_lock_irqsave(&fuse_log.lock, flags);
 	if (fuse_log.enable) {
@@ -236,7 +236,32 @@ static void btag_fuse_queue_request_and_unlock(void *data,
 		if (filter & FUSE_POSTFILTER)
 			stat[opcode].postfilter++;
 		total_req_cnt++;
+
+#if IS_ENABLED(CONFIG_CGROUP_SCHED)
+		total_top_cnt++;
+		rcu_read_lock();
+		grp = task_cgroup(current, cpuset_cgrp_id);
+		rcu_read_unlock();
+		if (opcode == FUSE_UNLINK) {
+			if (grp->kn->name && !strcmp("top-app", grp->kn->name))
+				total_top_unlink_cnt++;
+		}
+
+#else
+		if (opcode == FUSE_UNLINK)
+			total_unlink_cnt++;
+#endif
+
+		pid_fuse_stats[current->pid].req_cnt++;
+		pid_fuse_stats[current->pid].tgid = current->tgid;
+		if (pid_fuse_stats[current->pid].req_cnt > fuse_req_max_cnt) {
+			fuse_req_max_cnt = pid_fuse_stats[current->pid].req_cnt;
+			fuse_req_max_cnt_pid = current->pid;
+		}
+
 		spin_unlock_irqrestore(&stat_lock, flags);
+
+		mtk_btag_earaio_update_pwd(BTAG_IO_FUSE, 0);
 	}
 
 	if (!opname(opcode))
@@ -323,6 +348,13 @@ static void clean_up_stat(void)
 	spin_lock_irqsave(&stat_lock, flags);
 	memset(stat, 0, sizeof(stat));
 	total_req_cnt = 0;
+#if IS_ENABLED(CONFIG_CGROUP_SCHED)
+	total_top_unlink_cnt = 0;
+	prev_total_top_unlink_cnt = 0;
+#else
+	total_unlink_cnt = 0;
+	prev_total_unlink_cnt = 0;
+#endif
 	spin_unlock_irqrestore(&stat_lock, flags);
 }
 
@@ -620,6 +652,8 @@ void mtk_btag_fuse_init(struct proc_dir_entry *btag_root)
 		goto free_pstat_e;
 	}
 
+	pid_fuse_stats = kzalloc(sizeof(struct pid_fuse_stat_entry)*TEMP_PID_CNT, GFP_KERNEL);
+
 	return;
 
 free_pstat_e:
@@ -643,4 +677,61 @@ void mtk_btag_fuse_exit(void)
 	proc_remove(req_hist_e);
 	proc_remove(fuse_root);
 	uninstall_tracepoints();
+}
+
+void mtk_btag_fuse_get_req_cnt(int *total_cnt, int *unlink_cnt)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&stat_lock, flags);
+#if IS_ENABLED(CONFIG_CGROUP_SCHED)
+	*total_cnt = (int)(total_top_cnt - prev_total_top_cnt);
+	*unlink_cnt = (int)(total_top_unlink_cnt - prev_total_top_unlink_cnt);
+#else
+	*total_cnt = (int)(total_req_cnt - prev_total_req_cnt);
+	*unlink_cnt = (int)(total_unlink_cnt - prev_total_unlink_cnt);
+#endif
+	spin_unlock_irqrestore(&stat_lock, flags);
+}
+
+void mtk_btag_eara_get_fuse_data(struct eara_iostat *data)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&stat_lock, flags);
+#if IS_ENABLED(CONFIG_CGROUP_SCHED)
+	data->fuse_req_cnt = (int)(total_top_cnt - prev_total_top_cnt);
+	data->fuse_unlink_cnt = (int)(total_top_unlink_cnt - prev_total_top_unlink_cnt);
+#else
+	data->fuse_req_cnt = (int)(total_req_cnt - prev_total_req_cnt);
+	data->fuse_unlink_cnt = (int)(total_unlink_cnt - prev_total_unlink_cnt);
+#endif
+
+	data->hot_pid = fuse_req_max_cnt_pid;
+	data->hot_tgid = pid_fuse_stats[fuse_req_max_cnt_pid].tgid;
+	memset(pid_fuse_stats, 0, sizeof(struct pid_fuse_stat_entry)*TEMP_PID_CNT);
+	fuse_req_max_cnt = 0;
+	fuse_req_max_cnt_pid = 0;
+
+#if IS_ENABLED(CONFIG_CGROUP_SCHED)
+	prev_total_top_cnt = total_top_cnt;
+	prev_total_top_unlink_cnt = total_top_unlink_cnt;
+#else
+	prev_total_req_cnt = total_req_cnt;
+	prev_total_unlink_cnt = total_unlink_cnt;
+#endif
+	spin_unlock_irqrestore(&stat_lock, flags);
+}
+
+void mtk_btag_fuse_clear_req_cnt(void)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&stat_lock, flags);
+#if IS_ENABLED(CONFIG_CGROUP_SCHED)
+	prev_total_top_cnt = total_top_cnt;
+#else
+	prev_total_req_cnt = total_req_cnt;
+#endif
+	spin_unlock_irqrestore(&stat_lock, flags);
 }

@@ -33,7 +33,7 @@
 
 	/* chosen */
 	chosen: chosen {
-		bootargs = "console=tty0 console=ttyS0,921600n1 root=/dev/ram \
+		bootargs = "console=tty0 root=/dev/ram \
 			vmalloc=400M swiotlb=noforce \
 			transparent_hugepage=never \
 			initcall_debug=1 pelt=8 \
@@ -41,6 +41,10 @@
 			firmware_class.path=/vendor/firmware \
 			loop.max_part=7";
 			kaslr-seed = <0 0>;
+	};
+
+	mgm: mgm {
+		compatible = "arm,physical-memory-group-manager";
 	};
 
 	cluster0_opp: opp_table0 {
@@ -389,10 +393,12 @@
 		logger-enable-states = "mcusysoff";
 
 		irq-remain = <&edge_keypad &edge_mdwdt>,
+				<&level_vpu_core0 &level_vpu_core1>,
+				<&level_mtk_mdla0 &level_edma0>,
 				<&level_mali0 &level_mali1>,
 				<&level_mali2 &level_mali3 &level_mali4>,
-				<&level_mtk_mdla>,
-				<&level_usb_host>,
+				<&level_i2c0>,
+				<&level_btif_tx &level_btif_rx &level_bt>,
 				<&level_cam1 &level_cam2>;
 
 		resource-ctrl = <&bus26m &infra &syspll>,
@@ -422,7 +428,23 @@
 			};
 			edge_mdwdt: edge_mdwdt {
 				target = <&mddriver>;
-				value = <1 0 0 0x02000000>;
+				value = <1 0 0x80000000 0x02000000>;
+			};
+			level_vpu_core0: level_vpu_core0 {
+				target = <&vpu_core0>;
+				value = <0 0 0 0>;
+			};
+			level_vpu_core1: level_vpu_core1 {
+				target = <&vpu_core1>;
+				value = <0 0 0 0>;
+			};
+			level_mtk_mdla0: level_mtk_mdla0 {
+				target = <&mtk_mdla>;
+				value = <0 0 0 0>;
+			};
+			level_edma0: level_edma0 {
+				target = <&edma0>;
+				value = <0 0 0 0>;
 			};
 			level_mali0: level_mali0 {
 				target = <&mali>;
@@ -444,12 +466,20 @@
 				target = <&mali>;
 				value = <0 4 0 0>;
 			};
-			level_mtk_mdla: level_mtk_mdla {
-				target = <&mtk_mdla>;
+			level_i2c0: level_i2c0 {
+				target = <&i2c0>;
 				value = <0 0 0 0>;
 			};
-			level_usb_host: level_usb_host {
-				target = <&usb_host>;
+			level_btif_tx: level_btif_tx {
+				target = <&btif>;
+				value = <0 1 0 0>;
+			};
+			level_btif_rx: level_btif_rx {
+				target = <&btif>;
+				value = <0 2 0 0>;
+			};
+			level_bt: level_bt {
+				target = <&bt>;
 				value = <0 0 0 0>;
 			};
 			level_cam1: level_cam1 {
@@ -459,6 +489,10 @@
 			level_cam2: level_cam2 {
 					target = <&cam2_legacy>;
 					value = <0 1 0 0>;
+			};
+			level_dsi0: level-dsi0 {
+				target = <&dsi0>;
+				value = <0 0 0 0>;
 			};
 		};
 
@@ -692,7 +726,10 @@
 	};
 
 	hwrng: hwrng {
-		compatible = "mediatek,mt67xx-rng";
+		compatible = "arm,sec-rng";
+		methods = "smc";
+		method-fid = /bits/ 16 <0x26a>;
+		quality = /bits/ 16 <900>;
 	};
 
 	clkitg: clkitg {
@@ -1906,11 +1943,11 @@
 				<1179206984 921600 550 2228224 550 8912896 60>, /* HEIF */
 				<809062486 921600 120 2228224 60 8912896 30>; /* VP9 */
 			throughput-table =
-				<877088845 0 597 597>, /* MPEG4 */
-				<826757197 0 597 597>, /* MPEG1 */
-				<843534413 0 597 597>, /* MPEG2 */
-				<859189832 0 597 597>, /* H.263 */
-				<808996950 0 597 597>, /* VP8 */
+				<877088845 0 643 643>, /* MPEG4 */
+				<826757197 0 643 643>, /* MPEG1 */
+				<843534413 0 643 643>, /* MPEG2 */
+				<859189832 0 643 643>, /* H.263 */
+				<808996950 0 643 643>, /* VP8 */
 				<875967048 0 298 298>, /* H.264 */
 				<826496577 0 298 298>, /* H.264 */
 				<1129727304 0 298 298>, /* HEVC */
@@ -3845,6 +3882,10 @@
 		compatible = "mediatek,security_ao";
 		reg = <0 0x1001a000 0 0x1000>;
 	};
+	masp@1000a000 {
+		compatible = "mediatek,masp";
+		reg = <0 0x1000a000 0 0x1000>;
+	};
 
 	topckgen_ao@1001b000 {
 		compatible = "mediatek,topckgen_ao";
@@ -5464,6 +5505,7 @@
 	mali: mali@13000000 {
 		compatible = "mediatek,mali", "arm,mali-valhall";
 		reg = <0 0x13000000 0 0x4000>;
+		physical-memory-group-manager = <&mgm>;
 		interrupts =
 			<GIC_SPI 453 IRQ_TYPE_LEVEL_HIGH 0>,
 			<GIC_SPI 454 IRQ_TYPE_LEVEL_HIGH 0>,
@@ -5667,8 +5709,8 @@
 			<1>, /*MTK_DRM_OPT_ESD_CHECK_RECOVERY*/
 			<1>, /*MTK_DRM_OPT_ESD_CHECK_SWITCH*/
 			<1>, /*MTK_DRM_OPT_PRESENT_FENCE*/
-			<1>, /*MTK_DRM_OPT_RDMA_UNDERFLOW_AEE*/
-			<1>, /*MTK_DRM_OPT_DSI_UNDERRUN_AEE*/
+			<0>, /*MTK_DRM_OPT_RDMA_UNDERFLOW_AEE*/
+			<0>, /*MTK_DRM_OPT_DSI_UNDERRUN_AEE*/
 			<1>, /*MTK_DRM_OPT_HRT*/
 			<1>, /*MTK_DRM_OPT_HRT_MODE*/
 			<0>, /*MTK_DRM_OPT_DELAYED_TRIGGER*/
@@ -6386,6 +6428,7 @@
 		reg = <0 0x14009000 0 0x1000>;
 		interrupts = <GIC_SPI 303 IRQ_TYPE_LEVEL_HIGH 0>;
 		clocks = <&mmsys_config_clk CLK_MM_DISP_COLOR0>;
+		doze-bypass = <1>;
 	};
 
 	disp_ccorr1: disp_ccorr1@1400a000 {
@@ -6399,6 +6442,7 @@
 		ccorr-linear-per-pipe = <0x01>;
 		ccorr-prim-force-linear = <0x0>;
 		ccorr-linear = <0>;
+		doze-bypass = <0x10001>;
 	};
 
 	disp_ccorr0: disp_ccorr0@1400b000 {
@@ -6412,6 +6456,7 @@
 		ccorr-linear-per-pipe = <0x01>;
 		ccorr-prim-force-linear = <0x0>;
 		ccorr-linear = <1>;
+		doze-bypass = <0x10001>;
 	};
 
 	disp_aal0: disp_aal0@1400c000 {
@@ -6423,6 +6468,7 @@
 		mtk-aal-support = <1>;
 		mtk-dre30-support = <0>;
 		mtk-cabc-no-support = <1>;
+		doze-bypass = <0x10001>;
 	};
 
 	disp_gamma0: disp_gamma0@1400d000 {
@@ -8447,6 +8493,12 @@
 		/*cvsd_mcu_read, write, packet_indicator*/
 		mediatek,offset =<0xf00 0x800 0x140 0x144 0x148>;
 		disable_write_silence = <1>;
+	};
+
+	gpufreq_early_init: gpufreq_early_init {
+		compatible = "mediatek,gpufreq_early_init";
+		vgpu-supply = <&mt6359p_vproc2_reg>;
+		vsram-gpu-supply = <&mt6359p_vsram_md_reg>;
 	};
 
 	gpufreq: gpufreq {

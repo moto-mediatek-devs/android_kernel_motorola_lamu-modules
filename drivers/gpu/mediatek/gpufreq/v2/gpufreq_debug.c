@@ -95,18 +95,20 @@ static int gpufreq_status_proc_show(struct seq_file *m, void *v)
 			g_shared_status->cur_regulator_vsram_stack);
 
 	seq_printf(m,
-		"%-16s SegmentID: %d, WorkingOPPNum: %2d, SignedOPPNum: %2d\n",
+		"%-16s SegmentID: %d, WorkingOPPNum: %2d, SignedOPPNum: %2d, DACLow: %6d\n",
 		"[GPU   Segment]",
 		g_shared_status->segment_id,
 		g_shared_status->opp_num_gpu,
-		g_shared_status->signed_opp_num_gpu);
+		g_shared_status->signed_opp_num_gpu,
+		g_shared_status->dac_low_vgpu);
 	if (g_dual_buck)
 		seq_printf(m,
-			"%-16s SegmentID: %d, WorkingOPPNum: %2d, SignedOPPNum: %2d\n",
+			"%-16s SegmentID: %d, WorkingOPPNum: %2d, SignedOPPNum: %2d, DACLow: %6d\n",
 			"[STACK Segment]",
 			g_shared_status->segment_id,
 			g_shared_status->opp_num_stack,
-			g_shared_status->signed_opp_num_stack);
+			g_shared_status->signed_opp_num_stack,
+			g_shared_status->dac_low_vstack);
 
 	seq_printf(m,
 		"%-16s LimitIndex: %2d, Limiter: %2d, Priority: %2d\n",
@@ -149,7 +151,9 @@ static int gpufreq_status_proc_show(struct seq_file *m, void *v)
 		g_gpueb_support ? "On" : "Off",
 		g_shared_status->stress_test == STRESS_RANDOM ? "Random" :
 		g_shared_status->stress_test == STRESS_TRAVERSE ? "Traverse" :
-		g_shared_status->stress_test == STRESS_MAX_MIN ? "Max_Min" : "Off");
+		g_shared_status->stress_test == STRESS_MAX_MIN ? "Max_Min" :
+		g_shared_status->stress_test == STRESS_ASCENDING ? "Ascending" :
+		g_shared_status->stress_test == STRESS_DESCENDING ? "Descending" : "Off");
 	seq_printf(m,
 		"%-16s AgingMargin: %s, AVSMargin: %s, GPM1.0: %s, GPM3.0: %s, DFD: %s\n",
 		"[MFGSYS Config]",
@@ -169,9 +173,10 @@ static int gpufreq_status_proc_show(struct seq_file *m, void *v)
 		g_shared_status->temper_comp_norm_stack,
 		g_shared_status->temper_comp_high_stack);
 	seq_printf(m,
-		"%-16s DBGVer: 0x%08x, PTPVer: 0x%04x, SBVer: 0x%04x, CType: %d\n",
+		"%-16s DBGVer: 0x%08x, KDBGVer: 0x%08x, PTPVer: 0x%04x, SBVer: 0x%04x, CType: %d\n",
 		"[MFGSYS Config]",
 		g_shared_status->dbg_version,
+		g_shared_status->kdbg_version,
 		g_shared_status->ptp_version,
 		g_shared_status->sb_version,
 		g_shared_status->chip_type);
@@ -435,7 +440,7 @@ static ssize_t limit_table_proc_write(struct file *file,
 
 	mutex_lock(&gpufreq_debug_lock);
 
-	if (sscanf(buf, "%6s %2d %2d %2d", cmd, &limiter, &ceiling, &floor) == 4) {
+	if (sscanf(buf, "%6s %2d %7d %7d", cmd, &limiter, &ceiling, &floor) == 4) {
 		if (sysfs_streq(cmd, "set")) {
 			ret = gpufreq_set_limit(TARGET_DEFAULT, limiter, ceiling, floor);
 			if (ret)
@@ -780,7 +785,9 @@ static int mfgsys_config_proc_show(struct seq_file *m, void *v)
 		"[Misc]",
 		g_shared_status->stress_test == STRESS_RANDOM ? "Random" :
 		g_shared_status->stress_test == STRESS_TRAVERSE ? "Traverse" :
-		g_shared_status->stress_test == STRESS_MAX_MIN ? "Max_Min" : "Disable",
+		g_shared_status->stress_test == STRESS_MAX_MIN ? "Max_Min" :
+		g_shared_status->stress_test == STRESS_ASCENDING ? "Ascending" :
+		g_shared_status->stress_test == STRESS_DESCENDING ? "Descending" : "Disable",
 		g_shared_status->test_mode == TEST_PRIVILEGE ? "Privilege" :
 		g_shared_status->test_mode == TEST_ADVANCED ? "Advanced" : "Normal");
 
@@ -813,8 +820,10 @@ static int mfgsys_config_proc_show(struct seq_file *m, void *v)
 	}
 
 	seq_puts(m, "\n[GPU BModel]\n");
+	seq_printf(m, "VSYS_SEARCH_GPUTOP_DVFS_H1,%d\n", g_shared_status->slt2_bmodel.vgpu_h1);
 	seq_printf(m, "VSYS_SEARCH_GPUTOP_DVFS_H,%d\n", g_shared_status->slt2_bmodel.vgpu_h);
 	seq_printf(m, "VSYS_SEARCH_GPUTOP_DVFS_L,%d\n", g_shared_status->slt2_bmodel.vgpu_l);
+	seq_printf(m, "VSYS_SEARCH_GPUSTACK_DVFS_H1,%d\n", g_shared_status->slt2_bmodel.vstack_h1);
 	seq_printf(m, "VSYS_SEARCH_GPUSTACK_DVFS_H,%d\n", g_shared_status->slt2_bmodel.vstack_h);
 	seq_printf(m, "VSYS_SEARCH_GPUSTACK_DVFS_L,%d\n", g_shared_status->slt2_bmodel.vstack_l);
 
@@ -860,6 +869,10 @@ static ssize_t mfgsys_config_proc_write(struct file *file,
 				val = STRESS_TRAVERSE;
 			else if (sysfs_streq(input_val, "maxmin"))
 				val = STRESS_MAX_MIN;
+			else if (sysfs_streq(input_val, "ascending"))
+				val = STRESS_ASCENDING;
+			else if (sysfs_streq(input_val, "descending"))
+				val = STRESS_DESCENDING;
 		} else if (sysfs_streq(input_target, "margin")) {
 			target = CONFIG_MARGIN;
 			if (sysfs_streq(input_val, "enable"))
@@ -974,6 +987,70 @@ done:
 	return (ret < 0) ? ret : count;
 }
 
+static int whitebox_test_proc_show(struct seq_file *m, void *v)
+{
+	if (g_shared_status->test_mode == TEST_NORMAL)
+		goto done;
+
+	mutex_lock(&gpufreq_debug_lock);
+
+	/* WB test case user guide */
+	seq_puts(m, "[#] [GPUFREQ Whitebox Test Case] [Operation]\n");
+	seq_puts(m, "[0] test_once                    enable\n");
+	seq_puts(m, "[1] mfg1_slave_stress            enable/disable\n");
+
+	mutex_unlock(&gpufreq_debug_lock);
+
+done:
+	return GPUFREQ_SUCCESS;
+}
+
+static ssize_t whitebox_test_proc_write(struct file *file,
+		const char __user *buffer, size_t count, loff_t *data)
+{
+	int ret = GPUFREQ_SUCCESS;
+	char buf[64], input_target[32], input_val[32];
+	unsigned int len = 0;
+	enum gpufreq_config_target target = CONFIG_TARGET_INVALID;
+	enum gpufreq_config_value val = CONFIG_VAL_INVALID;
+
+	len = (count < (sizeof(buf) - 1)) ? count : (sizeof(buf) - 1);
+	if (copy_from_user(buf, buffer, len)) {
+		ret = GPUFREQ_EINVAL;
+		goto done;
+	}
+	buf[len] = '\0';
+
+	if (g_shared_status->test_mode == TEST_NORMAL)
+		goto done;
+
+	mutex_lock(&gpufreq_debug_lock);
+
+	if (sscanf(buf, "%17s %10s", input_target, input_val) == 2) {
+		/* parsing */
+		if (sysfs_streq(input_target, "test_once")) {
+			target = CONFIG_WB_TEST_ONCE;
+			if (sysfs_streq(input_val, "enable"))
+				val = FEAT_ENABLE;
+		} else if (sysfs_streq(input_target, "mfg1_slave_stress")) {
+			target = CONFIG_WB_MFG1_SLAVE_STRESS;
+			if (sysfs_streq(input_val, "enable"))
+				val = FEAT_ENABLE;
+			else if (sysfs_streq(input_val, "disable"))
+				val = FEAT_DISABLE;
+		}
+
+		/* set to mfgsys if valid */
+		if (target != CONFIG_TARGET_INVALID && val != CONFIG_VAL_INVALID)
+			gpufreq_set_mfgsys_config(target, val);
+	}
+
+	mutex_unlock(&gpufreq_debug_lock);
+
+done:
+	return (ret < 0) ? ret : count;
+}
+
 #if GPUFREQ_MSSV_TEST_MODE
 static int mssv_test_proc_show(struct seq_file *m, void *v)
 {
@@ -1070,6 +1147,7 @@ PROC_FOPS_RW(fix_target_opp_index);
 PROC_FOPS_RW(fix_custom_freq_volt);
 PROC_FOPS_RW(mfgsys_power_control);
 PROC_FOPS_RW(mfgsys_config);
+PROC_FOPS_RW(whitebox_test);
 #if GPUFREQ_MSSV_TEST_MODE
 PROC_FOPS_RW(mssv_test);
 #endif /* GPUFREQ_MSSV_TEST_MODE */
@@ -1094,6 +1172,7 @@ static int gpufreq_create_procfs(void)
 		PROC_ENTRY(fix_custom_freq_volt),
 		PROC_ENTRY(mfgsys_power_control),
 		PROC_ENTRY(mfgsys_config),
+		PROC_ENTRY(whitebox_test),
 #if GPUFREQ_MSSV_TEST_MODE
 		PROC_ENTRY(mssv_test),
 #endif /* GPUFREQ_MSSV_TEST_MODE */

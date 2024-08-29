@@ -386,6 +386,15 @@ static irqreturn_t mtk_wdma_irq_handler(int irq, void *dev_id)
 	if ((val & BIT(1)) && !ufbc) {
 		DDPPR_ERR("[IRQ] %s: frame underrun!\n",
 			  mtk_dump_comp_str(wdma));
+
+		if (wdma->mtk_crtc)
+			drm_priv = wdma->mtk_crtc->base.dev->dev_private;
+		if (wdma->mtk_crtc && drm_priv &&
+			drm_priv->data->mmsys_id == MMSYS_MT6899) {
+			mtk_dump_analysis(wdma);
+			mtk_dump_reg(wdma);
+		}
+
 		underrun_new_ts = sched_clock();
 		if (wdma->mtk_crtc && &(wdma->mtk_crtc->base)
 			&& (underrun_new_ts - underrun_old_ts > 1000*1000*1000)) { //1s
@@ -1812,8 +1821,9 @@ golden_setting:
 	gsc = addon_config->addon_wdma_config.p_golden_setting_context;
 	mtk_wdma_golden_setting(comp, gsc, handle);
 
-	DDPINFO("[capture] config addr:0x%lx, roi:(%d,%d,%d,%d)\n",
-		(unsigned long)addr, clip_x, clip_y, clip_w, clip_h);
+	DDPINFO("%s:comp:%u,addr:0x%lx,roi:(%d,%d,%d,%d),fmt:0x%x\n",
+		__func__, comp->id, (unsigned long)addr, clip_x, clip_y,
+		clip_w, clip_h, comp->fb->format->format);
 	cfg_info->addr = addr;
 	cfg_info->width = clip_w;
 	cfg_info->height = clip_h;
@@ -2205,6 +2215,37 @@ int MMPathTraceWDMA(struct mtk_ddp_comp *ddp_comp, char *str,
 	return n;
 }
 
+struct mtk_ddp_comp *mtk_disp_get_wdma_comp_by_scn(struct drm_crtc *crtc, enum addon_scenario scn)
+{
+	const struct mtk_addon_scenario_data *addon_data = NULL;
+	const struct mtk_addon_module_data *addon_module = NULL;
+	const struct mtk_addon_path_data *path_data = NULL;
+	struct mtk_drm_private *priv = NULL;
+	struct mtk_ddp_comp *comp = NULL;
+
+	if (IS_ERR_OR_NULL(crtc))
+		return NULL;
+
+	priv = crtc->dev->dev_private;
+	if (IS_ERR_OR_NULL(priv))
+		return NULL;
+
+	addon_data = mtk_addon_get_scenario_data(__func__, crtc, scn);
+	if (IS_ERR_OR_NULL(addon_data))
+		return NULL;
+
+	addon_module = &addon_data->module_data[0];
+	path_data = mtk_addon_module_get_path(addon_module->module);
+	comp = priv->ddp_comp[path_data->path[path_data->path_len - 1]];
+
+	if (IS_ERR_OR_NULL(comp)) {
+		DDPMSG("%s, invalid wdma comp for scn:%d\n", __func__, scn);
+		return NULL;
+	}
+
+	return comp;
+}
+
 static int mtk_wdma_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 			  enum mtk_ddp_io_cmd cmd, void *params)
 {
@@ -2215,16 +2256,12 @@ static int mtk_wdma_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 	int ret = 0;
 
 	mtk_crtc = comp->mtk_crtc;
-	if (!mtk_crtc) {
-		DDPMSG("%s:%d mtk_crtc is NULL\n", __func__, __LINE__);
+	if (!mtk_crtc)
 		return -1;
-	}
 
 	crtc = &mtk_crtc->base;
-	if (!crtc) {
-		DDPMSG("%s:%d crtc is NULL\n", __func__, __LINE__);
+	if (!crtc)
 		return -1;
-	}
 
 	priv = crtc->dev->dev_private;
 	if (!priv) {
@@ -2309,7 +2346,12 @@ static int mtk_wdma_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 				__func__, comp->id, data->larb_id, comp->larb_num);
 			break;
 		}
-		data->bw = comp->hrt_bw;
+		if (priv->data->mmsys_id == MMSYS_MT6899 &&
+			wdma->info_data->force_ostdl_bw &&
+			!wdma->info_data->is_support_ufbc)
+			data->bw = wdma->info_data->force_ostdl_bw;
+		else
+			data->bw = comp->hrt_bw;
 		if (data->bw > 0)
 			DDPDBG("%s, wdma comp:%d, larb:%d, bw:%d\n",
 				__func__, comp->id, data->larb_id, data->bw);
@@ -2837,7 +2879,7 @@ static const struct mtk_disp_wdma_data mt6899_wdma_driver_data = {
 	.fifo_size_uv_2plane = PARSE_FROM_DTS,
 	.fifo_size_3plane = PARSE_FROM_DTS,
 	.fifo_size_uv_3plane = PARSE_FROM_DTS,
-	.force_ostdl_bw = 7000,
+	.force_ostdl_bw = 3000,
 	.buf_con1_fld_fifo_pseudo_size = REG_FLD_MSB_LSB(11, 0),
 	.buf_con1_fld_fifo_pseudo_size_uv = REG_FLD_MSB_LSB(22, 12),
 	.sodi_config = mt6989_mtk_sodi_config,

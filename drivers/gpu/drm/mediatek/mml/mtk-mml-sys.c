@@ -1136,12 +1136,12 @@ s32 mml_sys_pw_enable(struct mml_comp *comp, const s8 mode)
 
 	ret = mml_comp_pw_enable(comp, mode);
 
-	if (mode == MML_MODE_DIRECT_LINK ||
-		mode == MML_MODE_RACING ||
-		mode == MML_MODE_DDP_ADDON)
-		mml_dpc_mtcmos_auto(comp->sysid, true, mode);
-
 	if (!ret && pwon) {
+		if (mode == MML_MODE_DIRECT_LINK ||
+			mode == MML_MODE_RACING ||
+			mode == MML_MODE_DDP_ADDON)
+			mml_dpc_mtcmos_auto(comp->sysid, true, mode);
+
 		ret = clk_prepare_enable(sys->clk_sys_26m);
 		if (ret)
 			mml_err("%s clk_sys_26m fail %d", __func__, ret);
@@ -1156,13 +1156,14 @@ s32 mml_sys_pw_disable(struct mml_comp *comp, const s8 mode)
 	struct mml_sys *sys = comp_to_sys(comp);
 	bool pwoff = comp->pw_cnt == 1;
 
-	if (pwoff)
+	if (pwoff) {
 		clk_disable_unprepare(sys->clk_sys_26m);
 
-	if (mode == MML_MODE_DIRECT_LINK ||
-		mode == MML_MODE_RACING ||
-		mode == MML_MODE_DDP_ADDON)
-		mml_dpc_mtcmos_auto(comp->sysid, false, mode);
+		if (mode == MML_MODE_DIRECT_LINK ||
+			mode == MML_MODE_RACING ||
+			mode == MML_MODE_DDP_ADDON)
+			mml_dpc_mtcmos_auto(comp->sysid, false, mode);
+	}
 
 	ret = mml_comp_pw_disable(comp, mode);
 
@@ -1178,6 +1179,7 @@ s32 mml_mminfra_pw_enable(struct mml_comp *comp)
 		return ret;
 
 	comp->mminfra_pw_cnt++;
+	mml_mmp(mminfra_enable, MMPROFILE_FLAG_PULSE, comp->id, comp->mminfra_pw_cnt);
 	if (comp->mminfra_pw_cnt > 1)
 		return 0;
 	if (comp->mminfra_pw_cnt <= 0) {
@@ -1212,6 +1214,7 @@ s32 mml_mminfra_pw_disable(struct mml_comp *comp)
 		return ret;
 
 	comp->mminfra_pw_cnt--;
+	mml_mmp(mminfra_disable, MMPROFILE_FLAG_PULSE, comp->id, comp->mminfra_pw_cnt);
 	if (comp->mminfra_pw_cnt > 0)
 		return 0;
 	if (comp->mminfra_pw_cnt < 0) {
