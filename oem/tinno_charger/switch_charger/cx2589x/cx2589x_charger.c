@@ -1120,6 +1120,8 @@ static int cx2589x_charger_set_property(struct power_supply *psy,
 			cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
 #endif
 			cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
+			cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_UNKNOWN;
+
 			/*
 			 * due to we set Auto DPDM enable func to disable when detecting the DCP.
 			 * we should set it back to enable when plug out the charger for next time auto detect.

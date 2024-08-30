@@ -689,7 +689,7 @@ static int sgm4154x_get_state(struct sgm4154x_device *sgm, struct sgm4154x_state
 	state->therm_stat = !!(chrg_stat & SGM4154x_THERM_STAT);
 	state->vsys_stat = !!(chrg_stat & SGM4154x_VSYS_STAT);
 
-	pr_info("chrg_type:0x%x, chrg_stat:0x%x online:%d\n",
+	pr_info("chrg_type:0x%x, chrg_stat:0x%x, online:%d\n",
 		state->chrg_type, state->chrg_stat, state->online);
 
 	ret = sgm4154x_read_reg(sgm, SGM4154x_CHRG_FAULT, &fault);
@@ -973,8 +973,9 @@ static int sgm4154x_plug_out(struct charger_device *chg_dev)
 	int ret = 0;
 	struct sgm4154x_device *sgm = dev_get_drvdata(&chg_dev->dev);
 
-	pr_info("enter, disable charging\n");
+	pr_info("enter\n");
 
+	ret = sgm4154x_set_dpdm_hiz(sgm);
 	ret = sgm4154x_disable_charger(sgm);
 	if (ret) {
 		pr_err("Failed to disable charging:%d\n", ret);
@@ -1215,6 +1216,7 @@ static int sgm4154x_charger_set_property(struct power_supply *psy,
 			sgm->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
 #endif
 			sgm->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
+			sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_UNKNOWN;
 			cancel_delayed_work(&sgm->charge_detect_delayed_work);
 			power_supply_changed(sgm->charger);
 		}
