@@ -56,11 +56,12 @@ int pe50_get_log_level(void)
 #define PE50_VSYS_UPPER_BOUND_GAP        40      /* mV */
 #define PE50_START_SOC_MAX_GAP		4	/* % */
 #define PE50_WHILE_LOOP_ITERATION_MAX	50
-/* TN Begin modified by xinjun.lu/860715 20240820 CR/EKLAMU-202 */
+/* TN Begin modified by xinjun.lu/860715 20240828 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 #define PE50_ENTER_POWER_MIN		30
+#define PE50_SET_CV		4528
 #endif
-/* TN End modified by xinjun.lu/860715 20240820 CR/EKLAMU-202 */
+/* TN End modified by xinjun.lu/860715 20240828 CR/EKLAMU-202 */
 
 
 
@@ -990,6 +991,16 @@ static int pe50_enable_swchg_charging(struct pe50_algo_info *info, bool en)
 
 	PE50_INFO("en = %d\n", en);
 	if (en) {
+/* TN Begin modified by xinjun.lu/860715 20240828 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+		ret = pe50_hal_set_cv(info->alg, CHG1, PE50_SET_CV);
+		if (ret < 0) {
+			PE50_ERR("set cv fail(%d)\n", ret);
+			return ret;
+		}
+#endif
+/* TN End modified by xinjun.lu/860715 20240828 CR/EKLAMU-202 */
+
 		ret = pe50_hal_enable_charging(info->alg, CHG1, true);
 		if (ret < 0) {
 			PE50_ERR("en swchg fail(%d)\n", ret);

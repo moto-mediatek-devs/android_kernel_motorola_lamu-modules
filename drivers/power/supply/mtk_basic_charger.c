@@ -290,16 +290,18 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		is_basic = true;
 	}
 
-/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+/* TN Begin modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
-	info->setting.pe50_fcc_limit = ((info->pe50.target_fcc < 0) ? 0 : info->pe50.target_fcc);
-	if (pdata->thermal_charging_current_limit < 0 ||
-		pdata->thermal_charging_current_limit > info->pe50.min_therm_current_limit)
-		info->setting.pe50_current_limit_dvchg1 = pdata->thermal_charging_current_limit;
-	else
-		info->setting.pe50_current_limit_dvchg1 = info->pe50.min_therm_current_limit;
+	if (!IS_ERR_OR_NULL(info->current_alg) && info->current_alg->alg_id == PE5_ID) {
+		info->setting.pe50_fcc_limit = ((info->pe50.target_fcc < 0) ? 0 : info->pe50.target_fcc);
+		if (pdata->thermal_charging_current_limit < 0 ||
+			pdata->thermal_charging_current_limit > info->pe50.min_therm_current_limit)
+			info->setting.pe50_current_limit_dvchg1 = pdata->thermal_charging_current_limit;
+		else
+			info->setting.pe50_current_limit_dvchg1 = info->pe50.min_therm_current_limit;
+	}
 #endif
-/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+/* TN End modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
 
 	if (support_fast_charging(info))
 		is_basic = false;
@@ -356,14 +358,14 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		}
 	}
 
-/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+/* TN Begin modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
-	//pdata->charging_current_limit = ((info->pe50.target_fcc < 0) ? 0 : info->pe50.target_fcc);
-	chr_err("min_charging_current is too low, info->pe50.target_fcc %d %d\n",
-		pdata->charging_current_limit, info->pe50.target_fcc );
-	info->pe50.target_usb = pdata->input_current_limit;
+	if (!IS_ERR_OR_NULL(info->current_alg) && info->current_alg->alg_id == PE5_ID) {
+		pdata->charging_current_limit = ((info->pe50.target_fcc < 0) ? 0 : info->pe50.target_fcc);
+		info->pe50.target_usb = pdata->input_current_limit;
+	}
 #endif
-/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+/* TN End modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
 
 	sc_select_charging_current(info, pdata);
 
@@ -679,6 +681,15 @@ static int do_algorithm(struct mtk_charger *info)
 				is_basic = true;
 			}
 		}
+/* TN Begin modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+		if (!IS_ERR_OR_NULL(alg) && alg->alg_id == PE5_ID) {
+			info->current_alg = alg;
+		} else {
+			info->current_alg = NULL;
+		}
+#endif
+/* TN End modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
 	} else {
 		if (info->enable_hv_charging != true ||
 		    pdata->charging_current_limit == 0 ||
@@ -697,7 +708,25 @@ static int do_algorithm(struct mtk_charger *info)
 					dev_name(&alg->dev), val);
 			}
 		}
+/* TN Begin modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+		info->current_alg = NULL;
+#endif
+/* TN End modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
+
 	}
+
+/* TN Begin modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	if (!IS_ERR_OR_NULL(info->current_alg))
+		chr_info("%s: Used current alg: %s \n",
+						__func__, dev_name(&info->current_alg->dev));
+	else
+		chr_err("%s: Used current alg is NULL\n",
+						__func__);
+#endif
+/* TN End modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
+
 	info->is_chg_done = chg_done;
 
 	if (is_basic == true) {

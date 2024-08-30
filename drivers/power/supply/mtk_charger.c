@@ -5257,11 +5257,12 @@ static int charger_routine_thread(void *arg)
 
 		check_battery_exist(info);
 		check_dynamic_mivr(info);
-/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+/* TN Begin modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
-		pe50_charger_check_status(info);
+		if (!IS_ERR_OR_NULL(info->current_alg) && info->current_alg->alg_id == PE5_ID)
+			pe50_charger_check_status(info);
 #endif
-/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+/* TN End modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
 		charger_check_status(info);
 		mtk_check_ta_status(info);
 		kpoc_power_off_check(info);

@@ -79,7 +79,7 @@
 			<60 4208 600>;
 };
 
-/* TN Begin modified by xinjun.lu/860715 20240814 CR/EKLAMU-202 */
+/* TN Begin modified by xinjun.lu/860715 20240826 CR/EKLAMU-202 */
 &pe5 {
 	polling-interval = <500>;
 	vbat-cv = <4530>;
@@ -90,8 +90,16 @@
 	pe5_therm_vol_thres = <80>;
 	pe5_therm_step = <3>;
 	pe5_max_ibat = <6000>;
+	tta-level-def = <0 0 0 0 25 40 50 60 70>;
+	tta-curlmt = <0 0 0 0 0 300 600 900 (-1)>;
+	tbat-level-def = <0 0 0 5 25 40 50 55 60>;
+	tbat-curlmt = <(-1) (-1) (-1) 300 0 300 600 900 (-1)>;
+	tdvchg-level-def = <0 0 0 5 25 55 70 85 90>; /* {0, 0, 0, 5, 25, 55, 60, 65, 70} */
+	tdvchg-curlmt = <(-1) (-1) (-1) (-1) (-1) (-1) (-1) 900 (-1)>; /* {-1, -1, -1, 300, 0, 300, 600, 900, -1} */
+	tswchg-level-def = <0 0 0 5 25 55 60 65 70>;
+	tswchg-curlmt = <(-1) (-1) (-1) 200 0 200 300 400 (-1)>;
 };
-/* TN End modified by xinjun.lu/860715 20240814 CR/EKLAMU-202 */
+/* TN End modified by xinjun.lu/860715 20240826 CR/EKLAMU-202 */
 
 &pdc {
 	min_charger_voltage = <4600000>;

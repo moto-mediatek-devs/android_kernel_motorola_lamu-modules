@@ -729,11 +729,12 @@ struct mtk_charger {
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 	//struct pe50_charger_cfg pe50;
 
-/* TN Begin modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+/* TN Begin modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
 	struct pe50_params pe50;
+	struct chg_alg_device *current_alg;
 #endif
-/* TN End modified by xinjun.lu/860715 20240729 CR/EKLAMU-202 */
+/* TN End modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
 
 };
 

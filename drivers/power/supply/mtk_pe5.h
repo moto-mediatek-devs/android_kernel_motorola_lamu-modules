@@ -189,12 +189,12 @@ struct pe50_algo_data {
 	u32 start_soc_max;		/* algo start soc upper bound */
 /* TN Begin modified by xinjun.lu/860715 20240820 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
-	u32 pe50_therm_fcc_limit;
-	u32 pe50_fcc_limit;
-	u32 pe50_therm_cur_thres;
-	u32 pe50_therm_step;
-	u32 pe50_max_ibat;
-	u32 pe50_therm_vol_thres;
+	int pe50_therm_fcc_limit;
+	int pe50_fcc_limit;
+	int pe50_therm_cur_thres;
+	int pe50_therm_step;
+	int pe50_max_ibat;
+	int pe50_therm_vol_thres;
 #endif
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	bool pe50_can_start_again;
@@ -336,6 +336,11 @@ extern int pe50_hal_get_adc(struct chg_alg_device *alg, enum chg_idx chgidx,
 			    enum pe50_adc_channel chan, int *val);
 extern int pe50_hal_get_soc(struct chg_alg_device *alg, u32 *soc);
 extern int pe50_hal_is_adapter_ready(struct chg_alg_device *alg);
+/* TN Begin modified by xinjun.lu/860715 20240828 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+extern int pe50_hal_set_cv(struct chg_alg_device *alg, enum chg_idx chgidx, u32 mv);
+#endif
+/* TN End modified by xinjun.lu/860715 20240828 CR/EKLAMU-202 */
 extern int pe50_hal_set_ichg(struct chg_alg_device *alg, enum chg_idx chgidx,
 			     u32 mA);
 extern int pe50_hal_set_aicr(struct chg_alg_device *alg, enum chg_idx chgidx,
