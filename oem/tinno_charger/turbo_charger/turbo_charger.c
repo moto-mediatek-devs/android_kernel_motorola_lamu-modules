@@ -864,7 +864,7 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 {
 	int ret;
 	int rc = 0;
-	int vbatt_volt, vbus_volt, batt_soc;
+	int vbatt_volt, vbus_volt, vout_volt, batt_soc;
 	int ibatt_curr, ibus_curr;
 	int volt_change;
 	///bool qc_pps_balance;
@@ -875,35 +875,23 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 	union power_supply_propval prop = {0,};
 	int state = info->state;
 
-	TURBO_CHARGER_DBG("vbus:%d uV, vbat:%d uV, ibus:%d uA, ibat:%d uA\n",
-				info->cp.vbus_volt, info->cp.vbat_volt, info->cp.ibus_curr, info->cp.ibat_curr);
+	TURBO_CHARGER_DBG("vbus:%d uV, vbat:%d uV, vout:%d uV, ibus:%d uA, ibat:%d uA\n",
+				info->cp.vbus_volt, info->cp.vbat_volt, info->cp.vout_volt, info->cp.ibus_curr, info->cp.ibat_curr);
 
 	vbus_volt = info->cp.vbus_volt;
 	vbatt_volt = info->cp.vbat_volt;
+	vout_volt = info->cp.vout_volt;
 	ibus_curr = info->cp.ibus_curr;
+	ibatt_curr = info->cp.ibat_curr;
 
 	if (info->pres_temp_zone == ZONE_COLD ||
 			info->pres_temp_zone == ZONE_HOT ||
-			(vbatt_volt > info->batt_ovp_limit && !info->sw.charge_enabled)) {
+			(vout_volt > info->batt_ovp_limit && !info->sw.charge_enabled)) {
 		TURBO_CHARGER_DBG("invalid condition, move to stop charge\n");
 		turbo_charger_move_state(info, TURBO_STATE_STOP_CHARGE);
 	}
 
 	chrg_step = info->chrg_step;
-
-	/*get Vbat from CP*/
-	ret = power_supply_get_property(info->cp_psy,
-					POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE, &prop);
-	if (!ret) {
-		vbatt_volt = prop.intval;
-	}
-
-	/*get Ibat from FG*/
-	ret = power_supply_get_property(info->batt_psy,
-					POWER_SUPPLY_PROP_CURRENT_NOW, &prop);
-	if (!ret) {
-		ibatt_curr = prop.intval;
-	}
 
 	/*get SOC from FG*/
 	ret = power_supply_get_property(info->batt_psy,
@@ -912,14 +900,12 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 		batt_soc = prop.intval;
 	}
 
-	TURBO_CHARGER_DBG("batt_vol:%d uV, batt_curr:%d uA, batt_soc:%d\n", vbatt_volt, ibatt_curr, batt_soc);
-
 	switch (info->state) {
 	case TURBO_STATE_DISCONNECT:
 		TURBO_CHARGER_DBG("current state is : %s\n", turbo_charger_state_str[info->state]);
 		is_turbo_charger_ready = false;
 		info->turbo_charger_request_volt = 0;
-		TURBO_CHARGER_DBG("batt_volt:%d uV is ok, start turbo charging\n", vbatt_volt);
+		TURBO_CHARGER_DBG("vout_volt:%d uV is ok, start turbo charging\n", vout_volt);
 		turbo_charger_move_state(info, TURBO_STATE_CHRG_PUMP_ENTRY);
 		heartbeat_delay_ms = HEARTBEAT_SHORT_DELAY_MS;
 		info->sys_therm_cooling = false;
@@ -928,7 +914,7 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 	case TURBO_STATE_ENTRY:
 		TURBO_CHARGER_DBG("current state is : %s\n", turbo_charger_state_str[info->state]);
 		if (info->turbo_charger_support && batt_soc < CP_CHRG_SOC_LIMIT) {
-			turbo_charger_find_chrg_step(info, info->pres_temp_zone, vbatt_volt);
+			turbo_charger_find_chrg_step(info, info->pres_temp_zone, vout_volt);
 			//charger_dev_enable_termination(info->sw_chg, true);
 			charger_dev_enable_vbus_ovp(info->sw_chg, false);
 			/*TN Begin modify vbus ovp by rongxing.li/860682 20231208 CR/EKFOGO4G-8986*/
@@ -966,7 +952,7 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 		/*TN Begin modified by lingfei.tang/77407 20231201 CR/EKFOGO4G-5993*/
 		ffc_reduce_count = 0;
 		/*TN End modified by lingfei.tang/77407 20231201 CR/EKFOGO4G-5993*/
-		turbo_charger_find_chrg_step(info, info->pres_temp_zone, vbatt_volt);
+		turbo_charger_find_chrg_step(info, info->pres_temp_zone, vout_volt);
 		if (turbo_config.fc2_disable_sw) {
 			turbo_charger_enable_sw(info, false);
 			turbo_charger_set_curr_limit_sw(info, info->sw_charging_curr_limited);
@@ -1017,8 +1003,8 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 		//charger_dev_set_eoc_current(info->sw_chg, 600000); //qc cut-off current
 
 
-		info->turbo_charger_request_volt = (2 * vbatt_volt) % 20000;
-		info->turbo_charger_request_volt = (2 * vbatt_volt) - info->turbo_charger_request_volt + info->turbo_charger_volt_comp; //2 * vbatt + 200mv;
+		info->turbo_charger_request_volt = (2 * vout_volt) % 20000;
+		info->turbo_charger_request_volt = (2 * vout_volt) - info->turbo_charger_request_volt + info->turbo_charger_volt_comp; //2 * vout + 200mv;
 
 		info->turbo_charger_request_curr = min(info->turbo_charger_curr_max, info->turbo_charging_curr_min);
 
@@ -1028,7 +1014,7 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 		info->turbo_charger_request_curr_prev = info->turbo_charger_request_curr;
 		info->turbo_charger_request_volt_prev = vbus_volt;  //5V
 		//info->turbo_charger_request_volt_prev = info->cp.vbus_volt;  //5V
-		info->turbo_charger_vbatt_volt_prev = vbatt_volt;
+		info->turbo_charger_vbatt_volt_prev = vout_volt;
 		info->turbo_charger_ibatt_curr_prev = ibatt_curr;
 		info->turbo_charger_therm_loop_cn = 0;
 		heartbeat_delay_ms = HEARTBEAT_SHORT_DELAY_MS;
@@ -1061,7 +1047,7 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 		if (!info->cp.charge_enabled) {
 			info->turbo_charger_volt_comp = DEFAULT_TURBO_VOLT_COMP;
 			turbo_charger_move_state(info, TURBO_STATE_SW_ENTRY);
-		} else if (vbatt_volt > info->chrg_step.chrg_step_cv_volt) {
+		} else if (vout_volt > info->chrg_step.chrg_step_cv_volt) {
 			if ((info->turbo_charger_request_curr - info->turbo_charger_curr_steps) > info->typec_middle_current ||
 					(ibatt_curr - info->turbo_charger_curr_steps) > info->chrg_step.chrg_step_cc_curr) {
 				info->turbo_charger_request_curr -= info->turbo_charger_curr_steps;
@@ -1079,7 +1065,7 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 			info->turbo_charger_request_curr = info->turbo_charger_request_curr_prev;
 			goto schedule;
 		} else if ((info->turbo_charger_request_curr + info->turbo_charger_curr_steps) <= info->turbo_charger_curr_max &&
-						(vbatt_volt < info->chrg_step.chrg_step_cv_volt) &&
+						(vout_volt < info->chrg_step.chrg_step_cv_volt) &&
 						(ibatt_curr < chrg_step.chrg_step_cc_curr) &&
 						(info->system_thermal_level == THERMAL_NOT_LIMIT || (info->system_thermal_level != THERMAL_NOT_LIMIT && ibatt_curr < info->system_thermal_level))) {
 			TURBO_CHARGER_DBG("turbo request curr: %d uA, turbo curr max: %d uA,"
@@ -1138,7 +1124,7 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 							"Enter into SW directly\n");
 			info->turbo_charger_volt_comp = DEFAULT_TURBO_VOLT_STEPS;
 			turbo_charger_move_state(info, TURBO_STATE_SW_ENTRY);
-		} else if (vbatt_volt > info->chrg_step.chrg_step_cv_volt) {
+		} else if (vout_volt > info->chrg_step.chrg_step_cv_volt) {
 			info->turbo_charger_request_volt -= info->turbo_charger_volt_steps;
 			turbo_charger_move_state(info, TURBO_STATE_CP_CC_LOOP);
 			TURBO_CHARGER_DBG("Duing the volt going up process, "
@@ -1155,7 +1141,7 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 			info->turbo_charger_request_volt = info->turbo_charger_request_volt_prev;
 			goto schedule;
 		} else if ((info->turbo_charger_request_volt + info->turbo_charger_volt_steps) <= info->turbo_charger_volt_max
-					&& vbatt_volt < info->chrg_step.chrg_step_cv_volt
+					&& vout_volt < info->chrg_step.chrg_step_cv_volt
 					&& ibatt_curr < ((info->chrg_step.pres_chrg_step == STEP_FIRST) ?
 						info->chrg_step.chrg_step_cc_curr + info->step_first_current_comp : info->chrg_step.chrg_step_cc_curr)) {
 					TURBO_CHARGER_DBG("turbo_charger_request_volt: %d uV, turbo_charger_volt_max: %d uV, chrg_step_cv_volt: %d uV, "
@@ -1194,10 +1180,10 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 
 	case TURBO_STATE_CP_CC_LOOP:
 		TURBO_CHARGER_DBG("current state is : %s\n", turbo_charger_state_str[info->state]);
-		TURBO_CHARGER_DBG("Temp zone:%d, vbatt_volt %d, select chrg step %d, step cc curr %d, "
+		TURBO_CHARGER_DBG("Temp zone:%d, vout_volt %d, select chrg step %d, step cc curr %d, "
 					"step cv volt %d, step cv tapper curr %d, "
 					"is the last chrg step %d\n",
-					info->pres_temp_zone, vbatt_volt,
+					info->pres_temp_zone, vout_volt,
 					info->chrg_step.pres_chrg_step,
 					info->chrg_step.chrg_step_cc_curr,
 					info->chrg_step.chrg_step_cv_volt,
@@ -1258,15 +1244,15 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 #endif
 		if (!info->turbo_charger_cc_loop_stage) {
 			info->turbo_charger_cc_loop_stage = true;
-			info->turbo_charger_vbatt_volt_prev = vbatt_volt;
+			info->turbo_charger_vbatt_volt_prev = vout_volt;
 		}
 
 		if (ibatt_curr < info->chrg_step.chrg_step_cc_curr) {
 			info->turbo_charger_request_curr += info->turbo_charger_curr_steps;
 			TURBO_CHARGER_DBG("CC_LOOP_STEP_1\n");
 		} else if (ibatt_curr > info->chrg_step.chrg_step_cc_curr + CC_CURR_DEBOUNCE) {
-			if (vbatt_volt > info->turbo_charger_vbatt_volt_prev + 1000) {
-				info->turbo_charger_vbatt_volt_prev = vbatt_volt;
+			if (vout_volt > info->turbo_charger_vbatt_volt_prev + 1000) {
+				info->turbo_charger_vbatt_volt_prev = vout_volt;
 				info->turbo_charger_request_curr -= info->turbo_charger_curr_steps;
 			} else {
 				TURBO_CHARGER_DBG("CC loop work well, continue\n");
@@ -1279,10 +1265,10 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 		TURBO_CHARGER_DBG("ibatt_curr:%d uA, cc curr:%d uA, taper_tunning_count:%d\n",
 					ibatt_curr, info->chrg_step.chrg_step_cc_curr, chrg_cc_power_tuning_cnt);
 
-		TURBO_CHARGER_DBG("vbatt_volt:%d uV, cc volt:%d uV, taper_tunning_count:%d\n",
-					vbatt_volt, info->chrg_step.chrg_step_cv_volt, chrg_cv_taper_tunning_cnt);
+		TURBO_CHARGER_DBG("vout_volt:%d uV, cc volt:%d uV, taper_tunning_count:%d\n",
+					vout_volt, info->chrg_step.chrg_step_cv_volt, chrg_cv_taper_tunning_cnt);
 
-		if (vbatt_volt >= info->chrg_step.chrg_step_cv_volt) {
+		if (vout_volt >= info->chrg_step.chrg_step_cv_volt) {
 			if (chrg_cv_taper_tunning_cnt > CV_TAPPER_COUNT) {
 				turbo_charger_move_state(info, TURBO_STATE_CP_CV_LOOP);
 				info->turbo_charger_cc_loop_stage = false;
@@ -1399,18 +1385,18 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 			}
 		}
 #endif
-	 TURBO_CHARGER_DBG("Temp zone:%d, vbatt_volt %d select chrg step %d, step cc curr %d, "
+	 TURBO_CHARGER_DBG("Temp zone:%d, vout_volt %d select chrg step %d, step cc curr %d, "
 				"step cv volt %d, step cv tapper curr %d, "
 				"is the last chrg step %d\n",
-			info->pres_temp_zone, vbatt_volt,
+			info->pres_temp_zone, vout_volt,
 			info->chrg_step.pres_chrg_step,
 			info->chrg_step.chrg_step_cc_curr,
 			info->chrg_step.chrg_step_cv_volt,
 			info->chrg_step.chrg_step_cv_tapper_curr,
 			info->chrg_step.last_step);
 
-		if (vbatt_volt >= chrg_step.chrg_step_cv_volt && (!chrg_step.last_step)) {
-			turbo_charger_find_chrg_step(info, info->pres_temp_zone, vbatt_volt);
+		if (vout_volt >= chrg_step.chrg_step_cv_volt && (!chrg_step.last_step)) {
+			turbo_charger_find_chrg_step(info, info->pres_temp_zone, vout_volt);
 			if (ibatt_curr > info->chrg_step.chrg_step_cv_tapper_curr + 10000) {
 				heartbeat_delay_ms = HEARTBEAT_NEXT_STATE_MS;
 				turbo_charger_move_state(info, TURBO_STATE_CP_CC_LOOP);
@@ -1418,7 +1404,7 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 		} else {
 			if (info->chrg_step.last_step && (ibatt_curr < info->turbo_charging_curr_min)) {
 				if (chrg_cv_taper_tunning_cnt > CV_TAPPER_COUNT) {
-					turbo_charger_find_chrg_step(info, info->pres_temp_zone, vbatt_volt);
+					turbo_charger_find_chrg_step(info, info->pres_temp_zone, vout_volt);
 					turbo_charger_move_state(info, TURBO_STATE_CP_QUIT);
 					heartbeat_delay_ms = HEARTBEAT_SHORT_DELAY_MS;
 					chrg_cv_taper_tunning_cnt = 0;
@@ -1426,9 +1412,9 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 					chrg_cv_taper_tunning_cnt++;
 				}
 			} else {
-				if (vbatt_volt > info->chrg_step.chrg_step_cv_volt + 10000) {
+				if (vout_volt > info->chrg_step.chrg_step_cv_volt + 10000) {
 					info->turbo_charger_request_volt -= 20000;
-				} else if (vbatt_volt < info->chrg_step.chrg_step_cv_volt - 10000) {
+				} else if (vout_volt < info->chrg_step.chrg_step_cv_volt - 10000) {
 					info->turbo_charger_request_volt += 20000;
 				} else {
 					TURBO_CHARGER_DBG("CV loop work well, continue\n");
@@ -1464,13 +1450,10 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 		TURBO_CHARGER_DBG("current state is : %s\n", turbo_charger_state_str[info->state]);
 		is_turbo_charger_ready = false;
 
-		if (!info->sw.charge_enabled) {
+		if (info->cp.charge_enabled) {
 			turbo_charger_set_curr_limit_sw(info, info->turbo_charging_curr_min + 200000);
 			turbo_charger_set_chg_curr_limit_sw(info, info->turbo_charging_curr_min);
 			turbo_charger_enable_sw(info, true);
-		}
-
-		if (info->cp.charge_enabled) {
 			turbo_charger_enable_cp(info, false);
 			turbo_charger_check_cp_enabled(info);
 		}
@@ -1515,24 +1498,24 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 
 	case TURBO_STATE_SW_LOOP:
 		TURBO_CHARGER_DBG("current state is : %s\n", turbo_charger_state_str[info->state]);
-		TURBO_CHARGER_DBG("turbo_charger_support:%d, pres_chrg_step:%d, last_step:%d vbatt_volt:%d, chrg_step_cc_curr:%d, batt_soc:%d\n",
+		TURBO_CHARGER_DBG("turbo_charger_support:%d, pres_chrg_step:%d, last_step:%d vout_volt:%d, chrg_step_cc_curr:%d, batt_soc:%d\n",
 						info->turbo_charger_support, info->chrg_step.pres_chrg_step, info->chrg_step.last_step,
-						vbatt_volt, info->chrg_step.chrg_step_cc_curr, batt_soc);
+						vout_volt, info->chrg_step.chrg_step_cc_curr, batt_soc);
 		is_turbo_charger_ready = false;
 		if (info->turbo_charger_support
 				&& info->chrg_step.pres_chrg_step != (info->turbo_charger_step_nums - 1)
 				&& info->chrg_step.last_step == false
-				&& vbatt_volt > info->pl_chrg_vbatt_min
+				&& vout_volt > info->pl_chrg_vbatt_min
 				&& info->chrg_step.chrg_step_cc_curr > info->turbo_charging_curr_min
 				&& batt_soc < CP_CHRG_SOC_LIMIT
 				&& info->system_thermal_level > info->thermal_min_level) {
-			TURBO_CHARGER_INFO("Enter CP, the reason is : turbo charger support %d, vbatt %d uV, chrg step %d\n",
-						info->turbo_charger_support, vbatt_volt, info->chrg_step.pres_chrg_step);
+			TURBO_CHARGER_INFO("Enter CP, the reason is : turbo charger support %d, vout_volt %d uV, chrg step %d\n",
+						info->turbo_charger_support, vout_volt, info->chrg_step.pres_chrg_step);
 			turbo_charger_move_state(info, TURBO_STATE_CHRG_PUMP_ENTRY);
 		} else if (!info->sw.charge_enabled) {
 			turbo_charger_move_state(info, TURBO_STATE_STOP_CHARGE);
 		} else {
-			TURBO_CHARGER_INFO("Continue to SW charging, vbatt %d uV, ibatt %d uA\n", vbatt_volt, ibatt_curr);
+			TURBO_CHARGER_INFO("Continue to SW charging, vout_volt %d uV, ibatt %d uA\n", vout_volt, ibatt_curr);
 		}
 
 		/*if ((ibatt_curr < 900000) && (g_in_flag == 0)) { // Switch battery cv when the current is less than 900ma
@@ -1561,7 +1544,7 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 		}
 
 		//usbqc_pm_set_swchg_cap(info, 2500);
-		turbo_charger_find_chrg_step(info, info->pres_temp_zone, vbatt_volt);
+		turbo_charger_find_chrg_step(info, info->pres_temp_zone, vout_volt);
 		if (info->pres_temp_zone != ZONE_COLD
 				&& info->pres_temp_zone != ZONE_HOT
 				&& info->sw.charge_enabled
@@ -1721,10 +1704,8 @@ static void turbo_charger_update_status_work(struct work_struct *work)
 		}
 	}
 
-	/*TN add begin by chao.zhang1/860682 20230926 CR/EKFOGO4G-1785*/
 	info->system_thermal_level = g_thermal_charging_current_limit;
 	TURBO_CHARGER_INFO("thermal limit charging current:%d uA\n", info->system_thermal_level);
-	/*TN add end by chao.zhang1/860682 20230926 CR/EKFOGO4G-1785*/
 
 	mutex_unlock(&info->turbo_charger_lock);
 
@@ -2141,24 +2122,15 @@ static int turbo_charger_remove(struct platform_device *pdev)
 
 static int turbo_charger_suspend(struct device *dev)
 {
-	struct platform_device *pdev = to_platform_device(dev);
-	struct turbo_charger_algo_info *info = platform_get_drvdata(pdev);
-
 	TURBO_CHARGER_INFO("++\n");
-	cancel_delayed_work(&info->turbo_charger_work);
 
 	return 0;
 }
 
 static int turbo_charger_resume(struct device *dev)
 {
-	struct platform_device *pdev = to_platform_device(dev);
-	struct turbo_charger_algo_info *info = platform_get_drvdata(pdev);
-
 	TURBO_CHARGER_INFO("++\n");
-	if (info->turbo_charger_active)
-		schedule_delayed_work(&info->turbo_charger_work,
-					msecs_to_jiffies(0));
+
 	return 0;
 }
 

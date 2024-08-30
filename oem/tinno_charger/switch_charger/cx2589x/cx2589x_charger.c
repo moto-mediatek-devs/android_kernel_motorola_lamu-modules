@@ -381,6 +381,27 @@ static int cx2589x_set_term_curr(struct charger_device *chg_dev, u32 uA)
 	return cx2589x_update_bits(cx, CX2589x_REG_05, CX2589x_TERMCHRG_CUR_MASK, reg_val);
 }
 
+static int cx2589x_set_chg_term(struct cx2589x_device *cx, bool en)
+{
+	int reg_val = -1;
+
+	reg_val = en <<  7;
+	return cx2589x_update_bits(cx, CX2589x_REG_07,
+					CX2589x_TERM_EN, reg_val);
+}
+
+static int cx2589x_enable_terminate(struct charger_device *chg_dev, bool en)
+{
+	int ret;
+	struct cx2589x_device *cx = dev_get_drvdata(&chg_dev->dev);
+
+	ret = cx2589x_set_chg_term(cx, en);
+	if (ret < 0)
+		pr_err("failed ret(%d)\n", ret);
+
+	return ret;
+}
+
 /*
 Precharge Current Limit
 0000 - 0101: 52mA - 337mA, step=57mA
@@ -2119,7 +2140,7 @@ static struct charger_ops cx2589x_chg_ops = {
 	//.get_mivr_state = cx2589x_get_input_minvolt_lim,
 	/* charing termination */
 	.set_eoc_current = cx2589x_set_term_curr,
-	//.enable_termination = mt6375_enable_te,
+	.enable_termination = cx2589x_enable_terminate,
 	//.reset_eoc_state = mt6375_reset_eoc_state,
 	//.safety_check = mt6375_sw_check_eoc,
 	.is_charging_done = cx2589x_get_charging_status,

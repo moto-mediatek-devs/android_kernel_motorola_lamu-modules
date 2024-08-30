@@ -4990,7 +4990,7 @@ static int ffc_bat_get_fv(struct mtk_charger *info, int temp_c)
 	//temp = charger->batt_info.batt_temp;
 	num_zones = info->num_ffc_zones;
 	if (info->ffc_zones == NULL) {
-		chr_err("[%s] ffc_zones is NULL\n", __func__);
+		chr_err("%s: Invalid ffc_zones\n", __func__);
 		return 0;
 	}
 	zone = info->ffc_zones;
@@ -4999,7 +4999,7 @@ static int ffc_bat_get_fv(struct mtk_charger *info, int temp_c)
 
 	info->chrg_iterm = zone->ffc_chg_iterm;
 	ffc_max_fv = zone->ffc_max_mv; //mV to uV
-	chr_info("[%s] FFC temp zone %d, fv %d mV, chg iterm %d mA\n", __func__,
+	chr_info("%s: FFC temp zone:%d, fv:%d mV, chg iterm:%d mA\n", __func__,
 		  ((i > 0) ? (i - 1) : 0), ffc_max_fv, info->chrg_iterm);
 
 	return ffc_max_fv;
@@ -5014,13 +5014,13 @@ static bool ffc_bat_check_chg_tapered(struct mtk_charger *info,
 	int allowed_fcc, target_ma, rc;
 
 	if (!info) {
-		chr_err("[%s] called before info valid!\n", __func__);
+		chr_err("%s: called before info valid!\n", __func__);
 		return false;
 	}
 
 	rc = charger_dev_get_charging_current(info->chg1_dev, &allowed_fcc);
 	if (rc < 0)
-		chr_err("[%s] can't get charging current!\n", __func__);
+		chr_err("%s: can't get charging current!\n", __func__);
 	else
 		allowed_fcc = allowed_fcc / 1000;
 
@@ -5029,7 +5029,7 @@ static bool ffc_bat_check_chg_tapered(struct mtk_charger *info,
 	else
 		target_ma = allowed_fcc - TAPER_DROP_MA;
 
-	chr_info("[%s] curr target_ma = %d batt_ma = %d\n", __func__, target_ma, batt_ma);
+	chr_info("%s: curr target_ma:%d, batt_ma:%d\n", __func__, target_ma, batt_ma);
 
 	if (batt_ma <= 0) {
 		if (info->chrg_taper_cnt >= TAPER_COUNT) {
@@ -5067,26 +5067,26 @@ static int ffc_bat_check_chg_done(struct mtk_charger *info)
 
 	bat_psy = power_supply_get_by_name("battery");
 	if (IS_ERR_OR_NULL(bat_psy)) {
-		chr_info("[%s] get bat_psy fail !!!", __func__);
+		chr_info("%s: get bat_psy fail !!!", __func__);
 		return -EINVAL;
 	}
 
 #if IS_ENABLED(CONFIG_OEM_SWITCH_CHARGER)
 	chg_psy = power_supply_get_by_name("primary_chg");
 	if (IS_ERR_OR_NULL(chg_psy)) {
-		chr_err("%s get chg psy failed\n", __func__);
+		chr_err("%s: get chg psy failed\n", __func__);
 	}
 #else
 	chg_psy = power_supply_get_by_name("mtk_charger_type");
 #endif /* CONFIG_OEM_SWITCH_CHARGER */
 	if (chg_psy == NULL || IS_ERR(chg_psy)) {
-		chr_err("%s Couldn't get chg_psy\n", __func__);
+		chr_err("%s: Couldn't get chg_psy\n", __func__);
 		ret = -EINVAL;
 	} else {
 		ret = power_supply_get_property(chg_psy,
 				POWER_SUPPLY_PROP_ONLINE, &prop);
 		if (ret < 0) {
-			chr_err("[%s]Error getting charger online ret = %d\n", __func__, ret);
+			chr_err("%s: getting charger online failed(%d)\n", __func__, ret);
 			return -EINVAL;
 		} else
 			charger_present = prop.intval;
@@ -5095,7 +5095,7 @@ static int ffc_bat_check_chg_done(struct mtk_charger *info)
 	ret = power_supply_get_property(bat_psy,
 			POWER_SUPPLY_PROP_VOLTAGE_NOW, &prop);
 	if (ret < 0) {
-		chr_err("[%s]Error getting Batt Volt ret = %d\n", __func__, ret);
+		chr_err("%s: getting batt volt failed(%d)\n", __func__, ret);
 		return -EINVAL;
 	} else
 		batt_mv = prop.intval / 1000;//uV to mV
@@ -5103,7 +5103,7 @@ static int ffc_bat_check_chg_done(struct mtk_charger *info)
 	ret = power_supply_get_property(bat_psy,
 			POWER_SUPPLY_PROP_CURRENT_NOW, &prop);
 	if (ret < 0) {
-		chr_err("[%s]Error getting Batt Curr now ret = %d\n", __func__, ret);
+		chr_err("%s: getting batt curr now failed(%d)\n", __func__, ret);
 		return -EINVAL;
 	} else
 		batt_ma = prop.intval / 1000;// uA to mA
@@ -5111,7 +5111,7 @@ static int ffc_bat_check_chg_done(struct mtk_charger *info)
 	ret = power_supply_get_property(bat_psy,
 			POWER_SUPPLY_PROP_CAPACITY, &prop);
 	if (ret < 0) {
-		chr_err("[%s]Error getting Batt Capacity ret = %d\n", __func__, ret);
+		chr_err("%s: getting batt capacity failed(%d)\n", __func__, ret);
 		return -EINVAL;
 	} else
 		batt_soc = prop.intval;
@@ -5119,12 +5119,12 @@ static int ffc_bat_check_chg_done(struct mtk_charger *info)
 	ret = power_supply_get_property(bat_psy,
 			POWER_SUPPLY_PROP_TEMP, &prop);
 	if (ret < 0) {
-		chr_err("[%s]Error getting Batt Temp ret = %d\n", __func__, ret);
+		chr_err("%s: getting batt temp failed(%d)\n", __func__, ret);
 		return -EINVAL;
 	} else
 		batt_temp = prop.intval / 10;
 
-	chr_info("[%s] charger_present = %d batt_mv = %d mV batt_ma = %d mA,batt_soc = %d batt_temp = %d C\n",
+	chr_info("%s: charger_present:%d, vbat:%d mV, ibat:%d mA, batt_soc:%d, batt_temp:%d C\n",
 				__func__, charger_present, batt_mv, batt_ma, batt_soc, batt_temp);
 
 	usb_mv = get_vbus(info);
@@ -5153,7 +5153,7 @@ static int ffc_bat_check_chg_done(struct mtk_charger *info)
 		}
 	}
 
-	chr_info("[%s] info->pres_chrg_step = %d target_mv = %d\n", __func__, info->pres_chrg_step, target_mv);
+	chr_info("%s: pres_chrg_step:%d, target_mv:%d\n", __func__, info->pres_chrg_step, target_mv);
 	return 0;
 }
 #endif

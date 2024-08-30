@@ -69,7 +69,7 @@
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
 #define FFC_BAT_VOLT_COMP_MV	100
 #define FFC_BAT_REDU_CURR_MA	1500
-#define FFC_BAT_VOLT_MAX_UV	4620000
+#define FFC_BAT_VOLT_MAX_UV		4540000
 #define FFC_BAT_VOLT_STEP_UV	5000
 bool is_turbo_charger_ready = false;
 EXPORT_SYMBOL(is_turbo_charger_ready);
@@ -107,18 +107,8 @@ static void select_cv(struct mtk_charger *info)
 		}
 /*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
-	int chg_current = get_battery_current(info); // mA
 	if ((turbo_charger_active == true) && (info->sw_jeita.sm == TEMP_T2_TO_T3)) {
 		constant_voltage = FFC_BAT_VOLT_MAX_UV;
-		if (chg_current < FFC_BAT_REDU_CURR_MA) {
-			constant_voltage -= FFC_BAT_VOLT_STEP_UV * ffc_reduce_count;
-			pr_info("%s:ffc_reduce_count = %d \n", __func__, ffc_reduce_count);
-			if (constant_voltage >= (info->target_mv * 1000))
-				ffc_reduce_count ++;
-		}
-
-		if (ffc_batt_full == true)
-			constant_voltage = (info->target_mv - FFC_BAT_VOLT_COMP_MV) * 1000;
 	} else
 #endif /* CONFIG_OEM_TURBO_CHARGER */
 	{
@@ -271,9 +261,9 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 			pdata->input_current_limit = 100000;  // mA
 			pdata->charging_current_limit = 100000;  // mA
 		} else {
-			chr_info("%s: from turbo charge to basic charge, limit input and charging current to 2000mA\n", __func__);
-			pdata->input_current_limit = 2200000;  // mA
-			pdata->charging_current_limit = 2000000;  // mA
+			chr_info("%s: from turbo charge to basic charge, limit input and charging current to 1200mA\n", __func__);
+			pdata->input_current_limit = 1400000;  // mA
+			pdata->charging_current_limit = 1200000;  // mA
 		}
 
 		if (ffc_batt_full == true)
