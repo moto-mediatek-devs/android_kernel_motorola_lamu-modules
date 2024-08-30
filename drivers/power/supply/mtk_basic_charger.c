@@ -69,7 +69,7 @@
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
 #define FFC_BAT_VOLT_COMP_MV	100
 #define FFC_BAT_REDU_CURR_MA	1500
-#define FFC_BAT_VOLT_MAX_UV		4540000
+#define FFC_BAT_VOLT_MAX_UV	4528000
 #define FFC_BAT_VOLT_STEP_UV	5000
 bool is_turbo_charger_ready = false;
 EXPORT_SYMBOL(is_turbo_charger_ready);
@@ -82,6 +82,9 @@ EXPORT_SYMBOL(ffc_batt_full);
 
 int ffc_reduce_count = 0;
 EXPORT_SYMBOL(ffc_reduce_count);
+
+extern int g_thermal_charging_current_limit;
+
 #endif /* CONFIG_OEM_TURBO_CHARGER */
 
 #define SW_BAT_VOLT_COMP_UV	16000
@@ -258,12 +261,12 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		/* QC3+ Charger */
 		if (is_turbo_charger_ready) {
 			chr_info("%s: turbo charge, limit input and charging current to 100mA\n", __func__);
-			pdata->input_current_limit = 100000;  // mA
-			pdata->charging_current_limit = 100000;  // mA
+			pdata->input_current_limit = 100000;  // uA
+			pdata->charging_current_limit = 100000;  // uA
 		} else {
 			chr_info("%s: from turbo charge to basic charge, limit input and charging current to 1200mA\n", __func__);
-			pdata->input_current_limit = 1400000;  // mA
-			pdata->charging_current_limit = 1200000;  // mA
+			pdata->input_current_limit = 1400000;  // uA
+			pdata->charging_current_limit = 1200000;  // uA
 		}
 
 		if (ffc_batt_full == true)
@@ -366,6 +369,7 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		pdata->thermal_input_current_limit = -1;
 		pdata2->thermal_charging_current_limit = -1;
 		pdata2->thermal_input_current_limit = -1;
+		g_thermal_charging_current_limit = -1;
 	}
 #endif
 /* TN End modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
