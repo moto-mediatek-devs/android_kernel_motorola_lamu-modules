@@ -6,6 +6,7 @@
 #define pr_fmt(fmt) "<SITUATION> " fmt
 
 #include "situation.h"
+#include "../sensorHub/inc_v1/SCP_sensorHub.h"/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449*/
 
 static struct situation_context *situation_context_obj;
 
@@ -90,6 +91,9 @@ static int handle_to_index(int handle)
 		break;
 	case ID_FLIP:
 		index = flip;
+		break;
+	case ID_TAP_TAP:
+		index = tap_tap;
 		break;
 /*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end*/
 	default:
@@ -179,6 +183,22 @@ int rearals_cali_report(int *value)
 }
 EXPORT_SYMBOL_GPL(rearals_cali_report);
 //TN End modified by jiawei.zou 20240802 for rearals_cali
+
+/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 start*/
+int taptap_cali_report(int *value)
+{
+	int err = 0;
+	struct sensor_event event;
+
+	memset(&event, 0, sizeof(struct sensor_event));
+	event.handle = ID_TAP_TAP;
+	event.flush_action = CALI_ACTION;
+	event.word[0] = value[0];
+	err = sensor_input_event(situation_context_obj->mdev.minor, &event);
+	return err;
+}
+EXPORT_SYMBOL_GPL(taptap_cali_report);
+/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 end*/
 
 int situation_notify_t(int handle, int64_t time_stamp)
 {
@@ -460,6 +480,32 @@ static ssize_t situdevnum_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%d\n", 0);	/* TODO: why +5? */
 }
 
+/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 start*/
+static ssize_t taptap_set_cali_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err = 0;
+	int32_t cfg_data;
+	err = sscanf(buf, "%d", &cfg_data);
+	if (err != 1) {
+		pr_debug("zjw invalid content: '%s', length = %zu\n", buf, count);
+		return count;
+	}
+	if((cfg_data < 1) || (cfg_data > 3))
+    {
+        pr_debug("cfg_data limit fail\n");
+        return 0;
+    }
+	err = sensor_cfg_to_hub(ID_TAP_TAP,
+		(uint8_t *)&cfg_data, sizeof(cfg_data));
+	if (err < 0)
+		pr_err("sensor_cfg_to_hub fail\n");
+	taptap_cali_report(&cfg_data);
+
+	return count;
+
+}
+/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 end*/
 
 static int situation_real_driver_init(void)
 {
@@ -553,6 +599,7 @@ static int situation_misc_init(struct situation_context *cxt)
 DEVICE_ATTR_RW(situactive);
 DEVICE_ATTR_RW(situbatch);
 DEVICE_ATTR_RW(situflush);
+DEVICE_ATTR_WO(taptap_set_cali);/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449*/
 DEVICE_ATTR_RO(situdevnum);
 
 static struct attribute *situation_attributes[] = {
@@ -560,6 +607,7 @@ static struct attribute *situation_attributes[] = {
 	&dev_attr_situbatch.attr,
 	&dev_attr_situflush.attr,
 	&dev_attr_situdevnum.attr,
+	&dev_attr_taptap_set_cali.attr,/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449*/
 	NULL
 };
 

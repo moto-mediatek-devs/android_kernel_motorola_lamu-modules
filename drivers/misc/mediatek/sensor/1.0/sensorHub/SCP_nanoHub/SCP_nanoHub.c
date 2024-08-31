@@ -888,6 +888,10 @@ static void SCP_sensorHub_init_sensor_state(void)
 	mSensorState[SENSOR_TYPE_FLIP].sensorType = SENSOR_TYPE_FLIP;
 	mSensorState[SENSOR_TYPE_FLIP].rate = SENSOR_RATE_ONESHOT;
 	mSensorState[SENSOR_TYPE_FLIP].timestamp_filter = false;
+
+	mSensorState[SENSOR_TYPE_TAP_TAP].sensorType = SENSOR_TYPE_TAP_TAP;
+	mSensorState[SENSOR_TYPE_TAP_TAP].rate = SENSOR_RATE_ONESHOT;
+	mSensorState[SENSOR_TYPE_TAP_TAP].timestamp_filter = false;
 /*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end*/
 
 }
@@ -1759,6 +1763,11 @@ int sensor_get_data_from_hub(uint8_t sensorType,
 		data_t->gesture_data_t.probability;
 		break;
 	case ID_FLIP:
+		data->time_stamp = data_t->time_stamp;
+		data->gesture_data_t.probability =
+		data_t->gesture_data_t.probability;
+		break;
+	case ID_TAP_TAP:
 		data->time_stamp = data_t->time_stamp;
 		data->gesture_data_t.probability =
 		data_t->gesture_data_t.probability;

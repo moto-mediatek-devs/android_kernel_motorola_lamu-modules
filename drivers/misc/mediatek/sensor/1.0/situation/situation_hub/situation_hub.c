@@ -75,6 +75,9 @@ static int __init situation_hub_init(void)
 #if IS_ENABLED(CONFIG_MTK_FLIP_HUB)
 	flip_hub_init();
 #endif
+#if IS_ENABLED(CONFIG_MTK_TAP_TAP_HUB)
+	tap_tap_hub_init();
+#endif
 /*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end*/
 
 	return 0;
@@ -149,6 +152,9 @@ static void __exit situation_hub_exit(void)
 
 #if IS_ENABLED(CONFIG_MTK_FLIP_HUB)
 	flip_hub_exit();
+#endif
+#if IS_ENABLED(CONFIG_MTK_TAP_TAP_HUB)
+	tap_tap_hub_exit();
 #endif
 /*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end*/
 

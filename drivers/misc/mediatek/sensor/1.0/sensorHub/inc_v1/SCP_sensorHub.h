@@ -272,6 +272,7 @@ struct data_unit_t {
 		struct light_vec_t rearals;
 		int32_t rearflk;
 // -20240617 wnn add mtk sensor 1.0 flicker support end
+		int32_t taptap;
 		int32_t data[8];
 	};
 } __packed;

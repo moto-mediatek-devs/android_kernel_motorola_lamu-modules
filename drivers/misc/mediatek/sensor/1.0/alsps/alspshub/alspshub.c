@@ -985,6 +985,14 @@ static int rearals_set_cali(uint8_t *data, uint8_t count)
 }
 /* -20240617 wnn add mtk sensor 1.0 flicker support end */
 
+/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 start*/
+static int taptap_set(uint8_t *data, uint8_t count)
+{
+//	int32_t *buf = (int32_t *)data;
+	return sensor_cfg_to_hub(ID_TAP_TAP, data, count);
+}
+/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 end*/
+
 static int rgbw_enable(int en)
 {
 	int res = 0;
@@ -1244,6 +1252,9 @@ static int alspshub_probe(struct platform_device *pdev)
 	/* +20240617 wnn add mtk sensor 1.0 flicker support start */
 	als_ctl.rearset_cali = rearals_set_cali;
 	/* -20240617 wnn add mtk sensor 1.0 flicker support end */
+	/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 start*/
+	als_ctl.taptap_set = taptap_set;
+	/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 end*/
 	als_ctl.rgbw_enable = rgbw_enable;
 	als_ctl.rgbw_batch = rgbw_batch;
 	als_ctl.rgbw_flush = rgbw_flush;

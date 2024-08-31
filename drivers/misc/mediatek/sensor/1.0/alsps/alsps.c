@@ -660,6 +660,32 @@ static ssize_t rearalscali_store(struct device *dev,
 }
 /* -20240617 wnn add mtk sensor 1.0 flicker support end */
 
+/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 start*/
+static ssize_t taptapset_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct alsps_context *cxt = NULL;
+	int err = 0;
+	uint8_t *cali_buf = NULL;
+
+	pr_info("taptap set cali:%d count=%d\n", *(int*)buf, (int)count);
+	cali_buf = vzalloc((int)count);
+	if (!cali_buf)
+		return -ENOMEM;
+	memcpy(cali_buf, buf, count);
+
+	mutex_lock(&alsps_context_obj->alsps_op_mutex);
+	cxt = alsps_context_obj;
+	if (cxt->als_ctl.taptap_set != NULL)
+		err = cxt->als_ctl.taptap_set(cali_buf, count);
+	if (err < 0)
+		pr_err("taptap set setting err %d\n", err);
+	mutex_unlock(&alsps_context_obj->alsps_op_mutex);
+	vfree(cali_buf);
+	return count;
+}
+/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 end*/
+
 #if !IS_ENABLED(CONFIG_NANOHUB) || !IS_ENABLED(CONFIG_MTK_ALSPSHUB)
 static int ps_enable_and_batch(void)
 {
@@ -1020,6 +1046,9 @@ DEVICE_ATTR_WO(alscali);
 /* +20240617 wnn add mtk sensor 1.0 flicker support start */
 DEVICE_ATTR_WO(rearalscali);
 /* -20240617 wnn add mtk sensor 1.0 flicker support end */
+/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 start*/
+DEVICE_ATTR_WO(taptapset);
+/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 end*/
 DEVICE_ATTR_RW(psactive);
 DEVICE_ATTR_RW(psbatch);
 DEVICE_ATTR_RW(psflush);
@@ -1035,6 +1064,9 @@ static struct attribute *als_attributes[] = {
 	/* +20240617 wnn add mtk sensor 1.0 flicker support start */
 	&dev_attr_rearalscali.attr,
 	/* -20240617 wnn add mtk sensor 1.0 flicker support end */
+	/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 start*/
+	&dev_attr_taptapset.attr,
+	/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 end*/
 	NULL
 };
 
@@ -1190,6 +1222,9 @@ int als_register_control_path(struct als_control_path *ctl)
 	cxt->als_ctl.set_cali = ctl->set_cali;
 	/* -20240617 wnn add mtk sensor 1.0 flicker support end */
 	cxt->als_ctl.rearset_cali = ctl->rearset_cali;
+	/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 start*/
+	cxt->als_ctl.taptap_set = ctl->taptap_set;
+	/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 end*/
 	cxt->als_ctl.rgbw_enable = ctl->rgbw_enable;
 	cxt->als_ctl.rgbw_batch = ctl->rgbw_batch;
 	cxt->als_ctl.rgbw_flush = ctl->rgbw_flush;

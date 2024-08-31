@@ -76,6 +76,10 @@
 #if IS_ENABLED(CONFIG_MTK_FLIP_HUB)
 #include "flip/flip.h"
 #endif
+
+#if IS_ENABLED(CONFIG_MTK_TAP_TAP_HUB)
+#include "tap_tap/tap_tap.h"
+#endif
 /*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end*/
 
 #endif

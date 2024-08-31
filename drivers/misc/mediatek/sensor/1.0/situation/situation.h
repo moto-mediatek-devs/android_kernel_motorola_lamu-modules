@@ -37,6 +37,7 @@ enum situation_index_table {
 	chopchop,
 	sig_mov,
 	flip,
+	tap_tap,
 /*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end*/
 	max_situation_support,
 };
@@ -99,5 +100,8 @@ extern int situation_remove(void);
 //TN Begin modified by jiawei.zou 20240802 for rearals_cali
 extern int rearals_cali_report(int *value);
 //TN End modified by jiawei.zou 20240802 for rearals_cali
+/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 start*/
+extern int taptap_cali_report(int *value);
+/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 end*/
 
 #endif
