@@ -23,7 +23,7 @@ struct rearals_ipi_data {
 };
 static struct rearals_ipi_data *obj_ipi_data;
 
-static int rearals_factory_enable_sensor(bool enabledisable,
+int rearals_factory_enable_sensor(bool enabledisable,
 					 int64_t sample_periods_ms)
 {
 	int err = 0;
@@ -48,8 +48,16 @@ static int rearals_factory_enable_sensor(bool enabledisable,
 	}
 	return 0;
 }
+EXPORT_SYMBOL(rearals_factory_enable_sensor);
 
-static int rearals_factory_get_data(int32_t sensor_data[1])
+int rearals_factory_get_enable(void)
+{
+	struct rearals_ipi_data *obj = obj_ipi_data;
+	return READ_ONCE(obj->factory_enable);
+}
+EXPORT_SYMBOL(rearals_factory_get_enable);
+
+int rearals_factory_get_data(int32_t sensor_data[3])
 {
 	int err = 0;
 	struct data_unit_t data;
@@ -59,10 +67,14 @@ static int rearals_factory_get_data(int32_t sensor_data[1])
 		pr_err_ratelimited("sensor_get_data_from_hub fail!!\n");
 		return -1;
 	}
-	sensor_data[0] = data.rearals;
+	printk("lux:%d, ir:%d, clear:%d\n", data.rearals.als_lux, data.rearals.als_raw_data, data.rearals.ir_clr_data);
+	sensor_data[0] = data.rearals.als_lux;
+	sensor_data[1] = data.rearals.als_raw_data;
+	sensor_data[2] = data.rearals.ir_clr_data;
 
 	return err;
 }
+EXPORT_SYMBOL(rearals_factory_get_data);
 
 static int rearals_factory_enable_calibration(void)
 {
@@ -149,7 +161,7 @@ static int rearals_get_data(int *probability, int *status)
 		return -1;
 	}
 	time_stamp		= data.time_stamp;
-	*probability	= data.rearals;
+	*probability	= data.rearals.als_lux;
 	return 0;
 }
 static int rearals_open_report_data(int open)
@@ -186,8 +198,8 @@ static int rearals_recv_data(struct data_unit_t *event, void *reserved)
 	if (event->flush_action == FLUSH_ACTION)
 		err = situation_flush_report(ID_REAR_ALS);
 	else if (event->flush_action == DATA_ACTION) {
-		printk("rearals recv data: %d\n", event->rearals);
-		err = situation_data_report_t(ID_REAR_ALS, event->rearals, (int64_t)event->time_stamp);
+		printk("rearals recv data: %d\n", event->rearals.als_lux);
+		err = situation_data_report_t(ID_REAR_ALS, event->rearals.als_lux, (int64_t)event->time_stamp);
 	} else if (event->flush_action == CALI_ACTION) {
 		printk("rearals recv cali data: %d\n", event->data[0]);
 		spin_lock(&calibration_lock);

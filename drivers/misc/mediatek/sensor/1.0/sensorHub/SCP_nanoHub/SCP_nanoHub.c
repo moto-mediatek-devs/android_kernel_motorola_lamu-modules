@@ -1732,7 +1732,11 @@ int sensor_get_data_from_hub(uint8_t sensorType,
 		break;
 	case ID_REAR_ALS:
 		data->time_stamp = data_t->time_stamp;
-		data->rearals = data_t->rearals;
+		/* +20240819 wnn add fall reset start */
+		data->rearals.als_lux = data_t->rearals.als_lux;
+		data->rearals.als_raw_data = data_t->rearals.als_raw_data;
+		data->rearals.ir_clr_data = data_t->rearals.ir_clr_data;
+		/* -20240819 wnn add fall reset end */
 		break;
 	case ID_REAR_FLICKER:
 		data->time_stamp = data_t->time_stamp;

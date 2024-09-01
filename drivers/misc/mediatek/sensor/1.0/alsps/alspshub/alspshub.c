@@ -85,6 +85,9 @@ enum {
 
 /* +20240617 wnn add mtk sensor 1.0 flicker support start */
 extern void rearals_set_caliobj_offset(int32_t offset);
+extern int rearals_factory_enable_sensor(bool enabledisable, int64_t sample_periods_ms);
+extern int rearals_factory_get_enable(void);
+extern int rearals_factory_get_data(int32_t sensor_data[3]);
 /* -20240617 wnn add mtk sensor 1.0 flicker support end */
 
 long alspshub_read_ps(u8 *ps)
@@ -396,6 +399,62 @@ static ssize_t test_alsgetch_show(struct device_driver *ddri, char *buf)
     res = snprintf(buf, PAGE_SIZE,"%u %u %u %u\n", lux, raw, ir, clr);
     return res;
 }
+
+static ssize_t test_rear_alsenable_store(struct device_driver *ddri, const char *buf,
+                                          size_t tCount)
+{
+    int enable = 0, ret = 0;
+
+    ret = kstrtoint(buf, 10, &enable);
+    if (ret != 0)
+    {
+        pr_debug("kstrtoint fail\n");
+        return 0;
+    }
+    if (0 != enable && 1 != enable)
+    {
+        pr_debug("value fail\n");
+        return 0;
+    }
+    ret = rearals_factory_enable_sensor(enable, 200);
+    return tCount;
+}
+
+static ssize_t test_rear_alsenable_show(struct device_driver *ddri, char *buf)
+{
+    int res = 0;
+    int enable = rearals_factory_get_enable();
+    res = snprintf(buf, PAGE_SIZE,"%u\n", enable);
+    return res;
+}
+
+static ssize_t test_rear_alsgetch_show(struct device_driver *ddri, char *buf)
+{
+    int res = 0;
+    uint32_t lux = 0;
+    uint32_t raw = 0;
+    uint32_t ir  = 0;
+    uint32_t clr = 0;
+    int   enable = 0;
+    int      ret = 0;
+    uint32_t data[3] = {0, 0, 0};
+
+    enable = rearals_factory_get_enable();
+    if(enable)
+    {
+        ret = rearals_factory_get_data(data);
+        if (!ret)
+        {
+            lux = data[0];
+            raw = data[1];
+            ir  = data[2] & 0xFFFF;
+            clr = (data[2] >> 16) & 0xFFFF;
+        }
+    }
+
+    res = snprintf(buf, PAGE_SIZE,"%u %u %u %u\n", lux, raw, ir, clr);
+    return res;
+}
 /* +20240815 ll add mtk sensor 1.0 alsp sensor test cali node end */
 
 static DRIVER_ATTR_RO(als);
@@ -410,6 +469,8 @@ static DRIVER_ATTR_RW(test_alsenable);
 static DRIVER_ATTR_RW(test_alscali);
 static DRIVER_ATTR_RO(test_alsgetcali);
 static DRIVER_ATTR_RO(test_alsgetch);
+static DRIVER_ATTR_RW(test_rear_alsenable);
+static DRIVER_ATTR_RO(test_rear_alsgetch);
 
 static DRIVER_ATTR_WO(test_pscali);
 static struct driver_attribute *alspshub_attr_list[] = {
@@ -424,7 +485,9 @@ static struct driver_attribute *alspshub_attr_list[] = {
 	&driver_attr_test_alscali,
 	&driver_attr_test_pscali,
 	&driver_attr_test_alsgetcali,
-	&driver_attr_test_alsgetch
+	&driver_attr_test_alsgetch,
+	&driver_attr_test_rear_alsenable,
+	&driver_attr_test_rear_alsgetch,
 };
 /* +20240709 db add mtk sensor 1.0 alsp sensor test cali node end */
 

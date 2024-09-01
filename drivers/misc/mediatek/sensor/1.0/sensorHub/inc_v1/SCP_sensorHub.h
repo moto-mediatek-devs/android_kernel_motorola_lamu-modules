@@ -269,7 +269,7 @@ struct data_unit_t {
 		struct geofence_event_t geofence_data_t;
 		struct sar_event_t sar_event;
 // +20240617 wnn add mtk sensor 1.0 flicker support start
-		int32_t rearals;
+		struct light_vec_t rearals;
 		int32_t rearflk;
 // -20240617 wnn add mtk sensor 1.0 flicker support end
 		int32_t data[8];
