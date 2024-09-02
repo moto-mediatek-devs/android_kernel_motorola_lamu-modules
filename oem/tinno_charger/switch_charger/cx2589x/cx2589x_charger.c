@@ -82,6 +82,7 @@ static int cx2589x_enable_otg(struct charger_device *chg_dev, bool en);
 #define R_VBUS_CHARGER_1   330
 #define R_VBUS_CHARGER_2   39
 
+#define BC12_RETRY_CNT 5
 
 static struct proc_dir_entry *entry;
 static bool dump_reg_enable;
@@ -1372,6 +1373,7 @@ out:
 }
 
 static int cx2589x_set_dp(struct charger_device *chg_dev, u32 volt);
+
 static void charger_detect_work_func(struct work_struct *work)
 {
 	struct cx2589x_device *cx = NULL;
@@ -1396,6 +1398,7 @@ static void charger_detect_work_func(struct work_struct *work)
 
 	if (!cx->state.vbus_gd) {
 		pr_err("Vbus not present\n");
+		cx->bc12_retried = 0;
 		//cx2589x_disable_charger(cx);
 		cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
 		cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
@@ -1404,6 +1407,7 @@ static void charger_detect_work_func(struct work_struct *work)
 
 	if (!state.online) {
 		pr_err("Vbus not online\n");
+		cx->bc12_retried = 0;
 		cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
 		cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
 		goto err;
@@ -1450,6 +1454,13 @@ static void charger_detect_work_func(struct work_struct *work)
 		cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
 		cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_SDP;
 		cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB;
+
+		/* resolve EKLAMU-3431*/
+		if(cx->bc12_retried < BC12_RETRY_CNT) {
+			cx->bc12_retried ++;
+			pr_info("CX2589x retry bc12 count %d\n", cx->bc12_retried);
+			schedule_delayed_work(&cx->charger_bc12_retry_work, msecs_to_jiffies(100));
+		}
 		break;
 
 	case CX2589x_UNKNOWN:
@@ -1561,6 +1572,24 @@ static void charger_usb_detect_work_func(struct work_struct *work)
 	return;
 }
 
+/* resolve EKLAMU-3431*/
+static void charger_bc12_retry_work_func(struct work_struct *work) {
+
+	struct cx2589x_device *cx = NULL;
+
+	cx = container_of(work, struct cx2589x_device, charger_bc12_retry_work.work);
+	if (IS_ERR_OR_NULL(cx)) {
+		pr_err("Cann't get cx2589x_device\n");
+		return ;
+	}
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+	charger_detect_init(cx);
+#endif
+	cx2589x_force_dpdm(cx);
+	msleep(1000);
+	schedule_delayed_work(&cx->charge_detect_delayed_work, msecs_to_jiffies(50));
+}
+
 static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
 {
 	struct cx2589x_device *cx = private;
@@ -1592,6 +1621,7 @@ static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
 	}
 
 	if (!prev_vbus_gd && cx->state.vbus_gd) {
+		cx->bc12_retried = 0;
 #if 0
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 		charger_detect_init(cx);
@@ -1603,6 +1633,7 @@ static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
 #endif
 		pr_info("adapter/usb inserted\n");
 	} else if (prev_vbus_gd && !cx->state.vbus_gd) {
+		cx->bc12_retried = 0;
 		pr_info("adapter/usb removed\n");
 #if 0
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
@@ -1613,6 +1644,8 @@ static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
 		//cx2589x_set_dpdm_hiz(cx);
 		allow_set_dp_dm_vol = false;
 #endif
+	} else if (!prev_vbus_gd && !cx->state.vbus_gd) {
+		cx->bc12_retried = 0;
 	}
 #else
 	schedule_delayed_work(&cx->charge_detect_delayed_work, 100);
@@ -2309,6 +2342,7 @@ static int cx2589x_driver_probe(struct i2c_client *client,
 		return -ENOMEM;
 	}
 
+	cx->bc12_retried = 0;
 	cx->client = client;
 	cx->dev = dev;
 
@@ -2356,6 +2390,8 @@ static int cx2589x_driver_probe(struct i2c_client *client,
 	INIT_DELAYED_WORK(&cx->charge_detect_delayed_work, charger_detect_work_func);
 	INIT_DELAYED_WORK(&cx->charge_monitor_work, charger_monitor_work_func);
 	INIT_DELAYED_WORK(&cx->charge_usb_detect_work, charger_usb_detect_work_func);
+	/* resolve EKLAMU-3431*/
+	INIT_DELAYED_WORK(&cx->charger_bc12_retry_work, charger_bc12_retry_work_func);
 
 	if (client->irq) {
 		ret = devm_request_threaded_irq(dev, client->irq, NULL,
