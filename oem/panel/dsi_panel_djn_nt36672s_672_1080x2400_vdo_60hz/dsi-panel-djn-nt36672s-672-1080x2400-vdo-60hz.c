@@ -238,7 +238,7 @@ static void djn_panel_init(struct djn *ctx)
 	gpiod_set_value(ctx->reset_gpio, 1);
 	udelay(5 * 1000);
 	gpiod_set_value(ctx->reset_gpio, 0);
-	udelay(2 * 1000);
+	udelay(5 * 1000);
 	gpiod_set_value(ctx->reset_gpio, 1);
 	udelay(15 * 1000);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
@@ -595,11 +595,62 @@ static void djn_panel_init(struct djn *ctx)
 	djn_dcs_write_seq_static(ctx, 0XB8, 0X15);
 	djn_dcs_write_seq_static(ctx, 0XC0, 0X01);
 
-	djn_dcs_write_seq_static(ctx, 0XFF, 0X23);//待修改
-	djn_dcs_write_seq_static(ctx, 0XFB, 0X01);
-	djn_dcs_write_seq_static(ctx, 0X00, 0X60);
-	djn_dcs_write_seq_static(ctx, 0X07, 0X00);
-	djn_dcs_write_seq_static(ctx, 0X09, 0XAF);
+	djn_dcs_write_seq_static(ctx, 0xFF,0xF0);
+	djn_dcs_write_seq_static(ctx, 0xFB,0x01);
+	djn_dcs_write_seq_static(ctx, 0xD2,0x50);
+	djn_dcs_write_seq_static(ctx, 0x27,0x09);
+	djn_dcs_write_seq_static(ctx, 0xFF,0x23);
+	djn_dcs_write_seq_static(ctx, 0xFB,0x01);
+	djn_dcs_write_seq_static(ctx, 0x00,0x60);
+	djn_dcs_write_seq_static(ctx, 0x07,0x00);
+	djn_dcs_write_seq_static(ctx, 0x08,0x02);
+	djn_dcs_write_seq_static(ctx, 0x09,0x55);
+	djn_dcs_write_seq_static(ctx, 0x0A,0x00);
+	djn_dcs_write_seq_static(ctx, 0x0B,0x00);
+	djn_dcs_write_seq_static(ctx, 0x0C,0x00);
+	djn_dcs_write_seq_static(ctx, 0x0D,0x00);
+	djn_dcs_write_seq_static(ctx, 0x10,0x50);
+	djn_dcs_write_seq_static(ctx, 0x11,0x01);
+	djn_dcs_write_seq_static(ctx, 0x12,0x95);
+	djn_dcs_write_seq_static(ctx, 0x15,0xCF);
+	djn_dcs_write_seq_static(ctx, 0x16,0x0C);
+
+	djn_dcs_write_seq_static(ctx, 0x19,0x20);
+	djn_dcs_write_seq_static(ctx, 0x1A,0x3F);
+	djn_dcs_write_seq_static(ctx, 0x1B,0x3F);
+	djn_dcs_write_seq_static(ctx, 0x1C,0x3F);
+	djn_dcs_write_seq_static(ctx, 0x1D,0x3C);
+	djn_dcs_write_seq_static(ctx, 0x1E,0x3C);
+	djn_dcs_write_seq_static(ctx, 0x1F,0x33);
+	djn_dcs_write_seq_static(ctx, 0x20,0x33);
+	djn_dcs_write_seq_static(ctx, 0x21,0x2F);
+	djn_dcs_write_seq_static(ctx, 0x22,0x2E);
+	djn_dcs_write_seq_static(ctx, 0x23,0x30);
+	djn_dcs_write_seq_static(ctx, 0x24,0x37);
+	djn_dcs_write_seq_static(ctx, 0x25,0x38);
+	djn_dcs_write_seq_static(ctx, 0x26,0x2C);
+	djn_dcs_write_seq_static(ctx, 0x27,0x24);
+	djn_dcs_write_seq_static(ctx, 0x28,0x28);
+	djn_dcs_write_seq_static(ctx, 0x29,0x20);
+	djn_dcs_write_seq_static(ctx, 0x2A,0x3F);
+	djn_dcs_write_seq_static(ctx, 0x2B,0x3F);
+
+	djn_dcs_write_seq_static(ctx, 0x58,0xFF);
+	djn_dcs_write_seq_static(ctx, 0x59,0xFB);
+	djn_dcs_write_seq_static(ctx, 0x5A,0xF6);
+	djn_dcs_write_seq_static(ctx, 0x5B,0xF1);
+	djn_dcs_write_seq_static(ctx, 0x5C,0xED);
+	djn_dcs_write_seq_static(ctx, 0x5D,0xE0);
+	djn_dcs_write_seq_static(ctx, 0x5E,0xD6);
+	djn_dcs_write_seq_static(ctx, 0x5F,0xD0);
+	djn_dcs_write_seq_static(ctx, 0x60,0xC5);
+	djn_dcs_write_seq_static(ctx, 0x61,0xBC);
+	djn_dcs_write_seq_static(ctx, 0x62,0xB2);
+	djn_dcs_write_seq_static(ctx, 0x63,0xA9);
+	djn_dcs_write_seq_static(ctx, 0x64,0xA2);
+	djn_dcs_write_seq_static(ctx, 0x65,0x9D);
+	djn_dcs_write_seq_static(ctx, 0x66,0x9B);
+	djn_dcs_write_seq_static(ctx, 0x67,0x96);
 
 	djn_dcs_write_seq_static(ctx, 0XFF, 0X10);
 	djn_dcs_write_seq_static(ctx, 0XFB, 0X01);
@@ -743,6 +794,18 @@ static int djn_prepare(struct drm_panel *panel)
 
 #ifdef TINNO_LCM_OEM_CONFIG
 	if(djn_gesture_mode) {
+		ctx->reset_gpio =
+		devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
+		if (IS_ERR(ctx->reset_gpio)) {
+			dev_info(ctx->dev, "%s: cannot get reset_gpio %ld\n",
+				__func__, PTR_ERR(ctx->reset_gpio));
+			return PTR_ERR(ctx->reset_gpio);;
+		}
+
+		gpiod_set_value(ctx->reset_gpio, 0);
+		udelay(5 * 1000);
+		devm_gpiod_put(ctx->dev, ctx->reset_gpio);
+
 		udelay(10000);
 		djn_panel_init(ctx);
 		ret = ctx->error;
@@ -755,9 +818,9 @@ static int djn_prepare(struct drm_panel *panel)
 #ifdef PANEL_SUPPORT_READBACK
 		djn_panel_get_data(ctx);
 #endif
-	is_suspend = 0;
-	pr_info("nt36672s Skip Power Control !\n");
-	return ret;
+		is_suspend = 0;
+		pr_info("nt36672s Skip Power Control !\n");
+		return ret;
 	}
 	else
 #endif
@@ -853,9 +916,9 @@ static int djn_enable(struct drm_panel *panel)
 	return 0;
 }
 
-#define HFP (36)
-#define HSA (28)
-#define HBP (36)
+#define HFP (22)
+#define HSA (4)
+#define HBP (10)
 #define VFP_60 (56)
 //#define VFP_90 (300)
 #define VSA (8)
