@@ -94,3 +94,9 @@ config OEM_DRE_MODE
 	help
 	  support dre_mode
 
+config OEM_QLC
+	tristate "qlc for emmc"
+	depends on PROJECT_LAMU
+	default m
+	help
+	  support qlc_mode

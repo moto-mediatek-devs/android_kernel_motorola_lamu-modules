@@ -2142,6 +2142,7 @@ def get_overlay_modules_list():
         mgk_64_device_modules.append("oem/sensors/ant_det/oem_antdet.ko")
         mgk_64_device_modules.append("oem/audiopa_aw/snd-soc-aw87xxx.ko")
         mgk_64_device_modules.append("oem/tinno_dre_mode/oem_dre_mode.ko")
+        mgk_64_device_modules.append("oem/qlc/oem_qlc.ko")
 
 
     if "p325a_overlay.config" in DEFCONFIG_OVERLAYS:
