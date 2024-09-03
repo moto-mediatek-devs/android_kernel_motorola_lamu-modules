@@ -92,6 +92,8 @@
 #define HUSB320_REG_INTERRUPT1          0x15
 #define HUSB320_REG_USER_CFG            0x16
 
+#define HUSB320_REG_NUM                 0x16
+
 /* Register Values */
 #define HUSB320_REV                     0x10
 #define HUSB320_REVTYPE                 0x01
@@ -1496,6 +1498,48 @@ static ssize_t fauto_snk_en_store(struct device *dev,
 DEVICE_ATTR(fauto_snk_en, S_IRUGO | S_IWUSR,
 		fauto_snk_en_show, fauto_snk_en_store);
 
+static ssize_t husb320_show_registers(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct husb320_chip *chip = dev_get_drvdata(dev);
+	uint8_t addr;
+	uint8_t tmpbuf[300];
+	int len;
+	int idx = 0;
+	int ret;
+
+	idx = snprintf(buf, PAGE_SIZE, "%s:\n", "husb320");
+
+	for (addr = 0; addr <= HUSB320_REG_NUM; addr++) {
+		ret = i2c_smbus_read_byte_data(chip->client, addr);
+		if (ret >= 0) {
+			len = snprintf(tmpbuf, PAGE_SIZE - idx,
+				"Reg[%.2X] = 0x%.2x\n", addr, ret);
+			memcpy(&buf[idx], tmpbuf, len);
+			idx += len;
+		}
+	}
+
+	return idx;
+}
+
+static ssize_t husb320_store_register(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct husb320_chip *chip = dev_get_drvdata(dev);
+	int ret;
+	unsigned int val;
+	unsigned int reg;
+
+	ret = sscanf(buf, "%x %x", &reg, &val);
+	if (ret == 2 && reg <= HUSB320_REG_NUM)
+		i2c_smbus_write_byte_data(chip->client, reg, val);
+
+	return count;
+}
+
+static DEVICE_ATTR(registers, 0660, husb320_show_registers, husb320_store_register);
+
 static int husb320_create_devices(struct device *cdev)
 {
 	int ret = 0;
@@ -1587,7 +1631,16 @@ static int husb320_create_devices(struct device *cdev)
 		ret = -ENODEV;
 		goto err13;
 	}
+	ret = device_create_file(cdev, &dev_attr_registers);
+	if (ret < 0) {
+		dev_err(cdev,
+				"failed to create dev_attr_registers\n");
+		ret = -ENODEV;
+		goto err14;
+	}
 	return ret;
+err14:
+	device_remove_file(cdev, &dev_attr_fauto_snk_en);
 err13:
 	device_remove_file(cdev, &dev_attr_fremedy);
 err12:
@@ -1620,6 +1673,7 @@ err0:
 
 static void husb320_destory_device(struct device *cdev)
 {
+	device_remove_file(cdev, &dev_attr_fchip_state);
 	device_remove_file(cdev, &dev_attr_ftype);
 	device_remove_file(cdev, &dev_attr_fmode);
 	device_remove_file(cdev, &dev_attr_freset);
@@ -1632,6 +1686,8 @@ static void husb320_destory_device(struct device *cdev)
 	device_remove_file(cdev, &dev_attr_fccdebounce);
 	device_remove_file(cdev, &dev_attr_fdcable);
 	device_remove_file(cdev, &dev_attr_fremedy);
+	device_remove_file(cdev, &dev_attr_fauto_snk_en);
+	device_remove_file(cdev, &dev_attr_registers);
 }
 
 static int husb320_power_set_icurrent_max(struct husb320_chip *chip,
