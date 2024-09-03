@@ -795,7 +795,7 @@ __maybe_unused static int wt6670f_i2c_sequence_send(const struct i2c_client *cli
 	return (ret == 2) ? count : ret;
 }
 
-#define FIRWARE_SIZE                0x40
+#define FIRWARE_SIZE                0x01
 #define ENABLE_ISP_CMD_LEN          7
 #define I2C_MASTER_SEND_LEN         3
 #define ISP_CHIP_ID                 0x70
@@ -858,7 +858,7 @@ static void wt6670f_isp_flow(struct wt6670f_charger *chip)
 			high_addr = (pos >> 8) & 0x0f ;
 			low_addr = pos % 256;
 			length = FIRWARE_SIZE;
-			pr_info("high_addr = %02x, low_addr = %02x, length = %d\n", high_addr, low_addr, length);
+			pr_debug("high_addr = %02x, low_addr = %02x, length = %d\n", high_addr, low_addr, length);
 
 			memset(code, 0, FIRWARE_SIZE);
 			set_addr_high_byte_cmd[2] = high_addr;
@@ -902,7 +902,7 @@ static void wt6670f_isp_flow(struct wt6670f_charger *chip)
 				goto update_failed;
 			}
 			pos = pos + length;
-			pr_info("pos = %d\n", pos);
+			pr_debug("pos = %d\n", pos);
 		}
 
 		for (i = 0; i < 16; i++) {
@@ -917,10 +917,10 @@ static void wt6670f_isp_flow(struct wt6670f_charger *chip)
 			flash_addr = 0x00;
 			wt6670f_i2c_read_cmd(chip->client, flash_addr, mem_data);
 			for (j = 0; j < 64; j++) {
-				pr_info("mem_data[%d]=%02x\n", j + flash_addr + i * 256, mem_data[j]);
-				pr_info("wt6670f_fw_bin[%d]=%02x\n", j + flash_addr + i * 256, wt6670f_fw_bin[j + flash_addr + i * 256]);
+				pr_debug("mem_data[%d]=%02x\n", j + flash_addr + i * 256, mem_data[j]);
+				pr_debug("wt6670f_fw_bin[%d]=%02x\n", j + flash_addr + i * 256, wt6670f_fw_bin[j + flash_addr + i * 256]);
 				if (wt6670f_fw_bin[j + flash_addr + i * 256] != mem_data[j]) {
-					pr_err("flash data is wrong\n");
+					pr_err("flash data is wrong [%d]\n", __LINE__);
 					ret = ERROR_CALLBACK_FAILED;
 					goto update_failed;
 				}
@@ -929,10 +929,10 @@ static void wt6670f_isp_flow(struct wt6670f_charger *chip)
 			flash_addr = 0x40;
 			wt6670f_i2c_read_cmd(chip->client, flash_addr, mem_data);
 			for (j = 0; j < 64; j++) {
-				pr_info("mem_data[%d] = %02x\n", j + flash_addr + i * 256, mem_data[j]);
-				pr_info("wt6670f_fw_bin[%d] = %02x\n", j + flash_addr + i * 256, wt6670f_fw_bin[j + flash_addr + i * 256]);
+				pr_debug("mem_data[%d] = %02x\n", j + flash_addr + i * 256, mem_data[j]);
+				pr_debug("wt6670f_fw_bin[%d] = %02x\n", j + flash_addr + i * 256, wt6670f_fw_bin[j + flash_addr + i * 256]);
 				if (wt6670f_fw_bin[j + flash_addr + i * 256] != mem_data[j]) {
-					pr_err("flash data is wrong\n");
+					pr_err("flash data is wrong [%d]\n", __LINE__);
 					ret = ERROR_CALLBACK_FAILED;
 					goto update_failed;
 				}
@@ -941,10 +941,10 @@ static void wt6670f_isp_flow(struct wt6670f_charger *chip)
 			flash_addr = 0x80;
 			wt6670f_i2c_read_cmd(chip->client, flash_addr, mem_data);
 			for (j = 0; j < 64; j++) {
-				pr_info("mem_data[%d] = %02x\n", j + flash_addr + i * 256, mem_data[j]);
-				pr_info("wt6670f_fw_bin[%d] = %02x\n", j + flash_addr + i * 256, wt6670f_fw_bin[j + flash_addr + i * 256]);
+				pr_debug("mem_data[%d] = %02x\n", j + flash_addr + i * 256, mem_data[j]);
+				pr_debug("wt6670f_fw_bin[%d] = %02x\n", j + flash_addr + i * 256, wt6670f_fw_bin[j + flash_addr + i * 256]);
 				if (wt6670f_fw_bin[j + flash_addr + i * 256] != mem_data[j]) {
-					pr_err("flash data is wrong\n");
+					pr_err("flash data is wrong [%d]\n", __LINE__);
 					ret = ERROR_CALLBACK_FAILED;
 					goto update_failed;
 				}
@@ -953,10 +953,10 @@ static void wt6670f_isp_flow(struct wt6670f_charger *chip)
 			flash_addr = 0xC0;
 			wt6670f_i2c_read_cmd(chip->client, flash_addr, mem_data);
 			for (j = 0; j < 64; j++) {
-				pr_info("mem_data[%d] = %02x\n", j + flash_addr + i * 256, mem_data[j]);
-				pr_info("wt6670f_fw_bin[%d] = %02x\n", j + flash_addr + i * 256, wt6670f_fw_bin[j + flash_addr + i * 256]);
+				pr_debug("mem_data[%d] = %02x\n", j + flash_addr + i * 256, mem_data[j]);
+				pr_debug("wt6670f_fw_bin[%d] = %02x\n", j + flash_addr + i * 256, wt6670f_fw_bin[j + flash_addr + i * 256]);
 				if (wt6670f_fw_bin[j + flash_addr + i * 256] != mem_data[j]) {
-					pr_err("flash data is wrong\n");
+					pr_err("flash data is wrong [%d]\n", __LINE__);
 					ret = ERROR_CALLBACK_FAILED;
 					goto update_failed;
 				}
