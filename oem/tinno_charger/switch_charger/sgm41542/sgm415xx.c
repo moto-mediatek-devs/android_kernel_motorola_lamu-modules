@@ -1686,6 +1686,9 @@ static irqreturn_t sgm4154x_irq_handler_thread(int irq, void *private)
 		sgm4154x_set_input_curr_lim(sgm->chg_dev, 100000);
 		sgm4154x_set_ichrg_curr(sgm->chg_dev, 100000);
 		sgm4154x_enable_charger(sgm);
+		if (sgm->state.input_det_done) {
+			schedule_delayed_work(&sgm->retry_charger_detect_work, msecs_to_jiffies(100));
+		}
 		return IRQ_HANDLED;
 	}
 
