@@ -3234,6 +3234,7 @@ static kal_uint32 set_test_pattern_mode(kal_uint32 modes, struct SET_SENSOR_PATT
 	LOG_INF("set_test_pattern enum: %d\n", modes);
 	if (modes) {
 		if (modes == 1 && (pTestpatterndata != NULL)) { //Solid Color
+			mdelay(80);
 			write_cmos_sensor(0x0600, 0x0001);
 			Color_R = (pTestpatterndata->COLOR_R) & 0xFFFF;
 			Color_Gr = (pTestpatterndata->COLOR_Gr) & 0xFFFF;
