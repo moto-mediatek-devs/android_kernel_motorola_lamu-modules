@@ -1579,7 +1579,7 @@ static kal_uint32 preview(MSDK_SENSOR_EXPOSURE_WINDOW_STRUCT *image_window,
 	LOG_INF("%s E\n", __func__);
 	spin_lock(&imgsensor_drv_lock);
 	imgsensor.sensor_mode = IMGSENSOR_MODE_PREVIEW;
-    imgsensor.vblank_convert = 1252; //for 1632x1224 30fps
+    imgsensor.vblank_convert = 2504; //for 1632x1224 30fps
 	imgsensor.pclk = imgsensor_info.pre.pclk;
 	//imgsensor.video_mode = KAL_FALSE;
 	imgsensor.line_length = imgsensor_info.pre.linelength;
