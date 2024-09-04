@@ -338,16 +338,16 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 			&& info->chr_type == POWER_SUPPLY_TYPE_USB)
 			chr_debug("USBIF & STAND_HOST skip current check\n");
 		else {
-/* TN Begin modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
+/* TN Begin modified by jirui.li/860702 20240904 CR/EKLAMU-834 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 				chr_info("[%s] charging_current_limit:%d, temp_charging_current_limit:%d\n",
 						__func__, pdata->charging_current_limit, pdata->temp_charging_current_limit);
 				if (pdata->temp_charging_current_limit < pdata->charging_current_limit) {
 					pdata->charging_current_limit = pdata->temp_charging_current_limit;
-					pdata->input_current_limit = pdata->temp_charging_current_limit;
+				//	pdata->input_current_limit = pdata->temp_charging_current_limit;
 				}
 #endif /* CONFIG_OEM_TINNO_CHARGER */
-/* TN End modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
+/* TN End modified by jirui.li/860702 20240904 CR/EKLAMU-834 */
 		}
 	}
 

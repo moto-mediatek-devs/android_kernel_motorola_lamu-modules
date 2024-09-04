@@ -136,12 +136,19 @@ static char *stepchg_str[] = {
 static bool first_insert = true;
 #endif
 /* TN End modified by xinjun.lu/860715 20240808 CR/EKLAMU-202 */
-/* TN Begin modified by jirui.li/860702 20240814 CR/EKLAMU-1339 */
+/* TN Begin modified by jirui.li/860702 20240904 CR/EKLAMU-1339 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 #define BATTERY_PROTECT_MAX_SOC		80
 #define BATTERY_PROTECT_MIN_SOC		20
+#define SW_JEITA_TEMP_10		10
+#define SW_JEITA_CV1		4250000
+#define SW_JEITA_CV2		4500000
+#define SW_JEITA_CV1_CURRENT_LIMIT		1000
+#define SW_JEITA_CV1_CURRENT_LIMIT_GAP		50
+static bool sw_jeita_enter_1A = false;
+static bool sw_jeita_enter_cv1 = false;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
-/* TN End modified by jirui.li/860702 20240814 CR/EKLAMU-1339 */
+/* TN End modified by jirui.li/860702 20240904 CR/EKLAMU-1339 */
 #ifdef MODULE
 static char __chg_cmdline[COMMAND_LINE_SIZE];
 static char *chg_cmdline = __chg_cmdline;
@@ -920,12 +927,14 @@ void do_sw_jeita_state_machine(struct mtk_charger *info)
 	sw_jeita->pre_sm = sw_jeita->sm;
 	sw_jeita->charging = true;
 
-/* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+/* TN Begin modified by xinjun.lu/860715 20240904 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	struct charger_data *pdata;
 	pdata = &info->chg_data[CHG1_SETTING];
+	int vbat = get_battery_voltage(info);
+	int ibat = get_battery_current(info);
 #endif /* CONFIG_OEM_TINNO_CHARGER */
-/* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
+/* TN End modified by xinjun.lu/860715 20240904 CR/EKLAMU-202 */
 
 	/* JEITA battery temp Standard */
 	if (info->battery_temp >= info->data.temp_t4_thres) {
@@ -1032,7 +1041,7 @@ void do_sw_jeita_state_machine(struct mtk_charger *info)
 		sw_jeita->cv = 0;
 	}
 
-/* TN Begin modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
+/* TN Begin modified by jirui.li/860702 20240904 CR/EKLAMU-834 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	if (sw_jeita->sm == TEMP_ABOVE_T4)
 		pdata->temp_charging_current_limit = info->data.jeita_temp_above_t4_icurrent;
@@ -1048,9 +1057,33 @@ void do_sw_jeita_state_machine(struct mtk_charger *info)
 		pdata->temp_charging_current_limit = info->data.jeita_temp_below_t0_icurrent;
 	else
 		pdata->temp_charging_current_limit = 0;
+
+	if (sw_jeita->sm == TEMP_T1_TO_T2 && info->battery_temp < SW_JEITA_TEMP_10) {
+		if (vbat > SW_JEITA_CV1 / 1000 && vbat < SW_JEITA_CV2 / 1000) {
+			sw_jeita_enter_cv1 = true;
+		}
+
+		if (sw_jeita_enter_cv1) {
+			sw_jeita->cv = SW_JEITA_CV1;
+			if (ibat <= SW_JEITA_CV1_CURRENT_LIMIT + SW_JEITA_CV1_CURRENT_LIMIT_GAP) {
+				sw_jeita_enter_1A = true;
+				sw_jeita_enter_cv1 = false;
+				sw_jeita->cv = SW_JEITA_CV2;
+			}
+		} else {
+			sw_jeita->cv = SW_JEITA_CV2;
+		}
+
+		if (sw_jeita_enter_1A) {
+			pdata->temp_charging_current_limit = SW_JEITA_CV1_CURRENT_LIMIT;
+			if (vbat >= SW_JEITA_CV2 / 1000)
+				sw_jeita_enter_1A = false;
+		}
+	}
+
 	chr_err("[SW_JEITA] temp_curr:%d\n", pdata->temp_charging_current_limit);
 #endif /* CONFIG_OEM_TINNO_CHARGER */
-/* TN End modified by jirui.li/860702 20240722 CR/EKLAMU-834 */
+/* TN End modified by jirui.li/860702 20240904 CR/EKLAMU-834 */
 
 	chr_err("[SW_JEITA]preState:%d newState:%d tmp:%d cv:%d\n",
 		sw_jeita->pre_sm, sw_jeita->sm, info->battery_temp,
@@ -4786,11 +4819,13 @@ static int mtk_charger_plug_out(struct mtk_charger *info)
 	charger_dev_set_input_current(info->chg1_dev, 100000);
 	charger_dev_set_mivr(info->chg1_dev, info->data.min_charger_voltage);
 	charger_dev_plug_out(info->chg1_dev);
-/*TN Begin modified by hao.jia/809321 20240729 CR/EKLAMU-202*/
+/*TN Begin modified by hao.jia/809321 20240904 CR/EKLAMU-202*/
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	info->ext_chr_type = POWER_SUPPLY_TYPE_UNKNOWN;
+	sw_jeita_enter_1A = false;
+	sw_jeita_enter_cv1 = false;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
-/*TN End modified by hao.jia/809321 20240729 CR/EKLAMU-202*/
+/*TN End modified by hao.jia/809321 20240904 CR/EKLAMU-202*/
 
 /* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
