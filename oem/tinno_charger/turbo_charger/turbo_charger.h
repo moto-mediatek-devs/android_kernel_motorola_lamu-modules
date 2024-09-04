@@ -162,6 +162,11 @@ struct cp_device {
 	int	die_temp;
 };
 
+struct batt_device {
+	int	soc;
+	int	temp;
+};
+
 struct turbo_charger_step_power {
 	int	chrg_step_curr;
 	int	chrg_step_volt;
@@ -233,6 +238,7 @@ struct turbo_charger_algo_info {
 	struct	power_supply		*qc_logic_psy;
 	struct	cp_device		cp;
 	struct	sw_device		sw;
+	struct	batt_device		batt;
 	struct	charger_device		*sw_chg;
 	struct	charger_device		*cp_chg;
 
