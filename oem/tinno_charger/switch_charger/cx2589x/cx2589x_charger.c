@@ -2501,10 +2501,41 @@ static const struct of_device_id cx2589x_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, cx2589x_of_match);
 
+#ifdef CONFIG_PM_SLEEP
+static int cx2589x_suspend(struct device *dev)
+{
+	struct cx2589x_device *cx = dev_get_drvdata(dev);
+
+	pr_info("enter\n");
+	if (device_may_wakeup(dev))
+		enable_irq_wake(cx->client->irq);
+	disable_irq(cx->client->irq);
+
+	return 0;
+}
+
+static int cx2589x_resume(struct device *dev)
+{
+	struct cx2589x_device *cx = dev_get_drvdata(dev);
+
+	pr_info("enter\n");
+	enable_irq(cx->client->irq);
+	if (device_may_wakeup(dev))
+		disable_irq_wake(cx->client->irq);
+
+	return 0;
+}
+#endif
+
+static const struct dev_pm_ops cx2589x_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(cx2589x_suspend, cx2589x_resume)
+};
+
 static struct i2c_driver cx2589x_driver = {
 	.driver = {
 		.name = "cx2589x-charger",
 		.of_match_table = cx2589x_of_match,
+		.pm = &cx2589x_pm_ops,
 	},
 	.probe = cx2589x_driver_probe,
 	.remove = cx2589x_charger_remove,
