@@ -98,6 +98,8 @@ EXPORT_SYMBOL(is_qc3_charger_ready);
 extern bool turbo_charger_active;
 extern int ffc_reduce_count;
 extern bool is_turbo_charger_ready;
+static unsigned int turbo_power_mode = 0;
+static unsigned int turbo_test_mode = 0;
 #endif /* CONFIG_OEM_TURBO_CHARGER */
 /*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 
@@ -1907,6 +1909,41 @@ static ssize_t battery_protection_mode_store(struct device *dev , struct device_
 }
 static DEVICE_ATTR_RW(battery_protection_mode);
 /* TN End modified by jirui.li/860702 20240814 CR/EKLAMU-1339 */
+
+/* TN Begin modified by jirui.li/860702 20240814 CR/EKLAMU-30 */
+static ssize_t turbo_power_mode_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	struct mtk_charger *pinfo = dev->driver_data;
+	int value = 0;
+	int chr_type = get_charger_type(pinfo);
+	if ((chr_type == POWER_SUPPLY_TYPE_USB_QC3 || chr_type == POWER_SUPPLY_TYPE_USB_QC3P) ||
+	    (pinfo->pe50.apdo_cap.pdp > 15 && chr_type == POWER_SUPPLY_TYPE_USB_DCP)) {
+		turbo_power_mode = 1;
+	} else {
+		turbo_power_mode = 0;
+	}
+	value = turbo_power_mode || turbo_test_mode;
+	chr_info("%s value %d\n", __func__, value);
+	return sprintf(buf, "%d\n", value);
+}
+static ssize_t turbo_power_mode_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t size)
+{
+	signed int temp;
+	if (kstrtoint(buf, 10, &temp) == 0) {
+		chr_info("%s %s turbo_power_mode\n", __func__, temp ? "enable" : "disable");
+		if (temp == 1)
+			turbo_test_mode = 1;
+		else
+			turbo_test_mode = 0;
+	} else
+		chr_err("%s: format error!\n", __func__);
+	return size;
+}
+static DEVICE_ATTR_RW(turbo_power_mode);
+/* TN End modified by jirui.li/860702 20240814 CR/EKLAMU-30 */
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 
@@ -5585,6 +5622,11 @@ static int mtk_charger_setup_files(struct platform_device *pdev)
 	if (ret)
 		goto _out;
 /* TN End modified by jirui.li/860702 20240814 CR/EKLAMU-1339 */
+/* TN Begin modified by jirui.li/860702 20240814 CR/EKLAMU-30 */
+	ret = device_create_file(&(pdev->dev), &dev_attr_turbo_power_mode);
+	if (ret)
+		goto _out;
+/* TN End modified by jirui.li/860702 20240814 CR/EKLAMU-30 */
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 
