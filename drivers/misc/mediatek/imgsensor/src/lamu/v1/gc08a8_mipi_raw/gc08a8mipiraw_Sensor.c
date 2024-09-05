@@ -1640,11 +1640,21 @@ static kal_uint32 set_test_pattern_mode(kal_bool enable)
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
 static int front_cam_get_info(char *buf, void *arg0)
 {
-	long resolv = 0;
-	int pi = 0;
-	resolv = imgsensor_info.cap.grabwindow_width * imgsensor_info.cap.grabwindow_height;
-	pi = resolv/1000/1000 + (resolv/1000/100%10 > 5 ? 1 : 0);
-	return sprintf(buf, "%s [%d*%d] %dM", "gc08a8_front_dd_||_mipi_raw", imgsensor_info.cap.grabwindow_width, imgsensor_info.cap.grabwindow_height, pi);
+    long resolv = 0;
+    int pi = 0;
+    int skuNumber = 0;
+    skuNumber = oem_hw_sku();
+    LOG_INF("front_cam_get_info:Read sku number: %d\n", skuNumber);
+    resolv = imgsensor_info.cap.grabwindow_width * imgsensor_info.cap.grabwindow_height;
+    pi = resolv/1000/1000 + (resolv/1000/100%10 > 5 ? 1 : 0);
+
+    if (skuNumber > 0 && skuNumber < 10) {
+        return sprintf(buf, "%s [%d*%d] %dM", "gc08a8_front_dd_|_mipi_raw", imgsensor_info.cap.grabwindow_width, imgsensor_info.cap.grabwindow_height, pi);
+    } else if (skuNumber > 10) {
+        return sprintf(buf, "%s [%d*%d] %dM", "gc08a8_front_dd_||_mipi_raw", imgsensor_info.cap.grabwindow_width, imgsensor_info.cap.grabwindow_height, pi);
+    } else {
+        return sprintf(buf, "%s [%d*%d] %dM", "gc08a8_front_dd_||_mipi_raw", imgsensor_info.cap.grabwindow_width, imgsensor_info.cap.grabwindow_height, pi);
+    }
 }
 #endif
 
