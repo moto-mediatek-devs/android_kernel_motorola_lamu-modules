@@ -1908,7 +1908,7 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 	uint32_t pen_battery = 0;
 
 #if WAKEUP_GESTURE
-	if (bTouchIsAwake == 0) {
+	if (bTouchIsAwake == 0 && ts->gesture_tpye) {
 		pm_wakeup_event(&ts->client->dev, 5000);
 	}
 #endif
@@ -1979,7 +1979,7 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 #endif /* POINT_DATA_CHECKSUM */
 
 #if WAKEUP_GESTURE
-	if (bTouchIsAwake == 0) {
+	if (bTouchIsAwake == 0  && ts->gesture_tpye) {
 		input_id = (uint8_t)(point_data[1] >> 3);
 		nvt_ts_wakeup_gesture_report(input_id, point_data);
 		mutex_unlock(&ts->lock);
@@ -3069,7 +3069,8 @@ static int32_t nvt_ts_suspend(struct device *dev)
 	}
 
 #if !WAKEUP_GESTURE
-	nvt_irq_enable(false);
+	if (!ts->gesture_tpye)
+		nvt_irq_enable(false);
 #endif
 
 #if NVT_TOUCH_ESD_PROTECT
@@ -3085,20 +3086,21 @@ static int32_t nvt_ts_suspend(struct device *dev)
 	bTouchIsAwake = 0;
 
 #if WAKEUP_GESTURE
-	//---write command to enter "wakeup gesture mode"---
-	buf[0] = EVENT_MAP_HOST_CMD;
-	buf[1] = 0x13;
-	CTP_SPI_WRITE(ts->client, buf, 2);
+	if (ts->gesture_tpye) {
+		//---write command to enter "wakeup gesture mode"---
+		buf[0] = EVENT_MAP_HOST_CMD;
+		buf[1] = 0x13;
+		CTP_SPI_WRITE(ts->client, buf, 2);
 
-	enable_irq_wake(ts->client->irq);
+		enable_irq_wake(ts->client->irq);
 
-	NVT_LOG("Enabled touch wakeup gesture\n");
-
-#else // WAKEUP_GESTURE
-	//---write command to enter "deep sleep mode"---
-	buf[0] = EVENT_MAP_HOST_CMD;
-	buf[1] = 0x11;
-	CTP_SPI_WRITE(ts->client, buf, 2);
+		NVT_LOG("Enabled touch wakeup gesture\n");
+	} else {	//---write command to enter "deep sleep mode"---
+		buf[0] = EVENT_MAP_HOST_CMD;
+		buf[1] = 0x11;
+		CTP_SPI_WRITE(ts->client, buf, 2);
+		NVT_LOG("Enter deep sleep\n");
+	}
 #endif // WAKEUP_GESTURE
 
 	mutex_unlock(&ts->lock);
@@ -3169,7 +3171,8 @@ static int32_t nvt_ts_resume(struct device *dev)
 	}
 
 #if !WAKEUP_GESTURE
-	nvt_irq_enable(true);
+	if (!ts->gesture_tpye)
+		nvt_irq_enable(true);
 #endif
 
 #if NVT_TOUCH_ESD_PROTECT
