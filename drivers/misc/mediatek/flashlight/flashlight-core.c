@@ -20,6 +20,7 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/thermal.h>
+#include <linux/delay.h>
 
 #ifdef CONFIG_COMPAT
 #include <linux/compat.h>
@@ -48,6 +49,8 @@ LIST_HEAD(flashlight_list);
 /* duty current */
 static struct flashlight_arg duty_current_arg;
 
+static unsigned char current_addr;
+static unsigned char current_data;
 /* power variables */
 #ifdef CONFIG_MTK_FLASHLIGHT_PT
 static int pt_low_vol = LOW_BATTERY_LEVEL_0;
@@ -1761,6 +1764,74 @@ unlock:
 }
 static DEVICE_ATTR_RW(flashlight_sw_disable);
 
+static ssize_t flashlight_reg_show(
+		struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "addr = 0x%x, data = 0x%x\n", current_addr, current_data);
+}
+
+static ssize_t flashlight_reg_store(struct device *dev,
+				    struct device_attribute *attr,
+				    const char *buf, size_t size)
+{
+	struct flashlight_dev_arg fl_dev_arg;
+	struct flashlight_dev *fdev_current = NULL;
+	int ret = 0;
+	char num;
+	int count = 0;
+	char *token, *cur = (char *)buf;
+	char delim[] = " ";
+	while (cur) {
+		token = strsep(&cur, delim);
+		ret = kstrtos8(token, 16, &num);
+		if (ret) {
+			pr_info("Error argumentse\n");
+			return -1;
+		}
+
+		if (count == FLASHLIGHT_ARG_TYPE)
+			fl_dev_arg.addr = num;
+		else if (count == FLASHLIGHT_ARG_CT)
+			fl_dev_arg.data = num;
+		else {
+			count++;
+			break;
+		}
+		count++;
+	}
+	
+	count--;
+	mutex_lock(&fl_mutex);
+	fdev_current = flashlight_find_dev_by_full_index(flashlight_id[0].type, flashlight_id[0].ct,
+							 flashlight_id[0].part);
+	mutex_unlock(&fl_mutex);
+	if (!fdev_current) {
+		pr_info("Find no flashlight device\n");
+		ret = -1;
+		return -1;
+	}
+
+	fl_dev_arg.channel = fdev_current->dev_id.channel;
+	if (count == FLASHLIGHT_ARG_CT) {
+		fdev_current->ops->flashlight_ioctl(FLASH_IOC_SET_REGISTER,
+						    (unsigned long)&fl_dev_arg);
+		msleep(50);
+		fdev_current->ops->flashlight_ioctl(FLASH_IOC_GET_REGISTER,
+						    (unsigned long)&fl_dev_arg);
+
+	} else if (count == FLASHLIGHT_ARG_TYPE) {
+		fdev_current->ops->flashlight_ioctl(FLASH_IOC_GET_REGISTER,
+						    (unsigned long)&fl_dev_arg);
+	}
+	else return -1;
+		
+	current_addr = fl_dev_arg.addr;
+	current_data = fl_dev_arg.data;
+
+	return size;
+}
+static DEVICE_ATTR_RW(flashlight_reg);
+
 /******************************************************************************
  * Platform device and driver
  *****************************************************************************/
@@ -1923,7 +1994,11 @@ static int flashlight_probe(struct platform_device *pdev)
 		pr_info("Failed to create device file(torch)\n");
 		goto err_create_torch_device_file;
 	}
-
+	if (device_create_file(flashlight_device,
+				&dev_attr_flashlight_reg)) {
+		pr_info("Failed to create device file(torch)\n");
+		goto err_create_flashlight_reg;
+	}
 	fl_parse_dt(&pdev->dev);
 
 	/* init flashlight */
@@ -1947,6 +2022,8 @@ err_create_charger_device_file:
 	device_remove_file(flashlight_device, &dev_attr_flashlight_pt);
 err_create_pt_device_file:
 	device_remove_file(flashlight_device, &dev_attr_flashlight_strobe);
+err_create_flashlight_reg:
+	device_remove_file(flashlight_device, &dev_attr_flashlight_reg);
 err_create_strobe_device_file:
 	device_destroy(flashlight_class, flashlight_devno);
 err_create_device:
@@ -1980,6 +2057,7 @@ static int flashlight_remove(struct platform_device *pdev)
 	device_remove_file(flashlight_device, &dev_attr_flashlight_charger);
 	device_remove_file(flashlight_device, &dev_attr_flashlight_pt);
 	device_remove_file(flashlight_device, &dev_attr_flashlight_strobe);
+	device_remove_file(flashlight_device, &dev_attr_flashlight_reg);
 	/* remove device */
 	device_destroy(flashlight_class, flashlight_devno);
 	/* remove class */

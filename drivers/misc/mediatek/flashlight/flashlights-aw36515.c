@@ -651,7 +651,12 @@ static int aw36515_ioctl(unsigned int cmd, unsigned long arg)
 		pr_info("FLASH_IOC_GET_HW_FAULT2(%d)\n", channel);
 		fl_arg->arg = aw36515_get_flag(2);
 		break;
-
+	case FLASH_IOC_GET_REGISTER:
+		aw36515_i2c_read(aw36515_i2c_client, fl_arg->addr, &fl_arg->data);
+		break;
+	case FLASH_IOC_SET_REGISTER:
+		aw36515_i2c_write(aw36515_i2c_client, fl_arg->addr, fl_arg->data);
+		break;
 	default:
 		pr_info("No such command and arg(%d): (%d, %d)\n",
 				channel, _IOC_NR(cmd), (int)fl_arg->arg);

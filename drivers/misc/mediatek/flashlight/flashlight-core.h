@@ -122,6 +122,8 @@ struct flashlight_dev {
 struct flashlight_dev_arg {
 	int channel;
 	int arg;
+	unsigned char addr;
+	unsigned char data;
 };
 
 #if IS_ENABLED(CONFIG_MTK_FLASHLIGHT_THERMAL)
