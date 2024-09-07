@@ -125,6 +125,10 @@ EXPORT_SYMBOL(mml_stash);
 int mml_urate = 110;
 module_param(mml_urate, int, 0644);
 
+/* dc mode reserve time in us */
+int dc_sw_reserve = 300;
+module_param(dc_sw_reserve, int, 0644);
+
 #if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
 static bool mml_timeout_dump = true;
 static DEFINE_MUTEX(mml_dump_mutex);
@@ -165,6 +169,10 @@ static char mml_log_record[MML_LOG_SIZE];
 static u32 mml_log_idx;
 static u32 mml_log_end;
 
+static atomic_t mml_task_ref = ATOMIC_INIT(0);
+int mml_task_check_cnt = 16;
+module_param(mml_task_check_cnt, int, 0644);
+
 void mml_save_log_record(const char *fmt, ...)
 {
 	va_list args;
@@ -190,31 +198,43 @@ void mml_save_log_record(const char *fmt, ...)
 }
 EXPORT_SYMBOL_GPL(mml_save_log_record);
 
-void mml_print_log_record(struct seq_file *seq)
+u32 mml_print_log_buffer(char *debug_buffer, u32 buffer_size)
 {
-	int ret = 0;
-	u32 idx, end, size = seq->size;
+	u32 idx, end;
 	unsigned long flags = 0;
+	u32 len, buf_idx = 0, copy_sz;
 
-	seq_puts(seq, "\nMML log buffer begin:\n");
+	len = snprintf(debug_buffer, buffer_size, "\nMML log buffer begin:\n");
+	if (len <= 0 || len >= buffer_size)
+		goto done;
+	buf_idx += len;
+	buffer_size -= len;
 
 	spin_lock_irqsave(&mml_log_lock, flags);
-	idx = mml_log_idx + 1;
+	idx = mml_log_idx;
 	end = mml_log_end;
 
-	if (idx > 0 && end > idx) {
-		ret = seq_write(seq, mml_log_record + idx,
-			min_t(u32, end - idx - 1, seq->size));
-		if (!ret)
-			seq_puts(seq, "\n");
+	if (buffer_size && idx > 0 && end > idx) {
+		copy_sz = min_t(u32, end - idx, buffer_size);
+
+		memcpy(debug_buffer + buf_idx, mml_log_record + idx, copy_sz);
+		buf_idx += copy_sz;
+		buffer_size -= copy_sz;
 	}
-	if (!ret) {
-		ret = seq_write(seq, mml_log_record, min_t(u32, idx - 1, seq->size));
-		if (!ret)
-			seq_puts(seq, "\n");
+
+	if (buffer_size) {
+		copy_sz = min_t(u32, idx, buffer_size);
+		memcpy(debug_buffer + buf_idx, mml_log_record, copy_sz);
+		buf_idx += copy_sz;
+		buffer_size -= copy_sz;
 	}
+
 	spin_unlock_irqrestore(&mml_log_lock, flags);
-	mml_log("%s print log index %u end %u sz %u ret %d", __func__, idx, end, size, ret);
+
+done:
+	mml_msg("%s print log index %u end %u write %u remain %u",
+		__func__, mml_log_idx, mml_log_end, buf_idx, buffer_size);
+	return buf_idx;
 }
 
 int mml_topology_register_ip(const char *ip, const struct mml_topology_ops *op)
@@ -1188,8 +1208,10 @@ static u64 mml_core_calc_tput(struct mml_task *task, u32 pixel, u32 pipe,
 {
 	u64 duration = mml_core_time_dur_us(end, start);
 
-	if (!duration)
+	if (!duration || duration <= dc_sw_reserve)
 		duration = 1;
+	else
+		duration -= dc_sw_reserve;
 
 	/* truoughput by end time */
 	task->pipe[pipe].throughput = (u32)div_u64(pixel, duration);
@@ -1397,9 +1419,10 @@ static void mml_core_dvfs_end(struct mml_task *task, u32 pipe)
 
 	ktime_get_real_ts64(&curr_time);
 
-	if (timespec64_compare(&curr_time, &task->end_time) > 0) {
+	if (mml_isdc(cfg->info.mode) && timespec64_compare(&curr_time, &task->end_time) > 0) {
 		overdue = true;
 		mml_trace_tag_start(MML_TTAG_OVERDUE);
+		mml_mmp(overdue, MMPROFILE_FLAG_PULSE, task->job.jobid, 0);
 	}
 
 	mml_msg_qos("task dvfs end %p job %i pipe %u cur %2u.%03llu end %2u.%03llu clt id %hhu%s",
@@ -1695,10 +1718,8 @@ static void core_taskdone_kt_work(struct kthread_work *work)
 
 	/* before clean up, signal buffer fence */
 	if (task->fence) {
-		dma_fence_signal(task->fence);
 		dma_fence_put(task->fence);
-		mml_mmp(fence_sig, MMPROFILE_FLAG_PULSE, task->job.jobid,
-			mmp_data2_fence(task->fence->context, task->fence->seqno));
+		task->fence = NULL;
 	}
 
 #if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
@@ -1827,10 +1848,16 @@ static void core_taskdone_check(struct mml_task *task)
 	/* cnt can be 1 or 2, if dual on and count 2 means pipes done */
 	cnt = atomic_inc_return(&task->pipe_done);
 	mml_mmp(taskdone, MMPROFILE_FLAG_PULSE, task->job.jobid, ((cfg->dual << 16) | cnt));
-	if (!cfg->dual || cnt > 1) {
-		task->done = true;
-		kthread_queue_work(cfg->ctx_kt_done, &task->kt_work_done);
+	if (cfg->dual && cnt <= 1)
+		return;
+
+	task->done = true;
+	if (task->fence) {
+		dma_fence_signal(task->fence);
+		mml_mmp(fence_sig, MMPROFILE_FLAG_PULSE, task->job.jobid,
+			mmp_data2_fence(task->fence->context, task->fence->seqno));
 	}
+	kthread_queue_work(cfg->ctx_kt_done, &task->kt_work_done);
 }
 
 static void core_taskdone_cb(struct cmdq_cb_data data)
@@ -2391,9 +2418,6 @@ static void core_config_task_work(struct kthread_work *work)
 	core_config_task(task);
 }
 
-#define MML_TASK_SAFE_CNT	512
-static atomic_t mml_task_ref = ATOMIC_INIT(0);
-
 static s32 task_cnt_get(char *buf, const struct kernel_param *kp)
 {
 	s32 len = 0;
@@ -2410,7 +2434,7 @@ static const struct kernel_param_ops task_cnt_param_ops = {
 };
 module_param_cb(task_cnt, &task_cnt_param_ops, NULL, 0644);
 
-struct mml_task *mml_core_create_task(void)
+struct mml_task *mml_core_create_task(u32 jobid)
 {
 	struct mml_task *task;
 	s32 ret;
@@ -2422,8 +2446,19 @@ struct mml_task *mml_core_create_task(void)
 		mml_err("failed to create mml task");
 		return ERR_PTR(-ENOMEM);
 	}
-	if (atomic_inc_return(&mml_task_ref) >= MML_TASK_SAFE_CNT)
-		mml_err("too many mml tasks:%d", atomic_read(&mml_task_ref));
+	if (atomic_inc_return(&mml_task_ref) >= mml_task_check_cnt) {
+		static bool aeeonce;
+
+		mml_err("too many mml tasks:%d job %u",
+			atomic_read(&mml_task_ref), jobid);
+
+		if (!aeeonce) {
+			aeeonce = true;
+			mml_fatal("mml", "too many mml tasks:%d job %u",
+				atomic_read(&mml_task_ref), jobid);
+		}
+
+	}
 	INIT_LIST_HEAD(&task->entry);
 	INIT_LIST_HEAD(&task->pipe[0].entry_clt);
 	INIT_LIST_HEAD(&task->pipe[1].entry_clt);

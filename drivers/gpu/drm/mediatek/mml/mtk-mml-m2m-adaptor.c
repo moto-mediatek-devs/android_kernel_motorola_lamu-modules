@@ -79,9 +79,15 @@ struct mml_m2m_ctx {
 
 	struct mutex q_mutex;
 	struct kref ref;
+	struct completion destroy;	/* ready for destroy */
 };
 
-static void m2m_ctx_destroy(struct kref *kref);
+static void m2m_ctx_complete(struct kref *ref)
+{
+	struct mml_m2m_ctx *ctx = container_of(ref, struct mml_m2m_ctx, ref);
+
+	complete(&ctx->destroy);
+}
 
 static void m2m_param_queue(struct mml_m2m_ctx *ctx)
 {
@@ -142,8 +148,6 @@ static void m2m_task_frame_done(struct mml_task *task)
 
 	mml_msg("[m2m]frame done task %p state %u job %u",
 		task, task->state, task->job.jobid);
-
-	kref_get(&mctx->ref);
 
 	/* clean up */
 	task_buf_put(task);
@@ -207,7 +211,8 @@ done:
 	/* notice frame done to v4l2 */
 	mml_m2m_process_done(mctx, vb_state);
 
-	kref_put(&mctx->ref, m2m_ctx_destroy);
+	/* kref_get mctx->ref in mml_m2m_device_run */
+	kref_put(&mctx->ref, m2m_ctx_complete);
 
 	mml_lock_wake_lock(mml, false);
 
@@ -1454,6 +1459,7 @@ static struct mml_m2m_ctx *m2m_ctx_create(struct mml_dev *mml)
 	mutex_init(&ctx->param_mutex);
 	mutex_init(&ctx->q_mutex);
 	kref_init(&ctx->ref);
+	init_completion(&ctx->destroy);
 
 	return ctx;
 }
@@ -1559,9 +1565,8 @@ err_ret:
 	return ret;
 }
 
-static void m2m_ctx_destroy(struct kref *kref)
+static void m2m_ctx_destroy(struct mml_m2m_ctx *mctx)
 {
-	struct mml_m2m_ctx *mctx = container_of(kref, struct mml_m2m_ctx, ref);
 	struct mml_ctx *ctx = &mctx->ctx;
 	struct mml_m2m_param *param, *tmp;
 	u32 i;
@@ -1598,7 +1603,9 @@ static int mml_m2m_release(struct file *file)
 		v4l2_fh_exit(&ctx->fh);
 		mutex_unlock(&v4l2_dev->m2m_mutex);
 
-		kref_put(&ctx->ref, m2m_ctx_destroy);
+		kref_put(&ctx->ref, m2m_ctx_complete);
+		wait_for_completion(&ctx->destroy);
+		m2m_ctx_destroy(ctx);
 	}
 	return 0;
 }
@@ -1819,7 +1826,7 @@ static void mml_m2m_device_run(void *priv)
 			mml_msg("[m2m]reuse task %p pkt %p %p",
 				task, task->pkts[0], task->pkts[1]);
 		} else {
-			task = mml_core_create_task();
+			task = mml_core_create_task(atomic_read(&ctx->job_serial));
 			if (IS_ERR(task)) {
 				result = PTR_ERR(task);
 				mml_err("%s create task for reuse frame fail", __func__);
@@ -1840,7 +1847,7 @@ static void mml_m2m_device_run(void *priv)
 			mml_err("%s create frame config fail", __func__);
 			goto err_unlock_exit;
 		}
-		task = mml_core_create_task();
+		task = mml_core_create_task(atomic_read(&ctx->job_serial));
 		if (IS_ERR(task)) {
 			list_del_init(&cfg->entry);
 			frame_config_destroy(cfg);
@@ -1919,6 +1926,10 @@ static void mml_m2m_device_run(void *priv)
 	/* kick vdisp power on */
 	mml_pw_kick_idle(task->config->mml);
 
+	/* hold mctx to avoid release from v4l2 before call frame_done */
+	kref_get(&mctx->ref);
+	/* kref_put mctx->ref in m2m_task_frame_done */
+
 	/* config to core */
 	mml_core_submit_task(cfg, task);
 
@@ -1928,7 +1939,7 @@ static void mml_m2m_device_run(void *priv)
 	}
 
 	/* note that m2m task is not queued to another thread so we can put mctx here */
-	kref_put(&mctx->ref, m2m_ctx_destroy);
+	kref_put(&mctx->ref, m2m_ctx_complete);
 
 	mml_trace_end();
 	return;
@@ -1962,7 +1973,7 @@ err_buf_exit:
 	}
 	mml_m2m_process_done(mctx, vb_state);
 
-	kref_put(&mctx->ref, m2m_ctx_destroy);
+	kref_put(&mctx->ref, m2m_ctx_complete);
 }
 
 static const struct v4l2_m2m_ops mml_m2m_ops __maybe_unused = {

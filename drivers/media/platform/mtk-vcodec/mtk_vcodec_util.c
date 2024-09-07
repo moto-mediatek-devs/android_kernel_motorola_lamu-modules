@@ -154,18 +154,6 @@ EXPORT_SYMBOL(mtk_venc_vcp_log);
 struct VENC_SLB_CB_T mtk_venc_slb_cb = {0};
 EXPORT_SYMBOL(mtk_venc_slb_cb);
 
-/* For vcp vdec low power mode force setting limit grouping count */
-int mtk_vdec_lpw_limit = MTK_VDEC_GROUP_CNT;
-EXPORT_SYMBOL_GPL(mtk_vdec_lpw_limit);
-
-/* For vcp vdec low power mode force setting timer default timeout (ms) */
-int mtk_vdec_lpw_timeout = MTK_VDEC_WAIT_GROUP_MS;
-EXPORT_SYMBOL_GPL(mtk_vdec_lpw_timeout);
-
-/* For vdec low power mode (group decode) dynamic low latency enable*/
-bool mtk_vdec_enable_dynll = true;
-EXPORT_SYMBOL_GPL(mtk_vdec_enable_dynll);
-
 /* For vdec open set cgroup colocate enable time*/
 int mtk_vdec_open_cgrp_delay = MTK_VDEC_OPEN_CGRP_MS;
 EXPORT_SYMBOL_GPL(mtk_vdec_open_cgrp_delay);
@@ -530,7 +518,7 @@ int mtk_vcodec_get_op_by_pid(enum mtk_instance_type type, int pid)
 }
 EXPORT_SYMBOL_GPL(mtk_vcodec_get_op_by_pid);
 
-static void mtk_vcodec_set_uclamp(bool enable, int ctx_id, int pid)
+static void mtk_vcodec_set_uclamp(bool enable, int ctx_id, int pid, unsigned int util_val)
 {
 	struct task_struct *p, *task_child;
 	struct sched_attr attr = {};
@@ -545,7 +533,7 @@ static void mtk_vcodec_set_uclamp(bool enable, int ctx_id, int pid)
 	attr.sched_util_max = -1;
 
 	if(enable)
-		attr.sched_util_min = 370;
+		attr.sched_util_min = util_val;
 	else
 		attr.sched_util_min = -1;
 
@@ -592,7 +580,7 @@ void mtk_vcodec_set_cpu_hint(struct mtk_vcodec_dev *dev, bool enable,
 			}
 		}
 		if (dev->cpu_hint_mode & (1 << MTK_UCLAMP_MODE)) // uclamp mode
-			mtk_vcodec_set_uclamp(enable, ctx_id, cpu_caller_pid);
+			mtk_vcodec_set_uclamp(enable, ctx_id, cpu_caller_pid, dev->uclamp_util_val);
 
 		dev->cpu_hint_ref_cnt++;
 		mtk_v4l2_debug(0, " [VDVFS][%d][%s] enable CPU hint by %s (ref cnt %d, mode %d)",
@@ -608,7 +596,7 @@ void mtk_vcodec_set_cpu_hint(struct mtk_vcodec_dev *dev, bool enable,
 			}
 		}
 		if (dev->cpu_hint_mode & (1 << MTK_UCLAMP_MODE))
-			mtk_vcodec_set_uclamp(enable, ctx_id, cpu_caller_pid);
+			mtk_vcodec_set_uclamp(enable, ctx_id, cpu_caller_pid, dev->uclamp_util_val);
 
 		mtk_v4l2_debug(0, "[VDVFS][%d][%s] disable CPU hint by %s (ref cnt %d mode %d)",
 			ctx_id, (type == MTK_INST_DECODER) ? "VDEC" : "VENC", debug_str,
@@ -1642,4 +1630,3 @@ EXPORT_SYMBOL_GPL(mtk_vcodec_get_log);
 
 MODULE_IMPORT_NS(DMA_BUF);
 MODULE_LICENSE("GPL v2");
-

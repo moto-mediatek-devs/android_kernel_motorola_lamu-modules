@@ -81,6 +81,7 @@ struct DRM_MMP_Events {
 /* if changed, need to update init_crtc_mmp_event() */
 struct CRTC_MMP_Events {
 	mmp_event trig_loop_done;
+	mmp_event event_loop_done;
 	mmp_event bwm_loop_done;
 	mmp_event enable;
 	mmp_event disable;
@@ -134,6 +135,7 @@ struct CRTC_MMP_Events {
 	mmp_event cwb_dump;
 	mmp_event discrete;
 	mmp_event discrete_fill;
+	mmp_event mml_job_status;
 	/*Msync 2.0 mmp start*/
 	mmp_event ovl_status_err;
 	mmp_event vfp_period;

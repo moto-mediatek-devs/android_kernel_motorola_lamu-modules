@@ -707,6 +707,14 @@ static void cmdq_mtcmos_by_fast(struct cmdq *cmdq, bool on)
 	spin_unlock_irqrestore(&cmdq->fast_mtcmos_lock, flags);
 }
 
+void cmdq_mbox_mtcmos_by_fast_chan(struct mbox_chan *chan, bool on)
+{
+	struct cmdq *cmdq = container_of(chan->mbox, typeof(*cmdq), mbox);
+
+	cmdq_mtcmos_by_fast(cmdq, on);
+}
+EXPORT_SYMBOL(cmdq_mbox_mtcmos_by_fast_chan);
+
 void cmdq_mbox_mtcmos_by_fast(void *cmdq_mbox, bool on)
 {
 	struct cmdq *cmdq;
@@ -3363,7 +3371,7 @@ static int cmdq_probe(struct platform_device *pdev)
 		of_property_read_bool(dev->of_node, "ddr-urgent");
 	cmdq->gce_res_sw_mode =
 		of_property_read_bool(dev->of_node, "gce-res-sw-mode");
-
+	cmdq->sw_ddr_en = of_property_read_bool(dev->of_node, "sw-ddr-en");
 	cmdq->mbox.dev = dev;
 	cmdq->share_dev = mtk_smmu_get_shared_device(dev);
 	cmdq_genpd_init(dev, cmdq);
@@ -3730,6 +3738,13 @@ void cmdq_mbox_enable(void *chan)
 		writel(CMDQ_TPR_EN, cmdq->base + CMDQ_TPR_MASK);
 		spin_unlock_irqrestore(&cmdq->lock, flags);
 
+		if (cmdq->gce_req_wa) {
+			cmdq_mbox_set_resource_req(GCED_HWID, true, true, GCE_DDREN_BIT);
+			cmdq_mbox_set_resource_req(GCEM_HWID, true, true, GCE_DDREN_BIT);
+			cmdq_mbox_set_resource_req(GCEM_HWID, true, true, GCE_DDRSRC_BIT);
+			cmdq_mbox_set_resource_req(GCEM_HWID, true, true, GCE_EMI_BIT);
+		}
+
 		// thread
 		if (cmdq->prebuilt_enable) {
 			cmdq_init_cpu(cmdq);
@@ -3741,14 +3756,6 @@ void cmdq_mbox_enable(void *chan)
 			cmdq_util_hw_trace_enable(cmdq->hwid,
 				cmdq_util_get_bit_feature() &
 				CMDQ_LOG_FEAT_PERF);
-
-		if (cmdq->gce_req_wa) {
-			cmdq_mbox_set_resource_req(GCED_HWID, true, true, GCE_DDREN_BIT);
-			cmdq_mbox_set_resource_req(GCEM_HWID, true, true, GCE_DDREN_BIT);
-			cmdq_mbox_set_resource_req(GCEM_HWID, true, true, GCE_DDRSRC_BIT);
-			cmdq_mbox_set_resource_req(GCEM_HWID, true, true, GCE_EMI_BIT);
-		}
-
 		cmdq_mtcmos_by_fast(cmdq, false);
 	}
 

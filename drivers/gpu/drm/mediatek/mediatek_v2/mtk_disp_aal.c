@@ -465,6 +465,7 @@ void disp_aal_refresh_by_kernel(struct mtk_disp_aal *aal_data, int need_lock)
 	if (atomic_read(&aal_data->primary_data->is_init_regs_valid) == 1) {
 		if (need_lock)
 			DDP_MUTEX_LOCK(&comp->mtk_crtc->lock, __func__, __LINE__);
+		atomic_set(&aal_data->primary_data->force_event_en, 1);
 		atomic_set(&aal_data->primary_data->event_en, 1);
 
 		/*
@@ -509,15 +510,14 @@ void disp_aal_notify_backlight_changed(struct mtk_ddp_comp *comp,
 	struct mtk_ddp_comp *output_comp = NULL;
 	unsigned int connector_id = 0;
 
-	AALAPI_LOG("bl %d/%d nits %d\n", trans_backlight, max_backlight, panel_nits);
-
 	output_comp = mtk_ddp_comp_request_output(mtk_crtc);
 	if (output_comp == NULL) {
 		DDPPR_ERR("%s: failed to get output_comp!\n", __func__);
 		return;
 	}
 	mtk_ddp_comp_io_cmd(output_comp, NULL, GET_CONNECTOR_ID, &connector_id);
-	AALAPI_LOG("connector_id = %d, max_backlight = %d\n", connector_id, max_backlight);
+	AALAPI_LOG("connector_id = %d, bl %d/%d nits %d type %d\n", connector_id,
+		trans_backlight, max_backlight, panel_nits, aal_data->primary_data->led_type);
 
 	if ((max_backlight != -1) && (trans_backlight > max_backlight))
 		trans_backlight = max_backlight;
@@ -556,8 +556,8 @@ void disp_aal_notify_backlight_changed(struct mtk_ddp_comp *comp,
 	spin_unlock_irqrestore(&aal_data->primary_data->hist_lock, flags);
 	// always notify aal service for LED changed
 	mtk_drm_idlemgr_kick(__func__, &mtk_crtc->base, need_lock);
-
-	disp_aal_refresh_by_kernel(aal_data, need_lock);
+	if (aal_data->primary_data->led_type != TYPE_ATOMIC)
+		disp_aal_refresh_by_kernel(aal_data, need_lock);
 }
 
 #ifdef CONFIG_LEDS_BRIGHTNESS_CHANGED
@@ -998,6 +998,7 @@ static bool disp_aal_write_dre3_curve(struct mtk_ddp_comp *comp, bool force_writ
 	int gain_offset;
 	int arry_offset = 0;
 	unsigned int write_value;
+	unsigned int sram_waddr, sram_wdata;
 
 	struct mtk_disp_aal *aal_data = comp_to_aal(comp);
 	void __iomem *dre3_va = disp_aal_dre3_va(comp);
@@ -1009,16 +1010,23 @@ static bool disp_aal_write_dre3_curve(struct mtk_ddp_comp *comp, bool force_writ
 		AALIRQ_LOG("no need to write dre3\n");
 		return true;
 	}
-	writel(aal_data->data->aal_dre_gain_start, dre3_va + DMDP_AAL_CURVE_SRAM_WADDR);
+	if (aal_data->data->aal_dre3_curve_sram) {
+		sram_waddr = DMDP_AAL_CURVE_SRAM_WADDR;
+		sram_wdata = DMDP_AAL_CURVE_SRAM_WDATA;
+	} else {
+		sram_waddr = DMDP_AAL_SRAM_RW_IF_0;
+		sram_wdata = DMDP_AAL_SRAM_RW_IF_1;
+	}
+	writel(aal_data->data->aal_dre_gain_start, dre3_va + sram_waddr);
 	for (gain_offset = aal_data->data->aal_dre_gain_start;
 		gain_offset <= aal_data->data->aal_dre_gain_end;
 			gain_offset += 4) {
 		if (arry_offset >= AAL_DRE30_GAIN_REGISTER_NUM)
 			return false;
 		write_value = aal_data->primary_data->dre30_gain.dre30_gain[arry_offset++];
-		if (!aal_data->data->aal_dre3_curve_sram)
-			writel(gain_offset, dre3_va + DMDP_AAL_CURVE_SRAM_WADDR);
-		writel(write_value, dre3_va + DMDP_AAL_CURVE_SRAM_WDATA);
+		if (!aal_data->data->aal_dre3_auto_inc)
+			writel(gain_offset, dre3_va + sram_waddr);
+		writel(write_value, dre3_va + sram_wdata);
 	}
 	return true;
 }
@@ -1026,6 +1034,7 @@ static bool disp_aal_write_dre3_curve(struct mtk_ddp_comp *comp, bool force_writ
 static int disp_aal_update_dre3_sram(struct mtk_ddp_comp *comp,
 	 bool check_sram)
 {
+	bool result = false;
 	unsigned long flags;
 	int dre_blk_x_num, dre_blk_y_num;
 	unsigned int read_value;
@@ -1077,17 +1086,23 @@ static int disp_aal_update_dre3_sram(struct mtk_ddp_comp *comp,
 	dre_blk_y_num = aal_data->primary_data->init_regs.dre_blk_y_num;
 	mtk_drm_trace_begin("read_dre3_hist");
 	if (spin_trylock_irqsave(&aal_data->primary_data->hist_lock, flags)) {
-		disp_aal_read_dre3_hist(comp, dre_blk_x_num, dre_blk_y_num);
-		aal_data->primary_data->dre30_hist.dre_blk_x_num = dre_blk_x_num;
-		aal_data->primary_data->dre30_hist.dre_blk_y_num = dre_blk_y_num;
-		atomic_set(&aal_data->hist_available, 1);
+		result = disp_aal_read_dre3_hist(comp, dre_blk_x_num, dre_blk_y_num);
+		if (result) {
+			aal_data->primary_data->dre30_hist.dre_blk_x_num = dre_blk_x_num;
+			aal_data->primary_data->dre30_hist.dre_blk_y_num = dre_blk_y_num;
+			atomic_set(&aal_data->hist_available, 1);
+		}
 		if (comp1) {
-			disp_aal_read_dre3_hist(comp1, dre_blk_x_num, dre_blk_y_num);
-			atomic_set(&aal1_data->hist_available, 1);
+			result = disp_aal_read_dre3_hist(comp1, dre_blk_x_num, dre_blk_y_num);
+			if (result)
+				atomic_set(&aal1_data->hist_available, 1);
 		}
 		spin_unlock_irqrestore(&aal_data->primary_data->hist_lock, flags);
-		AALIRQ_LOG("wake up dre3\n");
-		wake_up_interruptible(&aal_data->primary_data->hist_wq);
+		if (result) {
+			AALIRQ_LOG("wake up dre3\n");
+			wake_up_interruptible(&aal_data->primary_data->hist_wq);
+		} else
+			AALIRQ_LOG("skip wake up dre3\n");
 	} else {
 		AALIRQ_LOG("comp %d hist not retrieved\n", comp->id);
 		CRTC_MMP_MARK(0, aal_dre30_rw, comp->id, 0xEE);
@@ -1285,12 +1300,17 @@ static void disp_aal_dre3_reset_to_linear(struct mtk_ddp_comp *comp, int check)
 	for (blk_y = 0; blk_y < dre_blk_y_num; blk_y++) {
 		for (blk_x = 0; blk_x < dre_blk_x_num; blk_x++) {
 			/* write each block dre curve */
-			if (!disp_aal_dre3_write_linear_curve(aal_data, dre3_gain, blk_x, blk_y, dre_blk_x_num, check))
-				break;
+			if (!disp_aal_dre3_write_linear_curve(aal_data,
+				dre3_gain, blk_x, blk_y, dre_blk_x_num, check)) {
+				AALERR("%s write_linear_curve error\n");
+				return;
+			}
 		}
 	}
 	/* write each block dre curve last point */
-	disp_aal_dre3_write_linear_curve16(aal_data, dre3_gain, dre_blk_x_num, dre_blk_y_num, check);
+	if (!disp_aal_dre3_write_linear_curve16(aal_data,
+		dre3_gain, dre_blk_x_num, dre_blk_y_num, check))
+		AALERR("%s write_linear_curve16 error\n");
 }
 
 static void disp_aal_init_dre3_curve(struct mtk_ddp_comp *comp)
@@ -2421,7 +2441,8 @@ static int disp_aal_act_eventctl(struct mtk_ddp_comp *comp, void *data)
 #if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
 	disp_aal_set_interrupt(comp, enable, NULL);
 #endif
-
+	if (atomic_read(&aal_data->primary_data->force_event_en))
+		enable = 1;
 	atomic_set(&aal_data->primary_data->event_en, enable);
 	aal_data->primary_data->pre_enable = enable;
 
@@ -2525,6 +2546,7 @@ static int disp_aal_copy_hist_to_user(struct mtk_ddp_comp *comp,
 		atomic_set(&aal1_data->hist_available, 0);
 		atomic_set(&aal1_data->dre20_hist_is_ready, 0);
 	}
+	atomic_set(&aal_data->primary_data->force_event_en, 0);
 
 	return ret;
 }
@@ -2849,7 +2871,7 @@ static int disp_aal_cfg_set_param(struct mtk_ddp_comp *comp,
 				aal_data->primary_data->ess20_spect_param.ELVSSPN,
 				aal_data->primary_data->ess20_spect_param.flag);
 
-			if(! aal_data->primary_data->ess20_spect_param.flag)
+			if(!aal_data->primary_data->ess20_spect_param.flag)
 				mtk_leds_brightness_set(connector_id,
 					aal_data->primary_data->backlight_set,
 					aal_data->primary_data->ess20_spect_param.ELVSSPN,
@@ -3075,6 +3097,7 @@ static void disp_aal_primary_data_init(struct mtk_ddp_comp *comp)
 	atomic_set(&(aal_data->primary_data->should_stop), 0);
 	atomic_set(&(aal_data->primary_data->dre30_write), 0);
 	atomic_set(&(aal_data->primary_data->event_en), 1);
+	atomic_set(&(aal_data->primary_data->force_event_en), 0);
 	atomic_set(&(aal_data->primary_data->force_delay_check_trig), 0);
 	atomic_set(&(aal_data->primary_data->dre_halt), 0);
 	atomic_set(&(aal_data->primary_data->change_to_dre30), 0);
@@ -3120,14 +3143,9 @@ static void disp_aal_primary_data_init(struct mtk_ddp_comp *comp)
 	aal_data->primary_data->ess_level_cmd_id = 0;
 	aal_data->primary_data->dre_en_cmd_id = 0;
 	aal_data->primary_data->ess_en_cmd_id = 0;
-	aal_data->primary_data->led_type = TYPE_FILE;
+	//aal_data->primary_data->led_type = TYPE_FILE;
 	aal_data->primary_data->relay_state = 0x0 << PQ_FEATURE_DEFAULT;
 	aal_data->primary_data->pre_enable = 0;
-
-#ifdef CONFIG_LEDS_BRIGHTNESS_CHANGED
-	if (comp->id == DDP_COMPONENT_AAL0)
-		mtk_leds_register_notifier(&leds_init_notifier);
-#endif
 
 	aal_data->primary_data->refresh_wq = create_singlethread_workqueue("aal_refresh_trigger");
 	INIT_WORK(&aal_data->primary_data->refresh_task.task, disp_aal_refresh_trigger);
@@ -3762,7 +3780,10 @@ static int disp_aal_probe(struct platform_device *pdev)
 		dev_err(dev, "Failed to add component: %d\n", ret);
 		mtk_ddp_comp_pm_disable(&priv->ddp_comp);
 	}
-
+#ifdef CONFIG_LEDS_BRIGHTNESS_CHANGED
+	if (comp_id == DDP_COMPONENT_AAL0)
+		mtk_leds_register_notifier(&leds_init_notifier);
+#endif
 #if IS_ENABLED(CONFIG_MTK_DISP_LOGGER)
 #if IS_ENABLED(CONFIG_MTK_MME_SUPPORT)
 	MME_REGISTER_BUFFER(MME_MODULE_DISP, "DISP_AAL", MME_BUFFER_INDEX_9, MME_AAL_BUFFER_SIZE);

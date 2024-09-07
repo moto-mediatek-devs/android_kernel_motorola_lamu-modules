@@ -16,6 +16,15 @@ config DRM_MEDIATEK_DPTX_AUTO
 	  Choose this option if you want to enable
 	  DPTX AUTO driver for auto.
 
+config DRM_MEDIATEK_AUTO
+	tristate "DRM AUTO Yocto Support for Mediatek SoCs"
+	depends on DRM_MEDIATEK_V2
+	help
+	  DRM AUTO Yocto driver for Mediatek SoCs.
+	  This config will separate the auto from phone.
+	  Choose this option if you want to enable
+	  DRM AUTO Yocto driver for auto.
+
 config DRM_MEDIATEK_AUTO_YCT
 	tristate "DRM AUTO Yocto Support for Mediatek SoCs"
 	depends on DRM_MEDIATEK_V2
@@ -70,6 +79,15 @@ config MTK_FB_MMDVFS_SUPPORT
          If HRT hardware is not in the platform, then support for
          MMDVFS needs to be added through software.
 
+config MTK_LCM_DUAL_PORT_SUPPORT
+	bool "support lcm dual dsi port"
+	help
+	  This config decide if device support lcm dual dsi port
+	  If dsi support dual port, dual dsc may also should support
+	  If this value is Y, display maybe single pipe
+	  If dsi support dual port, each dsi could calculate lower mmclk, and
+	  support more types lcm
+
 config MTK_MT6382_BDG
 	tristate "Support Bridge IC 6382"
 	help
@@ -91,6 +109,14 @@ config MTK_SE_SUPPORT
 	  you should enable this option. Otherwise, it can be left disabled to
 	  reduce the driver's footprint.
 
+config MTK_DISP_MMDVFS_INIT_SEQUENCE
+	bool "Configure initialization sequence of DISP and MMDVFS"
+	help
+	  Say yes here to add support for adjusting the initialization sequence
+	  between DISP and MMDVFS . This can be used to resolve issues with screen
+	  flickering that arise due to the order in which these components are
+	  started during the boot process.
+
 config MTK_RECU_FENCE_LOCK
 	bool "enable fence deadlock workarond for img_gpu"
 	help
@@ -107,5 +133,13 @@ config MTK_LCM_PHYSICAL_ROTATION_HW
 	  be set firstly, because the code added in mtk_disp_ovl.c
 	  will use this configuration to change the variable called
 	  rotate to "1".
+
+config ENABLE_SEND_PPS_PER_FRAME
+	bool "send pps per frame"
+	help
+	  Say Y here if you want to enable send pps per frame support.
+	  For  some bridge need send pps per frame when enable dsc.
+	  Only for mt8678 dsi vdo mode.
+	  Only for demo.
 
 source "$(KCONFIG_EXT_PREFIX)drivers/gpu/drm/mediatek/mediatek_v2/mtk_drm_edp/Kconfig"

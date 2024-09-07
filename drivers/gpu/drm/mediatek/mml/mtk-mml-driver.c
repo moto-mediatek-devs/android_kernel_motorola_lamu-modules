@@ -18,6 +18,7 @@
 #include <linux/debugfs.h>
 #include <linux/minmax.h>
 #include <linux/dma-mapping.h>
+
 #include <mtk-smmu-v3.h>
 
 #include <soc/mediatek/mmdvfs_v3.h>
@@ -35,6 +36,13 @@
 #include "mtk-mml-sys.h"
 #include "mtk-mml-mmp.h"
 #include "mtk-mml-color.h"
+
+#if IS_ENABLED(CONFIG_PROC_FS)
+#include <linux/proc_fs.h>
+#define MML_DEBUG_PROC
+#endif
+
+#define MML_WAKE_SAFE_CNT 64
 
 #define CMDQ_GET_ADDR_LOW(addr)		((u16)(addr & GENMASK(15, 0)) | BIT(1))
 
@@ -76,11 +84,16 @@ struct mml_record {
  * so change this variable by 1 << N
  */
 #if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
-#define MML_RECORD_NUM		(1 << 10)
+#define MML_RECORD_NUM		(1 << 9)
 #else
 #define MML_RECORD_NUM		(1 << 8)
 #endif
 #define MML_RECORD_NUM_MASK	(MML_RECORD_NUM - 1)
+#define MML_RECORD_SIZE		0x20000
+
+/* 128KB for records and MML_LOG_SIZE for log */
+#define MML_DEBUG_BUF_SIZE	(MML_RECORD_SIZE + MML_LOG_SIZE + 128)
+#define MML_DEBUG_CMD_SZ	256
 
 #define MML_CRC_CNT	1024
 
@@ -177,12 +190,6 @@ struct mml_dev {
 	void (*kick_idle_cb)(void *disp_crtc);
 	void *disp_crtc;
 
-#if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
-	/* crc backup */
-	u32 *crc_va[MML_PIPE_CNT];
-	dma_addr_t crc_pa[MML_PIPE_CNT];
-	u32 crc_idx[MML_PIPE_CNT];
-#endif
 	bool tablet_ext;
 
 	struct device *mmu_dev; /* for dmabuf to iova */
@@ -198,6 +205,14 @@ struct mml_dev {
 	enum mml_frm_dump_buf frm_dump_opt_bufid;
 #endif
 	s32 gce_thread_cnt;
+
+	char *debug_buffer;
+	u32 debug_buf_idx;
+	bool debug_print_record;
+	bool debug_print_log;
+#ifdef MML_DEBUG_PROC
+	struct proc_dir_entry *dbg_procfs;
+#endif
 };
 
 int mml_comp_add(u32 id, struct device *dev, const struct component_ops *ops)
@@ -1609,6 +1624,7 @@ void mml_lock_wake_lock(struct mml_dev *mml, bool lock)
 		mml->wake_ref++;
 		if (mml->wake_ref == 1)
 			__pm_stay_awake(mml->wake_lock);
+		mml_mmp(wake_lock, MMPROFILE_FLAG_PULSE, mml->wake_ref, 0);
 	} else {
 		mml->wake_ref--;
 		if (mml->wake_ref == 0)
@@ -1616,8 +1632,21 @@ void mml_lock_wake_lock(struct mml_dev *mml, bool lock)
 
 		if (mml->wake_ref < 0)
 			mml_err("%s wake_ref < 0", __func__);
+		mml_mmp(wake_unlock, MMPROFILE_FLAG_PULSE, mml->wake_ref, 0);
 	}
 	mutex_unlock(&mml->wake_ref_mutex);
+
+	if (mml->wake_ref > MML_WAKE_SAFE_CNT) {
+		static bool aeeonce;
+
+		mml_err("too many wake lock:%d", mml->wake_ref);
+
+		if (!aeeonce) {
+			aeeonce = true;
+			mml_fatal("mml", "too many wake lock:%d", mml->wake_ref);
+		}
+
+	}
 }
 
 s32 mml_register_comp(struct device *master, struct mml_comp *comp)
@@ -1727,11 +1756,11 @@ void mml_record_track(struct mml_dev *mml, struct mml_task *task)
 	"state,ref,error," \
 	"src_crc_pipe0,dest_crc_pipe0,src_crc_pipe1,dest_crc_pipe1"
 
-static int mml_record_print(struct seq_file *seq, void *data)
+static int mml_record_print(struct mml_dev *mml)
 {
-	struct mml_dev *mml = (struct mml_dev *)seq->private;
 	struct mml_record *record;
 	u32 i, idx;
+	int len;
 
 	/* Protect only index part, since it is ok to print race data,
 	 * but not good to hurt performance of mml_record_track.
@@ -1740,16 +1769,23 @@ static int mml_record_print(struct seq_file *seq, void *data)
 	idx = mml->record_idx;
 	mutex_unlock(&mml->record_mutex);
 
-	seq_puts(seq, REC_TITLE ",\n");
+	len = snprintf(mml->debug_buffer + mml->debug_buf_idx,
+		MML_DEBUG_BUF_SIZE - mml->debug_buf_idx, REC_TITLE ",\n");
+	if (len > 0) {
+		mml->debug_buf_idx += len;
+	} else
+		mml->debug_buffer[mml->debug_buf_idx] = 0;
+
 	for (i = 0; i < ARRAY_SIZE(mml->records); i++) {
 		record = &mml->records[idx];
-		seq_printf(seq,
+		len = snprintf(mml->debug_buffer + mml->debug_buf_idx,
+			MML_DEBUG_BUF_SIZE - mml->debug_buf_idx,
 			/* idx to task */
 			"%u,%u,%llu,%llu,%#llx,%u,%u,%llu,%llu,%#llx,%u,%u,%u,%#x,"
 			/* config_pipe_time to flush_time */
 			"%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,"
 			/* state to dest crc */
-			"%u,%u,%s,%#010x,%#010x,%#010x,%#010x\n",
+			"%u,%u,%s,%#x,%#x,%#x,%#x\n",
 			idx,
 			record->jobid,
 			record->src_iova_map_time,
@@ -1781,14 +1817,61 @@ static int mml_record_print(struct seq_file *seq, void *data)
 			record->dest_crc[0],
 			record->src_crc[1],
 			record->dest_crc[1]);
+
+		if (len > 0) {
+			mml->debug_buf_idx += len;
+		} else {
+			mml->debug_buffer[mml->debug_buf_idx] = 0;
+			break;
+		}
+
 		idx = (idx + 1) & MML_RECORD_NUM_MASK;
 
 		/* do not occupy log space */
-		if (seq->size <= MML_LOG_SIZE)
+		if (mml->debug_buf_idx >= MML_RECORD_SIZE)
 			break;
 	}
 
-	mml_print_log_record(seq);
+	mml_log("%s records print size %u", __func__, mml->debug_buf_idx);
+
+	return 0;
+}
+
+static int mml_copy_debug_buffer(struct mml_dev *mml)
+{
+	if (!mml->debug_buffer) {
+		mml->debug_buffer = vmalloc(MML_DEBUG_BUF_SIZE);
+		if (!mml->debug_buffer)
+			return -ENOMEM;
+
+		mml_log("%s debug buffer create %p", __func__, mml->debug_buffer);
+	} else
+		mml->debug_buf_idx = 0;
+
+	if (mml->debug_print_record)
+		mml_record_print(mml);
+	if (mml->debug_print_log && mml->debug_buf_idx < MML_DEBUG_BUF_SIZE - 1)
+		mml->debug_buf_idx += mml_print_log_buffer(mml->debug_buffer + mml->debug_buf_idx,
+			MML_DEBUG_BUF_SIZE - mml->debug_buf_idx - 1);
+
+	mml_log("%s buffer size %u", __func__, mml->debug_buf_idx);
+
+	return 0;
+}
+
+static int mml_record_copy(struct seq_file *seq, void *data)
+{
+	struct mml_dev *mml = (struct mml_dev *)seq->private;
+	int ret;
+
+	ret = mml_copy_debug_buffer(mml);
+	if (ret)
+		return ret;
+
+	ret = seq_write(seq, mml->debug_buffer, min_t(u32, mml->debug_buf_idx, seq->size));
+	if (!ret)
+		seq_puts(seq, "\n");
+	mml_log("%s records and log size %u ret %d", __func__, mml->debug_buf_idx, ret);
 
 	return 0;
 }
@@ -1833,9 +1916,7 @@ void mml_record_dump(struct mml_dev *mml)
 
 static int mml_record_open(struct inode *inode, struct file *file)
 {
-	/* 128KB for records and MML_LOG_SIZE for log */
-	return single_open_size(file, mml_record_print, inode->i_private,
-		0x20000 + MML_LOG_SIZE);
+	return single_open_size(file, mml_record_copy, inode->i_private, MML_DEBUG_BUF_SIZE);
 }
 
 static const struct file_operations mml_record_fops = {
@@ -1875,98 +1956,6 @@ static void mml_record_init(struct mml_dev *mml)
 		dput(dir);
 
 	mml_log("%s done with size %zu", __func__, sizeof(mml->records));
-}
-
-u32 mml_backup_crc(struct mml_task *task, struct mml_comp_config *ccfg, phys_addr_t crc_reg,
-	u32 *crc_idx_out)
-{
-#if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
-	const u32 pipe = ccfg->pipe;
-	struct mml_dev *mml = task->config->mml;
-	struct cmdq_pkt *pkt = task->pkts[ccfg->pipe];
-	dma_addr_t pa_addr;
-	u32 crc_inst_offset = 0;
-
-	if (!mml->crc_va[pipe] && !mml->crc_pa[pipe]) {
-		mml->crc_va[pipe] =
-			cmdq_mbox_buf_alloc(task->config->path[pipe]->clt, &mml->crc_pa[pipe]);
-		mml_log("%s CRC backup buffer pipe %u va %p pa %pa",
-			__func__, pipe, mml->crc_va[pipe], &mml->crc_pa[pipe]);
-	}
-
-	if (unlikely(!mml->crc_va[pipe]) || unlikely(!mml->crc_pa[pipe])) {
-		mml_err("%s CRC backup buffer failed pipe %u", __func__, pipe);
-		goto done;
-	}
-
-	pa_addr = mml->crc_pa[pipe] + mml->crc_idx[pipe] * 4;
-	*crc_idx_out = mml->crc_idx[pipe]++;
-	if (mml->crc_idx[pipe] >= MML_CRC_CNT)
-		mml->crc_idx[pipe] = 0;
-
-	/* read reg value to spr : CMDQ_THR_SPR_IDX2*/
-	cmdq_pkt_read_addr(pkt, crc_reg, CMDQ_THR_SPR_IDX2);
-
-	/* write spr to dram pa */
-	cmdq_pkt_write_indriect(pkt, NULL, pa_addr, CMDQ_THR_SPR_IDX2, UINT_MAX);
-	crc_inst_offset = pkt->cmd_buf_size - CMDQ_INST_SIZE;
-
-	mml_msg("[crc]backup %#x to %pa offset %u idx %u",
-		(u32)crc_reg, &pa_addr, crc_inst_offset, *crc_idx_out);
-
-done:
-	return crc_inst_offset;
-#else
-	return 0;
-#endif
-}
-
-void mml_backup_crc_update(struct mml_task *task, struct mml_comp_config *ccfg,
-	u32 crc_inst_offset, u32 *crc_idx_out)
-{
-#if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
-	const u32 pipe = ccfg->pipe;
-	struct mml_dev *mml = task->config->mml;
-	struct cmdq_pkt *pkt = task->pkts[ccfg->pipe];
-	dma_addr_t pa_addr;
-	u32 *inst;
-
-	if (!mml->crc_pa[ccfg->pipe] || !mml->crc_va[pipe])
-		return;
-
-	pa_addr = mml->crc_pa[pipe] + mml->crc_idx[pipe] * 4;
-	*crc_idx_out =  mml->crc_idx[pipe]++;
-	if (mml->crc_idx[pipe] >= MML_CRC_CNT)
-		mml->crc_idx[pipe] = 0;
-
-	inst = (u32 *)cmdq_pkt_get_va_by_offset(pkt, crc_inst_offset);
-	inst[1] = (inst[1] & 0xffff0000) | CMDQ_GET_ADDR_LOW(pa_addr);
-
-	mml_msg("[crc]update offset %u idx %u to %pa",
-		crc_inst_offset, *crc_idx_out, &pa_addr);
-#endif
-}
-
-u32 mml_backup_crc_get(struct mml_task *task, struct mml_comp_config *ccfg, u32 crc_idx)
-{
-#if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
-	const u32 pipe = ccfg->pipe;
-	struct mml_dev *mml = task->config->mml;
-	u32 *crc_va;
-	u32 cur_crc;
-
-	if (!mml->crc_va[pipe])
-		return 0;
-
-	crc_va = mml->crc_va[pipe] + crc_idx;
-	cur_crc = readl(crc_va);
-
-	mml_msg("[crc]get idx %u val %#010x", crc_idx, cur_crc);
-
-	return cur_crc;
-#else
-	return 0;
-#endif
 }
 
 #if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
@@ -2154,6 +2143,88 @@ u32 mml_get_chip_swver(struct mml_dev *mml)
 }
 EXPORT_SYMBOL_GPL(mml_get_chip_swver);
 
+static void mml_process_dbg_cmd(const char *cmd, struct mml_dev *mml)
+{
+	if (IS_ERR_OR_NULL(cmd)) {
+		mml_err("%s invalid input", __func__);
+		return;
+	}
+
+	if (strncmp(cmd, "record:", 7) == 0) {
+		if (strncmp(cmd + 7, "on", 2) == 0)
+			mml->debug_print_record = true;
+		else if (strncmp(cmd + 7, "off", 3) == 0)
+			mml->debug_print_record = false;
+	} else if (strncmp(cmd, "log:", 4) == 0) {
+		if (strncmp(cmd + 4, "on", 2) == 0)
+			mml->debug_print_log = true;
+		else if (strncmp(cmd + 4, "off", 3) == 0)
+			mml->debug_print_log = false;
+	} else {
+		mml_err("%s unknown command %s", __func__, cmd);
+	}
+}
+
+#ifdef MML_DEBUG_PROC
+static int mml_debug_open(struct inode *inode, struct file *file)
+{
+	file->private_data = pde_data(inode);
+	return 0;
+}
+
+static ssize_t mml_debug_read(struct file *file, char __user *ubuf, size_t count, loff_t *ppos)
+{
+	struct mml_dev *mml = file->private_data;
+	static int n;
+	int ret;
+
+	if (*ppos)
+		goto out;
+
+	ret = mml_copy_debug_buffer(mml);
+	if (ret)
+		return ret;
+	n = mml->debug_buf_idx;
+
+out:
+	if (n < 0)
+		return -EINVAL;
+
+	return simple_read_from_buffer(ubuf, count, ppos, mml->debug_buffer, n);
+}
+
+static ssize_t mml_debug_write(struct file *file, const char __user *ubuf, size_t count,
+	loff_t *ppos)
+{
+	struct mml_dev *mml = file->private_data;
+	size_t ret;
+	char cmd_buffer[MML_DEBUG_CMD_SZ];
+	char *tok, *cmd;
+
+	ret = count;
+	if (count > MML_DEBUG_CMD_SZ)
+		count = MML_DEBUG_CMD_SZ;
+
+	if (copy_from_user(&cmd_buffer, ubuf, count))
+		return -EFAULT;
+
+	cmd_buffer[MML_DEBUG_CMD_SZ - 1] = 0;
+	mml_log("%s %s", __func__, cmd_buffer);
+
+	cmd = &cmd_buffer[0];
+	while ((tok = strsep(&cmd, " ")))
+		mml_process_dbg_cmd(tok, mml);
+
+	return ret;
+}
+
+static const struct proc_ops mml_debug_proc_fops = {
+	.proc_read = mml_debug_read,
+	.proc_write = mml_debug_write,
+	.proc_open = mml_debug_open,
+};
+#endif
+
 static bool dbg_probed;
 static int mml_probe(struct platform_device *pdev)
 {
@@ -2301,6 +2372,15 @@ static int mml_probe(struct platform_device *pdev)
 	mml->frm_dumps[mml_sys_tile][mml_frm_dump_dest1].prefix = "out1";
 #endif
 
+#ifdef MML_DEBUG_PROC
+	mml->dbg_procfs = proc_create_data("mmldbg", S_IFREG | 0440, NULL,
+		&mml_debug_proc_fops, mml);
+	if (!mml->dbg_procfs)
+		mml_err("fail to create mmldbg");
+	mml->debug_print_record = false;
+	mml->debug_print_log = true;
+#endif
+
 	mml_log("%s success end", __func__);
 	return 0;
 
@@ -2322,6 +2402,11 @@ static int mml_remove(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct mml_dev *mml = platform_get_drvdata(pdev);
+
+#ifdef MML_DEBUG_PROC
+	proc_remove(mml->dbg_procfs);
+	vfree(mml->debug_buffer);
+#endif
 
 	mml_v4l2_dev_destroy(dev, mml->v4l2_dev);
 	wakeup_source_unregister(mml->wake_lock);

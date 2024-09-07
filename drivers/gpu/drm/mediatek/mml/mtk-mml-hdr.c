@@ -463,7 +463,6 @@ static s32 hdr_config_frame(struct mml_comp *comp, struct mml_task *task,
 	struct cmdq_pkt *pkt = task->pkts[ccfg->pipe];
 
 	struct hdr_frame_data *hdr_frm = hdr_frm_data(ccfg);
-	struct mml_frame_data *src = &cfg->info.src;
 	const struct mml_frame_dest *dest = &cfg->info.dest[ccfg->node->out_idx];
 	struct mml_comp_hdr *hdr = comp_to_hdr(comp);
 	const phys_addr_t base_pa = comp->base_pa;
@@ -483,12 +482,9 @@ static s32 hdr_config_frame(struct mml_comp *comp, struct mml_task *task,
 	if (hdr->event_eof)
 		cmdq_pkt_clear_event(pkt, hdr->event_eof);
 
-	if (MML_FMT_10BIT(src->format) || MML_FMT_10BIT(dest->data.format))
-		cmdq_pkt_write(pkt, NULL, base_pa + hdr->data->reg_table[HDR_TOP],
-			3 << 28, 0x30000000);
-	else
-		cmdq_pkt_write(pkt, NULL, base_pa + hdr->data->reg_table[HDR_TOP],
-			1 << 28, 0x30000000);
+	/* Enable 10-bit output by default
+	 * cmdq_pkt_write(pkt, NULL, base_pa + hdr->data->reg_table[HDR_TOP], 3 << 28, 0x30000000);
+	 */
 
 	if (hdr->data->enable_dummy && !dest->pq_config.en_fg) {
 		cmdq_pkt_write(pkt, NULL, base_pa + hdr->data->reg_table[HDR_DUMMY1],
@@ -534,19 +530,6 @@ static s32 hdr_config_frame(struct mml_comp *comp, struct mml_task *task,
 			regs[i].mask, reuse, cache, &hdr_frm->reuse_reg);
 		mml_pq_msg("[hdr][config][%x] = %#x mask(%#x)",
 			regs[i].offset, regs[i].value, regs[i].mask);
-	}
-
-	// for debug ALPS09155466, will remove later :
-	// hdr_regs[HDR_TOP] value that bit 0 (hdr_en) should not be 0
-	if (result->hdr_reg_cnt > 1 &&
-		(regs[1].value & 0x1) == 0 &&
-		regs[1].offset == 0) {
-		mml_pq_err("%s:result_id[%llu] [regs][%x] = %#x mask(%#x)",
-			__func__, task->pq_task->comp_config.job_id,
-			regs[0].offset, regs[0].value, regs[0].mask);
-		mml_pq_err("%s:result_id[%llu] [regs][%x] = %#x mask(%#x)",
-			__func__, task->pq_task->comp_config.job_id,
-			regs[1].offset, regs[1].value, regs[1].mask);
 	}
 
 	if (mode == MML_MODE_MML_DECOUPLE || mode == MML_MODE_MML_DECOUPLE2) {
@@ -1001,19 +984,6 @@ static s32 hdr_reconfig_frame(struct mml_comp *comp, struct mml_task *task,
 		hdr_hist_ctrl(comp, task, ccfg, result);
 	}
 
-	// for debug ALPS09155466, will remove later :
-	// hdr_regs[HDR_TOP] value that bit 0 (hdr_en) should not be 0
-	if (result->hdr_reg_cnt > 1 &&
-		(regs[1].value & 0x1) == 0 &&
-		regs[1].offset == 0) {
-		mml_pq_err("%s:result_id[%llu] [regs][%x] = %#x mask(%#x)",
-			__func__, task->pq_task->comp_config.job_id,
-			regs[0].offset, regs[0].value, regs[0].mask);
-		mml_pq_err("%s:result_id[%llu] [regs][%x] = %#x mask(%#x)",
-			__func__, task->pq_task->comp_config.job_id,
-			regs[1].offset, regs[1].value, regs[1].mask);
-	}
-
 	mml_pq_msg("%s is_hdr_need_readback[%d]",
 		__func__, result->is_hdr_need_readback);
 	hdr_frm->is_hdr_need_readback = result->is_hdr_need_readback;
@@ -1074,6 +1044,12 @@ static s32 hdr_config_repost(struct mml_comp *comp, struct mml_task *task,
 	} else {
 		mml_pq_get_readback_buffer(task, pipe, &(task->pq_task->hdr_hist[pipe]));
 
+		begin_pa = cmdq_pkt_get_pa_by_offset(pkt, hdr_frm->begin_offset);
+		condi_inst = (u32 *)cmdq_pkt_get_va_by_offset(pkt, hdr_frm->condi_offset);
+		if (unlikely(!condi_inst))
+			mml_pq_err("%s wrong offset %u", __func__, hdr_frm->condi_offset);
+		*condi_inst = (u32)CMDQ_REG_SHIFT_ADDR(begin_pa);
+
 		if (unlikely(!task->pq_task->hdr_hist[pipe])) {
 			mml_pq_err("%s job_id[%d] hdr_hist is null", __func__,
 				task->job.jobid);
@@ -1084,13 +1060,6 @@ static s32 hdr_config_repost(struct mml_comp *comp, struct mml_task *task,
 			(u32)task->pq_task->hdr_hist[pipe]->pa);
 		mml_update(comp->id, reuse, hdr_frm->labels[HDR_POLLGPR_1],
 			(u32)DO_SHIFT_RIGHT(task->pq_task->hdr_hist[pipe]->pa, 32));
-
-		begin_pa = cmdq_pkt_get_pa_by_offset(pkt, hdr_frm->begin_offset);
-		condi_inst = (u32 *)cmdq_pkt_get_va_by_offset(pkt, hdr_frm->condi_offset);
-		if (unlikely(!condi_inst))
-			mml_pq_err("%s wrong offset %u\n", __func__, hdr_frm->condi_offset);
-
-		*condi_inst = (u32)CMDQ_REG_SHIFT_ADDR(begin_pa);
 
 		mml_pq_rb_msg("%s end job_id[%d] engine_id[%d] va[%p] pa[%pad] pkt[%p] ",
 			__func__, task->job.jobid, comp->id, task->pq_task->hdr_hist[pipe]->va,

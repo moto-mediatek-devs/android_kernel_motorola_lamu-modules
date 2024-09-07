@@ -69,6 +69,10 @@
 #include "mtk_disp_vidle.h"
 #include "mtk_vdisp_common.h"
 
+#if IS_ENABLED(CONFIG_MTK_DISP_MMDVFS_INIT_SEQUENCE)
+#include <soc/mediatek/mmdvfs_v3.h>
+#endif
+
 #ifdef CONFIG_MTK_FB_MMDVFS_SUPPORT
 #include <linux/interconnect.h>
 #include "dvfsrc-exp.h"
@@ -106,7 +110,7 @@
 
 #include "mtk_disp_vdisp_ao.h"
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 #include "mtk_drm_auto/mtk_drm_crtc_auto.h"
 #endif
 
@@ -2157,10 +2161,18 @@ static int mtk_atomic_commit(struct drm_device *drm,
 			return 0;
 		}
 
+		CRTC_MMP_MARK(drm_crtc_index(crtc), mml_job_status, mtk_crtc->is_mml,
+			atomic_read(&mtk_crtc->wait_mml_last_job_is_flushed));
+
 		if (mtk_crtc->is_mml) {
 			/* if last frame is mml, need to wait job done before holding lock */
 			ret = wait_event_interruptible(mtk_crtc->signal_mml_last_job_is_flushed_wq,
 					atomic_read(&mtk_crtc->wait_mml_last_job_is_flushed));
+			if (ret < 0) {
+				DDPPR_ERR("%s[%d] wait_event_interruptible fail, ret:%d\n",
+					__func__, __LINE__, ret);
+				break;
+			}
 			DDP_PROFILE("[PROFILE] pf:%u mml last job is flushed\n", pf);
 		}
 		break;
@@ -2201,6 +2213,9 @@ static int mtk_atomic_commit(struct drm_device *drm,
 		mtk_crtc = to_mtk_crtc(crtc);
 
 		atomic_set(&(mtk_crtc->wait_mml_last_job_is_flushed), 0);
+
+		CRTC_MMP_MARK(i, mml_job_status, mtk_crtc->is_mml,
+			atomic_read(&mtk_crtc->wait_mml_last_job_is_flushed));
 
 		DRM_MMP_MARK(mutex_lock, (unsigned long)&mtk_crtc->lock, i);
 
@@ -3325,6 +3340,32 @@ static const enum mtk_ddp_comp_id mt6899_mtk_ddp_main_bringup[] = {
 #endif
 
 };
+static const enum mtk_ddp_comp_id mt6899_mtk_ddp_main_bypass_pc_bringup[] = {
+	DDP_COMPONENT_DLI_ASYNC0,
+#ifdef DRM_BYPASS_PQ
+	DDP_COMPONENT_PQ0_OUT_CB4,
+	DDP_COMPONENT_PANEL0_COMP_OUT_CB1,
+#else
+	DDP_COMPONENT_RSZ0,
+	DDP_COMPONENT_TDSHP0,	 DDP_COMPONENT_DMDP_AAL0,
+	DDP_COMPONENT_AAL0,	 DDP_COMPONENT_COLOR0,
+	DDP_COMPONENT_CCORR0,	 DDP_COMPONENT_CCORR1,
+	DDP_COMPONENT_C3D0,	 DDP_COMPONENT_GAMMA0,
+	DDP_COMPONENT_POSTMASK0, DDP_COMPONENT_DITHER0,
+	DDP_COMPONENT_PQ0_OUT_CB0,
+	DDP_COMPONENT_PANEL0_COMP_OUT_CB1,
+#endif
+	DDP_COMPONENT_DLO_ASYNC0,
+	DDP_COMPONENT_DLI_ASYNC8,
+	DDP_COMPONENT_COMP0_IN_CB4,
+	DDP_COMPONENT_COMP0_OUT_CB5,
+	DDP_COMPONENT_MERGE0_OUT_CB0,
+	DDP_COMPONENT_DSI0,
+#ifndef DRM_BYPASS_PQ
+	DDP_COMPONENT_CHIST0,	 DDP_COMPONENT_CHIST1,
+#endif
+
+};
 
 /* CRTC1 */
 static const enum mtk_ddp_comp_id mt6899_mtk_ddp_ext_dp[] = {
@@ -3341,7 +3382,41 @@ static const enum mtk_ddp_comp_id mt6899_mtk_ddp_ext_dp[] = {
 	DDP_COMPONENT_DP_INTF0,
 };
 
-#if !IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if !IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
+#if IS_ENABLED(CONFIG_MTK_LCM_DUAL_PORT_SUPPORT)
+static const enum mtk_ddp_comp_id mt6991_mtk_ovlsys_main_bringup[] = {
+	DDP_COMPONENT_OVL_EXDMA3,
+	DDP_COMPONENT_OVL0_BLENDER3,
+	DDP_COMPONENT_OVL_EXDMA4,
+	DDP_COMPONENT_OVL0_BLENDER4,
+	DDP_COMPONENT_OVL_EXDMA5,
+	DDP_COMPONENT_OVL0_BLENDER5,
+	DDP_COMPONENT_OVL_EXDMA6,
+	DDP_COMPONENT_OVL0_BLENDER6,
+	DDP_COMPONENT_OVL_EXDMA7,
+	DDP_COMPONENT_OVL0_BLENDER7,
+	DDP_COMPONENT_OVL_EXDMA8,
+	DDP_COMPONENT_OVL0_BLENDER8,
+	DDP_COMPONENT_OVL_EXDMA9,
+	DDP_COMPONENT_OVL0_BLENDER9,
+	DDP_COMPONENT_OVLSYS_DLO_ASYNC0,
+	DDP_COMPONENT_OVLSYS1_DLI_ASYNC0,
+	DDP_COMPONENT_OVL1_EXDMA3,
+	DDP_COMPONENT_OVL1_BLENDER0,
+	DDP_COMPONENT_OVL1_EXDMA4,
+	DDP_COMPONENT_OVL1_BLENDER1,
+	DDP_COMPONENT_OVL1_EXDMA5,
+	DDP_COMPONENT_OVL1_BLENDER2,
+	DDP_COMPONENT_OVL1_OUTPROC0,
+	//DDP_COMPONENT_OVL0_OUTPROC_OUT_CB6,
+	DDP_COMPONENT_OVLSYS1_DLO_ASYNC5,
+	DDP_COMPONENT_OVL_EXDMA0,
+};
+
+static const enum mtk_ddp_comp_id mt6991_mtk_ddp_main_bringup[] = {
+	DDP_COMPONENT_DLI_ASYNC8,
+	DDP_COMPONENT_PQ0_IN_CB8,
+#else
 static const enum mtk_ddp_comp_id mt6991_mtk_ovlsys_main_bringup[] = {
 	DDP_COMPONENT_OVL_EXDMA3,
 	DDP_COMPONENT_OVL0_BLENDER1,
@@ -3364,6 +3439,7 @@ static const enum mtk_ddp_comp_id mt6991_mtk_ovlsys_main_bringup[] = {
 static const enum mtk_ddp_comp_id mt6991_mtk_ddp_main_bringup[] = {
 	DDP_COMPONENT_DLI_ASYNC0,
 	DDP_COMPONENT_PQ0_IN_CB0,
+#endif
 #ifdef DRM_BYPASS_PQ
 	DDP_COMPONENT_PQ0_OUT_CB6,
 	DDP_COMPONENT_PANEL0_COMP_OUT_CB1,
@@ -3378,12 +3454,19 @@ static const enum mtk_ddp_comp_id mt6991_mtk_ddp_main_bringup[] = {
 	DDP_COMPONENT_AAL0,		DDP_COMPONENT_GAMMA0,
 	DDP_COMPONENT_POSTMASK0,	DDP_COMPONENT_DITHER0,
 	DDP_COMPONENT_PQ0_OUT_CB0,
+#if IS_ENABLED(CONFIG_MTK_LCM_DUAL_PORT_SUPPORT)
+	DDP_COMPONENT_PANEL0_COMP_OUT_CB1,
+	DDP_COMPONENT_DLO_ASYNC1, DDP_COMPONENT_DLI_ASYNC21,
+	DDP_COMPONENT_SPLITTER0_IN_CB1,
+	DDP_COMPONENT_SPLITTER0_OUT_CB9,
+#else
 	DDP_COMPONENT_SPR0,
 	DDP_COMPONENT_PANEL0_COMP_OUT_CB0,
 	DDP_COMPONENT_DLO_ASYNC0,	DDP_COMPONENT_DLI_ASYNC20,
 	DDP_COMPONENT_ODDMR0,		DDP_COMPONENT_DITHER2,
 	DDP_COMPONENT_POSTALIGN0,
 	DDP_COMPONENT_SPLITTER0_OUT_CB9,
+#endif
 #endif
 	DDP_COMPONENT_COMP0_OUT_CB6,
 	DDP_COMPONENT_MERGE0_OUT_CB0,
@@ -3433,10 +3516,10 @@ static const enum mtk_ddp_comp_id mt6991_mtk_ddp_ext_dp[] = {
 
 /* CRTC3 */
 static const enum mtk_ddp_comp_id mt6991_mtk_ddp_secondary[] = {
-	DDP_COMPONENT_OVL1_EXDMA8,
-	DDP_COMPONENT_OVL1_BLENDER8,
-	DDP_COMPONENT_OVL1_EXDMA9,
-	DDP_COMPONENT_OVL1_BLENDER9,
+	DDP_COMPONENT_OVL1_EXDMA4,
+	DDP_COMPONENT_OVL1_BLENDER3,
+	DDP_COMPONENT_OVL1_EXDMA5,
+	DDP_COMPONENT_OVL1_BLENDER4,
 	DDP_COMPONENT_OVL1_OUTPROC4,
 	DDP_COMPONENT_OVLSYS1_DLO_ASYNC11,
 
@@ -3482,6 +3565,8 @@ static const enum mtk_ddp_comp_id mt6991_mtk_ovlsys_main_bringup[] = {
 	DDP_COMPONENT_OVL0_BLENDER4,
 	DDP_COMPONENT_OVL_EXDMA7,
 	DDP_COMPONENT_OVL0_BLENDER5,
+	DDP_COMPONENT_OVL_EXDMA8,
+	DDP_COMPONENT_OVL0_BLENDER6,
 	DDP_COMPONENT_OVL0_OUTPROC0,
 	DDP_COMPONENT_OVLSYS_DLO_ASYNC5,
 };
@@ -5438,6 +5523,28 @@ static const struct mtk_crtc_path_data mt6899_mtk_main_path_data = {
 	.scaling_data = mt6989_scaling_main,
 //	.scaling_data_dual = mt6989_scaling_main_dual,
 };
+static const struct mtk_crtc_path_data mt6899_mtk_main_bypass_pc_path_data = {
+	.ovl_path[DDP_MAJOR][0] = mt6899_mtk_ovlsys_main_bringup,
+	.ovl_path_len[DDP_MAJOR][0] = ARRAY_SIZE(mt6899_mtk_ovlsys_main_bringup),
+	.path[DDP_MAJOR][0] = mt6899_mtk_ddp_main_bypass_pc_bringup,
+	.path_len[DDP_MAJOR][0] = ARRAY_SIZE(mt6899_mtk_ddp_main_bypass_pc_bringup),
+	.path_req_hrt[DDP_MAJOR][0] = true,
+//	.ovl_path[DDP_MINOR][0] = mt6989_mtk_ovlsys_main_bringup,
+//	.ovl_path_len[DDP_MINOR][0] = ARRAY_SIZE(mt6989_mtk_ovlsys_main_bringup),
+//	.path[DDP_MINOR][0] = mt6989_mtk_ddp_main_bringup_minor,
+//	.path_len[DDP_MINOR][0] = ARRAY_SIZE(mt6989_mtk_ddp_main_bringup_minor),
+//	.path_req_hrt[DDP_MINOR][0] = true,
+//	.dual_ovl_path[0] = mt6989_mtk_ovlsys_dual_main_bringup,
+//	.dual_ovl_path_len[0] = ARRAY_SIZE(mt6989_mtk_ovlsys_dual_main_bringup),
+//	.dual_path[0] = mt6989_mtk_ddp_dual_main_bringup,
+//	.dual_path_len[0] = ARRAY_SIZE(mt6989_mtk_ddp_dual_main_bringup),
+//	.wb_path[DDP_MAJOR] = mt6983_mtk_ddp_main_wb_path,
+//	.wb_path_len[DDP_MAJOR] = ARRAY_SIZE(mt6983_mtk_ddp_main_wb_path),
+	.addon_data = mt6989_addon_main,
+//	.addon_data_dual = mt6989_addon_main_dual,
+	.scaling_data = mt6989_scaling_main,
+//	.scaling_data_dual = mt6989_scaling_main_dual,
+};
 
 static const struct mtk_crtc_path_data mt6899_mtk_ext_path_data = {
 	.path[DDP_MAJOR][0] = mt6899_mtk_ddp_ext_dp,
@@ -5467,6 +5574,11 @@ static const struct mtk_crtc_path_data mt6991_mtk_main_path_data = {
 //	.addon_data_dual = mt6989_addon_main_dual,
 	.scaling_data = mt6991_scaling_main,
 //	.scaling_data_dual = mt6989_scaling_main_dual,
+#if !IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_MTK_LCM_DUAL_PORT_SUPPORT)
+	.is_exdma_dual_layer = true,
+#endif
+#endif
 };
 
 static const struct mtk_crtc_path_data mt6991_mtk_main_full_set_data = {
@@ -5486,7 +5598,7 @@ static const struct mtk_crtc_path_data mt6991_mtk_ext_path_data = {
 	.path_len[DDP_MAJOR][0] = ARRAY_SIZE(mt6991_mtk_ddp_ext_dp),
 	.path_req_hrt[DDP_MAJOR][0] = true,
 	.addon_data = mt6991_addon_ext,
-#if !IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if !IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	.is_exdma_dual_layer = true,
 #endif
 };
@@ -5525,7 +5637,7 @@ static const struct mtk_crtc_path_data mt6991_mtk_discrete_path_data = {
 	.is_discrete_path = true,
 };
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 static const struct mtk_crtc_path_data mt6991_mtk_fifth_path_data = {
 	.path[DDP_MAJOR][0] = mt6991_mtk_ddp_fifth_path,
 	.path_len[DDP_MAJOR][0] = ARRAY_SIZE(mt6991_mtk_ddp_fifth_path),
@@ -6567,6 +6679,7 @@ static const struct mtk_mmsys_driver_data mt6989_mmsys_driver_data = {
 
 static const struct mtk_mmsys_driver_data mt6899_mmsys_driver_data = {
 	.main_path_data = &mt6899_mtk_main_path_data,
+	.main_bypass_pc_path_data = &mt6899_mtk_main_bypass_pc_path_data,
 	//.ext_alter_path_data = &mt6989_mtk_main_full_set_data,//temporary solution for OVL full set
 	.ext_path_data = &mt6899_mtk_ext_path_data,
 	//.third_path_data = &mt6989_mtk_dp_w_tdshp_path_data,
@@ -6600,7 +6713,7 @@ static const struct mtk_mmsys_driver_data mt6991_mmsys_driver_data = {
 	.third_path_data_wo_tdshp = &mt6991_mtk_dp_wo_tdshp_path_data,
 	.fourth_path_data_secondary = &mt6991_mtk_secondary_path_data,
 	.fourth_path_data_discrete = &mt6991_mtk_discrete_path_data,
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	.fifth_path_data = &mt6991_mtk_fifth_path_data,
 	.sixth_path_data = &mt6991_mtk_sixth_path_data,
 	.seventh_path_data = &mt6991_mtk_seventh_path_data,
@@ -6947,7 +7060,7 @@ int mtk_drm_pm_ctrl(struct mtk_drm_private *priv, enum disp_pm_action action)
 		if (priv->dsi_phy1_dev && (!pm_runtime_enabled(priv->dsi_phy1_dev)))
 			pm_runtime_enable(priv->dsi_phy1_dev);
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 		if (priv->dsi_phy2_dev && (!pm_runtime_enabled(priv->dsi_phy2_dev)))
 			pm_runtime_enable(priv->dsi_phy2_dev);
 #endif
@@ -6982,7 +7095,7 @@ int mtk_drm_pm_ctrl(struct mtk_drm_private *priv, enum disp_pm_action action)
 		if (priv->dsi_phy1_dev)
 			pm_runtime_disable(priv->dsi_phy1_dev);
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 		if (priv->dsi_phy2_dev)
 			pm_runtime_disable(priv->dsi_phy2_dev);
 #endif
@@ -7004,7 +7117,7 @@ int mtk_drm_pm_ctrl(struct mtk_drm_private *priv, enum disp_pm_action action)
 			}
 		}
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 		if (priv->dsi_phy2_dev) {
 			ret = pm_runtime_resume_and_get(priv->dsi_phy2_dev);
 			if (unlikely(ret)) {
@@ -7050,7 +7163,7 @@ int mtk_drm_pm_ctrl(struct mtk_drm_private *priv, enum disp_pm_action action)
 		if (priv->dsi_phy1_dev)
 			pm_runtime_put_sync(priv->dsi_phy1_dev);
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 		if (priv->dsi_phy2_dev)
 			pm_runtime_put_sync(priv->dsi_phy2_dev);
 #endif
@@ -7077,30 +7190,62 @@ int mtk_drm_pm_ctrl(struct mtk_drm_private *priv, enum disp_pm_action action)
 		if (priv->dsi_phy1_dev)
 			pm_runtime_put_sync(priv->dsi_phy1_dev);
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 		if (priv->dsi_phy2_dev)
 			pm_runtime_put_sync(priv->dsi_phy2_dev);
 #endif
 		break;
 	case DISP_PM_CHECK:
-		if (priv->dsi_phy0_dev && pm_runtime_get_if_in_use(priv->dsi_phy0_dev) <= 0)
-			return -1;
-		if (priv->dsi_phy1_dev && pm_runtime_get_if_in_use(priv->dsi_phy1_dev) <= 0)
-			return -1;
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
-		if (priv->dsi_phy2_dev && pm_runtime_get_if_in_use(priv->dsi_phy2_dev) <= 0)
-			return -1;
+		if (priv->dsi_phy0_dev && pm_runtime_get_if_in_use(priv->dsi_phy0_dev) <= 0) {
+			DDPMSG("%s, dsi phy0 unused,%d", __func__,
+				atomic_read(&priv->dsi_phy0_dev->power.usage_count));
+			ret = -1;
+			goto err_dsi_phy0;
+		}
+		if (priv->dsi_phy1_dev && pm_runtime_get_if_in_use(priv->dsi_phy1_dev) <= 0) {
+			DDPMSG("%s, dsi phy1 unused,%d", __func__,
+				atomic_read(&priv->dsi_phy1_dev->power.usage_count));
+			ret = -2;
+			goto err_dsi_phy1;
+		}
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
+		if (priv->dsi_phy2_dev && pm_runtime_get_if_in_use(priv->dsi_phy2_dev) <= 0) {
+			DDPMSG("%s, dsi phy2 unused,%d", __func__,
+				atomic_read(&priv->dsi_phy2_dev->power.usage_count));
+			ret = -3;
+			goto err_dsi_phy2;
+		}
 #endif
-		if (priv->dpc_dev && pm_runtime_get_if_in_use(priv->dpc_dev) <= 0)
+		if (priv->dpc_dev && pm_runtime_get_if_in_use(priv->dpc_dev) <= 0) {
+			DDPMSG("%s, dpc mminfra unused,%d", __func__,
+				atomic_read(&priv->dpc_dev->power.usage_count));
+			ret = -4;
 			goto err_dpc_dev;
-		if (priv->mmsys_dev && pm_runtime_get_if_in_use(priv->mmsys_dev) <= 0)
+		}
+		if (priv->mmsys_dev && pm_runtime_get_if_in_use(priv->mmsys_dev) <= 0) {
+			DDPMSG("%s, mmsys unused,%d", __func__,
+				atomic_read(&priv->mmsys_dev->power.usage_count));
+			ret = -5;
 			goto err_mmsys;
-		if (priv->side_mmsys_dev && pm_runtime_get_if_in_use(priv->side_mmsys_dev) <= 0)
+		}
+		if (priv->side_mmsys_dev && pm_runtime_get_if_in_use(priv->side_mmsys_dev) <= 0) {
+			DDPMSG("%s, side mmsys unused,%d", __func__,
+				atomic_read(&priv->side_mmsys_dev->power.usage_count));
+			ret = -6;
 			goto err_side_mmsys;
-		if (priv->ovlsys_dev && pm_runtime_get_if_in_use(priv->ovlsys_dev) <= 0)
+		}
+		if (priv->ovlsys_dev && pm_runtime_get_if_in_use(priv->ovlsys_dev) <= 0) {
+			DDPMSG("%s, ovlsys unused,%d", __func__,
+				atomic_read(&priv->ovlsys_dev->power.usage_count));
+			ret = -7;
 			goto err_ovlsys;
-		if (priv->side_ovlsys_dev && pm_runtime_get_if_in_use(priv->side_ovlsys_dev) <= 0)
+		}
+		if (priv->side_ovlsys_dev && pm_runtime_get_if_in_use(priv->side_ovlsys_dev) <= 0) {
+			DDPMSG("%s, side_ovlsys unused,%d", __func__,
+				atomic_read(&priv->side_ovlsys_dev->power.usage_count));
+			ret = -8;
 			goto err_side_ovlsys;
+		}
 		break;
 	}
 	return ret;
@@ -7118,15 +7263,18 @@ err_mmsys:
 	if (priv->dpc_dev)
 		pm_runtime_put(priv->dpc_dev);
 err_dpc_dev:
-	if (priv->dsi_phy0_dev)
-		pm_runtime_put_sync(priv->dsi_phy0_dev);
-	if (priv->dsi_phy1_dev)
-		pm_runtime_put_sync(priv->dsi_phy1_dev);
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	if (priv->dsi_phy2_dev)
 		pm_runtime_put_sync(priv->dsi_phy2_dev);
+err_dsi_phy2:
 #endif
-	return -1;
+	if (priv->dsi_phy1_dev)
+		pm_runtime_put_sync(priv->dsi_phy1_dev);
+err_dsi_phy1:
+	if (priv->dsi_phy0_dev)
+		pm_runtime_put_sync(priv->dsi_phy0_dev);
+err_dsi_phy0:
+	return ret;
 }
 
 static void mtk_drm_get_top_clk(struct mtk_drm_private *priv)
@@ -7250,10 +7398,6 @@ void mtk_drm_top_clk_prepare_enable(struct drm_crtc *crtc)
 			if (mtk_crtc &&
 				mtk_drm_helper_get_opt(priv->helper_opt, MTK_DRM_OPT_VIDLE_DECOUPLE_MODE))
 				mtk_crtc->is_mml_dc = false;
-			CRTC_MMP_MARK(crtc_idx, leave_vidle,
-				(0xc10c | 0x40000000), atomic_read(&top_clk_ref));
-			mtk_vidle_config_ff(false);
-			mtk_vidle_enable(mtk_vidle_is_ff_enabled(), priv);
 		}
 	}
 
@@ -9056,6 +9200,10 @@ static void mtk_drm_kms_lateinit(struct kthread_work *work)
 
 	mtk_drm_first_enable(drm);
 
+#if IS_ENABLED(CONFIG_MTK_DISP_MMDVFS_INIT_SEQUENCE)
+	mmdvfs_disp_boot_ready();
+#endif
+
 	/* power off mtcmos */
 	/* Because of align lk hw power status,
 	 * we power on mtcmos at the beginning of the display initialization.
@@ -9147,6 +9295,8 @@ static int mtk_drm_kms_init(struct drm_device *drm)
 	/* remove it after MT6989 MML DLO switch ready */
 	if (of_property_read_bool(private->mmsys_dev->of_node, "enable-main-full-ovl-path"))
 		ret = mtk_drm_crtc_create(drm, private->data->ext_alter_path_data);
+	else if (of_property_read_bool(private->mmsys_dev->of_node, "bypass-pc-path"))
+		ret = mtk_drm_crtc_create(drm, private->data->main_bypass_pc_path_data);
 	else
 		ret = mtk_drm_crtc_create(drm, private->data->main_path_data);
 	if (ret < 0)
@@ -9194,7 +9344,7 @@ static int mtk_drm_kms_init(struct drm_device *drm)
 				goto err_component_unbind;
 		}
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 		if (private->data->fifth_path_data) {
 			DDPMSG("CRTC4 Path\n");
 			if (of_property_read_bool(private->mmsys_dev->of_node,
@@ -10940,7 +11090,7 @@ static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
 	 .data = (void *)MTK_DISP_DPTX},
 	{.compatible = "mediatek,mt6899-dp_tx",
 	 .data = (void *)MTK_DISP_DPTX},
-#if !IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if !IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	{.compatible = "mediatek,mt6991-dp_tx",
 	 .data = (void *)MTK_DISP_DPTX},
 #endif
@@ -11550,7 +11700,7 @@ SKIP_OVLSYS_CONFIG:
 
 	private->dsi_phy0_dev = mtk_drm_get_pd_device(dev, "dsi_phy0");
 	private->dsi_phy1_dev = mtk_drm_get_pd_device(dev, "dsi_phy1");
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	private->dsi_phy2_dev = mtk_drm_get_pd_device(dev, "dsi_phy2");
 #endif
 
@@ -12074,11 +12224,11 @@ static void __exit mtk_drm_exit(void)
 module_init(mtk_drm_init);
 module_exit(mtk_drm_exit);
 
-#if (IS_ENABLED(CONFIG_DRM_MEDIATEK_EDPTX_AUTO_SUPPORT) && IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT))
+#if (IS_ENABLED(CONFIG_DRM_MEDIATEK_EDPTX_AUTO_SUPPORT) && IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO))
 MODULE_SOFTDEP("pre: mtk-drm-edp panel-serdes-max96789");
 #elif IS_ENABLED(CONFIG_DRM_MEDIATEK_EDPTX_AUTO_SUPPORT)
 MODULE_SOFTDEP("pre: mtk-drm-edp");
-#elif IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#elif IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 MODULE_SOFTDEP("pre: panel-serdes-max96789");
 #endif
 MODULE_AUTHOR("YT SHEN <yt.shen@mediatek.com>");

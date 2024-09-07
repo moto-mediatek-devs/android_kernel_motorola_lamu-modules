@@ -72,7 +72,8 @@ mediatek-drm-y := mtk_drm_drv.o \
 #ccflags-y += -DDRM_CMDQ_DISABLE
 #mediatek-drm-y += mtk_cmdq_dummy.o
 
-ifeq ($(CONFIG_DRM_MEDIATEK_AUTO_YCT), m)
+ifeq ($(CONFIG_DRM_MEDIATEK_AUTO), y)
+ccflags-y += -DMTK_AUTO_PRODUCT
 mediatek-drm-y += mtk_drm_auto/mtk_drm_ddp_comp_auto.o \
 	mtk_drm_auto/mtk_drm_crtc_auto.o
 endif
@@ -122,7 +123,7 @@ mtk-drm-edp-y += mtk_drm_edp/mtk_drm_edp_phy.o
 mtk-drm-edp-y += mtk_drm_edp/mtk_drm_edp.o
 obj-$(CONFIG_DRM_MEDIATEK_EDPTX_AUTO_SUPPORT) += mtk-drm-edp.o
 #ccflags-y += -DEDPTX_DEBUG
-#ccflags-y += -DEDPTX_ANDROID_SUPPORT
+ccflags-y += -DEDPTX_ANDROID_SUPPORT
 endif
 
 ifneq ($(findstring $(CONFIG_DRM_MEDIATEK_CEC), y m),)

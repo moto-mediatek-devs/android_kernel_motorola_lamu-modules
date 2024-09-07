@@ -62,6 +62,7 @@ struct mml_drm_ctx {
 	void *disp_crtc;
 	void (*dispen_cb)(bool enable, void *dispen_param);
 	void *dispen_param;
+	struct completion idle;
 };
 
 static struct mml_drm_ctx *task_ctx_to_drm(struct mml_task *task)
@@ -342,8 +343,8 @@ enum mml_mode mml_drm_query_cap(struct mml_drm_ctx *dctx,
 EXPORT_SYMBOL_GPL(mml_drm_query_cap);
 
 /* dc mode reserve time in us */
-int dc_sw_reserve = 1000;
-module_param(dc_sw_reserve, int, 0644);
+int dc_layer_reserve = 1500;
+module_param(dc_layer_reserve, int, 0644);
 
 int mml_drm_query_multi_layer(struct mml_drm_ctx *dctx,
 	struct mml_frame_info *infos, u32 cnt, u32 duration_us)
@@ -362,8 +363,8 @@ int mml_drm_query_multi_layer(struct mml_drm_ctx *dctx,
 		duration_us = MML_MAX_DUR;
 	mml_msg("[drm][query]%s duration %u", __func__, duration_us);
 
-	remain[mml_sys_frame] = duration_us -  dc_sw_reserve;
-	remain[mml_sys_tile] = duration_us -  dc_sw_reserve;
+	remain[mml_sys_frame] = duration_us -  dc_layer_reserve;
+	remain[mml_sys_tile] = duration_us -  dc_layer_reserve;
 
 	for (i = 0; i < cnt; i++) {
 		bool balance = false;
@@ -566,11 +567,37 @@ static void drm_task_move_to_idle(struct mml_task *task)
 		mml_dev_get_couple_cnt(dctx->ctx.mml));
 }
 
+static bool mml_drm_check_configs_idle_locked(struct mml_drm_ctx *dctx, bool warn)
+{
+	struct mml_ctx *ctx = &dctx->ctx;
+	struct mml_frame_config *cfg;
+	bool idle = false;
+
+	list_for_each_entry(cfg, &ctx->configs, entry) {
+		if (!list_empty(&cfg->await_tasks)) {
+			if (warn)
+				mml_log("[drm]%s await_tasks not empty", __func__);
+			goto done;
+		}
+
+		if (!list_empty(&cfg->tasks)) {
+			if (warn)
+				mml_log("[drm]%s tasks not empty", __func__);
+			goto done;
+		}
+	}
+
+	idle = true;
+done:
+	return idle;
+}
+
 static void drm_task_frame_done(struct mml_task *task)
 {
 	struct mml_frame_config *cfg = task->config;
 	struct mml_frame_config *tmp;
 	struct mml_ctx *ctx = task->ctx;
+	struct mml_drm_ctx *dctx = task_ctx_to_drm(task);
 	struct mml_dev *mml = cfg->mml;
 
 	mml_trace_ex_begin("%s", __func__);
@@ -633,6 +660,8 @@ static void drm_task_frame_done(struct mml_task *task)
 	}
 
 done:
+	if (!mml_drm_check_configs_idle_locked(dctx, false))
+		complete(&dctx->idle);
 	mutex_unlock(&ctx->config_mutex);
 
 	mml_lock_wake_lock(mml, false);
@@ -752,7 +781,7 @@ s32 mml_drm_submit(struct mml_drm_ctx *dctx, struct mml_submit *submit,
 			mml_msg("[drm]reuse task %p pkt %p %p",
 				task, task->pkts[0], task->pkts[1]);
 		} else {
-			task = mml_core_create_task();
+			task = mml_core_create_task(atomic_read(&ctx->job_serial));
 			if (IS_ERR(task)) {
 				result = PTR_ERR(task);
 				mml_err("[drm]%s create task for reuse frame fail", __func__);
@@ -773,7 +802,7 @@ s32 mml_drm_submit(struct mml_drm_ctx *dctx, struct mml_submit *submit,
 			mml_err("[drm]%s create frame config fail", __func__);
 			goto err_unlock_exit;
 		}
-		task = mml_core_create_task();
+		task = mml_core_create_task(atomic_read(&ctx->job_serial));
 		if (IS_ERR(task)) {
 			list_del_init(&cfg->entry);
 			frame_config_destroy(cfg);
@@ -1109,6 +1138,9 @@ static struct mml_drm_ctx *drm_ctx_create(struct mml_dev *mml,
 	/* install kick idle callback to mml driver */
 	mml_pw_set_kick_cb(mml, disp->kick_idle_cb, disp->disp_crtc);
 
+	/* idle complete event to prevent display ignore put context */
+	init_completion(&ctx->idle);
+
 	return ctx;
 }
 
@@ -1129,27 +1161,23 @@ EXPORT_SYMBOL_GPL(mml_drm_get_context);
 bool mml_drm_ctx_idle(struct mml_drm_ctx *dctx)
 {
 	struct mml_ctx *ctx = &dctx->ctx;
-	bool idle = false;
-
-	struct mml_frame_config *cfg;
+	bool idle = true;
 
 	mutex_lock(&ctx->config_mutex);
-	list_for_each_entry(cfg, &ctx->configs, entry) {
-		if (!list_empty(&cfg->await_tasks)) {
-			mml_log("[drm]%s await_tasks not empty", __func__);
-			goto done;
-		}
+	if (!mml_drm_check_configs_idle_locked(dctx, true)) {
+		idle = false;
+		init_completion(&dctx->idle);
+	}
+	mutex_unlock(&ctx->config_mutex);
 
-		if (!list_empty(&cfg->tasks)) {
-			mml_log("[drm]%s tasks not empty", __func__);
-			goto done;
+	if (!idle) {
+		if (!wait_for_completion_timeout(&dctx->idle, nsecs_to_jiffies(1000000000))) {
+			mml_err("[drm]wait idle timed out");
+			return false;
 		}
 	}
 
-	idle = true;
-done:
-	mutex_unlock(&ctx->config_mutex);
-	return idle;
+	return true;
 }
 EXPORT_SYMBOL_GPL(mml_drm_ctx_idle);
 
@@ -1564,7 +1592,8 @@ const struct mml_topology_path *mml_drm_query_dl_path(struct mml_drm_ctx *dctx,
 
 void mml_drm_submit_timeout(void)
 {
-	mml_aee("mml", "mml_drm_submit timeout");
+	//mml_aee("mml", "mml_drm_submit timeout");
+	mml_err("mml_drm_submit timeout");
 }
 EXPORT_SYMBOL_GPL(mml_drm_submit_timeout);
 

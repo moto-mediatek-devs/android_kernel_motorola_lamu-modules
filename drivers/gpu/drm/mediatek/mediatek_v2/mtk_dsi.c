@@ -35,7 +35,7 @@
 #include <linux/ratelimit.h>
 #include <soc/mediatek/smi.h>
 #include <soc/mediatek/dramc.h>
-#if IS_ENABLED(CONFIG_ENABLE_DSI_HOTPLUG)
+#if IS_ENABLED(CONFIG_ENABLE_DSI_HOTPLUG) || IS_ENABLED(CONFIG_ENABLE_SEND_PPS_PER_FRAME)
 #include <uapi/linux/sched/types.h>
 #endif
 
@@ -404,6 +404,15 @@
 #define DSI_GERNERIC_SHORT_PACKET_ID_2 0x23
 #define DSI_GERNERIC_LONG_PACKET_ID 0x29
 #define DSI_GERNERIC_READ_LONG_PACKET_ID 0x14
+
+#if IS_ENABLED(CONFIG_ENABLE_SEND_PPS_PER_FRAME)
+#define VFP_START_INT_FLAG	BIT(10)
+#define LONG_PKT			BIT(1)
+#define TIME_SEL			BIT(2)
+#define VM_CMD_USE_CMDQ		BIT(4)
+#define DSI_VM_CMD_CON1		0x114
+atomic_t pps_vfp_event = ATOMIC_INIT(0);
+#endif
 
 struct phy;
 unsigned int line_back_to_LP = 1;
@@ -2377,7 +2386,8 @@ int mtk_dsi_get_virtual_heigh(struct mtk_dsi *dsi,
 
 	if (!virtual_heigh)
 		virtual_heigh = crtc->mode.vdisplay;
-	DDPINFO("%s %d\n", __func__, virtual_heigh);
+	DDPDBG("%s %d\n", __func__, virtual_heigh);
+
 	return virtual_heigh;
 }
 
@@ -2407,7 +2417,8 @@ int mtk_dsi_get_virtual_width(struct mtk_dsi *dsi,
 
 	if (!virtual_width)
 		virtual_width = crtc->mode.hdisplay;
-	DDPINFO("%s %d\n", __func__, virtual_width);
+	DDPDBG("%s %d\n", __func__, virtual_width);
+
 	return virtual_width;
 }
 
@@ -2889,43 +2900,84 @@ static void mtk_dsi_tx_buf_rw(struct mtk_dsi *dsi)
 	writel(rw_times, dsi->regs + DSI_TX_BUF_RW_TIMES(dsi->driver_data));
 	mtk_dsi_mask(dsi, DSI_BUF_CON0(dsi->driver_data), BUF_BUF_EN, BUF_BUF_EN);
 
-	if (!mtk_crtc_is_frame_trigger_mode(&mtk_crtc->base) &&
-		dsi->driver_data->support_pre_urgent) {
-		/* line counter mode for vdo mode */
-		u32 line_time_ns;
-		u64 buf_preurgent_high;
-		u32 prefetch_time;
-		struct drm_display_mode *mode = mtk_crtc_get_display_mode_by_comp(__func__,
-						&mtk_crtc->base, comp, false);
+	if (dsi->driver_data->support_pre_urgent) {
+		if (!mtk_crtc_is_frame_trigger_mode(&mtk_crtc->base)) {
+			/* line counter mode for vdo mode */
+			u32 line_time_ns;
+			u64 buf_preurgent_high;
+			u32 prefetch_time;
+			struct drm_display_mode *mode = mtk_crtc_get_display_mode_by_comp(__func__,
+							&mtk_crtc->base, comp, false);
 
-		line_time_ns = mtk_dsi_get_line_time_ns(dsi, mtk_crtc);
-		if (line_time_ns)
-			buf_preurgent_high = DIV_ROUND_UP(dsi->driver_data->urgent_hi_fifo_us * 1000,
-							line_time_ns);
-		if (mode)
-			prefetch_time = mode->vtotal - mode->vsync_start;	// Unit: line cnt
-		if (line_time_ns != 0 && mode) {
-			if (prefetch_time - buf_preurgent_high > 0 &&
-				prefetch_time - buf_preurgent_high >= buf_preurgent_high) {
-				buf_preurgent_high = prefetch_time - buf_preurgent_high;
-			} else if (prefetch_time - buf_preurgent_high > 0 &&
-						prefetch_time - buf_preurgent_high < buf_preurgent_high) {
-				buf_preurgent_high = prefetch_time - buf_preurgent_high;
-				DDPPR_ERR("prefetch_time is too small! urgent signal will usually be sent\n");
+			line_time_ns = mtk_dsi_get_line_time_ns(dsi, mtk_crtc);
+			if (line_time_ns)
+				buf_preurgent_high = DIV_ROUND_UP(urgent_hi_fifo_us * 1000, line_time_ns);
+
+			if (mode)
+				prefetch_time = mode->vtotal - mode->vsync_start; // Unit: line cnt
+
+			DDPINFO("%s buf_preurgent_high=%llu, prefetch_time=%d\n",
+				__func__, buf_preurgent_high, prefetch_time);
+
+			if (line_time_ns != 0 && mode) {
+				if (prefetch_time - buf_preurgent_high > 0 &&
+					prefetch_time - buf_preurgent_high >= buf_preurgent_high) {
+					buf_preurgent_high = prefetch_time - buf_preurgent_high;
+				} else if (prefetch_time - buf_preurgent_high > 0 &&
+							prefetch_time - buf_preurgent_high < buf_preurgent_high) {
+					buf_preurgent_high = prefetch_time - buf_preurgent_high;
+					DDPINFO("prefetch_time is too small! urgent signal will usually be sent\n");
+				} else {
+					buf_preurgent_high = 0;
+					DDPINFO("prefetch_time is too small to get enough data!!!\n");
+				}
+
+				mtk_dsi_mask(dsi, DSI_BUF_CON0(dsi->driver_data), BUF_PREURGENT_MODE, 0);
+				writel(buf_preurgent_high, dsi->regs + DSI_BUF_PREURGENT_HIGH(dsi->driver_data));
+				mtk_dsi_mask(dsi, DSI_BUF_CON0(dsi->driver_data), BUF_VDE_BLOCK_URGENT, 0);
+				mtk_dsi_mask(dsi, DSI_BUF_CON0(dsi->driver_data), BUF_PREURGENT_EN, BUF_PREURGENT_EN);
 			} else {
-				buf_preurgent_high = 0;
-				DDPPR_ERR("prefetch_time is too small to get enough data!!!\n");
+				writel(0, dsi->regs + DSI_BUF_PREURGENT_HIGH(dsi->driver_data));
+				mtk_dsi_mask(dsi, DSI_BUF_CON0(dsi->driver_data), BUF_VDE_BLOCK_URGENT, 1);
+				mtk_dsi_mask(dsi, DSI_BUF_CON0(dsi->driver_data), BUF_PREURGENT_EN, 0);
+				DDPINFO("line_time/mode err, disable preurgent\n");
+			}
+		} else {
+			/* absolute timer mode for cmd mode */
+			u32 frame_time, rframe_time;
+			u32 ps_wc = 0, ps_wc_bits = 0, fps, urgent_threshold;
+			int prefetch_time, urgent_time;
+			struct mtk_panel_dsc_params *dsc_params = &ext->params->dsc_params;
+
+			fps = mtk_crtc->panel_ext->params->dyn_fps.vact_timing_fps;
+			fps = fps > 0 ? fps : drm_mode_vrefresh(&mtk_crtc->base.state->adjusted_mode);
+
+			if (dsc_params->enable)
+				ps_wc = dsc_params->chunk_size * (dsc_params->slice_mode + 1);
+			else {
+				if (dsc_params->bit_per_pixel == 10)
+					ps_wc = width * 30 / 8;
+				else
+					ps_wc = width * dsi_buf_bpp;
 			}
 
-			mtk_dsi_mask(dsi, DSI_BUF_CON0(dsi->driver_data), BUF_PREURGENT_MODE, 0);
-			writel(buf_preurgent_high, dsi->regs + DSI_BUF_PREURGENT_HIGH(dsi->driver_data));
+			ps_wc_bits = ps_wc * 8; // byte -> bits
+			frame_time = 1000000 / fps;
+			rframe_time = ps_wc_bits * height / dsi->lanes / dsi->data_rate;
+			//200: sw config. time //500: sw reserved time
+			prefetch_time = frame_time - rframe_time - 200 - 500;
+			urgent_time = prefetch_time - urgent_hi_fifo_us;
+			urgent_time = urgent_time > urgent_hi_fifo_us ?
+						urgent_time : urgent_hi_fifo_us;
+
+			urgent_threshold = urgent_time * dsi->data_rate / 8 / 64;
 			mtk_dsi_mask(dsi, DSI_BUF_CON0(dsi->driver_data), BUF_VDE_BLOCK_URGENT, 0);
+			mtk_dsi_mask(dsi, DSI_BUF_CON0(dsi->driver_data), BUF_PREURGENT_MODE, 1);
+			writel(urgent_threshold, dsi->regs + DSI_BUF_PREURGENT_HIGH(dsi->driver_data));
 			mtk_dsi_mask(dsi, DSI_BUF_CON0(dsi->driver_data), BUF_PREURGENT_EN, BUF_PREURGENT_EN);
-		} else {
-			writel(0, dsi->regs + DSI_BUF_PREURGENT_HIGH(dsi->driver_data));
-			mtk_dsi_mask(dsi, DSI_BUF_CON0(dsi->driver_data), BUF_VDE_BLOCK_URGENT, 1);
-			mtk_dsi_mask(dsi, DSI_BUF_CON0(dsi->driver_data), BUF_PREURGENT_EN, 0);
-			DDPPR_ERR("line_time/mode err, disable preurgent\n");
+
+			DDPMSG("%s,urgent_threshold=%d,prefetch_time=%d,urgent_time=%d,rframe_time=%d,fps=%d\n",
+					__func__, urgent_threshold, prefetch_time, urgent_time, rframe_time, fps);
 		}
 	}
 }
@@ -2943,9 +2995,27 @@ static void mtk_dsi_calc_vdo_timing(struct mtk_dsi *dsi)
 	struct videomode *vm = NULL;
 	struct dynamic_mipi_params *dyn = NULL;
 	struct mtk_panel_spr_params *spr_params = NULL;
+	struct mtk_ddp_comp *comp = NULL;
+	struct mtk_drm_crtc *mtk_crtc = NULL;
+	struct mtk_drm_private *priv = NULL;
 
 	if (!dsi) {
-		DDPPR_ERR("%s with NULL dsi\n", __func__);
+		pr_info("%s with NULL dsi\n", __func__);
+		return;
+	}
+	comp = &dsi->ddp_comp;
+	if (!comp) {
+		pr_info("%s, comp is NULL\n", __func__);
+		return;
+	}
+	mtk_crtc = comp->mtk_crtc;
+	if (!mtk_crtc) {
+		pr_info("%s, mtk_crtc is NULL\n", __func__);
+		return;
+	}
+	priv = mtk_crtc->base.dev->dev_private;
+	if (!priv) {
+		pr_info("%s, priv is NULL\n", __func__);
 		return;
 	}
 
@@ -3057,16 +3127,33 @@ static void mtk_dsi_calc_vdo_timing(struct mtk_dsi *dsi)
 		}
 	} else {
 		if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE) {
-			horizontal_sync_active_byte = t_hsa * dsi_tmp_buf_bpp - 10;
-
-			horizontal_backporch_byte = t_hbp * dsi_tmp_buf_bpp - 10;
+			if (priv->data->mmsys_id == MMSYS_MT6991) {
+				horizontal_sync_active_byte = t_hsa * dsi_tmp_buf_bpp - 10;
+				horizontal_backporch_byte = t_hbp * dsi_tmp_buf_bpp - 10;
+			} else {
+				horizontal_sync_active_byte =
+					ALIGN_TO((t_hsa * dsi_tmp_buf_bpp - 10), 4);
+				horizontal_backporch_byte =
+					ALIGN_TO((t_hbp * dsi_tmp_buf_bpp - 10), 4);
+			}
 		} else {
-			horizontal_sync_active_byte = t_hsa * dsi_tmp_buf_bpp - 4;
-
-			horizontal_backporch_byte = (t_hbp + t_hsa) * dsi_tmp_buf_bpp - 10;
+			if (priv->data->mmsys_id == MMSYS_MT6991) {
+				horizontal_sync_active_byte = t_hsa * dsi_tmp_buf_bpp - 4;
+				horizontal_backporch_byte = (t_hbp + t_hsa) * dsi_tmp_buf_bpp - 10;
+			} else {
+				horizontal_sync_active_byte =
+					ALIGN_TO((t_hsa * dsi_tmp_buf_bpp - 4), 4);
+				horizontal_backporch_byte =
+					ALIGN_TO(((t_hbp + t_hsa) * dsi_tmp_buf_bpp -
+					10), 4);
+			}
 		}
 
-		horizontal_frontporch_byte = t_hfp * dsi_tmp_buf_bpp - 12;
+		if (priv->data->mmsys_id == MMSYS_MT6991)
+			horizontal_frontporch_byte = t_hfp * dsi_tmp_buf_bpp - 12;
+		else
+			horizontal_frontporch_byte =
+				ALIGN_TO((t_hfp * dsi_tmp_buf_bpp - 12), 4);
 	}
 	dsi->vfp = t_vfp;
 	dsi->vbp = t_vbp;
@@ -3101,6 +3188,26 @@ void DSI_Config_VDO_Timing_with_DSC(struct mtk_dsi *dsi)
 	u32 t_hsa = vm->hsync_len;
 	u32 width = mtk_dsi_get_virtual_width(dsi, dsi->encoder.crtc);
 	u32 height = mtk_dsi_get_virtual_heigh(dsi, dsi->encoder.crtc);
+
+	struct mtk_ddp_comp *comp = NULL;
+	struct mtk_drm_crtc *mtk_crtc = NULL;
+	struct mtk_drm_private *priv = NULL;
+
+	comp = &dsi->ddp_comp;
+	if (!comp) {
+		pr_info("%s, comp is NULL\n", __func__);
+		return;
+	}
+	mtk_crtc = comp->mtk_crtc;
+	if (!mtk_crtc) {
+		pr_info("%s, mtk_crtc is NULL\n", __func__);
+		return;
+	}
+	priv = mtk_crtc->base.dev->dev_private;
+	if (!priv) {
+		pr_info("%s, priv is NULL\n", __func__);
+		return;
+	}
 
 	if (dsi->ext && dsi->ext->params)
 		dyn = &dsi->ext->params->dyn;
@@ -3207,10 +3314,17 @@ void DSI_Config_VDO_Timing_with_DSC(struct mtk_dsi *dsi)
 	"[DISP]-kernel-%s, ap_tx_total_word_cnt=%d, ap_tx_line_cycle=%d, ap_tx_cycle_time=%d\n",
 	__func__, ap_tx_total_word_cnt, ap_tx_line_cycle, ap_tx_cycle_time);
 
-	writel(t_hsa, dsi->regs + DSI_HSA_WC(dsi->driver_data));
-	writel(t_hbp, dsi->regs + DSI_HBP_WC(dsi->driver_data));
-	writel(t_hfp, dsi->regs + DSI_HFP_WC(dsi->driver_data));
-	writel(t_hbllp, dsi->regs + DSI_BLLP_WC(dsi->driver_data));
+	if (priv->data->mmsys_id == MMSYS_MT6991) {
+		writel(t_hsa, dsi->regs + DSI_HSA_WC(dsi->driver_data));
+		writel(t_hbp, dsi->regs + DSI_HBP_WC(dsi->driver_data));
+		writel(t_hfp, dsi->regs + DSI_HFP_WC(dsi->driver_data));
+		writel(t_hbllp, dsi->regs + DSI_BLLP_WC(dsi->driver_data));
+	} else {
+		writel(ALIGN_TO((t_hsa), 4), dsi->regs + DSI_HSA_WC(dsi->driver_data));
+		writel(ALIGN_TO((t_hbp), 4), dsi->regs + DSI_HBP_WC(dsi->driver_data));
+		writel(ALIGN_TO((t_hfp), 4), dsi->regs + DSI_HFP_WC(dsi->driver_data));
+		writel(ALIGN_TO((t_hbllp), 4), dsi->regs + DSI_BLLP_WC(dsi->driver_data));
+	}
 }
 
 static void mtk_dsi_config_vdo_timing(struct mtk_dsi *dsi)
@@ -3351,6 +3465,10 @@ static void mtk_dsi_set_interrupt_enable(struct mtk_dsi *dsi)
 			inten |= TE_RDY_INT_FLAG | INTERNAL_SOF_INT_FLAG | LTPO_VSYNC_INT_FLAG;
 			inten |= DSI_DONE_INT_FLAG | SLEEPIN_ULPS_DONE_INT_FLAG | SLEEPOUT_DONE_INT_FLAG;
 		}
+#if IS_ENABLED(CONFIG_ENABLE_SEND_PPS_PER_FRAME)
+		if (dsi && dsi->ext && dsi->ext->params && dsi->ext->params->b_send_pps_per_frame)
+			inten |= VFP_START_INT_FLAG;
+#endif
 	} else
 		inten |= TE_RDY_INT_FLAG;
 
@@ -3633,58 +3751,62 @@ EXPORT_SYMBOL(mtk_get_cur_backlight);
 void mtk_dsi_set_backlight(struct mtk_dsi *dsi)
 {
 	struct mtk_connector_state *mtk_conn_state = NULL;
-	unsigned int index;
+	struct mtk_drm_crtc *mtk_crtc = NULL;
+	struct mtk_crtc_state *mtk_crtc_state = NULL;
+	unsigned int con_index, crtc_index;
 	static unsigned long long csc_bl[MAX_CONNECTOR] = {0};
 	static unsigned long long csc_nits[MAX_CONNECTOR] = {0};
+	static unsigned int gamma_gain[MAX_CRTC][GAMMA_GAIN_MAX] = {0};
+	bool set_bl, set_gamma;
 
 	if (dsi == NULL) {
 		DDPINFO("%s, dsi is null\n", __func__);
 		return;
 	}
-
 	mtk_conn_state = to_mtk_connector_state(dsi->conn.state);
 	if (mtk_conn_state == NULL) {
 		DDPINFO("%s, mtk_conn_state is null\n", __func__);
 		return;
 	}
+	mtk_crtc = dsi->ddp_comp.mtk_crtc;
+	if (mtk_crtc == NULL) {
+		DDPPR_ERR("%s[%d]:mtk_crtc is NULL\n", __func__, __LINE__);
+		return;
+	}
+	mtk_crtc_state = to_mtk_crtc_state(mtk_crtc->base.state);
+	if (mtk_crtc_state == NULL) {
+		DDPPR_ERR("%s[%d]:mtk_crtc_state is NULL\n", __func__, __LINE__);
+		return;
+	}
 
-	index = dsi->conn.index;
-	if (csc_bl[index] != mtk_conn_state->prop_val[index][CONNECTOR_PROP_CSC_BL]) {
+	con_index = dsi->conn.index;
+	crtc_index = drm_crtc_index(&mtk_crtc->base);
+	set_bl = csc_bl[con_index] != mtk_conn_state->prop_val[con_index][CONNECTOR_PROP_CSC_BL];
+	set_gamma = !!memcmp(gamma_gain[crtc_index], mtk_crtc_state->bl_sync_gamma_gain, sizeof(gamma_gain[0]));
+	/* atomic set bl */
+	if (set_bl || set_gamma) {
 		struct mtk_ddp_comp *comp;
-		struct mtk_drm_crtc *mtk_crtc = dsi->ddp_comp.mtk_crtc;
-		struct mtk_crtc_state *mtk_crtc_state = NULL;
-		struct pq_common_data *pq_data = NULL;
 
-		if (mtk_crtc == NULL) {
-			DDPPR_ERR("%s[%d]:mtk_crtc is NULL\n", __func__, __LINE__);
-			return;
-		}
+		DDPINFO("%s, con/crtc[%d/%d]: %llu,%llu,%u -> %llu,%llu,%u\n", __func__, con_index, crtc_index,
+			csc_nits[con_index], csc_bl[con_index], gamma_gain[crtc_index][0],
+			mtk_conn_state->prop_val[con_index][CONNECTOR_PROP_PANEL_NITS],
+			mtk_conn_state->prop_val[con_index][CONNECTOR_PROP_CSC_BL],
+			mtk_crtc_state->bl_sync_gamma_gain[0]);
+		csc_bl[con_index] = mtk_conn_state->prop_val[con_index][CONNECTOR_PROP_CSC_BL];
+		csc_nits[con_index] = mtk_conn_state->prop_val[con_index][CONNECTOR_PROP_PANEL_NITS];
+		memcpy(gamma_gain[crtc_index], mtk_crtc_state->bl_sync_gamma_gain, sizeof(gamma_gain[0]));
 
-		mtk_crtc_state = to_mtk_crtc_state(mtk_crtc->base.state);
-		if (mtk_crtc_state == NULL) {
-			DDPPR_ERR("%s[%d]:mtk_crtc_state is NULL\n", __func__, __LINE__);
-			return;
-		}
-
-		csc_bl[index] = mtk_conn_state->prop_val[index][CONNECTOR_PROP_CSC_BL];
-		csc_nits[index] = mtk_conn_state->prop_val[index][CONNECTOR_PROP_PANEL_NITS];
-		DDPINFO("%s, csc_bl[%d] = %llu nits %llu\n", __func__, index, csc_bl[index], csc_nits[index]);
-		pq_data = mtk_crtc->pq_data;
-		if (pq_data)
-			DDPDBG("%s, DISP_PQ_CCORR_SILKY_BRIGHTNESS[%d]\n", __func__,
-			pq_data->new_persist_property[DISP_PQ_CCORR_SILKY_BRIGHTNESS]);
-
-		if (dsi->driver_data && dsi->driver_data->support_bl_at_te)
-			mtk_drm_setbacklight_at_te(&mtk_crtc->base, csc_bl[index], 0, (0X1<<SET_BACKLIGHT_LEVEL));
-		else
-			mtk_drm_setbacklight(&mtk_crtc->base, csc_bl[index], 0, (0X1<<SET_BACKLIGHT_LEVEL), 0);
+		if (set_bl && dsi->driver_data && dsi->driver_data->support_bl_at_te)
+			mtk_drm_setbacklight_at_te(&mtk_crtc->base, csc_bl[con_index], 0, (0X1<<SET_BACKLIGHT_LEVEL));
+		else if (set_bl)
+			mtk_drm_setbacklight(&mtk_crtc->base, csc_bl[con_index], 0, (0X1<<SET_BACKLIGHT_LEVEL), 0);
 
 		comp = mtk_ddp_comp_sel_in_cur_crtc_path(mtk_crtc, MTK_DISP_AAL, 0);
 		if (comp)
-			disp_aal_notify_backlight_changed(comp, csc_bl[index], csc_nits[index], -1, 0);
+			disp_aal_notify_backlight_changed(comp, csc_bl[con_index], csc_nits[con_index], -1, 0);
 
 		comp = mtk_ddp_comp_sel_in_cur_crtc_path(mtk_crtc, MTK_DISP_GAMMA, 0);
-		if (comp)
+		if (comp && set_gamma)
 			disp_gamma_set_gain(comp, mtk_crtc_state->cmdq_handle,
 				mtk_crtc_state->bl_sync_gamma_gain, /* index 0, 1, 2 are gamma gain */
 				mtk_crtc_state->bl_sync_gamma_gain[GAMMA_GAIN_RANGE]); /* index 3 is range */
@@ -3784,6 +3906,11 @@ void dump_cur_pos(struct mtk_drm_crtc *mtk_crtc)
 			mtk_dump_cur_pos(comp);
 	}
 }
+
+#if IS_ENABLED(CONFIG_ENABLE_SEND_PPS_PER_FRAME)
+void mipi_dsi_dcs_write_pps(struct mtk_dsi *dsi,
+				  const void *data, size_t len, bool is_pps);
+#endif
 
 irqreturn_t mtk_dsi_irq_status(int irq, void *dev_id)
 {
@@ -3903,8 +4030,13 @@ irqreturn_t mtk_dsi_irq_status(int irq, void *dev_id)
 
 				mtk_dprec_snapshot();
 
-				if (dsi->encoder.crtc)
-					mtk_drm_crtc_mini_analysis(dsi->encoder.crtc);
+				if (dsi->encoder.crtc) {
+					if (priv->data->mmsys_id == MMSYS_MT6899) {
+						mtk_drm_crtc_analysis(dsi->encoder.crtc);
+						mtk_drm_crtc_dump(dsi->encoder.crtc);
+					} else
+						mtk_drm_crtc_mini_analysis(dsi->encoder.crtc);
+				}
 
 				mtk_vidle_dpc_analysis();
 
@@ -3946,7 +4078,15 @@ irqreturn_t mtk_dsi_irq_status(int irq, void *dev_id)
 		//if (status & INP_UNFINISH_INT_EN)
 			//DDPPR_ERR("[IRQ] %s: input relay unfinish\n",
 				  //mtk_dump_comp_str(comp));
-
+#if IS_ENABLED(CONFIG_ENABLE_SEND_PPS_PER_FRAME)
+		if (status & VFP_START_INT_FLAG) {
+			panel_ext = dsi->ext;
+			if(panel_ext && panel_ext->params->b_send_pps_per_frame && !dsi->is_slave) {
+				atomic_set(&pps_vfp_event, 1);
+				wake_up_interruptible(&dsi->pps_wq);
+			}
+		}
+#endif
 		if (status & SLEEPOUT_DONE_INT_FLAG) {
 			if (atomic_read(&dsi->ulps_async) == 0) {
 				wakeup_dsi_wq(&dsi->exit_ulps_done);
@@ -5766,6 +5906,15 @@ SKIP_WAIT_FRAME_DONE:
 
 	mtk_vidle_force_power_ctrl_by_cpu(false);
 
+	/* vlp release when suspend */
+	if (underrun_cnt > 0) {
+		DDPMSG("%s, underrun force release:%u\n", __func__, underrun_cnt);
+		while (underrun_cnt > 0) {
+			mtk_vidle_force_power_ctrl_by_cpu(false);
+			underrun_cnt--;
+		}
+	}
+
 	DDPINFO("%s-\n", __func__);
 }
 
@@ -7370,7 +7519,7 @@ bool mtk_dsi_is_cmd_mode(struct mtk_ddp_comp *comp)
 	if (mtk_ddp_comp_get_type(comp->id) == MTK_DISP_WDMA)
 		return true;
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	if(mtk_ddp_comp_get_type(comp->id) != MTK_DSI) {
 		DDPMSG("[W]%s comp %s is not dsi type\n", __func__, mtk_dump_comp_str(comp));
 		return false;
@@ -7965,6 +8114,9 @@ static void build_vm_cmdq(struct mtk_dsi *dsi,
 {
 	unsigned int i = 0, j = 0, k;
 	const char *tx_buf = msg->tx_buf;
+#if IS_ENABLED(CONFIG_ENABLE_SEND_PPS_PER_FRAME)
+	unsigned int cmd_addr = dsi->driver_data->reg_cmdq1_ofs;
+#endif
 
 	if (!dsi || !dsi->driver_data) {
 		DDPPR_ERR("%s:%d NULL Pointer\n", __func__, __LINE__);
@@ -7987,14 +8139,31 @@ static void build_vm_cmdq(struct mtk_dsi *dsi,
 			vm_cmd_addr = dsi->driver_data->reg_vm_cmd_data20_ofs + (i%16);
 		if (i / 16 == 3)
 			vm_cmd_addr = dsi->driver_data->reg_vm_cmd_data30_ofs + (i%16);
-
+#if IS_ENABLED(CONFIG_ENABLE_SEND_PPS_PER_FRAME)
+		if (handle) {
+			if (msg->tx_len > 64) { // vm cmd used cmdq, fill data to cmdq
+				cmdq_pkt_write(handle, dsi->ddp_comp.cmdq_base,
+					dsi->ddp_comp.regs_pa + cmd_addr, vm_cmd_val, ~0);
+				cmd_addr += 0x4;
+			} else
+				cmdq_pkt_write(handle, dsi->ddp_comp.cmdq_base,
+					dsi->ddp_comp.regs_pa + vm_cmd_addr,
+					vm_cmd_val, ~0);
+		} else {
+			if (msg->tx_len > 64) { // vm cmd used cmdq, fill data to cmdq
+				writel(vm_cmd_val, dsi->regs + cmd_addr);
+				cmd_addr += 0x4;
+			} else
+				writel(vm_cmd_val, dsi->regs + vm_cmd_addr);
+		}
+#else
 		if (handle)
 			cmdq_pkt_write(handle, dsi->ddp_comp.cmdq_base,
 				dsi->ddp_comp.regs_pa + vm_cmd_addr,
 				vm_cmd_val, ~0);
 		else
 			writel(vm_cmd_val, dsi->regs + vm_cmd_addr);
-
+#endif
 		i += 4;
 	}
 }
@@ -8005,6 +8174,9 @@ static void mtk_dsi_vm_cmdq(struct mtk_dsi *dsi,
 	const char *tx_buf = msg->tx_buf;
 	u8 config, type = msg->type;
 	u32 reg_val;
+#if IS_ENABLED(CONFIG_ENABLE_SEND_PPS_PER_FRAME)
+	u32 used_cmdq_val, cmq_size_val;
+#endif
 
 	if (!dsi || !dsi->driver_data) {
 		DDPPR_ERR("%s:%d NULL Pointer\n", __func__, __LINE__);
@@ -8014,6 +8186,24 @@ static void mtk_dsi_vm_cmdq(struct mtk_dsi *dsi,
 	config = (msg->tx_len > 2) ? VM_LONG_PACKET : 0;
 
 	if (msg->tx_len > 2) {
+#if IS_ENABLED(CONFIG_ENABLE_SEND_PPS_PER_FRAME)
+		if (msg->tx_len > 64) {
+			used_cmdq_val = (msg->tx_len << 16) | (type << 8) | config;
+			cmq_size_val = (msg->tx_len << 8) | (msg->tx_len + 3) / 4;
+			if (handle){
+				cmdq_pkt_write(handle, dsi->ddp_comp.cmdq_base,
+					dsi->ddp_comp.regs_pa + DSI_VM_CMD_CON1, VM_CMD_USE_CMDQ, VM_CMD_USE_CMDQ);
+				cmdq_pkt_write(handle, dsi->ddp_comp.cmdq_base,
+					dsi->ddp_comp.regs_pa + dsi->driver_data->reg_cmdq0_ofs, used_cmdq_val, ~0);
+				cmdq_pkt_write(handle, dsi->ddp_comp.cmdq_base,
+					dsi->ddp_comp.regs_pa + DSI_CMDQ_CON(dsi->driver_data), cmq_size_val, ~0);
+			}else{
+				mtk_dsi_mask(dsi, DSI_VM_CMD_CON1, VM_CMD_USE_CMDQ, VM_CMD_USE_CMDQ);
+				writel(used_cmdq_val, dsi->regs + dsi->driver_data->reg_cmdq0_ofs);
+				writel(cmq_size_val, dsi->regs + DSI_CMDQ_CON(dsi->driver_data));
+			}
+		}
+#endif
 		build_vm_cmdq(dsi, msg, handle);
 		reg_val = (msg->tx_len << 16) | (type << 8) | config;
 	} else if (msg->tx_len == 2) {
@@ -8024,7 +8214,10 @@ static void mtk_dsi_vm_cmdq(struct mtk_dsi *dsi,
 	}
 
 	reg_val |= (VM_CMD_EN + TS_VFP_EN);
-
+#if IS_ENABLED(CONFIG_ENABLE_SEND_PPS_PER_FRAME)
+	if (msg->tx_len > 64)
+		reg_val |= (VM_LONG_PACKET + TIME_SEL);
+#endif
 	if (handle == NULL)
 		writel(reg_val, dsi->regs + dsi->driver_data->reg_vm_cmd_con_ofs);
 	else
@@ -8032,6 +8225,126 @@ static void mtk_dsi_vm_cmdq(struct mtk_dsi *dsi,
 			dsi->ddp_comp.regs_pa + dsi->driver_data->reg_vm_cmd_con_ofs, reg_val, ~0);
 
 }
+
+#if IS_ENABLED(CONFIG_ENABLE_SEND_PPS_PER_FRAME)
+static ssize_t mtk_dsi_host_send_vm_cmd(struct mtk_dsi *dsi,
+				     const struct mipi_dsi_msg *msg, u8 flag);
+
+static void _mtk_mipi_dsi_write_gce(struct mtk_dsi *dsi,
+				struct cmdq_pkt *handle,
+				const struct mipi_dsi_msg *msg);
+
+void mipi_dsi_dcs_write_pps(struct mtk_dsi *dsi,
+				  const void *data, size_t len, bool is_pps)
+{
+	int dsi_mode = !mtk_dsi_is_cmd_mode(&dsi->ddp_comp);
+	struct mtk_ddp_comp *comp = &dsi->ddp_comp;
+	struct mtk_drm_crtc *mtk_crtc = comp->mtk_crtc;
+	struct cmdq_pkt *handle = NULL;
+	unsigned int use_lpm_or_vm = 0; //0: vm, 1: LP, 2: vm used LP cmdq
+
+	struct mipi_dsi_msg msg;
+
+	msg.tx_buf = data;
+	msg.tx_len = len;
+
+	if (!comp)
+		pr_info("%s: error, comp=NULL!\n", __func__);
+	if (!mtk_crtc)
+		pr_info("%s: error, mtk_crtc=NULL!\n", __func__);
+
+	if (dsi_mode)
+		mtk_crtc_pkt_create(&handle, &mtk_crtc->base,
+				    mtk_crtc->gce_obj.client[CLIENT_DSI_CFG]);
+	else
+		mtk_crtc_pkt_create(&handle, &mtk_crtc->base,
+				    mtk_crtc->gce_obj.client[CLIENT_CFG]);
+
+	if (!handle)
+		pr_info("%s: error, handle=NULL!\n", __func__);
+
+	switch (len) {
+	case 0:
+		return;
+
+	case 1:
+		msg.type = MIPI_DSI_DCS_SHORT_WRITE;
+		break;
+
+	case 2:
+		msg.type = MIPI_DSI_DCS_SHORT_WRITE_PARAM;
+		break;
+
+	default:
+		msg.type = MIPI_DSI_DCS_LONG_WRITE;
+		break;
+	}
+
+	if (is_pps)
+		msg.type = MIPI_DSI_PICTURE_PARAMETER_SET; //0x0a, type is pps
+
+	if (!dsi_mode) {
+		pr_info("%s:not support cmd mode!\n", __func__);
+		return;
+	} else if (dsi_mode != 0 && use_lpm_or_vm == 0) { /* VDO with VM_CMD */
+		mtk_dsi_vm_cmdq(dsi, &msg, handle);
+
+		/* clear VM_CMD_DONE */
+		cmdq_pkt_write(handle, dsi->ddp_comp.cmdq_base,
+			       dsi->ddp_comp.regs_pa + DSI_INTSTA, 0,
+			       VM_CMD_DONE_INT_EN);
+
+		/* start to send VM cmd */
+		cmdq_pkt_write(handle, dsi->ddp_comp.cmdq_base,
+			       dsi->ddp_comp.regs_pa + DSI_START, 0,
+			       VM_CMD_START);
+		cmdq_pkt_write(handle, dsi->ddp_comp.cmdq_base,
+			       dsi->ddp_comp.regs_pa + DSI_START, VM_CMD_START,
+			       VM_CMD_START);
+
+		/* poll VM cmd done */
+		mtk_dsi_cmdq_poll(&dsi->ddp_comp, handle,
+				  dsi->ddp_comp.regs_pa + DSI_INTSTA,
+				  VM_CMD_DONE_INT_EN, VM_CMD_DONE_INT_EN);
+		cmdq_pkt_write(handle, dsi->ddp_comp.cmdq_base,
+			       dsi->ddp_comp.regs_pa + DSI_START, 0,
+			       VM_CMD_START);
+
+		/* clear VM_CMD_DONE */
+		cmdq_pkt_write(handle, dsi->ddp_comp.cmdq_base,
+			       dsi->ddp_comp.regs_pa + DSI_INTSTA, 0,
+			       VM_CMD_DONE_INT_EN);
+	} else if (dsi_mode != 0 &&
+		   use_lpm_or_vm == 1) { /* VDO to CMD with LP */
+		msg.flags |= MIPI_DSI_MSG_USE_LPM;
+		pr_info("cmd send pps +\n");
+		/* wait frame done */
+		cmdq_pkt_wait_no_clear(handle,
+				       mtk_crtc->gce_obj.event[EVENT_CMD_EOF]);
+		mtk_dsi_stop_vdo_mode(dsi, handle);
+
+		mtk_dsi_poll_for_idle(dsi, handle);
+
+		_mtk_mipi_dsi_write_gce(dsi, handle, &msg);
+
+		cmdq_pkt_write(handle, dsi->ddp_comp.cmdq_base,
+			       dsi->ddp_comp.regs_pa + DSI_START, 0x0, ~0);
+		cmdq_pkt_write(handle, dsi->ddp_comp.cmdq_base,
+			       dsi->ddp_comp.regs_pa + DSI_START, 0x1, ~0);
+
+		mtk_dsi_poll_for_idle(dsi, handle);
+
+		mtk_dsi_start_vdo_mode(comp, handle);
+		mtk_disp_mutex_trigger(comp->mtk_crtc->mutex[0], handle);
+		mtk_dsi_trigger(comp, handle);
+	} else {
+		pr_info("send pps -????\n");
+	}
+
+	cmdq_pkt_flush(handle);
+	cmdq_pkt_destroy(handle);
+}
+#endif
 
 static void mtk_dsi_cmdq_gce(struct mtk_dsi *dsi, struct cmdq_pkt *handle,
 				const struct mipi_dsi_msg *msg)
@@ -12566,6 +12879,10 @@ static int mtk_dsi_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 				inten |= TE_RDY_INT_FLAG | LTPO_VSYNC_INT_FLAG | INTERNAL_SOF_INT_FLAG;
 				inten |= DSI_DONE_INT_FLAG | SLEEPIN_ULPS_DONE_INT_FLAG | SLEEPOUT_DONE_INT_FLAG;
 			}
+#if IS_ENABLED(CONFIG_ENABLE_SEND_PPS_PER_FRAME)
+			if (dsi && dsi->ext && dsi->ext->params && dsi->ext->params->b_send_pps_per_frame)
+				inten |= VFP_START_INT_FLAG;
+#endif
 			cmdq_pkt_write(handle, comp->cmdq_base,
 				comp->regs_pa + DSI_INTEN, inten, inten);
 			if (dsi->slave_dsi)
@@ -12618,6 +12935,10 @@ static int mtk_dsi_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 				inten |= TE_RDY_INT_FLAG | LTPO_VSYNC_INT_FLAG | INTERNAL_SOF_INT_FLAG;
 				inten |= DSI_DONE_INT_FLAG | SLEEPIN_ULPS_DONE_INT_FLAG | SLEEPOUT_DONE_INT_FLAG;
 			}
+#if IS_ENABLED(CONFIG_ENABLE_SEND_PPS_PER_FRAME)
+			if (dsi && dsi->ext && dsi->ext->params && dsi->ext->params->b_send_pps_per_frame)
+				inten |= VFP_START_INT_FLAG;
+#endif
 			cmdq_pkt_write(handle, comp->cmdq_base,
 				comp->regs_pa + DSI_INTEN, inten, inten);
 			if (dsi->slave_dsi)
@@ -12864,7 +13185,7 @@ static int mtk_dsi_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		list_for_each_entry(m, &dsi->conn.modes, head)
 			num++;
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_AUTO)
 		if (!panel_ext || !num) {
 			DDPMSG("%s %s connector status %s modes %d\n",
 			       __func__, mtk_dump_comp_str(comp),
@@ -13468,7 +13789,7 @@ static int mtk_dsi_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		mtk_cal_dsi_valid_partial_roi(comp, partial_roi);
 	}
 		break;
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	case SET_CRTC_ID:
 	{
 		DDPMSG("%s set %s possible crtcs 0x%x\n", __func__,
@@ -13701,6 +14022,29 @@ static int mtk_dsi_hotplug_kthread(void *data)
 		if (kthread_should_stop())
 			break;
 	}
+	return 0;
+}
+#endif
+
+
+#if IS_ENABLED(CONFIG_ENABLE_SEND_PPS_PER_FRAME)
+static int mtk_dsi_pps_kthread(void *data)
+{
+	struct mtk_dsi *dsi = (struct mtk_dsi *)data;
+	struct mtk_panel_ext *panel_ext = dsi->ext;
+	struct sched_param param = {.sched_priority = MAX_RT_PRIO - 15};
+
+	init_waitqueue_head(&dsi->pps_wq);
+	sched_setscheduler(current, SCHED_FIFO, &param);
+
+	while (!kthread_should_stop()) {
+		wait_event_interruptible(dsi->pps_wq,
+			atomic_read(&pps_vfp_event));
+		mipi_dsi_dcs_write_pps(dsi, panel_ext->params->pps, 128, true);
+
+		atomic_set(&pps_vfp_event, 0);
+	}
+
 	return 0;
 }
 #endif
@@ -13982,7 +14326,6 @@ static const struct mtk_dsi_driver_data mt6899_dsi_driver_data = {
 	.need_wait_fifo = false,
 	.dsi_buffer = true,
 	.support_pre_urgent = true,
-	.smi_dbg_disable = true,
 	.buffer_unit = 32,
 	.sram_unit = 32,
 	.urgent_lo_fifo_us = 14,
@@ -14022,6 +14365,7 @@ static const struct mtk_dsi_driver_data mt6991_dsi_driver_data = {
 	.n_verion = VER_N3,
 	.require_phy_reset = false,
 	.keep_hs_eotp = true,
+	.support_pre_urgent = false,
 	.reg_phy_base = 0x600,
 	.reg_20_ofs = 0x020,
 	.reg_30_ofs = 0x030,
@@ -14046,7 +14390,7 @@ static const struct mtk_dsi_driver_data mt6991_dsi_driver_data = {
 	.dsi_ltpo_vdo_con = 0x1A8,
 	.dsi_ltpo_vdo_sq0 = 0x1AC,
 	.support_bl_at_te = 1,
-	.support_512byte_rx = 0,
+	.support_512byte_rx = 1,
 	.dsi_rx_trig_sta = 0x0B8,
 	.dsi_rx_con = 0x0A0,
 };
@@ -14533,6 +14877,15 @@ static int mtk_dsi_probe(struct platform_device *pdev)
 	//wake_up_process(dsi->hotplug_task);
 #endif
 
+#if IS_ENABLED(CONFIG_ENABLE_SEND_PPS_PER_FRAME)
+	if (!dsi->is_slave && dsi->ext && dsi->ext->params->b_send_pps_per_frame) {
+		dsi->pps_task = kthread_run(mtk_dsi_pps_kthread,
+			(void *)dsi, "mtk_dsi_pps_thread");
+		if (IS_ERR(dsi->pps_task))
+			pr_info("%s: failed to create pps thread, err=%d\n", __func__, PTR_ERR(dsi->pps_task));
+	}
+#endif
+
 #if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
 	// need power on panel for connector detect
 	if (dsi->panel) {
@@ -14562,6 +14915,10 @@ static int mtk_dsi_remove(struct platform_device *pdev)
 
 #if IS_ENABLED(CONFIG_ENABLE_DSI_HOTPLUG)
 	kthread_stop(dsi->hotplug_task);
+#endif
+#if IS_ENABLED(CONFIG_ENABLE_SEND_PPS_PER_FRAME)
+	if (dsi->pps_task)
+		kthread_stop(dsi->pps_task);
 #endif
 	mtk_output_dsi_disable(dsi, NULL, false);
 	component_del(&pdev->dev, &mtk_dsi_component_ops);

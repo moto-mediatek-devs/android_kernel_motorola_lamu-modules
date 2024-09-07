@@ -193,9 +193,11 @@ static unsigned int g_maxfreq;
 static int g_minfreq_idx;
 static int g_maxfreq_idx;
 static int api_sync_flag;
+static int policy_api_sync_flag;
 static unsigned long long g_latest_api_sync_ts_ms;
 static unsigned long long g_latest_api_sync_done_ts_us;
 static unsigned int api_sync_counter;
+static unsigned int policy_api_sync_counter;
 #define API_SYNC_DURATION_US 1000
 
 /* need to sync to EB */
@@ -1211,6 +1213,7 @@ bool ged_dvfs_gpu_freq_commit(unsigned long ui32NewFreqID,
 	enum gpu_dvfs_policy_state policy_state;
 	int is_fix_dvfs = 0;
 	int top_freq_diff = 0, sc_freq_diff = 0;
+	bool commit_success = false;
 
 	ui32CurFreqID = ged_get_cur_oppidx();
 	is_fix_dvfs = ged_is_fix_dvfs();
@@ -1248,13 +1251,10 @@ bool ged_dvfs_gpu_freq_commit(unsigned long ui32NewFreqID,
 		g_ulCommitFreq = ged_get_freq_by_idx(ui32NewFreqID);
 		ged_commit_freq = ui32NewFreq;
 		ged_commit_opp_freq = ged_get_freq_by_idx(ui32NewFreqID);
-		g_last_commit_api_flag = api_sync_flag;
-		// record commit freq ID if api boost disable
-		if (api_sync_flag == 0)
-			g_last_commit_before_api_boost = ui32NewFreqID;
 
-		/* do change */
-		if (ui32NewFreqID != ui32CurFreqID || dcs_get_setting_dirty()) {
+		if (ui32NewFreqID != ui32CurFreqID ||
+			ui32NewFreqID != (ged_dvfs_get_last_commit_dual_idx() & 0xFF) ||
+			dcs_get_setting_dirty()) {
 			/* call to ged gpufreq wrapper module */
 			ged_gpufreq_commit(ui32NewFreqID, eCommitType, &bCommited);
 
@@ -1264,9 +1264,11 @@ bool ged_dvfs_gpu_freq_commit(unsigned long ui32NewFreqID,
 			 * in previous execution period
 			 * Does this fatal for precision?
 			 */
+			if (ged_get_cur_stack_freq() == ged_get_freq_by_idx(ui32NewFreqID))
+				commit_success = true;
 			ged_log_buf_print2(ghLogBuf_DVFS, GED_LOG_ATTR_TIME,
-		"[GED_K] new freq ID committed: idx=%lu type=%u, g_type=%u",
-				ui32NewFreqID, eCommitType, g_CommitType);
+		"[GED_K] new freq ID committed: idx=%lu type=%u, g_type=%u, commit_status=%d",
+				ui32NewFreqID, eCommitType, g_CommitType,commit_success);
 			if (bCommited == true) {
 				ged_log_buf_print(ghLogBuf_DVFS,
 					"[GED_K] committed true");
@@ -1274,6 +1276,15 @@ bool ged_dvfs_gpu_freq_commit(unsigned long ui32NewFreqID,
 			}
 		}
 
+		// record api_sync_flag & api_boost_counter if commit success or FRAME BASE COMMIT
+		if (commit_success || eCommitType == GED_DVFS_FRAME_BASE_COMMIT) {
+			g_last_commit_api_flag = policy_api_sync_flag;
+			g_last_api_boost_counter = policy_api_sync_counter;
+		}
+
+		// record commit freq ID if api boost disable
+		if (policy_api_sync_flag == 0)
+			g_last_commit_before_api_boost = ui32NewFreqID;
 
 		trace_tracing_mark_write(5566, "gpu_freq",
 			(long long) div_u64(ged_get_cur_stack_freq(), 1000));
@@ -1341,6 +1352,7 @@ bool ged_dvfs_gpu_freq_dual_commit(unsigned long stackNewFreqID,
 	int ret = GED_OK;
 	int is_fix_dvfs = 0;
 	int top_freq_diff = 0, sc_freq_diff = 0;
+	bool commit_success = false;
 
 	ui32CurFreqID = ged_get_cur_oppidx();
 	newTopFreq = ged_get_top_freq_by_virt_opp(topNewFreqID);
@@ -1384,15 +1396,11 @@ bool ged_dvfs_gpu_freq_dual_commit(unsigned long stackNewFreqID,
 	g_ulCommitFreq = ged_get_freq_by_idx(stackNewFreqID);
 	ged_commit_freq = ui32NewFreq;
 	ged_commit_opp_freq = ged_get_freq_by_idx(stackNewFreqID);
-	g_last_commit_api_flag = api_sync_flag;
-	g_last_api_boost_counter = api_sync_counter;
-	// record commit freq ID if api boost disable
-	if (api_sync_flag == 0)
-		g_last_commit_before_api_boost = stackNewFreqID;
 
 	/* do change, top change or stack change */
 	if (stackNewFreqID != ui32CurFreqID ||
 		newTopFreq != ged_get_cur_top_freq() ||
+		stackNewFreqID != (ged_dvfs_get_last_commit_dual_idx() & 0xFF) ||
 		dcs_get_setting_dirty()) {
 		if (FORCE_OPP >= 0)
 			stackNewFreqID = FORCE_OPP;
@@ -1420,15 +1428,28 @@ bool ged_dvfs_gpu_freq_dual_commit(unsigned long stackNewFreqID,
 		 * in previous execution period
 		 * Does this fatal for precision?
 		 */
+		if (ged_get_cur_stack_freq() == ged_get_freq_by_idx(stackNewFreqID))
+			commit_success = true;
+
 		ged_log_buf_print2(ghLogBuf_DVFS, GED_LOG_ATTR_TIME,
-	"[GED_K] new freq ID committed: idx=%lu type=%u, g_type=%u",
-			stackNewFreqID, eCommitType, g_CommitType);
+	"[GED_K] new freq ID committed: idx=%lu type=%u, g_type=%u, commit_status=%d",
+			stackNewFreqID, eCommitType, g_CommitType,commit_success);
 		if (bCommited == true) {
 			ged_log_buf_print(ghLogBuf_DVFS,
 				"[GED_K] committed true");
 			g_ui32PreFreqID = ui32CurFreqID;
 		}
 	}
+
+	// record api_sync_flag & api_boost_counter if commit success or FRAME BASE COMMIT
+	if (commit_success || eCommitType == GED_DVFS_FRAME_BASE_COMMIT) {
+		g_last_commit_api_flag = policy_api_sync_flag;
+		g_last_api_boost_counter = policy_api_sync_counter;
+	}
+
+	// record commit freq ID if api boost disable
+	if (policy_api_sync_flag == 0)
+		g_last_commit_before_api_boost = stackNewFreqID;
 
 	trace_tracing_mark_write(5566, "gpu_freq",
 		(long long) div_u64(ged_get_cur_stack_freq(), 1000));
@@ -2574,7 +2595,7 @@ void set_api_sync_flag(int flag)
 	} else if (flag == 5) {
 		dcs_set_fix_num(4);
 		start_mewtwo_timer();
-	} else if (flag == 6 || flag == 7) {
+	} else if (((flag & 0xFFFF0000) == 0x60000) || ((flag & 0xFFFF0000) == 0x70000)) {
 		if (api_sync_flag != flag)
 			api_sync_flag = flag;
 	} else if (flag == 8) {
@@ -2758,7 +2779,6 @@ static bool ged_dvfs_policy(
 		struct ged_risky_bq_info info;
 		int uncomplete_flag = 0;
 		enum gpu_dvfs_policy_state policy_state;
-		int api_sync_flag;
 		int fallback_duration_flag;
 		int early_force_fallback_flag = 0;
 		struct async_counter asyncCounter = {0};
@@ -2877,11 +2897,11 @@ static bool ged_dvfs_policy(
 
 		// change to fallback mode if frame is overdued (only in LB)
 		policy_state = ged_get_policy_state();
-		api_sync_flag = get_api_sync_flag();
+		policy_api_sync_flag = get_api_sync_flag();
 		if (policy_state == POLICY_STATE_LB ||
 				policy_state == POLICY_STATE_LB_FALLBACK) {
 			// overwrite state & timeout value set prior to ged_dvfs_run
-			if (uncomplete_flag || api_sync_flag == 1 ||
+			if (uncomplete_flag || policy_api_sync_flag == 1 ||
 				(gpu_freq_pre > gpu_freq_overdue_max &&
 				t_gpu > div_u64(t_gpu_target * OVERDUE_TH, 10))) {
 				ged_set_policy_state(POLICY_STATE_LB_FALLBACK);
@@ -2893,7 +2913,7 @@ static bool ged_dvfs_policy(
 		} else if (policy_state == POLICY_STATE_FORCE_LB ||
 				policy_state == POLICY_STATE_FORCE_LB_FALLBACK) {
 			// overwrite state & timeout value set prior to ged_dvfs_run
-			if (uncomplete_flag || api_sync_flag == 1) {
+			if (uncomplete_flag || policy_api_sync_flag == 1) {
 				ged_set_policy_state(POLICY_STATE_FORCE_LB_FALLBACK);
 				ged_set_backup_timer_timeout(ged_get_fallback_time());
 			} else {
@@ -2941,10 +2961,11 @@ static bool ged_dvfs_policy(
 		trace_tracing_mark_write(5566, "t_gpu", t_gpu);
 		trace_tracing_mark_write(5566, "t_gpu_target", t_gpu_target);
 
+		policy_api_sync_counter = api_sync_counter;
 		// set cur freq back to before api boost
-		if ((g_last_commit_api_flag == 1 && api_sync_flag == 0) ||
-			(g_last_commit_api_flag == 1 && api_sync_flag == 1 &&
-			g_last_api_boost_counter != api_sync_counter)) {
+		if ((g_last_commit_api_flag == 1 && policy_api_sync_flag == 0) ||
+			(g_last_commit_api_flag == 1 && policy_api_sync_flag == 1 &&
+			g_last_api_boost_counter != policy_api_sync_counter)) {
 			ui32GPUFreq = g_last_commit_before_api_boost;
 			i32NewFreqID = ui32GPUFreq;
 		}

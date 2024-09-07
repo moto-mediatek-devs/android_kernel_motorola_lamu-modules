@@ -41,6 +41,9 @@ module_param(mml_max_hrt, int, 0644);
 int mml_force_rsz;
 module_param(mml_force_rsz, int, 0644);
 
+int mml_rgbrot = 1;
+module_param(mml_rgbrot, int, 0644);
+
 int mml_path_mode;
 module_param(mml_path_mode, int, 0644);
 
@@ -731,6 +734,11 @@ static void tp_select_path(struct mml_topology_cache *cache,
 	if (cfg->info.mode == MML_MODE_RACING) {
 		/* always rdma to wrot for racing case */
 		scene = PATH_MML1_NOPQ;
+		if (mml_rgbrot &&
+		    MML_FMT_IS_RGB(cfg->info.src.format) && MML_FMT_IS_RGB(dest_fmt)) {
+			mml_msg("[topology]enable rgb rotate");
+			cfg->rgbrot = true;
+		}
 		goto done;
 	} else if (cfg->info.mode == MML_MODE_APUDC) {
 		scene = PATH_MML1_NOPQ;
@@ -762,8 +770,14 @@ static void tp_select_path(struct mml_topology_cache *cache,
 			scene = PATH_MML1_2IN_2OUT;
 		else if (en_pq || en_rsz)
 			scene = PATH_MML1_PQ;
-		else
+		else {
 			scene = PATH_MML1_NOPQ;
+			if (mml_rgbrot &&
+			    MML_FMT_IS_RGB(cfg->info.src.format) && MML_FMT_IS_RGB(dest_fmt)) {
+				mml_msg("[topology]enable rgb rotate");
+				cfg->rgbrot = true;
+			}
+		}
 
 		if (cfg->info.mode == MML_MODE_MML_DECOUPLE2) {
 			enum topology_scenario scene_dc2;
@@ -1066,7 +1080,7 @@ static enum mml_mode tp_query_mode(struct mml_dev *mml, struct mml_frame_info *i
 		if (!MML_FMT_ALPHA(info->src.format) ||
 		    info->src.width <= 32 ||
 		    info->dest_cnt != 1 ||
-		    info->dest[0].crop.r.width <= 32 ||
+		    info->dest[0].crop.r.width < 50 ||
 		    info->dest[0].compose.width <= 9)
 			goto not_support;
 		if (mml_isdc(info->mode))
@@ -1099,6 +1113,13 @@ static enum mml_mode tp_query_mode(struct mml_dev *mml, struct mml_frame_info *i
 	if (info->mode == MML_MODE_APUDC) {
 		*reason = mml_query_apudc;
 		return info->mode;
+	}
+
+	/* rgb should not go racing mode */
+	if (MML_FMT_IS_RGB(info->dest[0].data.format)) {
+		*reason = mml_query_format;
+		mode = MML_MODE_MML_DECOUPLE;
+		goto check_dc_tput;
 	}
 
 	/* rotate go to racing (inline rotate) */
@@ -1149,7 +1170,7 @@ static const struct mml_topology_path *tp_get_dl_path(struct mml_topology_cache 
 
 static enum mml_mode support_couple(void)
 {
-	return MML_MODE_DIRECT_LINK;
+	return MML_MODE_RACING;
 }
 
 static bool tp_support_dc2(void)

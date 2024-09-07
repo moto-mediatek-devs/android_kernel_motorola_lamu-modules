@@ -351,7 +351,6 @@ struct rrot_frame_data {
 	 * use in reuse command
 	 */
 	u16 labels[RROT_LABEL_TOTAL];
-	u32 crc_inst_offset;
 };
 
 static s32 rrot_write_addr(u32 comp_id, struct cmdq_pkt *pkt,
@@ -795,8 +794,28 @@ static void rrot_color_fmt(struct mml_frame_config *cfg,
 		break;
 	}
 
+	/*
+	 * 4'b0000:  0 RGB to JPEG
+	 * 4'b0001:  1 RGB to FULL709
+	 * 4'b0010:  2 RGB to BT601
+	 * 4'b0011:  3 RGB to BT709
+	 * 4'b0100:  4 JPEG to RGB
+	 * 4'b0101:  5 FULL709 to RGB
+	 * 4'b0110:  6 BT601 to RGB
+	 * 4'b0111:  7 BT709 to RGB
+	 * 4'b1000:  8 JPEG to BT601 / FULL709 to BT709
+	 * 4'b1001:  9 JPEG to BT709
+	 * 4'b1010: 10 BT601 to JPEG / BT709 to FULL709
+	 * 4'b1011: 11 BT709 to JPEG
+	 * 4'b1100: 12 BT709 to BT601
+	 * 4'b1101: 13 BT601 to BT709
+	 * 4'b1110: 14 JPEG to FULL709
+	 * 4'b1111: 15 IDENTITY
+	 *             FULL709 to JPEG
+	 *             FULL709 to BT601
+	 *             BT601 to FULL709
+	 */
 	if (profile_in == MML_YCBCR_PROFILE_BT2020 ||
-	    profile_in == MML_YCBCR_PROFILE_FULL_BT709 ||
 	    profile_in == MML_YCBCR_PROFILE_FULL_BT2020)
 		profile_in = MML_YCBCR_PROFILE_BT709;
 
@@ -807,6 +826,8 @@ static void rrot_color_fmt(struct mml_frame_config *cfg,
 			rrot_frm->matrix_sel = 3;
 		else if (profile_in == MML_YCBCR_PROFILE_FULL_BT601)
 			rrot_frm->matrix_sel = 0;
+		else if (profile_in == MML_YCBCR_PROFILE_FULL_BT709)
+			rrot_frm->matrix_sel = 1;
 		else
 			mml_err("[rrot] unknown color conversion %x",
 				profile_in);
@@ -1398,8 +1419,8 @@ static s32 rrot_config_frame(struct mml_comp *comp, struct mml_task *task,
 			0);
 	}
 
-	if (MML_FMT_10BIT(src->format) || MML_FMT_10BIT(dst_fmt))
-		output_10bit = 1;
+	/* Enable 10-bit output */
+	output_10bit = 1;
 	cmdq_pkt_write(pkt, NULL, base_pa + RROT_CON,
 		   (rrot_frm->lb_2b_mode << 12) |
 		   (output_10bit << 5) |
@@ -2009,17 +2030,16 @@ static void rrot_backup_crc(struct mml_comp *comp, struct mml_task *task,
 	struct mml_comp_config *ccfg)
 {
 #if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
-	struct rrot_frame_data *rrot_frm = rrot_frm_data(ccfg);
 	const phys_addr_t crc_reg = MML_FMT_COMPRESS(task->config->info.src.format) ?
 		(comp->base_pa + RROT_MON_STA_0 + 16 * 8) : (comp->base_pa + RROT_CHKS_EXTR);
 	const u32 rrot_idx = comp_to_rrot(comp)->pipe;
+	s32 ret;
 
 	if (likely(!mml_rdma_crc))
 		return;
 
-	rrot_frm->crc_inst_offset = mml_backup_crc(task, ccfg,
-		crc_reg, &task->rdma_crc_idx[rrot_idx]);
-	if (!rrot_frm->crc_inst_offset) {
+	ret = cmdq_pkt_backup(task->pkts[ccfg->pipe], crc_reg, &task->backup_crc_rdma[rrot_idx]);
+	if (ret) {
 		mml_err("%s fail to backup CRC", __func__);
 		mml_rdma_crc = 0;
 	}
@@ -2030,14 +2050,12 @@ static void rrot_backup_crc_update(struct mml_comp *comp, struct mml_task *task,
 	struct mml_comp_config *ccfg)
 {
 #if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
-	struct rrot_frame_data *rrot_frm = rrot_frm_data(ccfg);
 	const u32 rrot_idx = comp_to_rrot(comp)->pipe;
 
-	if (!mml_rdma_crc || !rrot_frm->crc_inst_offset)
+	if (!mml_rdma_crc || !task->backup_crc_rdma[rrot_idx].inst_offset)
 		return;
 
-	mml_backup_crc_update(task, ccfg, rrot_frm->crc_inst_offset,
-		&task->rdma_crc_idx[rrot_idx]);
+	cmdq_pkt_backup_update(task->pkts[ccfg->pipe], &task->backup_crc_rdma[rrot_idx]);
 #endif
 }
 
@@ -2383,13 +2401,14 @@ static void rrot_store_crc(struct mml_comp *comp, struct mml_task *task,
 #if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
 	struct mml_comp_rrot *rrot = comp_to_rrot(comp);
 
-	if (!mml_rdma_crc)
+	if (!mml_rdma_crc || !task->backup_crc_rdma[rrot->pipe].inst_offset)
 		return;
 
-	task->src_crc[rrot->pipe] = mml_backup_crc_get(task, ccfg, task->rdma_crc_idx[rrot->pipe]);
-	mml_msg("%s rrot0%s component %u job %u pipe %u crc %#010x idx %u",
+	task->src_crc[rrot->pipe] =
+		cmdq_pkt_backup_get(task->pkts[ccfg->pipe], &task->backup_crc_rdma[rrot->pipe]);
+	mml_msg("%s rrot0%s component %2u job %u pipe %u crc %#010x idx %u",
 		__func__, rrot->pipe == 0 ? "    " : "_2nd", comp->id, task->job.jobid,
-		ccfg->pipe, task->src_crc[rrot->pipe], task->rdma_crc_idx[rrot->pipe]);
+		ccfg->pipe, task->src_crc[rrot->pipe], task->backup_crc_rdma[rrot->pipe].val_idx);
 #endif
 }
 

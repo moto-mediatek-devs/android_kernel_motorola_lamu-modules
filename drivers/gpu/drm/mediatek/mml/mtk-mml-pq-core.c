@@ -2102,19 +2102,6 @@ static void handle_comp_config_result(struct mml_pq_chan *chan,
 		goto free_hdr_regs;
 	}
 
-	// for debug ALPS09155466, will remove later :
-	// hdr_regs[HDR_TOP] value that bit 0 (hdr_en) should not be 0
-	if (result->hdr_reg_cnt > 1 &&
-		(hdr_regs[1].value & 0x1) == 0 &&
-		hdr_regs[1].offset == 0) {
-		mml_pq_err("%s:result_id[%d] [hdr_regs][%x] = %#x mask(%#x)",
-			__func__,
-			job->result_job_id, hdr_regs[0].offset, hdr_regs[0].value, hdr_regs[0].mask);
-		mml_pq_err("%s:result_id[%d] [hdr_regs][%x] = %#x mask(%#x)",
-			__func__,
-			job->result_job_id, hdr_regs[1].offset, hdr_regs[1].value, hdr_regs[1].mask);
-	}
-
 	hdr_curve = kmalloc_array(HDR_CURVE_NUM, sizeof(u32),
 				  GFP_KERNEL);
 	if (unlikely(!hdr_curve)) {
@@ -3122,7 +3109,7 @@ static void destroy_ut_task(struct mml_task *task)
 static int run_ut_task_threaded(void *data)
 {
 	struct mml_task *task = data;
-	struct mml_task *task_check = mml_core_create_task();
+	struct mml_task *task_check = mml_core_create_task(0);
 	s32 ret;
 
 	mml_pq_log("start run mml_task for PQ UT [%lld.%lu]\n",
@@ -3159,7 +3146,7 @@ static void create_ut_task(const char *case_name)
 		return;
 	}
 
-	task = mml_core_create_task();
+	task = mml_core_create_task(0);
 	mml_pq_log("start create task for %s\n", case_name);
 	INIT_LIST_HEAD(&task->entry);
 	ktime_get_ts64(&task->end_time);

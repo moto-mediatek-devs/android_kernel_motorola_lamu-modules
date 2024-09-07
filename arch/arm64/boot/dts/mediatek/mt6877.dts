@@ -399,7 +399,8 @@
 				<&level_mali2 &level_mali3 &level_mali4>,
 				<&level_i2c0>,
 				<&level_btif_tx &level_btif_rx &level_bt>,
-				<&level_cam1 &level_cam2>;
+				<&level_cam1 &level_cam2>,
+				<&level_dsi0>;
 
 		resource-ctrl = <&bus26m &infra &syspll>,
 				<&dram_s0 &dram_s1>;
@@ -488,7 +489,7 @@
 			};
 			level_cam2: level_cam2 {
 					target = <&cam2_legacy>;
-					value = <0 1 0 0>;
+					value = <0 0 0 0>;
 			};
 			level_dsi0: level-dsi0 {
 				target = <&dsi0>;
@@ -3251,24 +3252,12 @@
 		map1 {
 			domain = "gpu";
 			method = "fhctl-ap";
-			mfgpll1 {
+			mfg_ao_mfgpll1 {
 				fh-id = <0>;
-				pll-id = <13>;
 				perms = <0x3>;
 			};
-			mfgpll2 {
+			mfg_ao_mfgpll4 {
 				fh-id = <1>;
-				pll-id = <14>;
-				perms = <0x3>;
-			};
-			mfgpll3 {
-				fh-id = <2>;
-				pll-id = <15>;
-				perms = <0x3>;
-			};
-			mfgpll4 {
-				fh-id = <3>;
-				pll-id = <16>;
 				perms = <0x3>;
 			};
 		};
@@ -3718,6 +3707,7 @@
 			"infra-ccif1-md",
 			"infra-ccif4-md",
 			"infra-ccif5-md";
+		ccif-pericfg = <&pericfg>;
 	};
 
 	mddriver:mddriver {
@@ -5709,8 +5699,8 @@
 			<1>, /*MTK_DRM_OPT_ESD_CHECK_RECOVERY*/
 			<1>, /*MTK_DRM_OPT_ESD_CHECK_SWITCH*/
 			<1>, /*MTK_DRM_OPT_PRESENT_FENCE*/
-			<0>, /*MTK_DRM_OPT_RDMA_UNDERFLOW_AEE*/
-			<0>, /*MTK_DRM_OPT_DSI_UNDERRUN_AEE*/
+			<1>, /*MTK_DRM_OPT_RDMA_UNDERFLOW_AEE*/
+			<1>, /*MTK_DRM_OPT_DSI_UNDERRUN_AEE*/
 			<1>, /*MTK_DRM_OPT_HRT*/
 			<1>, /*MTK_DRM_OPT_HRT_MODE*/
 			<0>, /*MTK_DRM_OPT_DELAYED_TRIGGER*/
@@ -8508,6 +8498,7 @@
 			<&topckgen_clk CLK_TOP_MFGPLL1>,
 			<&topckgen_clk CLK_TOP_MFG_INTERNAL1>,
 			<&topckgen_clk CLK_TOP_MFGPLL4>,
+			<&gpu_pll_ctrl_clk CLK_MFG_AO_MFGPLL1>,
 			<&mfgcfg_clk CLK_MFGCFG_BG3D>,
 			<&scpsys_clk SCP_SYS_MFG0>,
 			<&scpsys_clk SCP_SYS_MFG1>,
@@ -8520,6 +8511,7 @@
 			"clk_main_parent",  /* main pll freq */
 			"clk_sub_parent",   /* parking clk: 385 MHz */
 			"clk_pll4",
+			"clk_fhctl",
 			"subsys_bg3d",
 			"mtcmos_mfg0",      /* ASYNC */
 			"mtcmos_mfg1",      /* MFG_TOP */

@@ -81,7 +81,7 @@
 
 #include <soc/mediatek/mmqos.h>
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 #include "mtk_drm_auto/mtk_drm_ddp_comp_auto.h"
 #include "mtk_drm_auto/mtk_drm_crtc_auto.h"
 #endif
@@ -356,6 +356,36 @@ static unsigned int dual_comp_blender_map_mt6991(unsigned int comp_id)
 	unsigned int ret = 0;
 
 	switch (comp_id) {
+	case DDP_COMPONENT_OVL_EXDMA3:
+		ret = DDP_COMPONENT_OVL0_BLENDER3;
+		break;
+	case DDP_COMPONENT_OVL_EXDMA4:
+		ret = DDP_COMPONENT_OVL0_BLENDER4;
+		break;
+	case DDP_COMPONENT_OVL_EXDMA5:
+		ret = DDP_COMPONENT_OVL0_BLENDER5;
+		break;
+	case DDP_COMPONENT_OVL_EXDMA6:
+		ret = DDP_COMPONENT_OVL0_BLENDER6;
+		break;
+	case DDP_COMPONENT_OVL_EXDMA7:
+		ret = DDP_COMPONENT_OVL0_BLENDER7;
+		break;
+	case DDP_COMPONENT_OVL_EXDMA8:
+		ret = DDP_COMPONENT_OVL0_BLENDER8;
+		break;
+	case DDP_COMPONENT_OVL_EXDMA9:
+		ret = DDP_COMPONENT_OVL0_BLENDER9;
+		break;
+	case DDP_COMPONENT_OVL1_EXDMA3:
+		ret = DDP_COMPONENT_OVL1_BLENDER0;
+		break;
+	case DDP_COMPONENT_OVL1_EXDMA4:
+		ret = DDP_COMPONENT_OVL1_BLENDER1;
+		break;
+	case DDP_COMPONENT_OVL1_EXDMA5:
+		ret = DDP_COMPONENT_OVL1_BLENDER2;
+		break;
 	case DDP_COMPONENT_OVL1_EXDMA6:
 		ret = DDP_COMPONENT_OVL1_BLENDER5;
 		break;
@@ -445,13 +475,17 @@ void mtk_drm_crtc_exdma_ovl_path(struct mtk_drm_crtc *mtk_crtc,
 	if (priv->data->mmsys_id == MMSYS_MT6991) {
 
 		if (crtc_id == 0)
+#if IS_ENABLED(CONFIG_MTK_LCM_DUAL_PORT_SUPPORT)
+			next_blender = dual_comp_blender_map_mt6991(comp->id);
+#else
 			next_blender = DDP_COMPONENT_OVL0_BLENDER1 + plane_index;
+#endif
 		else if (crtc_id == 1)
 			next_blender = dual_comp_blender_map_mt6991(comp->id);
 		else if (crtc_id == 2)
 			next_blender = dual_comp_blender_map_mt6991(comp->id);
 		else if (crtc_id == 3)
-			next_blender = DDP_COMPONENT_OVL1_BLENDER8 + plane_index;
+			next_blender = DDP_COMPONENT_OVL1_BLENDER3 + plane_index;
 
 		value = mtk_ddp_exdma_mout_MT6991(comp->id, next_blender, &addr);
 		if (comp->id < DDP_COMPONENT_OVL1_EXDMA0)
@@ -612,6 +646,9 @@ void mtk_drm_crtc_exdma_path_setting_reset_without_cmdq(struct mtk_drm_crtc *mtk
 				if (mtk_drm_dal_enable() && i == 0xE98)
 					continue;
 				writel_relaxed(0, mtk_crtc->ovlsys0_regs + i);
+#if IS_ENABLED(CONFIG_MTK_LCM_DUAL_PORT_SUPPORT)
+				writel_relaxed(0, mtk_crtc->ovlsys1_regs + i);
+#endif
 			} else if (crtc_id == 1) {
 				writel_relaxed(0, mtk_crtc->ovlsys1_regs + i);
 			} else if (crtc_id == 2) {
@@ -654,6 +691,14 @@ void mtk_drm_crtc_exdma_path_setting_reset(struct mtk_drm_crtc *mtk_crtc,
 		cmdq_pkt_write(cmdq_handle, mtk_crtc->gce_obj.base,
 					ovl0_mutex_regs_pa + DISP_REG_MUTEX_MOD(0, ddp->data, mutex->id),
 					0, mask);
+#if IS_ENABLED(CONFIG_MTK_LCM_DUAL_PORT_SUPPORT)
+		if (ddp->ovlsys1_regs)
+			ovl1_mutex_regs_pa = ddp->ovlsys1_regs_pa;
+
+		cmdq_pkt_write(cmdq_handle, mtk_crtc->gce_obj.base,
+						ovl1_mutex_regs_pa + DISP_REG_MUTEX_MOD(0, ddp->data, mutex->id),
+						0, mask);
+#endif
 	} else if (crtc_id == 1) {
 		if (ddp->ovlsys1_regs)
 			ovl1_mutex_regs_pa = ddp->ovlsys1_regs_pa;
@@ -2215,6 +2260,10 @@ int mtk_drm_setbacklight_at_te(struct drm_crtc *crtc, unsigned int level,
 	/* Record Vblank start timestamp */
 	mtk_vblank_config_rec_start(mtk_crtc, cmdq_handle, SET_BL);
 
+	if ((panel_ext) && (panel_ext->SilkyBrightnessDelay)
+		&& (drm_mode_vrefresh(&crtc->state->adjusted_mode) == 60))
+		cmdq_pkt_sleep(cmdq_handle, CMDQ_US_TO_TICK(panel_ext->SilkyBrightnessDelay), CMDQ_GPR_R06);
+
 	/* set backlight */
 	oddmr_comp = priv->ddp_comp[DDP_COMPONENT_ODDMR0];
 	mtk_ddp_comp_io_cmd(oddmr_comp, cmdq_handle, ODDMR_BL_CHG, &level);
@@ -2393,12 +2442,12 @@ int mtk_drm_setbacklight(struct drm_crtc *crtc, unsigned int level,
 			mtk_crtc->gce_obj.event[EVENT_CABC_EOF]);
 	}
 
+	/* Record Vblank start timestamp */
+	mtk_vblank_config_rec_start(mtk_crtc, cmdq_handle, SET_BL);
+
 	if ((panel_ext) && (panel_ext->SilkyBrightnessDelay)
 		&& (drm_mode_vrefresh(&crtc->state->adjusted_mode) == 60))
 		cmdq_pkt_sleep(cmdq_handle, CMDQ_US_TO_TICK(panel_ext->SilkyBrightnessDelay), CMDQ_GPR_R06);
-
-	/* Record Vblank start timestamp */
-	mtk_vblank_config_rec_start(mtk_crtc, cmdq_handle, SET_BL);
 
 	/* set backlight */
 	oddmr_comp = priv->ddp_comp[DDP_COMPONENT_ODDMR0];
@@ -2442,7 +2491,7 @@ int mtk_drm_setbacklight(struct drm_crtc *crtc, unsigned int level,
 		mtk_vblank_config_rec_end_cal(mtk_crtc, cmdq_handle, SET_BL);
 	}
 
-	CRTC_MMP_MARK(index, backlight, bl_cnt, 0);
+	CRTC_MMP_MARK(index, backlight, bl_cnt, (unsigned long)cmdq_handle);
 	drm_trace_tag_mark("backlight");
 	bl_cnt++;
 
@@ -3576,7 +3625,11 @@ unsigned int mtk_crtc_get_plane_comp_id(struct drm_crtc *crtc, struct mtk_crtc_s
 				(state->lye_state.mml_ir_lye & (1 << plane_index)))
 				fun_lye++;
 		}
+#if IS_ENABLED(CONFIG_MTK_LCM_DUAL_PORT_SUPPORT)
+		comp_id = (DDP_COMPONENT_OVL_EXDMA3 + (plane_index - fun_lye) * 2);
+#else
 		comp_id = (DDP_COMPONENT_OVL_EXDMA3 + plane_index - fun_lye);
+#endif
 	}
 
 	DDPINFO("%s comp[%d %s] plane_index[%u] lye info[%08x %08x %08x]\n", __func__,
@@ -4394,6 +4447,12 @@ static void mtk_crtc_update_ovl_hrt_usage(struct drm_crtc *crtc)
 		for (int i = 0; i < MAX_LAYER_NR ; i++)
 			written += scnprintf(dbg_msg + written, 512 - written, "[%d]",
 				     mtk_crtc->usage_ovl_compr[i]);
+
+		memset(dbg_msg, 0, sizeof(dbg_msg));
+		written = scnprintf(dbg_msg, 512, "%s usage_ovl_ext_compr = ", __func__);
+		for (int i = 0; i < MAX_LAYER_NR ; i++)
+			written += scnprintf(dbg_msg + written, 512 - written, "[%d]",
+				     mtk_crtc->usage_ovl_ext_compr[i]);
 		DDPINFO("%s\n", dbg_msg);
 	}
 }
@@ -5231,9 +5290,11 @@ static void mtk_crtc_atomic_ddp_config(struct drm_crtc *crtc,
 	_mtk_crtc_atmoic_addon_module_disconnect(crtc, mtk_crtc->ddp_mode,
 						 old_lye_state, cmdq_handle);
 
+#if !IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	if (priv->data->ovl_exdma_rule && (lye_state->rpo_lye || lye_state->mml_dl_lye) &&
 	(old_crtc_state->prop_val[CRTC_PROP_LYE_IDX] < state->prop_val[CRTC_PROP_LYE_IDX]))
 		mtk_drm_crtc_exdma_path_setting_reset(mtk_crtc, cmdq_handle);
+#endif
 
 	_mtk_crtc_atmoic_addon_module_connect(crtc, mtk_crtc->ddp_mode,
 					      lye_state, cmdq_handle, false);
@@ -5315,6 +5376,21 @@ static unsigned int dual_comp_map_mt6991(unsigned int comp_id)
 	unsigned int ret = 0;
 
 	switch (comp_id) {
+	case DDP_COMPONENT_OVL_EXDMA3:
+		ret = DDP_COMPONENT_OVL_EXDMA4;
+		break;
+	case DDP_COMPONENT_OVL_EXDMA5:
+		ret = DDP_COMPONENT_OVL_EXDMA6;
+		break;
+	case DDP_COMPONENT_OVL_EXDMA7:
+		ret = DDP_COMPONENT_OVL_EXDMA8;
+		break;
+	case DDP_COMPONENT_OVL_EXDMA9:
+		ret = DDP_COMPONENT_OVL1_EXDMA3;
+		break;
+	case DDP_COMPONENT_OVL1_EXDMA4:
+		ret = DDP_COMPONENT_OVL1_EXDMA5;
+		break;
 	case DDP_COMPONENT_OVL1_EXDMA6:
 		ret = DDP_COMPONENT_OVL1_EXDMA7;
 		break;
@@ -7289,6 +7365,8 @@ static void mtk_crtc_update_ddp_state(struct drm_crtc *crtc,
 						sizeof(mtk_crtc->usage_ovl_fmt));
 					memset(mtk_crtc->usage_ovl_compr, 0,
 						sizeof(mtk_crtc->usage_ovl_compr));
+					memset(mtk_crtc->usage_ovl_ext_compr, 0,
+						sizeof(mtk_crtc->usage_ovl_ext_compr));
 					mtk_crtc_update_ovl_hrt_usage(crtc);
 				}
 
@@ -9008,7 +9086,7 @@ void mtk_crtc_start_bwm_ratio_loop(struct drm_crtc *crtc)
 		return;
 	}
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	if (!mtk_crtc->gce_obj.client[CLIENT_BWM_LOOP]) {
 		DDPMSG("%s CRTC%d has no bwm ratio loop client\n", __func__, crtc_id);
 		return;
@@ -9126,7 +9204,7 @@ void mtk_crtc_stop_bwm_ratio_loop(struct drm_crtc *crtc)
 		return;
 	}
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	if (!mtk_crtc->gce_obj.client[CLIENT_BWM_LOOP]) {
 		DDPMSG("%s CRTC%d has no bwm ratio loop client\n", __func__, drm_crtc_index(crtc));
 		return;
@@ -9140,14 +9218,14 @@ void mtk_crtc_stop_bwm_ratio_loop(struct drm_crtc *crtc)
 
 void update_layer_cap_for_bwm(struct drm_crtc *crtc,
 				struct drm_crtc_state *old_crtc_state,
-				unsigned int partial_enable)
+				unsigned int ovl_partial_dirty)
 {
 	struct drm_plane *plane = NULL;
 	unsigned int plane_mask = 0;
 
 	plane_mask = old_crtc_state->plane_mask;
 
-	if (partial_enable == 1) {
+	if (ovl_partial_dirty == 1) {
 		drm_for_each_plane_mask(plane, crtc->dev, plane_mask) {
 			struct mtk_plane_state *plane_state =
 				to_mtk_plane_state(plane->state);
@@ -9491,6 +9569,8 @@ static void ddp_cmdq_cb(struct cmdq_cb_data data)
 		atomic_set(&(mtk_crtc->wait_mml_last_job_is_flushed), 1);
 		wake_up_interruptible(&(mtk_crtc->signal_mml_last_job_is_flushed_wq));
 	}
+	CRTC_MMP_MARK(id, mml_job_status, mtk_crtc->is_mml,
+		atomic_read(&mtk_crtc->wait_mml_last_job_is_flushed));
 
 	DDP_COMMIT_LOCK(&priv->commit.lock, __func__, cb_data->pres_fence_idx);
 	DDP_MUTEX_LOCK(&mtk_crtc->lock, __func__, __LINE__);
@@ -9892,6 +9972,7 @@ static void trig_done_cb(struct cmdq_cb_data data)
 
 static void event_done_cb(struct cmdq_cb_data data)
 {
+	CRTC_MMP_MARK((unsigned long)data.data, event_loop_done, 0, 0);
 	drm_trace_tag_mark("event_loop_done");
 }
 #endif
@@ -10641,7 +10722,7 @@ void mtk_crtc_start_trig_loop(struct drm_crtc *crtc)
 		return;
 	}
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	if (!mtk_crtc->gce_obj.client[CLIENT_TRIG_LOOP]) {
 		DDPMSG("%s CRTC%d has no triger loop client\n", __func__, crtc_id);
 		return;
@@ -11074,7 +11155,7 @@ void mtk_crtc_stop_trig_loop(struct drm_crtc *crtc)
 		return;
 	}
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	if (!mtk_crtc->gce_obj.client[CLIENT_TRIG_LOOP]) {
 		DDPMSG("%s CRTC%d has no triger loop client\n", __func__, drm_crtc_index(crtc));
 		return;
@@ -12174,19 +12255,35 @@ static void _mtk_crtc_1tnp_setting(struct mtk_drm_crtc *mtk_crtc)
 	}
 }
 
+int mtk_crtc_set_check_trigger_type(struct mtk_drm_crtc *mtk_crtc, int type)
+{
+	if (!mtk_crtc) {
+		DDPPR_ERR("%s, mtk_crtc is NULL\n", __func__);
+		return -1;
+	}
+	mtk_crtc->check_trigger_type = type;
+	return type;
+}
+
 void mtk_crtc_check_trigger(struct mtk_drm_crtc *mtk_crtc, bool delay,
 		bool need_lock)
 {
-	struct drm_crtc *crtc = &mtk_crtc->base;
-	int index = 0;
+	struct drm_crtc *crtc;
+	int index = 0, type = 0;
 	struct mtk_crtc_state *mtk_state;
 	struct mtk_panel_ext *panel_ext;
 
 	if (!mtk_crtc) {
-		DDPPR_ERR("%s:%d, invalid crtc:0x%p\n",
-				__func__, __LINE__, crtc);
+		DDPPR_ERR("%s:%d, invalid mtk_crtc\n",
+				__func__, __LINE__);
 		return;
 	}
+	crtc = &mtk_crtc->base;
+	if (!crtc) {
+		DDPPR_ERR("%s, crtc is NULL\n", __func__);
+		return;
+	}
+	type = mtk_crtc->check_trigger_type;
 
 	if (need_lock)
 		DDP_MUTEX_LOCK_CONDITION(&mtk_crtc->lock, __func__, __LINE__, mtk_crtc->enabled);
@@ -12221,6 +12318,19 @@ void mtk_crtc_check_trigger(struct mtk_drm_crtc *mtk_crtc, bool delay,
 		panel_ext && panel_ext->params->doze_delay > 1){
 		DDPINFO("%s:%d, doze not to trigger\n", __func__, __LINE__);
 		goto err;
+	}
+
+	if (type) {
+		DDPINFO("%s:%d, trigger type %d\n", __func__, __LINE__, type);
+		CRTC_MMP_MARK(index, kick_trigger, 0xFF, type);
+		if (type == 1)
+			delay = true;
+		else if (type == 2)
+			goto err;
+		else if (type == 3) {
+			drm_trigger_repaint(DRM_REPAINT_FOR_IDLE, crtc->dev);
+			goto err;
+		}
 	}
 
 	if (delay) {
@@ -13302,7 +13412,7 @@ void mtk_drm_crtc_enable(struct drm_crtc *crtc)
 	mtk_crtc_config_default_path(mtk_crtc);
 	CRTC_MMP_MARK((int) crtc_id, enable, 1, 3);
 
-#if !IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if !IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	if (priv->data->ovl_exdma_rule)
 		mtk_drm_crtc_exdma_path_setting_reset_without_cmdq(mtk_crtc);
 #endif
@@ -13313,6 +13423,7 @@ void mtk_drm_crtc_enable(struct drm_crtc *crtc)
 	/* 9. restore OVL setting */
 	memset(mtk_crtc->usage_ovl_fmt, 0, sizeof(mtk_crtc->usage_ovl_fmt));
 	memset(mtk_crtc->usage_ovl_compr, 0, sizeof(mtk_crtc->usage_ovl_compr));
+	memset(mtk_crtc->usage_ovl_ext_compr, 0, sizeof(mtk_crtc->usage_ovl_ext_compr));
 	if (!only_output)
 		mtk_crtc_restore_plane_setting(mtk_crtc);
 
@@ -16034,11 +16145,13 @@ static void mtk_drm_crtc_atomic_begin(struct drm_crtc *crtc,
 		mtk_crtc_msync2_switch_begin(crtc);
 	}
 
+#if !IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	if (priv->data->ovl_exdma_rule &&
 		(old_mtk_state->prop_val[CRTC_PROP_LYE_IDX] < mtk_crtc_state->prop_val[CRTC_PROP_LYE_IDX])) {
 		mtk_drm_crtc_exdma_path_setting_reset(mtk_crtc, mtk_crtc_state->cmdq_handle);
 		CRTC_MMP_MARK(index, atomic_begin, (unsigned long)mtk_crtc_state->cmdq_handle, __LINE__);
 	}
+#endif
 
 	for_each_comp_in_cur_crtc_path(comp, mtk_crtc, i, j) {
 		mtk_ddp_comp_config_begin(comp, mtk_crtc_state->cmdq_handle, j);
@@ -16376,7 +16489,7 @@ void mtk_drm_crtc_plane_disable(struct drm_crtc *crtc, struct drm_plane *plane,
 							0, cmdq_handle);
 					mtk_ddp_comp_layer_off(comp, plane->index, 0, cmdq_handle);
 				} else {
-#if !IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if !IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 					mtk_ddp_comp_layer_off(comp, plane->index, 0, cmdq_handle);
 #else
 					comp = mtk_crtc_get_plane_comp(crtc, plane_state);
@@ -17644,7 +17757,7 @@ struct drm_display_mode *mtk_crtc_get_display_mode_by_comp(
 	else
 		mode = &crtc->state->adjusted_mode;
 
-	DDPDBG("%s scaling_en: %d, comp: %s, in_scaling_path: %d, mode: %ux%u@%d\n", source,
+	DDPINFO("%s scaling_en: %d, comp: %s, in_scaling_path: %d, mode: %ux%u@%d\n", source,
 		mtk_crtc->scaling_ctx.scaling_en,
 		(comp != NULL) ? mtk_dump_comp_str(comp) : "unknown",
 		(((comp != NULL) && comp->in_scaling_path) || in_scaling_path),
@@ -18081,7 +18194,7 @@ int mtk_drm_crtc_set_partial_update(struct drm_crtc *crtc,
 		state->ovl_partial_dirty = 1;
 
 	/* bwm skip ratio get if enable SISO PU */
-	update_layer_cap_for_bwm(crtc, old_crtc_state, partial_enable);
+	update_layer_cap_for_bwm(crtc, old_crtc_state, state->ovl_partial_dirty);
 
 	/* skip if ovl partial dirty is disable and equal to old */
 	if (!state->ovl_partial_dirty &&
@@ -19630,13 +19743,16 @@ static int mtk_drm_mode_switch_thread(void *data)
 
 		CRTC_MMP_MARK((int) drm_crtc_index(crtc), mode_switch, 1, 1);
 
-		if (mtk_crtc_with_event_loop(crtc) &&
+		if (mtk_crtc_with_event_loop(crtc) && mtk_crtc_with_trigger_loop(crtc) &&
 				mtk_crtc_is_frame_trigger_mode(crtc)) {
+			mtk_crtc_stop_trig_loop(crtc);
 			mtk_crtc_stop_event_loop(crtc);
 
 			mtk_crtc_skip_merge_trigger(mtk_crtc);
 
 			mtk_crtc_start_event_loop(crtc);
+			mtk_crtc_start_trig_loop(crtc);
+			CRTC_MMP_MARK((int) drm_crtc_index(crtc), mode_switch, 1, 4);
 		}
 
 		/* TODO: set proper DT with corresponding CRTC */
@@ -20315,22 +20431,17 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
 	}
 	output_comp = mtk_ddp_comp_request_output(mtk_crtc);
 	if (output_comp) {
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 		unsigned int possible_crtcs = 0;
 #endif
 
 		mtk_ddp_comp_io_cmd(output_comp, NULL, REQ_PANEL_EXT,
 				    &mtk_crtc->panel_ext);
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 		possible_crtcs = 1 << pipe;
 		mtk_ddp_comp_io_cmd(output_comp, NULL, SET_CRTC_ID,
 				    &possible_crtcs);
-
-		if (output_comp->id == DDP_COMPONENT_DSI2_VIRTUAL) {
-			mtk_crtc->virtual_path = true;
-			mtk_crtc->offset_x = mtk_crtc->panel_ext->params->crop_width[0];
-		}
 #endif
 	}
 

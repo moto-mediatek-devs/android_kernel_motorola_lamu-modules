@@ -174,6 +174,8 @@ void init_crtc_mmp_event(void)
 		/* init CRTC mmp events */
 		g_CRTC_MMP_Events[i].trig_loop_done = mmprofile_register_event(
 			crtc_mmp_root, "trig_loop_done");
+		g_CRTC_MMP_Events[i].event_loop_done = mmprofile_register_event(
+			crtc_mmp_root, "event_loop_done");
 		g_CRTC_MMP_Events[i].bwm_loop_done = mmprofile_register_event(
 			crtc_mmp_root, "bwm_loop_done");
 		g_CRTC_MMP_Events[i].enable =
@@ -308,6 +310,9 @@ void init_crtc_mmp_event(void)
 			mmprofile_register_event(crtc_mmp_root, "discrete");
 		g_CRTC_MMP_Events[i].discrete_fill =
 			mmprofile_register_event(crtc_mmp_root, "discrete_fill");
+		g_CRTC_MMP_Events[i].mml_job_status =
+			mmprofile_register_event(crtc_mmp_root, "mml_job_status");
+
 		/*Msync 2.0 mmp start*/
 		g_CRTC_MMP_Events[i].ovl_status_err =
 			mmprofile_register_event(crtc_mmp_root, "ovl_status_err");
