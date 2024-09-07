@@ -526,9 +526,9 @@ static const struct file_operations device_fops = {
 	.owner = THIS_MODULE,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	.unlocked_ioctl = device_ioctl,
-#ifdef HAVE_COMPAT_IOCTL
+//#ifdef HAVE_COMPAT_IOCTL
 	.compat_ioctl = device_ioctl,
-#endif
+//#endif
 #else
 #ifdef HAVE_UNLOCKED_IOCTL
 	.unlocked_ioctl = device_ioctl,
