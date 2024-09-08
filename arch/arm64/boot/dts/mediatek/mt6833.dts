@@ -2411,24 +2411,56 @@
 			throughput-normal-max = <458000000>;
 			throughput-config-offset = <2>;
 			throughput-table =
-					<875967048 4 860 1415 249000000 270>, /* H.264 */
-					<875967048 5 766 1151 458000000 334>,
-					<1129727304 2 2484 3703 249000000 100>, /* HEVC LP*/
-					<1129727304 4 1780 2889 458000000 83>,
-					<892744264 2 2484 3703 249000000 100>, /* H265*/
-					<892744264 4 1780 2889 458000000 83>,
-					<1179206984 2 2484 3703 249000000 100>, /* HEIF */
-					<1179206984 4 1780 2889 458000000 83>;
-			config-table =
-					<875967048 243000 4 4>, /* H.264 */
-					<875967048 486000 5 5>,
-					<1129727304 243000 2 2>, /* HEVC*/
-					<1129727304 486000 4 4>,
-					<892744264 243000 2 2>, /* H265*/
-					<892744264 486000 4 4>,
-					<1179206984 243000 2 2>, /* HEIF */
-					<1179206984 486000 4 4>,
-					<1179206984 4294967295 9 7>;
+				/* H.264 */
+				<875967048 1 1148 1148 249000000 88>, /* 720p30, LP */
+				<875967048 4 860 860 249000000 88>, /* 1080p30, LP */
+				<875967048 8 780 780 458000000 156>, /* 1080p60, LP */
+				<875967048 12 860 860 458000000 88>, /* 1080p30, LP */
+				<875967048 17 430 430 624000000 258>, /* others, LP */
+				/* HEVC */
+				<1129727304 1 1148 1148 249000000 88>, /* 720p30, LP */
+				<1129727304 4 860 860 249000000 88>, /* 1080p30, LP */
+				<1129727304 8 780 780 458000000 157>, /* 1080p60, LP */
+				<1129727304 12 860 860 458000000 88>, /* 2560x1440@30, LP */
+				<1129727304 17 430 430 624000000 248>, /* others, LP */
+
+				/* H.265 */
+				<892744264 1 1148 1148 249000000 88>, /* 720p30, LP */
+				<892744264 4 860 860 249000000 88>, /* 1080p30, LP */
+				<892744264 8 780 780 458000000 156>, /* 1080p60, LP */
+				<1129727304 12 860 860 458000000 88>, /* 2560x1440@30, LP */
+				<892744264 17 430 430 624000000 258>, /* others, LP */
+				/* HEIF */
+				<1179206984 1 1148 1148 249000000 88>, /* 720p30, LP */
+				<1179206984 4 860 860 249000000 88>, /* 1080p30, LP */
+				<1179206984 8 780 780 458000000 156>, /* 1080p60, LP */
+				<1129727304 12 860 860 458000000 88>, /* 2560x1440@30, LP */
+				<1179206984 17 430 430 624000000 258>; /* others, LP */
+			config-table = /* codec, mb/s, normal config, high quality config*/
+				/* H.264 */
+				<875967048 108000 1 1>, /* 720p30 */
+				<875967048 261120 4 4>, /* 1080p30 */
+				<875967048 522240 8 8>, /* 1080p60 */
+				<875967048 432000 12 12>, /* 2560x1440@30 */
+				<875967048 4294967295 17 17>, /* others */
+				/* HEVC */
+				<1129727304 108000 1 1>, /* 720p30 */
+				<1129727304 261120 4 4>, /* 1080p30 */
+				<1129727304 522240 8 8>, /* 1080p60 */
+				<1129727304 432000 12 12>, /* 2560x1440@30 */
+				<1129727304 4294967295 17 17>, /* others */
+				/* H.265 */
+				<892744264 108000 1 1>, /* 720p30 */
+				<892744264 261120 4 4>, /* 1080p30 */
+				<892744264 522240 8 8>, /* 1080p60 */
+				<892744264 432000 12 12>, /* 2560x1440@30 */
+				<892744264 4294967295 17 17>, /* others */
+				/* HEIF */
+				<1179206984 108000 1 1>, /* 720p30 */
+				<1179206984 261120 4 4>, /* 1080p30 */
+				<1179206984 522240 8 8>, /* 1080p60 */
+				<1179206984 432000 12 12>, /* 2560x1440@30 */
+				<1179206984 4294967295 17 17>; /* others */
 			bandwidth-table =
 					<7 2 5>,
 					<7 1 105>, /* FHD60 worst case * 0.7: 256*458/766 * 1.5 * 0.7 */
@@ -4070,9 +4102,35 @@
 
 	low_battery_throttling {
 		compatible = "mediatek,low_battery_throttling";
-		hv_thd_volt = <3300>;
-		lv1_thd_volt = <3150>;
-		lv2_thd_volt = <3000>;
+		lvsys-thd-enable = <0>;
+		vbat-thd-enable = <1>;
+		bat0-thd-volts-l = <
+			3250 3100 2700
+			3250 3100 2700
+			3250 3100 2700
+			3250 3100 2700>;
+		bat0-thd-volts-h = <
+			3300 3150 3000
+			3300 3150 3000
+			3300 3150 3000
+			3300 3150 3000>;
+		bat1-thd-volts-l = <
+			3250 3100 2700
+			3250 3100 2700
+			3250 3100 2700
+			3250 3100 2700>;
+		bat1-thd-volts-h = <
+			3300 3150 3000
+			3300 3150 3000
+			3300 3150 3000
+			3300 3150 3000>;
+		temperature-stage-threshold = <25 10 0>;
+		throttle-level = <0 1 2 3>,
+					<0 1 2 3>,
+					<0 1 2 3>,
+					<0 1 2 3>;
+		bootmode = <&chosen>;
+		gauge = <&mtk_gauge>;
 	};
 
 	pbm: pbm {
@@ -4085,8 +4143,16 @@
 
 	cpu_power_throttling: cpu_power_throttling {
 		compatible = "mediatek,cpu-power-throttling";
-		lbat_cpu_limit = <900000 900000 1300000>;
-		oc_cpu_limit = <900000 900000 1300000>;
+		lbat-max-level = <2>;
+		lbat-limit-freq-lv1 = < 2147483647  2147483647 2147483647>;
+		lbat-limit-freq-lv2 = < 900000  900000 1300000>;
+
+		oc-max-level = <2>;
+		oc-limit-freq-lv1 = < 2147483647  2147483647 2147483647>;
+		oc-limit-freq-lv2 = < 900000  900000 900000>;
+
+		soc-max-level = <1>;
+		soc-limit-freq-lv1 = < 2147483647  2147483647 2147483647>;
 	};
 
 	md_power_throttling: md_power_throttling {
@@ -4095,13 +4161,15 @@
 		oc_md_reduce_tx = <6>;
 	};
 
-	bp_thl: bp_thl {
+	bp_thl: bp-thl {
 		compatible = "mediatek,mtk-bp-thl";
-		soc_limit = <15>;
-		soc_limit_ext = <20>;
-		soc_limit_ext_release = <25>;
-	};
 
+		max-throttle-level = <2>;
+		soc-throttle-level = < 0 1>;
+
+		soc-max-stage = <1>;
+		soc-limit-threshold = <15>;
+	};
 	therm_ctrl@1100b000 {
 		compatible = "mediatek,therm_ctrl";
 		reg = <0 0x1100b000 0 0x1000>;
@@ -4901,6 +4969,7 @@ gpufreq: gpufreq {
 				<&infracfg_ao_clk CLK_IFRAO_AP_DMA>;
 		clock-names = "main", "dma";
 		clock-div = <1>;
+		mediatek,control-rs-stop;
 	};
 
 	i2c1: i2c@11d20000 {
@@ -4912,6 +4981,7 @@ gpufreq: gpufreq {
 				<&infracfg_ao_clk CLK_IFRAO_AP_DMA>;
 		clock-names = "main", "dma";
 		clock-div = <1>;
+		mediatek,control-rs-stop;
 	};
 
 	i2c2: i2c@11d21000 {
@@ -4923,6 +4993,7 @@ gpufreq: gpufreq {
 				<&infracfg_ao_clk CLK_IFRAO_AP_DMA>;
 		clock-names = "main", "dma";
 		clock-div = <1>;
+		mediatek,control-rs-stop;
 	};
 
 	i2c3: i2c@11cb0000 {
@@ -4934,6 +5005,7 @@ gpufreq: gpufreq {
 				<&infracfg_ao_clk CLK_IFRAO_AP_DMA>;
 		clock-names = "main", "dma";
 		clock-div = <1>;
+		mediatek,control-rs-stop;
 	};
 
 	i2c4: i2c@11d22000 {
@@ -4945,6 +5017,7 @@ gpufreq: gpufreq {
 				<&infracfg_ao_clk CLK_IFRAO_AP_DMA>;
 		clock-names = "main", "dma";
 		clock-div = <1>;
+		mediatek,control-rs-stop;
 	};
 
 	i2c5: i2c@11e01000 {
@@ -4957,6 +5030,7 @@ gpufreq: gpufreq {
 		clock-names = "main", "dma";
 		clock-div = <1>;
 		mediatek,data_hold_time;
+		mediatek,control-rs-stop;
 	};
 
 	i2c6: i2c@11f00000 {
@@ -4968,6 +5042,7 @@ gpufreq: gpufreq {
 				<&infracfg_ao_clk CLK_IFRAO_AP_DMA>;
 		clock-names = "main", "dma";
 		clock-div = <1>;
+		mediatek,control-rs-stop;
 	};
 
 	i2c7: i2c@11e02000 {
@@ -4979,6 +5054,7 @@ gpufreq: gpufreq {
 				<&infracfg_ao_clk CLK_IFRAO_AP_DMA>;
 		clock-names = "main", "dma";
 		clock-div = <1>;
+		mediatek,control-rs-stop;
 	};
 
 	i2c8: i2c@11d00000 {
@@ -4990,6 +5066,7 @@ gpufreq: gpufreq {
 				<&infracfg_ao_clk CLK_IFRAO_AP_DMA>;
 		clock-names = "main", "dma";
 		clock-div = <1>;
+		mediatek,control-rs-stop;
 	};
 
 	i2c9: i2c@11d01000 {
@@ -5001,6 +5078,7 @@ gpufreq: gpufreq {
 				<&infracfg_ao_clk CLK_IFRAO_AP_DMA>;
 		clock-names = "main", "dma";
 		clock-div = <1>;
+		mediatek,control-rs-stop;
 	};
 
 	pwm: pwm@10048000 {

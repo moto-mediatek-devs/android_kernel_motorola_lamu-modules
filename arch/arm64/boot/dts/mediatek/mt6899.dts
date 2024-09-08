@@ -134,7 +134,6 @@
 			    nosoftlockup \
 			    8250.nr_uarts=4 \
 			    androidboot.hardware=mt6899 \
-			    arm64.nomte \
 			    vmalloc=400M swiotlb=noforce \
 			    firmware_class.path=/vendor/firmware \
 			    cgroup.memory=nosocket,nokmem \
@@ -1086,7 +1085,7 @@ l3_hit,l3_mis,pmu_cyc_cnt";
 				"SW_R3,SW_R4,SW_R5,SW_R7,E_QOS";
 			node-104 = "SSPM_VCORE_DVFS__MISC_DETAIL",
 				"PS_B0,PS_B1,PS_B2,PS_B3,",
-				"PS_B4,PS_B5,PS_DPC,PS_B6,",
+				"PS_B4,PS_B5,PS_DPC,PS_B6,PS_B7",
 				"PS_TOTAL,MD_SCE,MD_STA,EMI_LEVEL,",
 				"HR_DPC,HR_IB,HR_MB,HR_BASE,",
 				"CEIL_MISC,RSV_1,RSV_2,",
@@ -1237,13 +1236,13 @@ l3_hit,l3_mis,pmu_cyc_cnt";
 				"RC1_M6_0,RC1_M6_1,RC1_M7_0,RC1_M7_1,",
 				"WD_CH0_0,WD_CH0_1,WD_CH1_0,WD_CH1_1";
 			node-126 = "SSPM_SPM_DBG__RC_REQ",
-				"xoufs_req,srclken_fpm_2,nfc_srcclkeni_0_dbc,srclken_bblpm_10,",
+				"xoufs_req,spm_srclken_fpm_2,nfc_srcclkeni_0_dbc,srclken_bblpm_10,",
 				"srclken_fpm_9,srclken_fpm_8,srclken_fpm_7,srclken_fpm_6,",
 				"srclken_fpm_5,srclken_fpm_4,srclken_fpm_3,srclken_fpm_2,",
 				"srclken_fpm_1,spm_srclken_fpm_0,dcxo_bblpm,dcxo_lpm,dcxo_fpm,",
-				"mainpll_en,univpll_en,adsppll,mmpll_en,apll1,apll2_en,msdcpll_en,",
+				"mainpll_en,univpll_en,adsppll,mmpll_en,apll1_en,apll2_en,msdcpll_en,",
 				"emipll_en,emipll2_en,tvdpll_en,imgpll_en,cg_en_axi,cg_en_peri_faxi,",
-				"cg_en_ufs_faxi,cg_en_pextp_faxi,cg_en_bus_aximem,cg_en_mem_sub,",
+				"cg_en_ufs_faxi,cg_en_pextp_faxi,cg_en_bus_aximen,cg_en_mem_sub,",
 				"cg_en_peri_fmem,cg_en_ufs_fmem,cg_en_pexpt_fmem,cg_en_mcu_infra,",
 				"cg_en_mcu_acp,cg_en_mminfra,cg_en_mmup";
 			node-127 = "SSPM_SWPM_SCP__POWER_IDX",
@@ -3389,6 +3388,7 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 		mediatek,restore-step;
 		mediatek,vcore-check-rg = <0x1c00f2b0>;
 		mediatek,vcore-check-offset = <6>;
+		mediatek,vcore-level =	/bits/ 8 <0 1 2 3 4 4>;
 	};
 
 	mmdvfs-user {
@@ -7258,7 +7258,6 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			default-glb-pwroff-timeout-us = <80>;
 			autosuspend-delay-ms = <25>;
 			adaptive-power-policy = <2>;
-			exception-mask = <0x5>;
 			gpu-frame-base-optimize = <1>;
 			system-coherency = <0>;
 			dbg-force-sync = <0>;
@@ -8171,7 +8170,7 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 				<0>, /*MTK_DRM_OPT_VDS_PATH_SWITCH*/
 				<0>, /*MTK_DRM_OPT_LAYER_REC*/
 				<1>, /*MTK_DRM_OPT_CLEAR_LAYER*/
-				<1>, /*MTK_DRM_OPT_LFR*/
+				<0>, /*MTK_DRM_OPT_LFR*/
 				<0>, /*MTK_DRM_OPT_SF_PF*/
 				<0>, /*MTK_DRM_OPT_DYN_MIPI_CHANGE*/
 				<0>, /*MTK_DRM_OPT_PRIM_DUAL_PIPE*/
@@ -10692,7 +10691,6 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			reg = <0 0x15310000 0 0x9000>;
 			// dma-ranges = <0x0 0x0 0x0 0x0 0x4 0x0>;
 			cmdqsec-supply = <&gce_m_sec>;
-			maeplat-supply = <&mtk_mae_plat>;
 			mboxes = <&gce_m 20 0 CMDQ_THR_PRIO_1>,
 					<&gce_m_sec 11 CMDQ_NO_TIMEOUT CMDQ_THR_PRIO_2>;
 			mediatek,larb = <&smi_larb12>;
@@ -10703,6 +10701,12 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			iommus = <&disp_iommu M4U_L12_P0_FDVT_RDA_0>,
 						<&disp_iommu M4U_L12_P1_FDVT_WRA_0>;
 			power-domains = <&hfrpsys MT6899_POWER_DOMAIN_ISP_MAIN>;
+		};
+
+		mtk_mae_plat: mtk-mae-plat@15319000 {
+			compatible = "mediatek,mtk-mae-plat-isp8-mt6899";
+			reg = <0 0x15319000 0 0x1000>;
+			mae-supply = <&mae>;
 			clocks = <&img_vcore_d1a_clk CLK_IMG_VCORE_GALS_DISP_CAMERA_MAE>,
 				<&img_vcore_d1a_clk CLK_IMG_VCORE_MAIN_CAMERA_MAE>,
 				<&img_vcore_d1a_clk CLK_IMG_VCORE_SUB0_CAMERA_MAE>,
@@ -10727,11 +10731,6 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 				"GALS_TRX_IPE0_CAMERA_MAE",
 				"GALS_TRX_IPE1_CAMERA_MAE",
 				"GALS_CAMERA_MAE";
-		};
-
-		mtk_mae_plat: mtk-mae-plat@15319000 {
-			compatible = "mediatek,mtk-mae-plat-isp8-mt6899";
-			reg = <0 0x15319000 0 0x1000>;
 		};
 
 		smi-larb9@15001000 {
@@ -11290,6 +11289,8 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			vdec-power-in-vcp = <1>;
 			vdec-mmdvfs-in-vcp = <1>;
 			vdec-mmdvfs-in-adaptive = <1>;
+			vdec-cpu-hint-mode = <0>; /* cpu grp awr mode */
+			vdec-clamp-util-val = <500>;
 		};
 
 		venc@17020000 {
@@ -11336,6 +11337,8 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			venc-power-in-vcp = <1>;
 			venc-mmdvfs-in-vcp = <1>;
 			venc-mmdvfs-in-adaptive = <1>;
+			venc-cpu-hint-mode = <0>; /* cpu grp awr mode */
+			venc-clamp-util-val = <500>;
 			port-arg-num = <3>;
 			port-def = <0 M4U_L7_P0_VENC_RCPU_U0 0>,
 				<0 M4U_L7_P1_VENC_REC_U0 0>,
@@ -12235,7 +12238,8 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			mediatek,larbs = <&smi_larb14>;
 			mediatek,larb-node-names = "camisp-l14-1";
 			interrupts = <GIC_SPI 382 IRQ_TYPE_LEVEL_HIGH 0>,
-						<GIC_SPI 388 IRQ_TYPE_LEVEL_HIGH 0>;
+						<GIC_SPI 388 IRQ_TYPE_LEVEL_HIGH 0>,
+						<GIC_SPI 394 IRQ_TYPE_LEVEL_HIGH 0>;
 			power-domains = <&hfrpsys MT6899_POWER_DOMAIN_CAM_MAIN>;
 			clocks = <&cam_main_r1a_clk CLK_CAM_MAIN_CAM_CAMSV>,
 					<&cam_main_r1a_clk CLK_CAM_MAIN_LARB14_CAMSV>,
@@ -12300,7 +12304,8 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			mediatek,larbs = <&smi_larb13>;
 			mediatek,larb-node-names = "camisp-l13-1";
 			interrupts = <GIC_SPI 383 IRQ_TYPE_LEVEL_HIGH 0>,
-						<GIC_SPI 389 IRQ_TYPE_LEVEL_HIGH 0>;
+						<GIC_SPI 389 IRQ_TYPE_LEVEL_HIGH 0>,
+						<GIC_SPI 395 IRQ_TYPE_LEVEL_HIGH 0>;
 			power-domains = <&hfrpsys MT6899_POWER_DOMAIN_CAM_MAIN>;
 			clocks = <&cam_main_r1a_clk CLK_CAM_MAIN_CAM_CAMSV>,
 					<&cam_main_r1a_clk CLK_CAM_MAIN_LARB13_CAMSV>,
@@ -12364,7 +12369,8 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			mediatek,cammux-id = <2>;
 			mediatek,larbs = <&smi_larb29>;
 			interrupts = <GIC_SPI 384 IRQ_TYPE_LEVEL_HIGH 0>,
-						<GIC_SPI 390 IRQ_TYPE_LEVEL_HIGH 0>;
+						<GIC_SPI 390 IRQ_TYPE_LEVEL_HIGH 0>,
+						<GIC_SPI 396 IRQ_TYPE_LEVEL_HIGH 0>;
 			iommus = <&disp_iommu M4U_L29_P0_CAMSV_C_CQI_E1>,
 				<&disp_iommu M4U_L29_P4_CAMSV_C_WDMA>;
 			power-domains = <&hfrpsys MT6899_POWER_DOMAIN_CAM_MAIN>;
@@ -12412,7 +12418,8 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			mediatek,cammux-id = <3>;
 			mediatek,larbs = <&smi_larb29>;
 			interrupts = <GIC_SPI 385 IRQ_TYPE_LEVEL_HIGH 0>,
-						<GIC_SPI 391 IRQ_TYPE_LEVEL_HIGH 0>;
+						<GIC_SPI 391 IRQ_TYPE_LEVEL_HIGH 0>,
+						<GIC_SPI 397 IRQ_TYPE_LEVEL_HIGH 0>;
 			iommus = <&disp_iommu M4U_L29_P1_CAMSV_D_CQI_E1>,
 				<&disp_iommu M4U_L29_P5_CAMSV_D_WDMA>;
 			power-domains = <&hfrpsys MT6899_POWER_DOMAIN_CAM_MAIN>;
@@ -12460,7 +12467,8 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			mediatek,cammux-id = <4>;
 			mediatek,larbs = <&smi_larb29>;
 			interrupts = <GIC_SPI 386 IRQ_TYPE_LEVEL_HIGH 0>,
-						<GIC_SPI 392 IRQ_TYPE_LEVEL_HIGH 0>;
+						<GIC_SPI 392 IRQ_TYPE_LEVEL_HIGH 0>,
+						<GIC_SPI 398 IRQ_TYPE_LEVEL_HIGH 0>;
 			iommus = <&disp_iommu M4U_L29_P2_CAMSV_E_CQI_E1>,
 				<&disp_iommu M4U_L29_P6_CAMSV_E_WDMA>;
 			power-domains = <&hfrpsys MT6899_POWER_DOMAIN_CAM_MAIN>;
@@ -13559,7 +13567,7 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			interconnects =
 				<&mmqos MASTER_LARB_PORT(M4U_L2_P0_MDP_RDMA0)
 					&mmqos SLAVE_COMMON(0)>;
-			interconnect-names = "mml0_dma";
+			interconnect-names = "mml_dma";
 			mmqos-supply = <&mmqos>;
 		};
 
@@ -13633,7 +13641,7 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			interconnects =
 				<&mmqos MASTER_LARB_PORT(M4U_L2_P1_MDP_WROT0)
 					&mmqos SLAVE_COMMON(0)>;
-			interconnect-names = "mml0_dma";
+			interconnect-names = "mml_dma";
 			mmqos-supply = <&mmqos>;
 		};
 
@@ -13653,7 +13661,7 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			interconnects =
 				<&mmqos MASTER_LARB_PORT(M4U_L2_P4_MDP_RDMA2)
 					&mmqos SLAVE_COMMON(0)>;
-			interconnect-names = "mml0_dma";
+			interconnect-names = "mml_dma";
 			mmqos-supply = <&mmqos>;
 		};
 
@@ -16294,7 +16302,7 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 		max-temperature-stage = <3>;
 		temperature-threshold = <25 10 0>;
 		system-ocp = <13000>;
-		system-uvlo = <2400>;
+		system-uvlo = <2610>;
 
 		bat-ocv-table-num = <0>;
 	};
@@ -16305,24 +16313,24 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 		vbat-thd-enable = <1>;
 		bat0-thd-volts-l = <
 			3550 3100 2900
-			3800 3100 2900
-			4300 3400 3100
-			4400 3400 3100>;
+			3650 3100 2900
+			3750 3400 3100
+			3850 3400 3100>;
 		bat0-thd-volts-h = <
 			3600 3550 3100
-			3900 3800 3100
-			4500 4300 3400
-			4500 4400 3400>;
+			3750 3650 3100
+			3850 3750 3400
+			3950 3850 3400>;
 		bat1-thd-volts-l = <
 			3550 3100 2900
-			3800 3100 2900
-			4300 3400 3100
-			4400 3400 3100>;
+			3650 3100 2900
+			3750 3400 3100
+			3850 3400 3100>;
 		bat1-thd-volts-h = <
 			3600 3550 3100
-			3900 3800 3100
-			4500 4300 3400
-			4500 4400 3400>;
+			3750 3650 3100
+			3850 3750 3400
+			3950 3850 3400>;
 		lvsys-thd-volt-l = <2900>;
 		lvsys-thd-volt-h = <3100>;
 		temperature-stage-threshold = <25 10 0>;

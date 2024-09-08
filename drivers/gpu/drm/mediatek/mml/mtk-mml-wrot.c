@@ -351,7 +351,6 @@ struct wrot_data {
 	u8 rb_swap;		/* WA: version for rb channel swap behavior */
 	bool yuv_pending;	/* WA: enable wrot yuv422/420 pending zero */
 	bool stash;		/* enable stash prefetch with leading time */
-	bool ir_sram_bw;		/* sram channel bw */
 };
 
 static const struct wrot_data mt6983_wrot_data = {
@@ -381,7 +380,6 @@ static const struct wrot_data mt6989_wrot_data = {
 	.read_mode = MML_PQ_SOF_MODE,
 	.px_per_tick = 2,
 	/* .rb_swap = 2 */
-	.px_per_tick = 2,
 	.yuv_pending = true,
 };
 
@@ -400,22 +398,8 @@ static const struct wrot_data mt6991_wrot_data = {
 	.sram_size = 512 * 1024,
 	.px_per_tick = 2,
 	.read_mode = MML_PQ_SOF_MODE,
-	.px_per_tick = 2,
 	.yuv_pending = true,
 	.stash = true,
-};
-
-static const struct wrot_data mt6899_wrot_data = {
-	.reg = wrot_mt6989,
-	.fifo = 256,
-	.tile_width = 512,
-	.sram_size = 512 * 1024,
-	.read_mode = MML_PQ_SOF_MODE,
-	.px_per_tick = 2,
-	/* .rb_swap = 2 */
-	.px_per_tick = 2,
-	.yuv_pending = true,
-	.ir_sram_bw = true,
 };
 
 struct mml_comp_wrot {
@@ -515,7 +499,6 @@ struct wrot_frame_data {
 	 * use in reuse command
 	 */
 	u16 labels[WROT_LABEL_TOTAL];
-	u32 crc_inst_offset;
 
 	u32 wdone_cnt;
 };
@@ -1091,31 +1074,42 @@ static void wrot_color_fmt(struct mml_frame_config *cfg,
 	}
 
 	/*
-	 * 4'b0000: RGB to JPEG
-	 * 4'b0010: RGB to BT601
-	 * 4'b0011: RGB to BT709
-	 * 4'b0100: JPEG to RGB
-	 * 4'b0110: BT601 to RGB
-	 * 4'b0111: BT709 to RGB
-	 * 4'b1000: JPEG to BT601
-	 * 4'b1001: JPEG to BT709
-	 * 4'b1010: BT601 to JPEG
-	 * 4'b1011: BT709 to JPEG
-	 * 4'b1100: BT709 to BT601
-	 * 4'b1101: BT601 to BT709
+	 * 4'b0000:  0 RGB to JPEG
+	 * 4'b0001:  1 RGB to FULL709
+	 * 4'b0010:  2 RGB to BT601
+	 * 4'b0011:  3 RGB to BT709
+	 * 4'b0100:  4 JPEG to RGB
+	 * 4'b0101:  5 FULL709 to RGB
+	 * 4'b0110:  6 BT601 to RGB
+	 * 4'b0111:  7 BT709 to RGB
+	 * 4'b1000:  8 JPEG to BT601 / FULL709 to BT709
+	 * 4'b1001:  9 JPEG to BT709
+	 * 4'b1010: 10 BT601 to JPEG / BT709 to FULL709
+	 * 4'b1011: 11 BT709 to JPEG
+	 * 4'b1100: 12 BT709 to BT601
+	 * 4'b1101: 13 BT601 to BT709
+	 * 4'b1110: 14 JPEG to FULL709
+	 * 4'b1111: 15 IDENTITY
+	 *             FULL709 to JPEG
+	 *             FULL709 to BT601
+	 *             BT601 to FULL709
 	 */
 	if (profile_in == MML_YCBCR_PROFILE_BT2020 ||
-	    profile_in == MML_YCBCR_PROFILE_FULL_BT709 ||
 	    profile_in == MML_YCBCR_PROFILE_FULL_BT2020)
 		profile_in = MML_YCBCR_PROFILE_BT709;
 
 	if (wrot_frm->mat_en == 1) {
-		if (profile_in == MML_YCBCR_PROFILE_BT601)
+		if (MML_FMT_IS_RGB(cfg->info.src.format) &&
+		    !cfg->info.dest[wrot_frm->out_idx].pq_config.en)
+			wrot_frm->mat_sel = 5;
+		else if (profile_in == MML_YCBCR_PROFILE_BT601)
 			wrot_frm->mat_sel = 6;
 		else if (profile_in == MML_YCBCR_PROFILE_BT709)
 			wrot_frm->mat_sel = 7;
 		else if (profile_in == MML_YCBCR_PROFILE_JPEG)
 			wrot_frm->mat_sel = 4;
+		else if (profile_in == MML_YCBCR_PROFILE_FULL_BT709)
+			wrot_frm->mat_sel = 5;
 		else
 			mml_err("[wrot] unknown profile conversion %x",
 				profile_in);
@@ -1144,18 +1138,33 @@ static void wrot_color_fmt(struct mml_frame_config *cfg,
 			   profile_out == MML_YCBCR_PROFILE_BT709) {
 			wrot_frm->mat_en = 1;
 			wrot_frm->mat_sel = 13;
+		} else if (profile_in == MML_YCBCR_PROFILE_JPEG &&
+			   profile_out == MML_YCBCR_PROFILE_FULL_BT709) {
+			wrot_frm->mat_en = 1;
+			wrot_frm->mat_sel = 14;
+		} else if (profile_in == MML_YCBCR_PROFILE_FULL_BT709 &&
+			   profile_out == MML_YCBCR_PROFILE_BT709) {
+			wrot_frm->mat_en = 1;
+			wrot_frm->mat_sel = 8;
+		} else if (profile_in == MML_YCBCR_PROFILE_BT709 &&
+			   profile_out == MML_YCBCR_PROFILE_FULL_BT709) {
+			wrot_frm->mat_en = 1;
+			wrot_frm->mat_sel = 10;
 		}
 	}
 
-	/* Enable dither */
-	if (MML_FMT_10BIT(cfg->info.src.format) && !MML_FMT_10BIT(fmt)) {
+	/* Enable 10-bit input */
+	if (!MML_FMT_10BIT(fmt)) {
 		wrot_frm->mat_en = 1;
-		wrot_frm->dither_con = (0x1 << 10) +
-			 (0x0 << 8) +
-			 (0x0 << 4) +
-			 (0x1 << 2) +
-			 (0x1 << 1) +
-			 (0x1 << 0);
+		/* Enable 10-to-8 dither */
+		if (MML_FMT_10BIT(cfg->info.src.format)) {
+			wrot_frm->dither_con = (0x1 << 10) +
+				 (0x0 << 8) +
+				 (0x0 << 4) +
+				 (0x1 << 2) +
+				 (0x1 << 1) +
+				 (0x1 << 0);
+		}
 	}
 }
 
@@ -1362,8 +1371,9 @@ static s32 wrot_config_frame(struct mml_comp *comp, struct mml_task *task,
 	/* calculate for later config tile use */
 	wrot_calc_hw_buf_setting(wrot, cfg, dest, wrot_frm);
 
-	if (cfg->alpharot) {
+	if (cfg->alpharot || cfg->rgbrot) {
 		wrot_frm->mat_en = 0;
+		wrot_frm->mat_sel = 15;
 
 		if (wrot->data->rb_swap == 1) {
 			if (!MML_FMT_AFBC(src_fmt) && !MML_FMT_10BIT(src_fmt))
@@ -2224,7 +2234,7 @@ static s32 wrot_config_tile(struct mml_comp *comp, struct mml_task *task,
 	}
 
 	/* no bandwidth for racing mode since wrot write to sram */
-	if (cfg->info.mode != MML_MODE_RACING || wrot->data->ir_sram_bw) {
+	if (cfg->info.mode != MML_MODE_RACING) {
 		/* calculate qos for later use */
 		plane = MML_FMT_PLANE(dest->data.format);
 		wrot_frm->datasize += mml_color_get_min_y_size(dest->data.format,
@@ -2408,14 +2418,14 @@ static void wrot_backup_crc(struct mml_comp *comp, struct mml_task *task,
 {
 #if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
 	struct mml_comp_wrot *wrot = comp_to_wrot(comp);
-	struct wrot_frame_data *wrot_frm = wrot_frm_data(ccfg);
+	int ret;
 
 	if (likely(!mml_wrot_crc))
 		return;
 
-	wrot_frm->crc_inst_offset = mml_backup_crc(task, ccfg,
-		comp->base_pa + wrot->reg[VIDO_CRC_VALUE], &task->wrot_crc_idx[ccfg->pipe]);
-	if (!wrot_frm->crc_inst_offset) {
+	ret = cmdq_pkt_backup(task->pkts[ccfg->pipe], comp->base_pa + wrot->reg[VIDO_CRC_VALUE],
+		&task->backup_crc_wdma[ccfg->pipe]);
+	if (ret) {
 		mml_err("%s fail to backup CRC", __func__);
 		mml_wrot_crc = 0;
 	}
@@ -2426,13 +2436,10 @@ static void wrot_backup_crc_update(struct mml_comp *comp, struct mml_task *task,
 	struct mml_comp_config *ccfg)
 {
 #if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
-	struct wrot_frame_data *wrot_frm = wrot_frm_data(ccfg);
-
-	if (!mml_wrot_crc || !wrot_frm->crc_inst_offset)
+	if (!mml_wrot_crc || !task->backup_crc_wdma[ccfg->pipe].inst_offset)
 		return;
 
-	mml_backup_crc_update(task, ccfg, wrot_frm->crc_inst_offset,
-		&task->wrot_crc_idx[ccfg->pipe]);
+	cmdq_pkt_backup_update(task->pkts[ccfg->pipe], &task->backup_crc_wdma[ccfg->pipe]);
 #endif
 }
 
@@ -2620,13 +2627,14 @@ static void wrot_store_crc(struct mml_comp *comp, struct mml_task *task,
 	const u32 pipe = ccfg->pipe;
 	struct mml_comp_wrot *wrot = comp_to_wrot(comp);
 
-	if (!mml_wrot_crc)
+	if (!mml_wrot_crc || !task->backup_crc_wdma[pipe].inst_offset)
 		return;
 
-	task->dest_crc[pipe] = mml_backup_crc_get(task, ccfg, task->wrot_crc_idx[pipe]);
-	mml_msg("%s wrot%d component %u job %u pipe %u crc %#010x idx %u",
+	task->dest_crc[pipe] =
+		cmdq_pkt_backup_get(task->pkts[pipe], &task->backup_crc_wdma[pipe]);
+	mml_msg("%s wrot%d component %2u job %u pipe %u crc %#010x idx %u",
 		__func__, wrot->idx, comp->id, task->job.jobid,
-		ccfg->pipe, task->dest_crc[ccfg->pipe], task->wrot_crc_idx[pipe]);
+		ccfg->pipe, task->dest_crc[pipe], task->backup_crc_wdma[pipe].val_idx);
 #endif
 }
 
@@ -2702,7 +2710,7 @@ static void wrot_debug_dump(struct mml_comp *comp)
 {
 	struct mml_comp_wrot *wrot = comp_to_wrot(comp);
 	void __iomem *base = comp->base;
-	u32 value[36];
+	u32 value[40];
 	u32 debug[33];
 	u32 dbg_id = 0, state, smi_req;
 	u32 shadow_ctrl;
@@ -2769,6 +2777,10 @@ static void wrot_debug_dump(struct mml_comp *comp)
 	value[33] = readl(base + wrot->reg[VIDO_CRC_CTRL]);
 	value[34] = readl(base + wrot->reg[VIDO_CRC_VALUE]);
 	value[35] = readl(base + wrot->reg[VIDO_MAT_CTRL]);
+	value[36] = readl(base + wrot->reg[VIDO_DITHER_CON]);
+	value[37] = readl(base + wrot->reg[VIDO_DITHER]);
+	value[38] = readl(base + wrot->reg[VIDO_AFBC_YUVTRANS]);
+	value[39] = readl(base + wrot->reg[VIDO_BKGD]);
 
 	/* debug id from 0x0100 ~ 0x2100, count 33 which is debug array size */
 	for (i = 0; i < ARRAY_SIZE(debug); i++) {
@@ -2783,8 +2795,10 @@ static void wrot_debug_dump(struct mml_comp *comp)
 		value[3], value[4], value[5]);
 	mml_err("VIDO_IN_SIZE %#010x VIDO_CROP_OFST %#010x VIDO_TAR_SIZE %#010x",
 		value[6], value[7], value[8]);
-	mml_err("VIDO_FRAME_SIZE %#010x VIDO_MAT_CTRL %#010x",
-		value[9], value[35]);
+	mml_err("VIDO_FRAME_SIZE %#010x VIDO_AFBC_YUVTRANS %#010x VIDO_BKGD %#010x",
+		value[9], value[38], value[39]);
+	mml_err("VIDO_MAT_CTRL %#010x VIDO_DITHER_CON %#010x VIDO_DITHER %#010x",
+		value[35], value[36], value[37]);
 	if (value[33] || value[34])
 		mml_err("VIDO_CRC_CTRL %#010x VIDO_CRC_VALUE %#010x", value[33], value[34]);
 	mml_err("VIDO_OFST ADDR_HIGH   %#010x ADDR   %#010x",
@@ -3071,11 +3085,11 @@ const struct of_device_id mml_wrot_driver_dt_match[] = {
 	},
 	{
 		.compatible = "mediatek,mt6899-mml0_wrot",
-		.data = &mt6899_wrot_data,
+		.data = &mt6989_wrot_data,
 	},
 	{
 		.compatible = "mediatek,mt6899-mml1_wrot",
-		.data = &mt6899_wrot_data,
+		.data = &mt6989_wrot_data,
 	},
 	{
 		.compatible = "mediatek,mt6989-mml_wrot",

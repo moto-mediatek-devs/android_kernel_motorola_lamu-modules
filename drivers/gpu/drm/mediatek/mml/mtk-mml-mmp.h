@@ -94,6 +94,7 @@ struct mml_mmp_events_t {
 	mmp_event throughput;
 	mmp_event bandwidth;
 	mmp_event mmdvfs;
+	mmp_event overdue;
 
 	/* events for inline rotate disp addon */
 	mmp_event addon_mml_calc_cfg;
@@ -114,6 +115,8 @@ struct mml_mmp_events_t {
 	mmp_event dpc_dvfs;
 
 	/* events for clock */
+	mmp_event wake_lock;
+	mmp_event wake_unlock;
 	mmp_event mminfra_enable;
 	mmp_event mminfra_disable;
 	mmp_event pw_get;

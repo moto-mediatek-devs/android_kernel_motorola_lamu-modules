@@ -999,6 +999,10 @@ static void get_volt_table_in_thread(struct eemg_det *det)
 	mutex_lock(det->loo_mutex);
 	ndet = (det->loo_role == HIGH_BANK) ?
 		id_to_eemg_det(det->loo_couple) : det;
+	if (ndet == NULL){
+		mutex_unlock(det->loo_mutex);
+		return;
+	}
 	eemg_debug("@@! In %s\n", __func__);
 	read_volt_from_VOP(det);
 	/* Copy volt to volt_tbl_init2 */
@@ -1119,12 +1123,20 @@ static void get_volt_table_in_thread(struct eemg_det *det)
 		if (ndet->volt_policy) {
 			if (i < det->turn_pt) {
 				highdet = id_to_eemg_det(ndet->loo_couple);
+				if (highdet == NULL){
+					mutex_unlock(det->loo_mutex);
+					return;
+				}
 				rm_dvtfix_offset = 0 - highdet->DVTFIXED;
 			} else
 				rm_dvtfix_offset = 0 - ndet->DVTFIXED;
 		} else {
 			if (i < det->turn_pt) {
 				highdet = id_to_eemg_det(ndet->loo_couple);
+				if (highdet == NULL){
+					mutex_unlock(det->loo_mutex);
+					return;
+				}
 				rm_dvtfix_offset = min(
 				((highdet->DVTFIXED * highdet->freq_tbl[i]
 				+ (100 - 1)) / 100),
@@ -1226,7 +1238,7 @@ static void get_volt_table_in_thread(struct eemg_det *det)
 
 	if (0 == (ndet->disabled % 2) && ndet->set_volt_to_upower)
 		ndet->ops->set_volt_gpu(ndet);
-	mutex_unlock(ndet->loo_mutex);
+	mutex_unlock(det->loo_mutex);
 }
 /*
  * Thread for voltage setting
@@ -1238,7 +1250,8 @@ static int eemg_volt_thread_handler(void *data)
 #ifdef CONFIG_EEMG_AEE_RR_REC
 	int temp __maybe_unused = -1;
 #endif
-
+	if (det == NULL)
+		return -1;
 	FUNC_ENTER(FUNC_LV_HELP);
 	do {
 		eemg_debug("In thread handler\n");
@@ -1358,6 +1371,10 @@ static void eemg_init_det(struct eemg_det *det, struct eemg_devinfo *devinfo,
 
 	ret = of_property_read_string_index(node, "eemg_detectors", det_id,
 		&domain);
+	if (ret !=0){
+		eemg_error("of_property_read_string_index error! ret: %d\n", ret);
+		return;
+	}
 	np = of_find_node_by_name(node, domain);
 	if (np) {
 		of_property_read_u32_index(np, "MDES", 0, &efuse_offset);
@@ -1436,7 +1453,11 @@ static void eemg_init_det(struct eemg_det *det, struct eemg_devinfo *devinfo,
 	/* get DVFS frequency table */
 	if (det->ops->get_freq_table_gpu) {
 		h_det = (det->loo_role == HIGH_BANK) ? det:id_to_eemg_det(det->loo_couple);
+		if (h_det == NULL)
+			return;
 		l_det = (det->loo_role == LOW_BANK) ? det:id_to_eemg_det(det->loo_couple);
+		if (l_det == NULL)
+			return;
 		det->ops->get_freq_table_gpu(det, h_det->max_freq_khz, l_det->max_freq_khz);
 	}
 
@@ -1643,6 +1664,8 @@ static void read_volt_from_VOP(struct eemg_det *det)
 	/* Check both high/low bank's voltage are ready */
 	if (det->loo_role != 0) {
 		couple_det = id_to_eemg_det(det->loo_couple);
+		if (couple_det == NULL)
+			return;
 		if ((couple_det->init2_done == 0) ||
 			(couple_det->mon_vop30 == 0) ||
 			(couple_det->mon_vop74 == 0))

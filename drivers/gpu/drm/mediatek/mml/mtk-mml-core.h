@@ -56,10 +56,10 @@ extern int rdma_stash_leading;
 #define mml_qos_force_bw	((mml_qos >> MML_QOS_FORCE_BW_SH) & MML_QOS_FORCE_MASK)
 
 /* 513 to ensure port has good ostd
- * 1536 is the worst bw calculated by DE
+ * 5329 is the worst bw calculated by 1440x3200 RGBA in+out w/ 1.2 overhead
  */
 #define MML_QOS_MIN_BW		513
-#define MML_QOS_MAX_BW		1536
+#define MML_QOS_MAX_BW		5329
 #define MML_QOS_MIN_STASH_BW	17
 
 /* MML couple mode HRT mode, HRT bandwidth to MMQoS and DPC
@@ -96,7 +96,7 @@ extern int mml_log_rec;
 #define MML_LOG_SIZE	(1 << 20)
 
 void mml_save_log_record(const char *fmt, ...);
-void mml_print_log_record(struct seq_file *seq);
+u32 mml_print_log_buffer(char *debug_buffer, u32 buffer_size);
 
 #define _mml_save_log(fmt, args...) do { \
 	struct timespec64 _curr_time; \
@@ -155,9 +155,14 @@ do { \
 
 #ifdef MML_FPGA
 #define _aee_api(...)
+#define _fatal_api(...)
 #else
 #define _aee_api(opt, tag, fmt, args...) \
 	(aee_kernel_warning_api(__FILE__, __LINE__, opt, tag, fmt, ##args))
+
+#define _fatal_api(opt, tag, fmt, args...) \
+	(aee_kernel_fatal_api(__FILE__, __LINE__, opt, tag, fmt, ##args))
+
 #endif
 
 #if IS_ENABLED(CONFIG_MTK_AEE_FEATURE)
@@ -172,6 +177,19 @@ do { \
 		cmdq_util_error_save("[mml][aee] "fmt"\n", ##args); \
 		_aee_api(DB_OPT_MML, tag, fmt, ##args); \
 	} while (0)
+
+#define mml_fatal(key, fmt, args...) \
+	do { \
+		char tag[LINK_MAX]; \
+		int len = snprintf(tag, LINK_MAX, "CRDISPATCH_KEY:%s", key); \
+		if (len >= LINK_MAX) \
+			pr_debug("%s %d len:%d over max:%d\n", \
+				__func__, __LINE__, len, LINK_MAX); \
+		_mml_log("[err][fatal]" fmt, ##args); \
+		_fatal_api(DB_OPT_MML, tag, fmt, ##args); \
+	} while (0)
+
+
 #else
 #define mml_aee(key, fmt, args...) \
 	do { \
@@ -183,6 +201,8 @@ do { \
 		cmdq_aee(fmt" (aee not ready)", ##args); \
 		cmdq_util_error_save("[mml][aee] "fmt"\n", ##args); \
 	} while (0)
+
+#define mml_fatal(args...) mml_aee(##args)
 
 #endif
 
@@ -578,6 +598,7 @@ struct mml_frame_config {
 	bool dual:1;
 	bool alpharot:1;
 	bool alpharsz:1;
+	bool rgbrot:1;
 	bool shadow:1;
 	bool framemode:1;
 	bool nocmd:1;
@@ -698,12 +719,16 @@ struct mml_task {
 	enum mml_adaptor_type adaptor_type;
 	struct kref ref;
 	struct mml_task_pipe pipe[MML_PIPE_CNT];
-	u32 wrot_crc_idx[MML_PIPE_CNT];
-	u32 rdma_crc_idx[MML_PIPE_CNT]; /* rdma or rrot0 and rrot0_2nd */
+	struct cmdq_backup backup_crc_rdma[MML_PIPE_CNT]; /* rdma or rrot0 and rrot0_2nd */
+	struct cmdq_backup backup_crc_wdma[MML_PIPE_CNT];
 	u32 dpc_srt_bw[mml_max_sys];
 	u32 dpc_hrt_bw[mml_max_sys];
 	u32 dpc_srt_write_bw[mml_max_sys];
 	u32 dpc_hrt_write_bw[mml_max_sys];
+
+	struct cmdq_backup perf_prete;
+	struct cmdq_backup perf_dispready;
+	struct cmdq_backup perf_sof;
 
 	/* mml context */
 	struct mml_ctx *ctx;
@@ -1048,7 +1073,7 @@ char *mml_core_get_dump_inst(u32 *size, void **raw, u32 *size_raw);
  *
  * Return:
  */
-struct mml_task *mml_core_create_task(void);
+struct mml_task *mml_core_create_task(u32 jobid);
 
 /**
  * mml_core_destroy_task -

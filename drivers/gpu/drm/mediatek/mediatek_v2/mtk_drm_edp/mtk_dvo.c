@@ -124,7 +124,6 @@ struct mtk_dvo {
 	struct pinctrl_state *pins_dvo;
 	u32 output_fmt;
 	int refcount;
-	bool pclk_enable;
 };
 
 static inline struct mtk_dvo *bridge_to_dvo(struct drm_bridge *b)
@@ -265,8 +264,6 @@ static void mtk_dvo_buffer_ctrl(struct mtk_dvo *dvo)
 
 static void mtk_dvo_pm_ctl(struct mtk_dvo *dvo, bool enable)
 {
-	u32 ret = 0;
-
 	/* DISP_EDPTX_PWR_CON */
 	void *address = ioremap(0x31B50074, 0x1);
 
@@ -540,8 +537,6 @@ static void mtk_dvo_power_off(struct mtk_dvo *dvo)
 	mtk_dvo_enable(dvo, false);
 	clk_disable_unprepare(dvo->engine_clk);
 	clk_disable_unprepare(dvo->tvd_clk);
-	clk_disable_unprepare(dvo->pixel_clk);
-	dvo->pclk_enable = false;
 	clk_disable_unprepare(dvo->hf_fdvo_clk);
 }
 
@@ -559,26 +554,18 @@ static int mtk_dvo_power_on(struct mtk_dvo *dvo)
 		goto err_hf_fdvo;
 	}
 
-	if (!dvo->pclk_enable) {
-		ret = clk_prepare_enable(dvo->pixel_clk);
-		if (ret) {
-			dev_info(dvo->dev, "Failed to enable pixel clock: %d\n", ret);
-			goto err_pixel;
-		}
-	}
-
 	/* set DVO switch 26Mhz crystal */
 	clk_set_parent(dvo->pixel_clk, dvo->dvo_clk);
 
 	ret = clk_prepare_enable(dvo->tvd_clk);
 	if (ret) {
-		dev_info(dvo->dev, "[eDPTX]Failed to enable tvd_clk clock: %d\n", ret);
+		dev_info(dvo->dev, "[eDPTX] Failed to enable tvd_clk clock: %d\n", ret);
 		goto err_tvd;
 	}
 
 	ret = clk_prepare_enable(dvo->engine_clk);
 	if (ret) {
-		dev_info(dvo->dev, "Failed to enable engine clock: %d\n", ret);
+		dev_info(dvo->dev, "[eDPTX] Failed to enable engine clock: %d\n", ret);
 		goto err_refcount;
 	}
 
@@ -587,8 +574,6 @@ static int mtk_dvo_power_on(struct mtk_dvo *dvo)
 err_refcount:
 	clk_disable_unprepare(dvo->tvd_clk);
 err_tvd:
-	clk_disable_unprepare(dvo->pixel_clk);
-err_pixel:
 	clk_disable_unprepare(dvo->hf_fdvo_clk);
 err_hf_fdvo:
 	dvo->refcount--;
@@ -839,11 +824,6 @@ static int mtk_dvo_bridge_attach(struct drm_bridge *bridge,
 	struct mtk_dvo *dvo = bridge_to_dvo(bridge);
 	int ret = 0, retry = 7;
 
-	ret = clk_prepare_enable(dvo->pixel_clk);
-	if (ret)
-		dev_info(dvo->dev, "[eDPTX]Failed to enable pixel clock: %d\n", ret);
-
-	dvo->pclk_enable = true;
 	/* set DVO switch 26Mhz crystal */
 	clk_set_parent(dvo->pixel_clk, dvo->dvo_clk);
 
@@ -898,11 +878,9 @@ static void mtk_dvo_bridge_disable(struct drm_bridge *bridge)
 
 static void mtk_dvo_bridge_enable(struct drm_bridge *bridge)
 {
-	int i = 0;
 	struct mtk_dvo *dvo = bridge_to_dvo(bridge);
 
 	dev_info(dvo->dev, "[eDPTX] %s+\n", __func__);
-
 	mtk_dvo_pm_ctl(dvo, true);
 	if (dvo->pinctrl && dvo->pins_dvo)
 		pinctrl_select_state(dvo->pinctrl, dvo->pins_dvo);
@@ -1050,7 +1028,7 @@ static int mtk_dvo_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		*base_bw = mtk_dvo_get_frame_hrt_bw_base_by_datarate(crtc, dvo);
 	}
 		break;
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	case SET_CRTC_ID:
 	{
 		DDPMSG("%s set %s possible crtcs 0x%x\n", __func__,

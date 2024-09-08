@@ -80,7 +80,7 @@ static DEFINE_MUTEX(layering_info_lock);
 #define DISP_LAYER_RULE_MAX_NUM 1024
 
 #define DISP_EXDMA_LAYER_LIMIT 7
-
+#define DISP_DUAL_EXDMA_LAYER_LIMIT 4
 static struct {
 	enum LYE_HELPER_OPT opt;
 	unsigned int val;
@@ -2337,7 +2337,6 @@ static int _calc_hrt_num(struct drm_device *dev,
 
 	for (i = 0; i < disp_info->layer_num[disp]; i++) {
 		int ovl_idx;
-		int skipped = 0;
 
 		layer_info = &disp_info->input_config[disp][i];
 		if (disp_info->gles_head[disp] == -1 ||
@@ -2376,18 +2375,14 @@ static int _calc_hrt_num(struct drm_device *dev,
 				}
 			}
 
-			if (layer_info->src_width > 40 || skipped == 1) {
-				sum_overlap_w += overlap_w;
-				add_layer_entry(layer_info, true, overlap_w);
-				if ((disp_idx == HRT_PRIMARY) && bw_monitor_is_on) {
-					sum_overlap_w_of_bwm += overlap_w_of_bwm;
-					DDPDBG_BWM("BWM line:%d sum_o_w:%d sum_o_w_of_bwm:%d\n",
-						__LINE__, sum_overlap_w, sum_overlap_w_of_bwm);
-					add_layer_entry_for_compare(layer_info, true,
-						overlap_w_of_bwm);
-				}
-			} else {
-				skipped = 1;
+			sum_overlap_w += overlap_w;
+			add_layer_entry(layer_info, true, overlap_w);
+			if ((disp_idx == HRT_PRIMARY) && bw_monitor_is_on) {
+				sum_overlap_w_of_bwm += overlap_w_of_bwm;
+				DDPDBG_BWM("BWM line:%d sum_o_w:%d sum_o_w_of_bwm:%d\n",
+					__LINE__, sum_overlap_w, sum_overlap_w_of_bwm);
+				add_layer_entry_for_compare(layer_info, true,
+					overlap_w_of_bwm);
 			}
 		} else if (i == disp_info->gles_head[disp]) {
 			/* Add GLES layer */
@@ -3010,12 +3005,19 @@ static int mtk_lye_get_exdma_comp_id(int disp_idx, int layer_idx,
 	if (disp_idx == 0) {
 		if (priv->data->mmsys_id == MMSYS_MT6991) {
 			int exdma_comp = 0;
-
+#if IS_ENABLED(CONFIG_MTK_LCM_DUAL_PORT_SUPPORT)
+			if (layer_idx < (DISP_DUAL_EXDMA_LAYER_LIMIT + fun_lye))
+				exdma_comp = DDP_COMPONENT_OVL_EXDMA3 + ((layer_idx - fun_lye) * 2);
+			else
+				exdma_comp = DDP_COMPONENT_OVL1_EXDMA4 + (layer_idx
+									- DISP_DUAL_EXDMA_LAYER_LIMIT - fun_lye) * 2;
+#else
 			if (layer_idx < (DISP_EXDMA_LAYER_LIMIT + fun_lye))
 				exdma_comp = DDP_COMPONENT_OVL_EXDMA3 + layer_idx - fun_lye;
 			else
 				exdma_comp = DDP_COMPONENT_OVL1_EXDMA3 + layer_idx
 									- DISP_EXDMA_LAYER_LIMIT - fun_lye;
+#endif
 			return exdma_comp;
 		}
 	} else if (disp_idx == 1) {
@@ -3088,10 +3090,25 @@ static int mtk_lye_get_exdma_comp_id(int disp_idx, int layer_idx,
 		else if (priv->data->mmsys_id == MMSYS_MT6989)
 			return DDP_COMPONENT_OVL5_2L;
 		else if (priv->data->mmsys_id == MMSYS_MT6991)
-			return (DDP_COMPONENT_OVL1_EXDMA8 + layer_idx - fun_lye);
+			return (DDP_COMPONENT_OVL1_EXDMA4 + layer_idx - fun_lye);
 		else
 			return DDP_COMPONENT_OVL2_2L;
 	}
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
+	else {
+		struct drm_crtc *crtc = priv->crtc[disp_idx];
+		struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+		int first_exdma_comp = mtk_crtc->first_exdma->id;
+		int exdma_comp = 0;
+
+		if (layer_idx < (DISP_EXDMA_LAYER_LIMIT + fun_lye))
+			exdma_comp = first_exdma_comp + layer_idx - fun_lye;
+		else
+			exdma_comp = first_exdma_comp + layer_idx
+						- DISP_EXDMA_LAYER_LIMIT - fun_lye;
+		return exdma_comp;
+	}
+#endif
 
 	DDPPR_ERR("Invalid disp_idx:%d\n", disp_idx);
 	return DDP_COMPONENT_OVL_EXDMA3;

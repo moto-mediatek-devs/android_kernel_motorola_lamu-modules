@@ -196,7 +196,7 @@ EXPORT_SYMBOL_GPL(soc_init_aud_intf);
 static int soc_alloc_sram(struct usb_offload_buffer *buf, unsigned int size)
 {
 	int ret = 0;
-	struct mtk_audio_usb_mem *audio_sram;
+	struct mtk_audio_usb_mem *audio_sram = NULL;
 
 	if (!aud_intf || !aud_intf->ops->allocate_sram)
 		return -EOPNOTSUPP;
@@ -513,6 +513,14 @@ static int mtk_usb_offload_genpool_allocate_memory(unsigned char **vaddr,
 	if (*vaddr == NULL) {
 		*vaddr = (unsigned char *)gen_pool_dma_zalloc_align(gen_pool_usb_offload,
 									size, paddr, align);
+		/* no enough space on reserved region */
+		if (*vaddr == NULL) {
+			USB_OFFLOAD_ERR("fail to allocate from rsv %s\n",
+				mem_id == USB_OFFLOAD_MEM_DRAM_ID ? "dram" : "sram");
+			*paddr = 0;
+			ret = -ENOMEM;
+		}
+
 		*paddr = gen_pool_virt_to_phys(gen_pool_usb_offload,
 					(unsigned long long)*vaddr);
 	}

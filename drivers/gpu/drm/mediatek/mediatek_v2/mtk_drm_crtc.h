@@ -36,6 +36,8 @@
 #if IS_ENABLED(CONFIG_ARM64)
 #if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
 #define MAX_CRTC 7
+#elif IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
+#define MAX_CRTC 6
 #else
 #define MAX_CRTC 4
 #endif
@@ -46,6 +48,7 @@
 #define OVL_LAYER_NR 12L
 #define MAX_LAYER_NR 20
 #endif
+#define OVL_EXT_LYE_NUM 3
 #define OVL_PHY_LAYER_NR 4L
 #define RDMA_LAYER_NR 1UL
 #define EXTERNAL_INPUT_LAYER_NR 2UL
@@ -1105,6 +1108,7 @@ struct mtk_drm_crtc {
 
 	atomic_t fence_change;
 	atomic_t mml_trigger;
+	int check_trigger_type;
 
 	unsigned int avail_modes_num;
 	struct drm_display_mode *avail_modes;
@@ -1230,6 +1234,7 @@ struct mtk_drm_crtc {
 
 	unsigned int usage_ovl_fmt[MAX_LAYER_NR]; // for mt6989 hrt by larb
 	unsigned int usage_ovl_compr[MAX_LAYER_NR];
+	unsigned int usage_ovl_ext_compr[MAX_LAYER_NR * OVL_EXT_LYE_NUM]; // for mt6899 port bw report
 
 	struct mtk_ddp_comp *last_blender;
 
@@ -1440,6 +1445,7 @@ int mtk_crtc_find_next_comp(struct drm_crtc *crtc, unsigned int ddp_mode,
 int mtk_crtc_find_prev_comp(struct drm_crtc *crtc, unsigned int ddp_mode,
 		enum mtk_ddp_comp_id comp_id);
 void mtk_drm_fake_vsync_switch(struct drm_crtc *crtc, bool enable);
+int mtk_crtc_set_check_trigger_type(struct mtk_drm_crtc *mtk_crtc, int type);
 void mtk_crtc_check_trigger(struct mtk_drm_crtc *mtk_crtc, bool delay,
 		bool need_lock);
 

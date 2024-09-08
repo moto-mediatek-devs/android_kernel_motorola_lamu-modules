@@ -970,7 +970,9 @@ static void mtk_ovl_update_hrt_usage(struct mtk_drm_crtc *mtk_crtc,
 			mtk_crtc->usage_ovl_fmt[(phy_id + lye_id)] = mtk_get_format_bpp(fmt);
 			mtk_crtc->usage_ovl_compr[(phy_id + lye_id)] =
 					plane_state->prop_val[PLANE_PROP_COMPRESS];
-		}
+		} else
+			mtk_crtc->usage_ovl_ext_compr[((phy_id + lye_id) * OVL_EXT_LYE_NUM + ext_lye_id - 1)] =
+					plane_state->prop_val[PLANE_PROP_COMPRESS];
 	}
 }
 
@@ -2158,6 +2160,9 @@ static int mtk_ovl_color_manage(struct mtk_ddp_comp *comp, unsigned int idx,
 	DDPDBG("%s, g, ig, gs, igs <%d><%d><%d><%d>\n",
 		__func__, gamma_en, igamma_en, gamma_sel, igamma_sel);
 
+	DDPDBG("%s, csc_wcg_en, csc_bc_en <%d><%d>\n",
+		__func__, csc_wcg_en, csc_bc_en);
+
 	/* csc combination */
 	if (csc_wcg_en || csc_bc_en)
 		mtk_ovl_csc_combination(csc_wcg_en, ocfbn,
@@ -2169,7 +2174,7 @@ done:
 			     FLD_ELn_IGAMMA_EN(ext_lye_idx - 1));
 		SET_VAL_MASK(wcg_value, wcg_mask, gamma_en,
 			     FLD_ELn_GAMMA_EN(ext_lye_idx - 1));
-		SET_VAL_MASK(wcg_value, wcg_mask, (csc_wcg_en || csc_bc_en) ? 1 : 0,
+		SET_VAL_MASK(wcg_value, wcg_mask, ((csc_wcg_en || csc_bc_en) ? 1 : 0),
 			     FLD_ELn_CSC_EN(ext_lye_idx - 1));
 		SET_VAL_MASK(sel_value, sel_mask, igamma_sel,
 			     FLD_ELn_IGAMMA_SEL(ext_lye_idx - 1));
@@ -2180,7 +2185,7 @@ done:
 			     FLD_Ln_IGAMMA_EN(lye_idx));
 		SET_VAL_MASK(wcg_value, wcg_mask, gamma_en,
 			     FLD_Ln_GAMMA_EN(lye_idx));
-		SET_VAL_MASK(wcg_value, wcg_mask, (csc_wcg_en || csc_bc_en) ? 1 : 0,
+		SET_VAL_MASK(wcg_value, wcg_mask, ((csc_wcg_en || csc_bc_en) ? 1 : 0),
 			     FLD_Ln_CSC_EN(lye_idx));
 		SET_VAL_MASK(sel_value, sel_mask, igamma_sel,
 			     FLD_Ln_IGAMMA_SEL(lye_idx));
@@ -2257,7 +2262,6 @@ static int mtk_ovl_yuv_matrix_convert(enum mtk_drm_dataspace plane_ds)
 			break;
 		}
 		break;
-
 	case MTK_DRM_DATASPACE_STANDARD_BT709:
 	case MTK_DRM_DATASPACE_STANDARD_BT2020:
 	case MTK_DRM_DATASPACE_STANDARD_BT2020_CONSTANT_LUMINANCE:
@@ -4657,7 +4661,10 @@ static int mtk_ovl_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 					port_bw, ~0);
 			}
 			comp->last_hrt_bw = port_bw;
-			if (port_bw && mtk_crtc->usage_ovl_compr[phy_id])
+			if (port_bw && (mtk_crtc->usage_ovl_compr[phy_id]
+						|| mtk_crtc->usage_ovl_ext_compr[phy_id * OVL_EXT_LYE_NUM]
+						|| mtk_crtc->usage_ovl_ext_compr[phy_id * OVL_EXT_LYE_NUM + 1]
+						|| mtk_crtc->usage_ovl_ext_compr[phy_id * OVL_EXT_LYE_NUM + 2]))
 				total_bw += port_bw;
 		}
 
@@ -4686,7 +4693,10 @@ static int mtk_ovl_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 					port_bw, ~0);
 			}
 			comp->last_hrt_bw_other = port_bw;
-			if (port_bw && mtk_crtc->usage_ovl_compr[phy_id + 1])
+			if (port_bw && (mtk_crtc->usage_ovl_compr[phy_id + 1]
+						|| mtk_crtc->usage_ovl_ext_compr[(phy_id + 1) * OVL_EXT_LYE_NUM]
+						|| mtk_crtc->usage_ovl_ext_compr[(phy_id + 1) * OVL_EXT_LYE_NUM + 1]
+						|| mtk_crtc->usage_ovl_ext_compr[(phy_id + 1) * OVL_EXT_LYE_NUM + 2]))
 				total_bw += port_bw;
 		}
 

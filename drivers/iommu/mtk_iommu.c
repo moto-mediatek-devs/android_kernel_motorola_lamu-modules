@@ -1496,6 +1496,10 @@ static irqreturn_t mtk_iommu_isr(int irq, void *dev_id)
 			layer, (write ? "write" : "read"), dom->cfg.arm_v7s_cfg.ttbr,
 			data->protect_base, readl_relaxed(base + REG_MMU_IVRP_PADDR));
 		mtk_iommu_dump_iova(data, IOMMU_BK0, fault_iova);
+#if IS_ENABLED(CONFIG_COMMON_CLK_MT6877_APU) && IS_ENABLED(CONFIG_MTK_IOMMU_DEBUG)
+		if (type == APU_IOMMU)
+			mtk_iommu_dbg_hang_detect(APU_IOMMU, APU_IOMMU0);
+#endif
 		report_custom_iommu_fault(fault_iova, fault_pa, regval, type, id);
 #endif
 #else
@@ -3572,7 +3576,8 @@ static const struct mtk_iommu_plat_data mt6761_data = {
 static const struct mtk_iommu_plat_data mt6765_data = {
 	.m4u_plat      = M4U_MT6765,
 	.flags         = HAS_SUB_COMM | OUT_ORDER_WR_EN | WR_THROT_EN |
-			 NOT_STD_AXI_MODE | SHARE_PGTABLE | HAS_EMI_PM,
+			 NOT_STD_AXI_MODE | SHARE_PGTABLE |
+			 HAS_EMI_PM | PGTABLE_PA_35_EN,
 	.inv_sel_reg   = REG_MMU_INV_SEL_GEN1,
 	.iova_region   = single_domain,
 	.iova_region_nr = ARRAY_SIZE(single_domain),
