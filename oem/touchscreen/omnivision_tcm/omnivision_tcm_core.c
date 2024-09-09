@@ -4472,38 +4472,10 @@ static int ovt_get_tp_info(char *buf, void *arg0)
 
 #define USER_STR_BUFF		PAGE_SIZE
 static unsigned char g_user_buf[USER_STR_BUFF] = {0};
-
-static ssize_t tp_fts_read(struct file *filp, char __user *buff, size_t size, loff_t *pos)
-{
-	u32 len = 0;
-	int retval;
-	LOGN(g_tcm_hcd->pdev->dev.parent, "++\n");
-
-	if (*pos != 0)
-		return 0;
-
-	mutex_lock(&g_tcm_hcd->extif_mutex);
-
-	memset(g_user_buf, 0, USER_STR_BUFF * sizeof(unsigned char));
-
-	retval = ovt_tcm_identify(g_tcm_hcd, false);
-	if (retval < 0) {
-		LOGE(g_tcm_hcd->pdev->dev.parent,
-			"Application firmware is not running\n");
-	}
-
-	len += snprintf(g_user_buf + len, USER_STR_BUFF - len,
-						"Read reg=CMD_IDENTIFY, read_data=%d\n", retval);
-	
-	mutex_unlock(&g_tcm_hcd->extif_mutex);
-	LOGN(g_tcm_hcd->pdev->dev.parent, "--\n");
-	return simple_read_from_buffer(buff, size, pos, g_user_buf, len);
-}
-
 static ssize_t tp_gesture_mode_read(struct file *filp, char __user *buff, size_t size, loff_t *pos)
 {
 	u32 len = 0;
-	LOGN(g_tcm_hcd->pdev->dev.parent, "++\n");
+	LOGD(g_tcm_hcd->pdev->dev.parent, "++\n");
 
 	if (*pos != 0)
 		return 0;
@@ -4518,7 +4490,7 @@ static ssize_t tp_gesture_mode_read(struct file *filp, char __user *buff, size_t
 	*pos += len;
 
 	mutex_unlock(&g_tcm_hcd->extif_mutex);
-	LOGN(g_tcm_hcd->pdev->dev.parent, "--\n");
+	LOGD(g_tcm_hcd->pdev->dev.parent, "--\n");
 	return len;
 }
 
@@ -4584,27 +4556,16 @@ static struct proc_ops proc_tp_gesture_mode_fops = {
 	.proc_write = tp_gesture_mode_write,
 	.proc_lseek = default_llseek,
 };
-static struct proc_ops proc_tp_fts_fops = {
-	.proc_read = tp_fts_read,
-	.proc_write = NULL,
-	.proc_lseek = default_llseek,
-};
 #else
 static struct file_operations proc_tp_gesture_mode_fops = {
 	.read = tp_gesture_mode_read,
 	.write = tp_gesture_mode_write,
 	.llseek = default_llseek,
 };
-static struct proc_ops proc_tp_fts_fops = {
-	.read = tp_fts_read,
-	.write = NULL,
-	.llseek = default_llseek,
-};
 #endif
 
 static proc_node tp_info_proc[] = {
 	{"tp_gesture_mode", NULL, &proc_tp_gesture_mode_fops, false},
-	{"fts_rw_reg", NULL, &proc_tp_fts_fops, false},
 };
 
 static void touch_info_node_init(void)

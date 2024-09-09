@@ -997,24 +997,25 @@ int nvt_apply_gesture_type(void)
 static unsigned char g_user_buf[USER_STR_BUFF] = {0};
 static ssize_t tp_gesture_mode_read(struct file *filp, char __user *buff, size_t size, loff_t *pos)
 {
-	int len;
+	u32 len = 0;
 	NVT_LOG("++\n");
 
 	if (*pos != 0)
 		return 0;
 
-	memset(g_user_buf, 0, USER_STR_BUFF * sizeof(unsigned char));
-
 	if (mutex_lock_interruptible(&ts->lock)) {
 		return -ERESTARTSYS;
 	}
-
-	len = scnprintf(g_user_buf, USER_STR_BUFF - 1, "%d\n", ts->gesture_tpye);
+	memset(g_user_buf, 0, USER_STR_BUFF * sizeof(unsigned char));
+	len += snprintf(g_user_buf + len, USER_STR_BUFF - len,
+						"%d\n", ts->gesture_tpye);
+	if (copy_to_user((char *)buff, g_user_buf, len))
+		NVT_ERR("Failed to copy data to user space\n");
+	*pos += len;
 
 	mutex_unlock(&ts->lock);
 	NVT_LOG("--\n");
-
-	return simple_read_from_buffer(buff, size, pos, g_user_buf, len);
+	return len;
 }
 
 extern int nvt_gesture_mode;
@@ -1059,68 +1060,6 @@ out:
 	return size;
 }
 
-#define FTS_RW_REG 0x23E00
-static ssize_t tp_fts_read(struct file *filp, char __user *buff, size_t size, loff_t *pos)
-{
-	uint8_t regval;
-	int len = 0;
-	uint8_t buf[4] = {0};
-	NVT_LOG("++\n");
-
-	if (*pos != 0)
-		return 0;
-
-	memset(g_user_buf, 0, USER_STR_BUFF * sizeof(unsigned char));
-
-	if (mutex_lock_interruptible(&ts->lock)) {
-		return -ERESTARTSYS;
-	}
-
-	nvt_set_page(FTS_RW_REG);
-	buf[0] = FTS_RW_REG & 0xFF;
-	buf[1] = 0x00;
-	CTP_SPI_READ(ts->client, buf, 2);
-	regval = buf[1];
-	nvt_set_page(ts->mmap->EVENT_BUF_ADDR);
-
-	len += snprintf(g_user_buf + len, USER_STR_BUFF - len,
-						"Read reg=0x23E00, read_data=%hhu\n", regval);
-	mutex_unlock(&ts->lock);
-	NVT_LOG("--\n");
-
-	return simple_read_from_buffer(buff, size, pos, g_user_buf, len);
-}
-
-static ssize_t tp_fts_write(struct file *filp, const char *buff, size_t size, loff_t *pos)
-{
-	char cmd[8] = { 0 };
-	unsigned int input;
-	if ((size) > sizeof(cmd)) {
-		NVT_ERR("ERROR! input length is larger than local buffer\n");
-		return -1;
-	}
-	if (mutex_lock_interruptible(&ts->lock)) {
-		return -ERESTARTSYS;
-	}
-	if (buff != NULL) {
-		if (copy_from_user(cmd, buff, size)) {
-			NVT_ERR("Failed to copy data from user space\n");
-			size = -1;
-			goto out;
-		}
-	}
-	if (sscanf(cmd, "%u", &input) != 1)
-		return -EINVAL;
-	nvt_write_addr(FTS_RW_REG, input);
-	nvt_set_page(ts->mmap->EVENT_BUF_ADDR);
-
-	NVT_LOG("tp_fts_write = %u\n", input);
-out:
-	mutex_unlock(&ts->lock);
-	return size;
-}
-
-
 #if LINUX_VERSION_CODE > KERNEL_VERSION(5, 6, 0)
 typedef struct {
 	char *name;
@@ -1143,27 +1082,16 @@ static struct proc_ops proc_tp_gesture_mode_fops = {
 	.proc_write = tp_gesture_mode_write,
 	.proc_lseek = default_llseek,
 };
-static struct proc_ops proc_tp_fts_fops = {
-	.proc_read = tp_fts_read,
-	.proc_write = tp_fts_write,
-	.proc_lseek = default_llseek,
-};
 #else
 static struct file_operations proc_tp_gesture_mode_fops = {
 	.read = tp_gesture_mode_read,
 	.write = tp_gesture_mode_write,
 	.llseek = default_llseek,
 };
-static struct proc_ops proc_tp_fts_fops = {
-	.read = tp_fts_read,
-	.write = tp_fts_write,
-	.llseek = default_llseek,
-};
 #endif
 
 static proc_node tp_info_proc[] = {
 	{"tp_gesture_mode", NULL, &proc_tp_gesture_mode_fops, false},
-	{"fts_rw_reg", NULL, &proc_tp_fts_fops, false},
 };
 
 static void touch_info_node_init(void)

@@ -514,6 +514,8 @@ static int touch_parse_report(void)
 			}
 			touch_data->gesture_id = data;
 			offset += bits;
+			LOGE(tcm_hcd->pdev->dev.parent,
+				"gesture_id = %x\n", touch_data->gesture_id);
 			break;
 		case TOUCH_FRAME_RATE:
 			bits = config_data[idx++];

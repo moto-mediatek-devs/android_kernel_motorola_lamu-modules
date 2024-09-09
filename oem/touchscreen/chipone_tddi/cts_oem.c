@@ -1691,32 +1691,6 @@ static ssize_t cts_gesture_mode_write(struct file *filp, const char *buff, size_
     boe_cts_gesture_mode = enable;
 	return size;
 }
-
-static ssize_t tp_fts_read(struct file *filp, char __user *buff, size_t size, loff_t *pos)
-{
-	struct chipone_ts_data *cts_data = g_cts_data;
-	struct cts_device *cts_dev = &cts_data->cts_dev;
-
-	u32 len = 0;
-	int retval = -1;
-    unsigned char user_buf[256] = {0};
-	cts_info("++\n");
-
-	if (*pos != 0)
-		return 0;
-
-	if(cts_plat_is_normal_mode(cts_dev->pdata))
-		retval = 0;
-	if (retval < 0) {
-		cts_err("Not found ilitek chip\n");
-	}
-
-	len = snprintf(user_buf, 255, "Read reg=IC_DUMMY, read_data=%d\n", retval);
-
-	cts_info("--\n");
-	return simple_read_from_buffer(buff, size, pos, user_buf, len);
-}
-
 #if LINUX_VERSION_CODE > KERNEL_VERSION(5, 6, 0)
 static struct proc_ops proc_cts_gesture_mode_fops = {
 	.proc_open = cts_gesture_mode_open,
@@ -1724,21 +1698,11 @@ static struct proc_ops proc_cts_gesture_mode_fops = {
 	.proc_write = cts_gesture_mode_write,
 	.proc_lseek = default_llseek,
 };
-static struct proc_ops proc_tp_fts_fops = {
-	.proc_read = tp_fts_read,
-	.proc_write = NULL,
-	.proc_lseek = default_llseek,
-};
 #else
 static struct file_operations proc_cts_gesture_mode_fops = {
 	.open = cts_gesture_mode_open,
 	.read = seq_read,
 	.write = cts_gesture_mode_write,
-	.llseek = default_llseek,
-};
-static struct proc_ops proc_tp_fts_fops = {
-	.read = tp_fts_read,
-	.write = NULL,
 	.llseek = default_llseek,
 };
 #endif
@@ -1830,11 +1794,6 @@ int cts_oem_init(struct chipone_ts_data *cts_data)
 	oem_data->cts_gesture_proc_entry = proc_create_data("tp_gesture_mode", 0664, touch_info_dir, &proc_cts_gesture_mode_fops, cts_data);
 	if (oem_data->cts_gesture_proc_entry == NULL) {
 		cts_err("create /proc/touch_info/tp_gesture_mode Failed!\n");
-		return -1;
-	}
-	oem_data->cts_gesture_proc_entry = proc_create_data("fts_rw_reg", 0644, touch_info_dir, &proc_tp_fts_fops, cts_data);
-	if (oem_data->cts_gesture_proc_entry == NULL) {
-		cts_err("create /proc/touch_info/fts_rw_reg Failed!\n");
 		return -1;
 	}
     cts_data->oem_data = oem_data;

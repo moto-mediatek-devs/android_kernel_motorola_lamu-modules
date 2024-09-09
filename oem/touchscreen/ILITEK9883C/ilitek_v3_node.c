@@ -2186,34 +2186,6 @@ out:
 	mutex_unlock(&ilits->touch_mutex);
 	return size;
 }
-
-static ssize_t tp_fts_read(struct file *filp, char __user *buff, size_t size, loff_t *pos)
-{
-	u32 len = 0;
-	int retval;
-	ILI_INFO("++\n");
-
-	if (*pos != 0)
-		return 0;
-
-	mutex_lock(&ilits->touch_mutex);
-
-	memset(g_user_buf, 0, USER_STR_BUFF * sizeof(unsigned char));
-	ili_ice_mode_ctrl(ENABLE, OFF);
-	retval = ili_ic_dummy_check();
-	if (retval < 0) {
-		ILI_ERR("Not found ilitek chip\n");
-	}
-	ili_ice_mode_ctrl(DISABLE, OFF);
-
-	len += snprintf(g_user_buf + len, USER_STR_BUFF - len,
-						"Read reg=IC_DUMMY, read_data=%d\n", retval);
-
-	mutex_unlock(&ilits->touch_mutex);
-	ILI_INFO("--\n");
-	return simple_read_from_buffer(buff, size, pos, g_user_buf, len);
-}
-
 int ili_get_tp_recore_ctrl(int data)
 {
 	int ret = 0;
@@ -4128,20 +4100,10 @@ static struct proc_ops proc_tp_gesture_mode_fops = {
 	.proc_write = tp_gesture_mode_write,
 	.proc_lseek = default_llseek,
 };
-static struct proc_ops proc_tp_fts_fops = {
-	.proc_read = tp_fts_read,
-	.proc_write = NULL,
-	.proc_lseek = default_llseek,
-};
 #else
 static struct file_operations proc_tp_gesture_mode_fops = {
 	.read = tp_gesture_mode_read,
 	.write = tp_gesture_mode_write,
-	.llseek = default_llseek,
-};
-static struct proc_ops proc_tp_fts_fops = {
-	.read = tp_fts_read,
-	.write = NULL,
 	.llseek = default_llseek,
 };
 #endif
@@ -4451,10 +4413,10 @@ device_destroy:
 	return -ENODEV;
 }
 
+
 proc_node tp_info_proc[] = {
 	{"tp_selftest_result", NULL, &proc_show_selftest_result_fops, false},
 	{"tp_gesture_mode", NULL, &proc_tp_gesture_mode_fops, false},
-	{"fts_rw_reg", NULL, &proc_tp_fts_fops, false},
 };
 
 void touch_info_node_init(void)
