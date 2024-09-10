@@ -96,7 +96,7 @@ static int tap_tap_recv_data(struct data_unit_t *event,
 	if (event->flush_action == FLUSH_ACTION)
 		pr_err("tap_tap do not support flush\n");
 	else if (event->flush_action == DATA_ACTION)
-		err = situation_data_report_t(ID_TAP_TAP,event->taptap,
+		err = situation_data_report_t(ID_TAP_TAP,event->taptap_t.state,
 					(int64_t)event->time_stamp);
 	else if(event->flush_action == CALI_ACTION){
 		pr_err("taptap cali data = %d\n",event->data[0]);

@@ -75,7 +75,7 @@ static int flip_recv_data(struct data_unit_t *event,
 	if (event->flush_action == FLUSH_ACTION)
 		pr_err("flip do not support flush\n");
 	else if (event->flush_action == DATA_ACTION)
-		err = situation_notify_t(ID_FLIP,
+		err = situation_data_report_t(ID_FLIP,event->flip_t.state,
 			(int64_t)event->time_stamp);
 	return err;
 }

@@ -190,7 +190,15 @@ struct fall_t {
 struct tilt_event_t {
 	int32_t state;		/* 0,1 */
 };
+/*TN Begin modified by jiawei.zou 20240909 EKLAMU-207 begin*/
+struct flip_event_t {
+	int32_t state;		/* 1,2 */
+};
 
+struct taptap_event_t {
+	int32_t state;		/* 1,2,3 */
+};
+/*TN Begin modified by jiawei.zou 20240909 EKLAMU-207 end*/
 struct in_pocket_event_t {
 	int32_t state;		/* 0,1 */
 };
@@ -272,7 +280,10 @@ struct data_unit_t {
 		struct light_vec_t rearals;
 		int32_t rearflk;
 // -20240617 wnn add mtk sensor 1.0 flicker support end
-		int32_t taptap;
+/*TN Begin modified by jiawei.zou 20240909 EKLAMU-207 begin*/
+		struct flip_event_t flip_t;
+		struct taptap_event_t taptap_t;
+/*TN Begin modified by jiawei.zou 20240909 EKLAMU-207 end*/
 		int32_t data[8];
 	};
 } __packed;
