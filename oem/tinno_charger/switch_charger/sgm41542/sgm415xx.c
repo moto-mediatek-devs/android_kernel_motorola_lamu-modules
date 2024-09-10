@@ -35,8 +35,6 @@
 #define PHY_MODE_BC11_CLR 2
 #endif
 
-extern void Charger_Detect_Init(void);
-extern void Charger_Detect_Release(void);
 #include "sgm415xx.h"
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
@@ -785,16 +783,24 @@ static int sgm4154x_get_charge_stat(struct sgm4154x_device *sgm)
 	return status;
 }
 
-__maybe_unused static int sgm4154x_set_hiz_en(struct charger_device *chg_dev, bool hiz_en)
+static int sgm4154x_set_hiz_en(struct charger_device *chg_dev, bool hiz_en)
 {
 	u8 reg_val;
 	struct sgm4154x_device *sgm = charger_get_data(chg_dev);
+	int ret = 0;
 
 	pr_info("set %s\n", hiz_en ? "enable" : "disable");
 	reg_val = hiz_en ? SGM4154x_HIZ_EN : 0;
 
-	return sgm4154x_update_bits(sgm, SGM4154x_CHRG_CTRL_0,
+	ret = sgm4154x_update_bits(sgm, SGM4154x_CHRG_CTRL_0,
 			SGM4154x_HIZ_EN, reg_val);
+	if (!ret && !hiz_en) {
+		atomic_set(&sgm->vbus_good_flag, 1);
+		msleep(150);
+		atomic_set(&sgm->vbus_good_flag, 0);
+	}
+
+	return ret;
 }
 
 static int sgm4154x_enable_charger(struct sgm4154x_device *sgm)
@@ -1686,6 +1692,9 @@ static irqreturn_t sgm4154x_irq_handler_thread(int irq, void *private)
 		sgm4154x_set_input_curr_lim(sgm->chg_dev, 100000);
 		sgm4154x_set_ichrg_curr(sgm->chg_dev, 100000);
 		sgm4154x_enable_charger(sgm);
+		if (sgm->state.input_det_done && !atomic_read(&sgm->vbus_good_flag)) {
+			schedule_delayed_work(&sgm->retry_charger_detect_work, msecs_to_jiffies(100));
+		}
 		return IRQ_HANDLED;
 	}
 
@@ -2410,6 +2419,7 @@ static int sgm4154x_driver_probe(struct i2c_client *client,
 
 	mutex_init(&sgm->lock);
 	mutex_init(&sgm->i2c_rw_lock);
+	atomic_set(&sgm->vbus_good_flag, 0);
 
 	i2c_set_clientdata(client, sgm);
 
