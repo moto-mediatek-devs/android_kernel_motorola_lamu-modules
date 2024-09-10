@@ -1062,7 +1062,7 @@ static int z350_psy_notifier_cb(struct notifier_block *nb,
 		}
 	}
 
-	pr_info("enter, power supply name is %s\n", psy->desc->name);
+	pr_debug("enter, power supply name is %s\n", psy->desc->name);
 
 	if (IS_ERR_OR_NULL(chip)) {
 		pr_err("failed to get z350 chip device\n");
@@ -1119,10 +1119,11 @@ static int z350_psy_notifier_cb(struct notifier_block *nb,
 						|| chip->qc3p_type == QC3P_POWER_40W) {
 						pr_info("detect QC3P type\n");
 						qc3p_charger_ready = true;
-					} else if (chip->charger_type == POWER_SUPPLY_TYPE_USB_QC3
+					} else if (chip->charger_type == POWER_SUPPLY_TYPE_USB_QC2
 								&& chip->qc3p_type == QC3P_POWER_NONE) {
 						z350_hard_reset_once(chip);
-						pr_info("get QC3 reset to DCP\n");
+						chip->first_detect_dcp = false;
+						pr_info("get QC2 reset to DCP\n");
 					} else if (chip->charger_type == POWER_SUPPLY_TYPE_USB_DCP
 								&& chip->qc3p_type == QC3P_POWER_NONE) {
 						pr_info("only support DCP adapter, Ignore next detection\n");

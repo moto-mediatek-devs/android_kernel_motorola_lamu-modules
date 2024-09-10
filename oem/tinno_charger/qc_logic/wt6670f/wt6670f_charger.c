@@ -38,6 +38,7 @@
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 #include "charger_class.h"
 #include "mtk_charger.h"
+#include "mtk_musb.h"
 #else
 #include <mt-plat/upmu_common.h>
 #include <mt-plat/v1/charger_class.h>
@@ -318,7 +319,7 @@ __maybe_unused static int wt6670f_read_block(struct wt6670f_charger *chip, u8 re
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-static int charger_detect_init(struct wt6670f_charger *chip)
+__maybe_unused static int charger_detect_init(struct wt6670f_charger *chip)
 {
 	struct phy *phy;
 	int ret;
@@ -340,7 +341,7 @@ static int charger_detect_init(struct wt6670f_charger *chip)
 	return ret;
 }
 
-static int charger_detect_release(struct wt6670f_charger *chip)
+__maybe_unused static int charger_detect_release(struct wt6670f_charger *chip)
 {
 	struct phy *phy;
 	int ret;
@@ -368,17 +369,9 @@ static int wt6670f_set_usbsw_state(struct wt6670f_charger *chip, int state)
 	pr_info("state = %s\n", state ? "usb" : "chg");
 
 	if (state == USBSW_CHG) {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-		charger_detect_init(chip);
-#else
 		Charger_Detect_Init();
-#endif
 	} else {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-		charger_detect_release(chip);
-#else
 		Charger_Detect_Release();
-#endif
 	}
 
 	return 0;
@@ -595,11 +588,7 @@ static void wt6670f_get_charger_type_func_work(struct work_struct *work)
 	charger_dev_set_input_current(chip->charger_dev, 500000);
 
 	charger_dev_enable_dpdm_hz(chip->charger_dev);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-	charger_detect_init(chip);
-#else
 	Charger_Detect_Init();
-#endif
 
 	m_chg_type = 0;
 	wt6670f_start_bc12_detection(chip);
@@ -688,11 +677,7 @@ static void wt6670f_get_charger_type_func_work(struct work_struct *work)
 	break;
 	}
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-	charger_detect_release(chip);
-#else
 	Charger_Detect_Release();
-#endif
 
 	power_supply_changed(chip->qc_phy_psy);
 }
@@ -1381,7 +1366,7 @@ static int wt6670f_psy_notifier_cb(struct notifier_block *nb,
 		}
 	}
 
-	pr_info("enter, power supply name is %s\n", psy->desc->name);
+	pr_debug("enter, power supply name is %s\n", psy->desc->name);
 
 	if (IS_ERR_OR_NULL(chip)) {
 		pr_err("failed to get wt6670f_charger chip device\n");
@@ -1426,6 +1411,7 @@ static int wt6670f_psy_notifier_cb(struct notifier_block *nb,
 					} else if (chip->charger_type == POWER_SUPPLY_TYPE_USB_QC2
 								&& chip->qc3p_type == QC3P_POWER_NONE) {
 						gpio_direction_output(chip->rst_gpio, 1);
+						chip->first_detect_dcp = false;
 						pr_info("get QC2 reset to DCP\n");
 					} else if (chip->charger_type == POWER_SUPPLY_TYPE_USB_DCP
 								&& chip->qc3p_type == QC3P_POWER_NONE) {
