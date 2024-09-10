@@ -24,6 +24,7 @@
 #include <linux/input/mt.h>
 #include <linux/of_gpio.h>
 #include <linux/of_irq.h>
+#include <linux/pinctrl/consumer.h>
 #include "nt36xxx.h"
 
 #if IS_ENABLED(NVT_DRM_PANEL_NOTIFY)
@@ -1608,6 +1609,26 @@ static int32_t nvt_parse_dt(struct device *dev)
 		ret = 0;
 	} else {
 		NVT_LOG("SPI_RD_FAST_ADDR=0x%06X\n", SPI_RD_FAST_ADDR);
+	}
+
+	ts->pinctrl = devm_pinctrl_get(ts->client->controller->dev.parent);
+	if (IS_ERR_OR_NULL(ts->pinctrl)) {
+		NVT_LOG("Failed to get ts->pinctrl handler[need confirm]");
+		ts->pinctrl = NULL;
+	}
+	/* default spi mode */
+	ts->pin_spi_mode_default = pinctrl_lookup_state(
+				ts->pinctrl, "lamu_spi_mode");
+	if (IS_ERR_OR_NULL(ts->pin_spi_mode_default)) {
+		NVT_LOG("Failed to get pinctrl state:%s, ret:%d",
+				"lamu_spi_mode", ret);
+		ts->pin_spi_mode_default = NULL;
+
+	} else {
+		ret = pinctrl_select_state(ts->pinctrl, ts->pin_spi_mode_default);
+		if (ret < 0)
+			NVT_LOG("Failed to select default pinstate, ret:%d", ret);
+		ret = 0;
 	}
 
 	return ret;

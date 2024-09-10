@@ -280,6 +280,8 @@ struct nvt_ts_data {
 	bool charger_plugin;
 	struct work_struct work;
 	struct notifier_block notifier_charger;
+	struct pinctrl *pinctrl;
+	struct pinctrl_state *pin_spi_mode_default;
 };
 
 #if NVT_TOUCH_PROC

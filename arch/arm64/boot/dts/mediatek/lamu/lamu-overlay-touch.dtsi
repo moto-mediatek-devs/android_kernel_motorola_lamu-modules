@@ -1,6 +1,13 @@
 /*[TN.NJDC] touch overlay file.start*/
 &spi2 {
     status = "ok";
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+	pinctrl-names = "default","lamu_spi_mode";
+	pinctrl-0 = <&ctp_lamu_pins_default>;
+	pinctrl-1 = <&ctp_lamu_spi_mode>;
+
     chipone_tddi@0 {
         compatible = "chipone-tddi","omnivision,tcm-spi","novatek,NVT-ts-spi","tchip,ilitek";
         reg = <0>;
@@ -45,5 +52,17 @@
     };
 
 };
-
+&pio {
+	ctp_lamu_pins_default: pins_default {
+	};
+	ctp_lamu_spi_mode: spimode_default {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO25__FUNC_SPI2_CSB>,
+				<PINMUX_GPIO26__FUNC_SPI2_MO>,
+				<PINMUX_GPIO27__FUNC_SPI2_CLK>,
+				<PINMUX_GPIO28__FUNC_SPI2_MI>;
+			drive-strength = <7>;
+		};
+	};
+};
 /*[TN.NJDC] touch overlay file.end*/
