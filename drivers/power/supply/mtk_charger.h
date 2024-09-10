@@ -725,6 +725,7 @@ struct mtk_charger {
 	int ext_chr_type;
 	bool battery_protection_mode;
 	bool is_over_bpm_max_soc;
+	bool demo_mode_limit;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 	//struct pe50_charger_cfg pe50;

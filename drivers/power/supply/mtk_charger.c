@@ -149,6 +149,7 @@ static bool first_insert = true;
 #define SW_JEITA_CV1_CURRENT_LIMIT_GAP		50
 static bool sw_jeita_enter_1A = false;
 static bool sw_jeita_enter_cv1 = false;
+#define DEMO_MODE_LIMIT_SOC_DEFAULT	70
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by jirui.li/860702 20240904 CR/EKLAMU-1339 */
 #ifdef MODULE
@@ -1944,6 +1945,33 @@ static ssize_t turbo_power_mode_store(struct device *dev,
 }
 static DEVICE_ATTR_RW(turbo_power_mode);
 /* TN End modified by jirui.li/860702 20240814 CR/EKLAMU-30 */
+/* TN Begin modified by jirui.li/860702 20240814 CR/EKLAMU-202 */
+static ssize_t demo_mode_limit_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	struct mtk_charger *pinfo = dev->driver_data;
+	chr_err("%s: %d\n", __func__, pinfo->demo_mode_limit);
+	return sprintf(buf, "%d\n", pinfo->demo_mode_limit);
+}
+static ssize_t demo_mode_limit_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t size)
+{
+	struct mtk_charger *pinfo = dev->driver_data;
+	signed int temp;
+	if (kstrtoint(buf, 10, &temp) == 0) {
+		chr_info("%s %s demo_mode_limit\n", __func__, temp ? "enable" : "disable");
+		if (temp == 1)
+			pinfo->demo_mode_limit = true;
+		else
+			pinfo->demo_mode_limit = false;
+	} else
+		chr_err("%s: format error!\n", __func__);
+	return size;
+}
+static DEVICE_ATTR_RW(demo_mode_limit);
+/* TN Begin modified by jirui.li/860702 20240814 CR/EKLAMU-202 */
+
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 
@@ -4277,6 +4305,13 @@ static void charger_check_status(struct mtk_charger *info)
 			}
 		}
 	}
+	if (info->demo_mode_limit) {
+		if (uisoc >= DEMO_MODE_LIMIT_SOC_DEFAULT) {
+			chr_err("enter demo_mode_limit,soc >= %d stop charging!!\n", info->demo_mode_limit);
+			charging = false;
+			goto stop_charging;
+		}
+	}
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by jirui.li/860702 20240814 CR/EKLAMU-1339 */
 	info->setting.vbat_mon_en = true;
@@ -5627,6 +5662,11 @@ static int mtk_charger_setup_files(struct platform_device *pdev)
 	if (ret)
 		goto _out;
 /* TN End modified by jirui.li/860702 20240814 CR/EKLAMU-30 */
+/* TN Begin modified by jirui.li/860702 20240814 CR/EKLAMU-202 */
+	ret = device_create_file(&(pdev->dev), &dev_attr_demo_mode_limit);
+	if (ret)
+		goto _out;
+/* TN End modified by jirui.li/860702 20240814 CR/EKLAMU-202 */
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 
@@ -6393,6 +6433,7 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	info->disable_thermal_current_limit = 0;
 	info->battery_protection_mode = false;
 	info->is_over_bpm_max_soc = false;
+	info->demo_mode_limit = false;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 
