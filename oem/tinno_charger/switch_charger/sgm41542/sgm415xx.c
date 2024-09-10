@@ -1600,11 +1600,11 @@ static void charger_detect_work_func(struct work_struct *work)
 
 	case SGM4154x_UNKNOWN:
 		pr_info("SGM4154x charger type: UNKNOWN\n");
-		sgm->chg_type = POWER_SUPPLY_TYPE_USB_OTHER;
+		sgm->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
-		sgm->psy_usb_type = POWER_SUPPLY_TYPE_USB_OTHER;
+		sgm->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
 #endif
-		sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_APPLE_BRICK_ID;
+		sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_UNKNOWN;
 		if (sgm->force_detect_count < 10) {
 			pr_info("SGM4154x charger type: UNKNOWN, retry bc1.2 count:%d\n", sgm->force_detect_count);
 			schedule_delayed_work(&sgm->retry_charger_detect_work, msecs_to_jiffies(100));
@@ -1613,11 +1613,11 @@ static void charger_detect_work_func(struct work_struct *work)
 
 	case SGM4154x_NON_STANDARD:
 		pr_info("SGM4154x charger type: NON STANDARD\n");
-		sgm->chg_type = POWER_SUPPLY_TYPE_USB_OTHER;
+		sgm->chg_type = POWER_SUPPLY_TYPE_USB_NON_STD;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
-		sgm->psy_usb_type = POWER_SUPPLY_TYPE_USB_OTHER;
+		sgm->psy_usb_type = POWER_SUPPLY_TYPE_USB_NON_STD;
 #endif
-		sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_APPLE_BRICK_ID;
+		sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB_DCP;
 		if (sgm->force_detect_count < 10) {
 			pr_info("SGM4154x charger type: NON STANDARD, retry bc1.2 count:%d\n", sgm->force_detect_count);
 			schedule_delayed_work(&sgm->retry_charger_detect_work, msecs_to_jiffies(100));
@@ -1626,11 +1626,11 @@ static void charger_detect_work_func(struct work_struct *work)
 
 	default:
 		pr_info("SGM4154x charger type: default\n");
-		sgm->chg_type = POWER_SUPPLY_TYPE_USB_OTHER;
+		sgm->chg_type = POWER_SUPPLY_TYPE_USB_NON_STD;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
-		sgm->psy_usb_type = POWER_SUPPLY_TYPE_USB_OTHER;
+		sgm->psy_usb_type = POWER_SUPPLY_TYPE_USB_NON_STD;
 #endif
-		sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_APPLE_BRICK_ID;
+		sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB_DCP;
 		if (sgm->force_detect_count < 10) {
 			pr_info("SGM4154x charger type: Default, retry bc1.2 count:%d\n", sgm->force_detect_count);
 			schedule_delayed_work(&sgm->retry_charger_detect_work, msecs_to_jiffies(100));

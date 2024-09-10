@@ -597,9 +597,9 @@ static void wt6670f_get_charger_type_func_work(struct work_struct *work)
 
 	switch (m_chg_type) {
 	case 0x1: // Floating
-	chip->charger_type = POWER_SUPPLY_TYPE_USB_OTHER;
+	chip->charger_type = POWER_SUPPLY_TYPE_USB_FLOAT;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
-	chip->usb_type = POWER_SUPPLY_USB_TYPE_SDP;
+	chip->usb_type = POWER_SUPPLY_TYPE_USB_FLOAT;
 #endif
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
 	chip->qc3p_type = QC3P_POWER_NONE;

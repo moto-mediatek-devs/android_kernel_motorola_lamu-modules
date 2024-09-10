@@ -5282,6 +5282,10 @@ static char *dump_charger_type(int chg_type, int usb_type)
 		return "std";
 /* TN Begin modified by hao.jia/809321 20240729 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	case POWER_SUPPLY_TYPE_USB_NON_STD:
+		return "Non-std";
+	case POWER_SUPPLY_TYPE_USB_FLOAT:
+		return "Float";
 	case POWER_SUPPLY_TYPE_USB_QC2:
 		return "QC2.0";
 	case POWER_SUPPLY_TYPE_USB_QC3:

@@ -526,7 +526,14 @@ int get_charger_type(struct mtk_charger *info)
 
 /* TN Begin modified by hao.jia/809321 20240727 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_OEM_DEVINFO)
-	chr_err("%s chr_type:%d ext_chr_type:%d\n", __func__, prop2.intval, info->ext_chr_type);
+	if (prop2.intval == POWER_SUPPLY_TYPE_USB_DCP) {
+		if (prop3.intval == POWER_SUPPLY_TYPE_USB_FLOAT)
+			prop2.intval = POWER_SUPPLY_TYPE_USB_FLOAT;
+		else if (prop3.intval == POWER_SUPPLY_TYPE_USB_NON_STD)
+			prop2.intval = POWER_SUPPLY_TYPE_USB_NON_STD;
+	}
+
+	chr_info("%s chr_type:%d ext_chr_type:%d\n", __func__, prop2.intval, info->ext_chr_type);
 	if (oem_pcba_charge_power() == CHARGE_POWER_33W) {
 		get_ext_charger_type(info);
 		if (info->ext_chr_type != POWER_SUPPLY_TYPE_UNKNOWN)

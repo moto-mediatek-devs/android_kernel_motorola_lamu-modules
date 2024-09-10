@@ -247,6 +247,15 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		is_basic = true;
 /* TN Begin modified by hao.jia/809321 20240823 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	} else if (info->chr_type == POWER_SUPPLY_TYPE_USB_FLOAT || info->chr_type == POWER_SUPPLY_TYPE_USB_NON_STD) {
+		/* Float/Non-std Charger */
+		chr_info("[%s]: for Float/Non-STD mode, set charge current:%d, input current:%d\n",
+						__func__, info->data.usb_charger_current, info->data.usb_charger_current);
+		pdata->input_current_limit =
+			info->data.usb_charger_current;
+		pdata->charging_current_limit =
+			info->data.usb_charger_current;
+		is_basic = true;
 	} else if (info->chr_type == POWER_SUPPLY_TYPE_USB_QC2) {
 		/* QC2.0 Charger */
 		chr_info("[%s]: for QC2 mode, set charge current:%d, input current:%d\n",
