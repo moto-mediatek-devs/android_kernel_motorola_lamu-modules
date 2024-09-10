@@ -793,6 +793,14 @@ static void msdc_reset_hw(struct msdc_host *host)
 	u32 val;
 	int ret;
 
+	sdr_set_field(host->base + MSDC_DMA_CTRL, MSDC_DMA_CTRL_STOP, 1);
+	ret = readl_poll_timeout_atomic(host->base + MSDC_DMA_CTRL, val,
+			!(val & MSDC_DMA_CTRL_STOP), 1, MSDC_RESET_HW_TIMEOUT);
+	if (ret) {
+		dev_info(host->dev, "[%s %d]timeout dump\n", __func__, __LINE__);
+		msdc_dump_info(NULL, 0, NULL, host);
+	}
+
 	sdr_set_bits(host->base + MSDC_CFG, MSDC_CFG_RST);
 	ret = readl_poll_timeout_atomic(host->base + MSDC_CFG, val,
 			!(val & MSDC_CFG_RST), 1, MSDC_RESET_HW_TIMEOUT);
@@ -812,13 +820,6 @@ static void msdc_reset_hw(struct msdc_host *host)
 	sdr_set_bits(host->base + MSDC_FIFOCS, MSDC_FIFOCS_CLR);
 	ret = readl_poll_timeout_atomic(host->base + MSDC_FIFOCS, val,
 			!(val & MSDC_FIFOCS_CLR), 1, MSDC_RESET_HW_TIMEOUT);
-	if (ret) {
-		dev_info(host->dev, "[%s %d]timeout dump\n", __func__, __LINE__);
-		msdc_dump_info(NULL, 0, NULL, host);
-	}
-
-	ret = readl_poll_timeout_atomic(host->base + MSDC_DMA_CFG, val,
-			!(val & MSDC_DMA_CFG_STS), 1, MSDC_RESET_HW_TIMEOUT);
 	if (ret) {
 		dev_info(host->dev, "[%s %d]timeout dump\n", __func__, __LINE__);
 		msdc_dump_info(NULL, 0, NULL, host);
@@ -1407,6 +1408,7 @@ static inline u32 msdc_cmd_prepare_raw_cmd(struct msdc_host *host,
 	u32 opcode = cmd->opcode;
 	u32 resp = msdc_cmd_find_resp(host, mrq, cmd);
 	u32 rawcmd = (opcode & 0x3f) | ((resp & 0x7) << 7);
+	u32 blksz = (readl(host->base + SDC_CMD) >> 16) & 0xFFF;
 
 	host->cmd_rsp = resp;
 
@@ -1447,7 +1449,9 @@ static inline u32 msdc_cmd_prepare_raw_cmd(struct msdc_host *host,
 					data->timeout_clks);
 
 		writel(data->blocks, host->base + SDC_BLK_NUM);
-	}
+	} else
+		rawcmd |= blksz << 16;
+
 	return rawcmd;
 }
 
@@ -1462,8 +1466,9 @@ static void msdc_start_data(struct msdc_host *host, struct mmc_request *mrq,
 
 	mod_delayed_work(system_wq, &host->req_timeout, DAT_TIMEOUT);
 	msdc_dma_setup(host, &host->dma, data);
-	sdr_set_bits(host->base + MSDC_INTEN, data_ints_mask);
 	sdr_set_field(host->base + MSDC_DMA_CTRL, MSDC_DMA_CTRL_START, 1);
+	udelay(1);
+	sdr_set_bits(host->base + MSDC_INTEN, data_ints_mask);
 	dev_dbg(host->dev, "DMA start\n");
 	dev_dbg(host->dev, "%s: cmd=%d DMA data: %d blocks; read=%d\n",
 			__func__, cmd->opcode, data->blocks, read);
@@ -2113,21 +2118,6 @@ static bool msdc_data_xfer_done(struct msdc_host *host, u32 events,
 						!(val & MSDC_DMA_CTRL_STOP), 1, 20000);
 		if (ret)
 			dev_info(host->dev, "DMA stop timed out\n");
-
-		sdr_set_bits(host->base + MSDC_FIFOCS, MSDC_FIFOCS_CLR);
-		ret = readl_poll_timeout_atomic(host->base + MSDC_FIFOCS, val,
-				!(val & MSDC_FIFOCS_CLR), 1, MSDC_RESET_HW_TIMEOUT);
-		if (ret) {
-			bitmap_set(host->err_bag.err_bitmap, ERR_MSDC_FIFOCS_CLR_TIMEOUT_BIT, 1);
-			msdc_dump_register_to_buf(host, 0);
-		}
-
-		ret = readl_poll_timeout_atomic(host->base + MSDC_DMA_CFG, val,
-				!(val & MSDC_DMA_CFG_STS), 1, MSDC_RESET_HW_TIMEOUT);
-		if (ret) {
-			bitmap_set(host->err_bag.err_bitmap, ERR_MSDC_DMA_CFG_STS_TIMEOUT_BIT, 1);
-			msdc_dump_register_to_buf(host, 1);
-		}
 
 		spin_lock_irqsave(&host->lock, flags);
 		sdr_clr_bits(host->base + MSDC_INTEN, data_ints_mask);
@@ -3793,10 +3783,6 @@ static int msdc_execute_hs400_tuning(struct mmc_host *mmc, struct mmc_card *card
 		host->dvfsrc_vcore_power ?
 		regulator_get_voltage(host->dvfsrc_vcore_power) : -1);
 
-#if IS_ENABLED(CONFIG_DEVICE_MODULES_MMC_CQHCI_DEBUG)
-	dump_stack();
-#endif
-
 	if (host->top_base) {
 		sdr_set_bits(host->top_base + EMMC50_PAD_DS_TUNE,
 			     PAD_DS_DLY_SEL);// 1:DS pass through
@@ -3855,12 +3841,10 @@ static int msdc_execute_hs400_tuning(struct mmc_host *mmc, struct mmc_card *card
 	dev_info(host->dev,"[%s]msdc tune pass,opcode=%d,vcore=%d",
 		__func__, MMC_SEND_EXT_CSD, host->autok_vcore);
 	host->is_skip_hs200_tune = 1;
-	msdc_reset_hw(host);
 	return 0;
 
 fail:
 	dev_err(host->dev, "Failed to tuning DS pin delay!\n");
-	msdc_reset_hw(host);
 	return -EIO;
 }
 
@@ -4947,6 +4931,23 @@ static int __maybe_unused msdc_runtime_suspend(struct device *dev)
 {
 	struct mmc_host *mmc = dev_get_drvdata(dev);
 	struct msdc_host *host = mmc_priv(mmc);
+	u32 val = 0;
+	int ret = 0;
+
+	if (mmc->caps2 & MMC_CAP2_CQE) {
+#if IS_ENABLED(CONFIG_DEVICE_MODULES_MMC_MTK_SW_CQHCI)
+		if (host->swcq_host)
+			ret = 0;
+#endif
+#if IS_ENABLED(CONFIG_DEVICE_MODULES_MMC_CQHCI)
+		if (host->cq_host)
+			ret = cqhci_suspend(mmc);
+#endif
+		val = readl(host->base + MSDC_INT);
+		writel(val, host->base + MSDC_INT);
+		if (ret)
+			dev_dbg(host->dev, "%s: %d\n", __func__, ret);
+	}
 
 	sdr_clr_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
 	if (host->sdio_irq_cnt == 0 && host->id == MSDC_SDIO) {
