@@ -950,7 +950,9 @@ struct irq_controller {
 #define SHUTDOWN_TIME 40
 #define AVGVBAT_ARRAY_SIZE 30
 #define INIT_VOLTAGE 3450
-#define BATTERY_SHUTDOWN_TEMPERATURE 60
+/* TN Begin modified by jirui.li/860702 20240911 CR/EKLAMU-131 */
+#define BATTERY_SHUTDOWN_TEMPERATURE 70
+/* TN End modified by jirui.li/860702 20240911 CR/EKLAMU-131 */
 #define DISABLE_POWER_PATH_VOLTAGE 2800
 
 struct shutdown_condition {
