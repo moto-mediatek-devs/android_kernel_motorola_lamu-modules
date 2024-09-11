@@ -1278,8 +1278,14 @@ static int bs_psy_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_VOLTAGE:
 		if (IS_ERR_OR_NULL(bs_data->chg_psy)) {
+/* TN Begin modified by xinjun.lu/860715 20240911 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_SWITCH_CHARGER)
+			bs_data->chg_psy = power_supply_get_by_name("primary_chg");
+#else
 			bs_data->chg_psy = devm_power_supply_get_by_phandle(
 				bm->dev, "charger");
+#endif
+/* TN End modified by xinjun.lu/860715 20240911 CR/EKLAMU-202 */
 			pr_err("%s retry to get chg_psy\n", __func__);
 		}
 		if (IS_ERR_OR_NULL(bs_data->chg_psy)) {
@@ -1408,6 +1414,13 @@ static void mtk_battery_external_power_changed(struct power_supply *psy)
 					}
 					power_supply_put(dv2_chg_psy);
 				}
+/* TN Begin modified by xinjun.lu/860715 20240911 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+			} else if (status.intval == POWER_SUPPLY_STATUS_DISCHARGING) {
+				bs_data->bat_status =
+					POWER_SUPPLY_STATUS_DISCHARGING;
+#endif
+/* TN End modified by xinjun.lu/860715 20240911 CR/EKLAMU-202 */
 			} else {
 				bs_data->bat_status =
 					POWER_SUPPLY_STATUS_CHARGING;
@@ -1418,6 +1431,11 @@ static void mtk_battery_external_power_changed(struct power_supply *psy)
 		if (status.intval == POWER_SUPPLY_STATUS_FULL
 			&& bm->b_EOC != true) {
 			pr_err("POWER_SUPPLY_STATUS_FULL, EOC\n");
+/* TN Begin modified by xinjun.lu/860715 20240911 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+			bs_data->bat_status = POWER_SUPPLY_STATUS_FULL;
+#endif
+/* TN End modified by xinjun.lu/860715 20240911 CR/EKLAMU-202 */
 			gauge_get_int_property(bm->gm1, GAUGE_PROP_BAT_EOC);
 			bm_send_cmd(bm, MANAGER_NOTIFY_CHR_FULL, 0);
 			pr_err("GAUGE_PROP_BAT_EOC done\n");
@@ -1910,7 +1928,13 @@ static int mtk_bm_probe(struct platform_device *pdev)
 
 	kthread_run(battery_manager_routine_thread, bm, "battery_manager_thread");
 
+/* TN Begin modified by xinjun.lu/860715 20240911 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_SWITCH_CHARGER)
+	bm->bs_data.chg_psy = power_supply_get_by_name("primary_chg");
+#else
 	bm->bs_data.chg_psy = devm_power_supply_get_by_phandle(&pdev->dev, "charger");
+#endif
+/* TN End modified by xinjun.lu/860715 20240911 CR/EKLAMU-202 */
 	if (IS_ERR_OR_NULL(bm->bs_data.chg_psy))
 		pr_err("[%s]Fail to get chg_psy!\n", __func__);
 
