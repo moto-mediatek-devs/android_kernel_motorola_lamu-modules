@@ -787,20 +787,12 @@ static int sgm4154x_set_hiz_en(struct charger_device *chg_dev, bool hiz_en)
 {
 	u8 reg_val;
 	struct sgm4154x_device *sgm = charger_get_data(chg_dev);
-	int ret = 0;
 
 	pr_info("set %s\n", hiz_en ? "enable" : "disable");
 	reg_val = hiz_en ? SGM4154x_HIZ_EN : 0;
 
-	ret = sgm4154x_update_bits(sgm, SGM4154x_CHRG_CTRL_0,
+	return sgm4154x_update_bits(sgm, SGM4154x_CHRG_CTRL_0,
 			SGM4154x_HIZ_EN, reg_val);
-	if (!ret && !hiz_en) {
-		atomic_set(&sgm->vbus_good_flag, 1);
-		msleep(150);
-		atomic_set(&sgm->vbus_good_flag, 0);
-	}
-
-	return ret;
 }
 
 static int sgm4154x_enable_charger(struct sgm4154x_device *sgm)
@@ -1641,9 +1633,7 @@ static void charger_detect_work_func(struct work_struct *work)
 			pr_info("SGM4154x charger type: Default, retry bc1.2 count:%d\n", sgm->force_detect_count);
 			schedule_delayed_work(&sgm->retry_charger_detect_work, msecs_to_jiffies(100));
 		}
-		__pm_relax(sgm->charger_wakelock);
-		//break;
-		return;
+		break;
 	}
 
 	if (sgm->state.chrg_type == SGM4154x_USB_SDP || sgm->state.chrg_type == SGM4154x_USB_CDP) {
@@ -1692,8 +1682,8 @@ static irqreturn_t sgm4154x_irq_handler_thread(int irq, void *private)
 		sgm4154x_set_input_curr_lim(sgm->chg_dev, 100000);
 		sgm4154x_set_ichrg_curr(sgm->chg_dev, 100000);
 		sgm4154x_enable_charger(sgm);
-		if (sgm->state.input_det_done && !atomic_read(&sgm->vbus_good_flag)) {
-			schedule_delayed_work(&sgm->retry_charger_detect_work, msecs_to_jiffies(100));
+		if (sgm->state.input_det_done) {
+			schedule_delayed_work(&sgm->charge_detect_delayed_work, msecs_to_jiffies(50));
 		}
 		return IRQ_HANDLED;
 	}
@@ -2419,7 +2409,6 @@ static int sgm4154x_driver_probe(struct i2c_client *client,
 
 	mutex_init(&sgm->lock);
 	mutex_init(&sgm->i2c_rw_lock);
-	atomic_set(&sgm->vbus_good_flag, 0);
 
 	i2c_set_clientdata(client, sgm);
 
