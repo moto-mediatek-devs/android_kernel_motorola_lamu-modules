@@ -9,4 +9,3 @@ obj-y += audiopa/
 obj-y += nfc/
 obj-y += audiopa_aw/
 obj-y += tinno_dre_mode/
-obj-y += qlc/
