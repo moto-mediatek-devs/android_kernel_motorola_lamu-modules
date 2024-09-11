@@ -806,6 +806,9 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 		info->ffc_zones = NULL;
 #endif /* CONFIG_OEM_TURBO_CHARGER */
 /* TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+	/*	PDtest */
+	if (of_property_read_u32(np, "enable-pdtest-mode", &val)>= 0)
+		info->en_cts_mode = val;
 
 	/*	dual parallel battery*/
 	np = of_parse_phandle(dev->of_node, "current-selector", 0);
@@ -4875,10 +4878,16 @@ static int mtk_charger_plug_out(struct mtk_charger *info)
 	info->charger_thread_polling = false;
 	info->dpdmov_stat = false;
 	info->lst_dpdmov_stat = false;
+	info->power_path_en = true;
+	info->en_power_path = true;
 
+	pdata1->usb_input_current_limit = -1;
+	pdata1->pd_input_current_limit = -1;
 	pdata1->disable_charging_count = 0;
 	pdata1->input_current_limit_by_aicl = -1;
 	pdata2->disable_charging_count = 0;
+	if (pdata1->thermal_input_current_limit == -1)
+		pdata1->input_current_limit = 15000;
 
 	notify.evt = EVT_PLUG_OUT;
 	notify.value = 0;
@@ -6007,7 +6016,8 @@ static int psy_charger_set_property(struct power_supply *psy,
 #endif /* CONFIG_OEM_TURBO_CHARGER */
 /*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 		info->chg_data[idx].thermal_charging_current_limit =
-			val->intval;
+			val->intval & UNLIMIT_CURRENT_MASK ?
+			-1 : val->intval;
 /* TN Begin modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 		if (info->disable_thermal_current_limit) {
@@ -6018,8 +6028,17 @@ static int psy_charger_set_property(struct power_supply *psy,
 /* TN End modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
 		break;
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
-		info->chg_data[idx].thermal_input_current_limit =
-			val->intval;
+		if (val->intval & USB_CURRENT_MASK) {
+			if (info->en_cts_mode)
+				info->chg_data[idx].usb_input_current_limit =
+				val->intval & UNLIMIT_CURRENT_MASK ?
+				-1 : (val->intval & ~(USB_CURRENT_MASK)) * 1000;
+		} else {
+			info->chg_data[idx].thermal_input_current_limit =
+			val->intval & UNLIMIT_CURRENT_MASK ?
+			-1 : val->intval;
+		}
+
 /* TN Begin modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 		if (info->disable_thermal_current_limit) {
@@ -6109,6 +6128,7 @@ int notify_adapter_event(struct notifier_block *notifier,
 	u32 boot_mode = 0;
 	bool report_psy = true;
 	int index = 0;
+	int i = 0;
 	struct info_notifier_block *ta_nb;
 
 	ta_nb = container_of(notifier, struct info_notifier_block, nb);
@@ -6165,6 +6185,7 @@ int notify_adapter_event(struct notifier_block *notifier,
 		_wake_up_charger(pinfo);
 		/* PD30 is ready */
 		break;
+
 	case MTK_TYPEC_WD_STATUS:
 		chr_err("wd status = %d\n", *(bool *)val);
 		pinfo->water_detected = *(bool *)val;
@@ -6180,6 +6201,24 @@ int notify_adapter_event(struct notifier_block *notifier,
 		}
 		mtk_chgstat_notify(pinfo);
 		report_psy = boot_mode == 8 || boot_mode == 9;
+		break;
+	case MTK_SINK_VBUS:
+		if (pinfo->en_cts_mode) {
+			for (i = 0; i < CHGS_SETTING_MAX; i++)
+				pinfo->chg_data[i].pd_input_current_limit = *(int *)val * 1000;
+			// charger_dev_set_input_current(pinfo->chg1_dev, *(int *)val);
+			if ((*(int *)val) < 100) {
+				if (pinfo->power_path_en) {
+					mtk_charger_force_disable_power_path(pinfo, CHG1_SETTING,
+					true);	// for pdtest, speed up job
+					pinfo->power_path_en = false;
+				}
+				pinfo->en_power_path = false;
+			}
+			chr_err("mtk get sink vbus ma = %d, pp= %d\n", *(int *)val,
+			pinfo->power_path_en);
+			_wake_up_charger(pinfo);
+		}
 		break;
 	}
 	chr_debug("%s: evt: pd:%d, ufcs:%d\n", __func__,
@@ -6250,6 +6289,8 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	for (i = 0; i < CHGS_SETTING_MAX; i++) {
 		info->chg_data[i].thermal_charging_current_limit = -1;
 		info->chg_data[i].thermal_input_current_limit = -1;
+		info->chg_data[i].usb_input_current_limit = -1;
+		info->chg_data[i].pd_input_current_limit = -1;
 		info->chg_data[i].input_current_limit_by_aicl = -1;
 	}
 	info->enable_hv_charging = true;
@@ -6427,6 +6468,8 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	}
 
 	info->is_charging = false;
+	info->power_path_en = true;
+	info->en_power_path = true;
 	info->safety_timer_cmd = -1;
 	info->cmd_pp = -1;
 

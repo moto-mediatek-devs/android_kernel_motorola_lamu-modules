@@ -191,8 +191,7 @@
 			operating-points-v2 = <&cluster0_opp>;
 			dynamic-power-coefficient = <85>;
 			capacity-dmips-mhz = <427>;
-			cpu-idle-states = <&cpuoff_l &clusteroff_l
-						&mcusysoff &s2idle>;
+
 		};
 
 		cpu1: cpu@001 {
@@ -732,7 +731,7 @@
 
 	infracfg_ao: infracfg_ao@10001000 {
 		compatible = "mediatek,common-infracfg_ao", "mediatek,mt6781-infracfg_ao",
-			"mediatek,infracfg_ao", "syscon";
+			"mediatek,infracfg_ao", "syscon", "simple-mfd";
 		reg = <0 0x10001000 0 0x1000>;
 		#clock-cells = <1>;
 
@@ -1217,14 +1216,11 @@
 				ccipll {
 					fh-id = <3>;
 				};
-				gpupll {
+				mfgpll {
 					fh-id = <4>;
 				};
 				mpll {
 					fh-id = <5>;
-				};
-				mempll {
-					fh-id = <6>;
 				};
 				mainpll {
 					fh-id = <7>;
@@ -1232,11 +1228,14 @@
 				msdcpll {
 					fh-id = <8>;
 				};
-				adsppll {
+				mmpll {
 					fh-id = <9>;
 				};
-				tvdpll {
+				adsppll {
 					fh-id = <10>;
+				};
+				tvdpll {
+					fh-id = <11>;
 				};
 			};
 	};

@@ -49,7 +49,7 @@ module_param(mml_dc, int, 0644);
 int mml_hrt_overhead = 100;
 module_param(mml_hrt_overhead, int, 0644);
 
-int mml_max_layers = MML_MAX_LAYER;
+int mml_max_layers;
 module_param(mml_max_layers, int, 0644);
 
 struct mml_drm_ctx {
@@ -305,7 +305,7 @@ enum mml_mode mml_drm_query_frame(struct mml_drm_ctx *dctx, struct mml_frame_inf
 		 * not increase after read. And it's safe to do one more mdp
 		 * decouple w/o mml couple/dc conflict.
 		 */
-		mml_log("[drm]%s mode %u to mdp dc or mml dc2 couple %d",
+		mml_msg("[drm]%s mode %u to mdp dc or mml dc2 couple %d",
 			__func__, mode, mml_dev_get_couple_cnt(dctx->ctx.mml));
 		if (tp->op->support_dc2 && tp->op->support_dc2())
 			mode = MML_MODE_MML_DECOUPLE2;
@@ -356,8 +356,11 @@ int mml_drm_query_multi_layer(struct mml_drm_ctx *dctx,
 	u32 remain[mml_max_sys] = {0};
 	u32 mml_layer_cnt = 0;
 	u32 i;
-	s32 max_layer = min(mml_max_layers, MML_MAX_LAYER);
 	bool couple_used = false;
+	struct mml_dev *mml = dctx->ctx.mml;
+	s32 max_layer = mml_max_layers ? mml_max_layers : mml_max_layer(mml);
+
+	max_layer = min(max_layer, MML_MAX_LAYER);
 
 	if (!duration_us)
 		duration_us = MML_MAX_DUR;
@@ -414,8 +417,13 @@ int mml_drm_query_multi_layer(struct mml_drm_ctx *dctx,
 
 		infos[i].mode = mode;
 
-		if (mode == MML_MODE_DIRECT_LINK || mode == MML_MODE_RACING)
-			couple_used = true;
+		if (mode == MML_MODE_DIRECT_LINK || mode == MML_MODE_RACING) {
+			if (unlikely(couple_used)) {
+				mml_err("[drm][query]layer %u skip multi couple layer", i);
+				mode = MML_MODE_NOT_SUPPORT;
+			} else
+				couple_used = true;
+		}
 
 		mml_mmp(query_layer, MMPROFILE_FLAG_PULSE,
 			i << 16 | (atomic_read(&dctx->ctx.job_serial) & 0xffff), mode);
@@ -571,23 +579,33 @@ static bool mml_drm_check_configs_idle_locked(struct mml_drm_ctx *dctx, bool war
 {
 	struct mml_ctx *ctx = &dctx->ctx;
 	struct mml_frame_config *cfg;
-	bool idle = false;
+	bool idle = true;
 
 	list_for_each_entry(cfg, &ctx->configs, entry) {
 		if (!list_empty(&cfg->await_tasks)) {
-			if (warn)
-				mml_log("[drm]%s await_tasks not empty", __func__);
-			goto done;
+			idle = false;
+			if (!warn)
+				goto done;
+			mml_log("[drm]%s await_tasks not empty", __func__);
 		}
 
 		if (!list_empty(&cfg->tasks)) {
-			if (warn)
-				mml_log("[drm]%s tasks not empty", __func__);
-			goto done;
+			struct mml_task *task;
+
+			idle = false;
+			if (!warn)
+				goto done;
+
+			task = list_first_entry(&cfg->tasks, typeof(*task), entry);
+
+			mml_log("[drm]%s tasks not empty mode %d head task job %u task cnt (%u %u %hhu)",
+				__func__, cfg->info.mode, task->job.jobid,
+				cfg->await_task_cnt,
+				cfg->run_task_cnt,
+				cfg->done_task_cnt);
 		}
 	}
 
-	idle = true;
 done:
 	return idle;
 }
@@ -660,7 +678,7 @@ static void drm_task_frame_done(struct mml_task *task)
 	}
 
 done:
-	if (!mml_drm_check_configs_idle_locked(dctx, false))
+	if (mml_drm_check_configs_idle_locked(dctx, false))
 		complete(&dctx->idle);
 	mutex_unlock(&ctx->config_mutex);
 
@@ -1162,6 +1180,8 @@ bool mml_drm_ctx_idle(struct mml_drm_ctx *dctx)
 {
 	struct mml_ctx *ctx = &dctx->ctx;
 	bool idle = true;
+
+	mml_drm_kick_done(dctx);
 
 	mutex_lock(&ctx->config_mutex);
 	if (!mml_drm_check_configs_idle_locked(dctx, true)) {

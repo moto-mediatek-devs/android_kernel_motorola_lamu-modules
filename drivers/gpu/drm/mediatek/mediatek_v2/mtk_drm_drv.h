@@ -30,6 +30,7 @@
 //#define DRM_BYPASS_PQ
 //#define DRM_OVL_SELF_PATTERN
 //#define MTK_DSI1_SUPPORT_DSC1
+//#define MTK_DSI2_SUPPORT_R2Y0
 
 #define MTK_DRM_FENCE_SUPPORT
 #if IS_ENABLED(CONFIG_MTK_CMDQ_MBOX_EXT)
@@ -315,6 +316,8 @@ struct mtk_drm_private {
 
 	unsigned int srt_channel_bw_sum[MAX_CRTC][BW_CHANNEL_NR];
 	unsigned int total_srt[MAX_CRTC];
+	unsigned int no_hwc_layers;
+	unsigned int no_hwc_overlap;
 };
 
 struct mtk_drm_property {

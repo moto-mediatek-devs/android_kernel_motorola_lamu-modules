@@ -69,11 +69,13 @@ void mml_mmp_init(void)
 	mml_mmp_events.mutex_dis = mmprofile_register_event(parent, "mutex_disable");
 
 	parent = mml_mmp_events.taskdone;
+	mml_mmp_events.dlo = mmprofile_register_event(parent, "dlo");
 	mml_mmp_events.irq_loop = mmprofile_register_event(parent, "irq_loop");
 	mml_mmp_events.irq_err = mmprofile_register_event(parent, "irq_err");
 	mml_mmp_events.irq_done = mmprofile_register_event(parent, "irq_done");
 	mml_mmp_events.irq_stop = mmprofile_register_event(parent, "irq_stop");
 	mml_mmp_events.fence_sig = mmprofile_register_event(parent, "fence_sig");
+	mml_mmp_events.m2m_sig = mmprofile_register_event(parent, "m2m_sig");
 
 	parent = mml_mmp_events.dvfs;
 	mml_mmp_events.throughput = mmprofile_register_event(parent, "throughput");
