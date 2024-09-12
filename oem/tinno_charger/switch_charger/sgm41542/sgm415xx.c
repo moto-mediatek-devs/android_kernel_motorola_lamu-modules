@@ -1688,6 +1688,14 @@ static irqreturn_t sgm4154x_irq_handler_thread(int irq, void *private)
 		if (sgm->state.input_det_done) {
 			schedule_delayed_work(&sgm->charge_detect_delayed_work, msecs_to_jiffies(50));
 		}
+
+		/*
+		 * sgm415xx can't generate interrupts when booting with cable connected.
+		 * so we trigger the interrupt callback manullay in probe.
+		 * manully interrupt will enter here firstly. we should clear flags here for hvdcp algorithm.
+		 */
+		sgm->force_detect_count = 0;
+		allow_set_dp_dm_vol = true;
 		return IRQ_HANDLED;
 	}
 
