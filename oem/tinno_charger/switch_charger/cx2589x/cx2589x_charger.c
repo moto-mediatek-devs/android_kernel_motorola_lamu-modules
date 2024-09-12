@@ -784,6 +784,9 @@ static int cx2589x_get_charge_stat(struct cx2589x_device *cx)
 		status = POWER_SUPPLY_STATUS_FULL;
 #endif
 
+	if (cx->battery_full)
+		status = POWER_SUPPLY_STATUS_FULL;
+
 	return status;
 }
 
@@ -1650,7 +1653,7 @@ static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
 #else
 	schedule_delayed_work(&cx->charge_detect_delayed_work, 100);
 #endif
-	//power_supply_changed(sgm->charger);
+	//power_supply_changed(cx->charger);
 	return IRQ_HANDLED;
 }
 
@@ -1995,6 +1998,27 @@ static int cx2589x_enable_otg(struct charger_device *chg_dev, bool en)
 	return ret;
 }
 
+static int cx2589x_do_event(struct charger_device *chg_dev, u32 event, u32 args)
+{
+	struct cx2589x_device *cx = charger_get_data(chg_dev);
+
+	pr_info("event:%d\n", event);
+
+	switch (event) {
+	case EVENT_FULL:
+		cx->battery_full = true;
+		break;
+	case EVENT_RECHARGE:
+	case EVENT_DISCHARGE:
+		cx->battery_full = false;
+		break;
+	default:
+		break;
+	}
+	power_supply_changed(cx->charger);
+	return 0;
+}
+
 __maybe_unused static int cx2589x_set_boost_voltage_limit(
 		struct charger_device *chg_dev, u32 uV)
 {
@@ -2208,6 +2232,7 @@ static struct charger_ops cx2589x_chg_ops = {
 	/* DPDM */
 	.set_dp = cx2589x_set_dp,
 	.set_dm = cx2589x_set_dm,
+	.event = cx2589x_do_event,
 };
 
 static ssize_t dump_reg_ctrl_write(struct file *filp,
@@ -2345,6 +2370,7 @@ static int cx2589x_driver_probe(struct i2c_client *client,
 	cx->bc12_retried = 0;
 	cx->client = client;
 	cx->dev = dev;
+	cx->battery_full = false;
 
 	mutex_init(&cx->lock);
 	mutex_init(&cx->i2c_rw_lock);

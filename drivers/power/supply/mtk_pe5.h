@@ -311,6 +311,13 @@ extern int pe50_hal_enable_chip(struct chg_alg_device *alg, enum chg_idx chgidx,
 				bool en);
 extern int pe50_hal_enable_hz(struct chg_alg_device *alg, enum chg_idx chgidx,
 			      bool en);
+/* TN Begin modified by xinjun.lu/860715 20240912 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+extern int pe50_hal_enable_termination(struct chg_alg_device *alg, enum chg_idx chgidx,
+			      bool en);
+#endif
+/* TN End modified by xinjun.lu/860715 20240912 CR/EKLAMU-202 */
+
 extern int pe50_hal_set_vbusovp(struct chg_alg_device *alg, enum chg_idx chgidx,
 				u32 mV);
 extern int pe50_hal_set_ibusocp(struct chg_alg_device *alg, enum chg_idx chgidx,

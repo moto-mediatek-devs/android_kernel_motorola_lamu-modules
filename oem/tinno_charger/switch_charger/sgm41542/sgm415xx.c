@@ -780,6 +780,9 @@ static int sgm4154x_get_charge_stat(struct sgm4154x_device *sgm)
 		status = POWER_SUPPLY_STATUS_FULL;
 #endif
 
+	if (sgm->battery_full)
+		status = POWER_SUPPLY_STATUS_FULL;
+
 	return status;
 }
 
@@ -2030,13 +2033,16 @@ static int sgm4154x_do_event(struct charger_device *chg_dev, u32 event, u32 args
 #else
 	switch (event) {
 	case EVENT_FULL:
+		sgm->battery_full = true;
+		break;
 	case EVENT_RECHARGE:
 	case EVENT_DISCHARGE:
-		power_supply_changed(sgm->charger);
+		sgm->battery_full = false;
 		break;
 	default:
 		break;
 	}
+	power_supply_changed(sgm->charger);
 #endif
 	return 0;
 }
@@ -2445,6 +2451,7 @@ static int sgm4154x_driver_probe(struct i2c_client *client,
 		return ret;
 	}
 
+	sgm->battery_full = false;
 	/* otg regulator */
 	s_chg_dev_otg = sgm->chg_dev;
 

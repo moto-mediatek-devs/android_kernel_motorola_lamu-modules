@@ -262,6 +262,7 @@ struct cx2589x_device {
 	struct iio_channel *vbus;
 	int force_detect_count;
 	int bc12_retried;
+	bool battery_full;
 };
 
 #endif /* _CX2589x_CHARGER_H__ */

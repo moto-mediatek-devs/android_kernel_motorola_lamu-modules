@@ -328,6 +328,21 @@ int pe50_hal_enable_hz(struct chg_alg_device *alg, enum chg_idx chgidx, bool en)
 	return charger_dev_enable_hz(hal->chgdevs[chgtyp], en);
 }
 
+/* TN Begin modified by xinjun.lu/860715 20240912 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+int pe50_hal_enable_termination(struct chg_alg_device *alg,
+	enum chg_idx chgidx, bool en)
+{
+	int chgtyp = to_chgtyp(chgidx);
+	struct pe50_hal *hal = chg_alg_dev_get_drv_hal_data(alg);
+
+	if (chgtyp < 0)
+		return chgtyp;
+	return charger_dev_enable_termination(hal->chgdevs[chgtyp], en);
+}
+#endif
+/* TN End modified by xinjun.lu/860715 20240912 CR/EKLAMU-202 */
+
 int pe50_hal_set_vbusovp(struct chg_alg_device *alg, enum chg_idx chgidx,
 			 u32 mV)
 {

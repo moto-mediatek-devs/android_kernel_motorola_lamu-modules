@@ -87,6 +87,13 @@ extern int g_thermal_charging_current_limit;
 
 #endif /* CONFIG_OEM_TURBO_CHARGER */
 
+/* TN Begin modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+bool adapter_support_pe50 = false;
+EXPORT_SYMBOL(adapter_support_pe50);
+#endif
+/* TN End modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
+
 #define SW_BAT_VOLT_COMP_UV	16000
 #define SW_BAT_REDU_CURR_MA	2000
 /*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
@@ -108,16 +115,24 @@ static void select_cv(struct mtk_charger *info)
 			info->setting.cv = info->sw_jeita.cv;
 			return;
 		}
-/*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+/*TN Begin modified by hao.jia/809321 20240907 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
 	if ((turbo_charger_active == true) && (info->sw_jeita.sm == TEMP_T2_TO_T3)) {
 		constant_voltage = FFC_BAT_VOLT_MAX_UV;
 	} else
 #endif /* CONFIG_OEM_TURBO_CHARGER */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	if (!IS_ERR_OR_NULL(info->current_alg) &&
+			info->current_alg->alg_id == PE5_ID &&
+			chg_alg_is_algo_running(info->current_alg) &&
+			info->sw_jeita.sm == TEMP_T2_TO_T3) {
+		constant_voltage = info->pe50.target_fv;
+	} else
+#endif /* CONFIG_PE50_FFC_SUPPORT */
+/*TN End modified by hao.jia/809321 20240907 CR/EKLAMU-202 */
 	{
 		constant_voltage = info->data.battery_cv;
 	}
-/*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 	info->setting.cv = constant_voltage;
 }
 
@@ -369,14 +384,19 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		}
 	}
 
-/* TN Begin modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
+/* TN Begin modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
 	if (!IS_ERR_OR_NULL(info->current_alg) && info->current_alg->alg_id == PE5_ID) {
 		pdata->charging_current_limit = ((info->pe50.target_fcc < 0) ? 0 : info->pe50.target_fcc);
 		info->pe50.target_usb = pdata->input_current_limit;
 	}
+	if (adapter_support_pe50) {
+		if (info->pe50.pres_chrg_step == STEP_FULL_PE50) {
+			pdata->charging_current_limit = 0;
+		}
+	}
 #endif
-/* TN End modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
+/* TN End modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
 
 	sc_select_charging_current(info, pdata);
 
@@ -508,7 +528,7 @@ static int do_algorithm(struct mtk_charger *info)
 	int cs_ir_cmp = 0;
 
 	pdata = &info->chg_data[CHG1_SETTING];
-/*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+/*TN Begin modified by hao.jia/809321 20240909 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
 	if ((turbo_charger_active == true) && (info->sw_jeita.sm == TEMP_T2_TO_T3)) {
 		if (info->pres_chrg_step == STEP_FULL) {
@@ -520,10 +540,18 @@ static int do_algorithm(struct mtk_charger *info)
 			ffc_batt_full = false;
 	} else
 #endif /* CONFIG_OEM_TURBO_CHARGER */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	if (adapter_support_pe50) {
+		if (info->pe50.pres_chrg_step == STEP_FULL_PE50)
+			chg_done = true;
+		chr_info("%s:chg_done=%d\n", __func__, chg_done);
+	} else
+#endif
 	{
 		charger_dev_is_charging_done(info->chg1_dev, &chg_done);
 	}
-/*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
+/*TN End modified by hao.jia/809321 20240909 CR/EKLAMU-202 */
+
 	is_basic = select_charging_current_limit(info, &info->setting);
 
 	if (info->cschg1_dev && info->cs_with_gauge

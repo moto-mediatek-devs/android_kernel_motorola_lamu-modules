@@ -16,6 +16,12 @@
 #include "mtk_charger_algorithm_class.h"
 #include "mtk_pe5.h"
 
+/* TN Begin modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+extern bool adapter_support_pe50;
+#endif
+/* TN End modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
+
 static int log_level = PE50_INFO_LEVEL;
 module_param(log_level, int, 0644);
 
@@ -958,6 +964,15 @@ static int pe50_set_dvchg_charging(struct pe50_algo_info *info, bool en)
 			PE50_ERR("set swchg hz fail(%d)\n", ret);
 			return ret;
 		}
+/* TN Begin modified by xinjun.lu/860715 20240912 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+		ret = pe50_hal_enable_termination(info->alg, CHG1, false);
+		if (ret < 0) {
+			PE50_ERR("set swchg termination fail(%d)\n", ret);
+			return ret;
+		}
+#endif
+/* TN End modified by xinjun.lu/860715 20240912 CR/EKLAMU-202 */
 	}
 	ret = pe50_enable_dvchg_charging(info, PE50_DVCHG_MASTER, en);
 	if (ret < 0)
@@ -4008,6 +4023,16 @@ static int pe50_is_algo_ready(struct chg_alg_device *alg)
 		goto out;
 	}
 	ret = ALG_READY;
+
+/* TN Begin modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+	if (info->data->ta_auth_data.pdp >= PE50_ENTER_POWER_MIN)
+		adapter_support_pe50 = true;
+	else
+		adapter_support_pe50 = false;
+#endif
+/* TN End modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
+
 out:
 	mutex_unlock(&data->lock);
 	return ret;
