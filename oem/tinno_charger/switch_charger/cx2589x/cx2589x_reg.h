@@ -242,12 +242,10 @@ struct cx2589x_device {
 #endif
 	struct regulator_dev *otg_rdev;
 
-	struct delayed_work charge_detect_delayed_work;
+	struct delayed_work charger_type_detect_work;
 	struct delayed_work charge_monitor_work;
-	struct delayed_work charge_usb_detect_work;
-	struct delayed_work charge_force_dpdm_work;
-	/* resolve EKLAMU-3431*/
-	struct delayed_work charger_bc12_retry_work;
+	struct delayed_work unknow_charger_type_detect_work;
+	struct delayed_work retry_charger_detect_work;
 	struct notifier_block pm_nb;
 	bool cx2589x_suspend_flag;
 
@@ -261,8 +259,11 @@ struct cx2589x_device {
 	int batt_curr;
 	struct iio_channel *vbus;
 	int force_detect_count;
-	int bc12_retried;
 	bool battery_full;
+	int unknow_detect_count;
+	bool fake_sdp_type;
+	bool unknow_type_check;
+	bool typec_attached;
 };
 
 #endif /* _CX2589x_CHARGER_H__ */

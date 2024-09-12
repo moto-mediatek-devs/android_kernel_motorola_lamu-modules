@@ -63,8 +63,12 @@
 extern bool turbo_charger_active;
 extern bool ffc_batt_full;
 #endif
-//static bool allow_set_dp_dm_vol = false;
 
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+#include <tinno_charger.h>
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+
+static bool allow_set_dp_dm_vol = false;
 static int cx2589x_set_boost_current_limit(struct charger_device *chg_dev, u32 uA);
 static int cx2589x_enable_otg(struct charger_device *chg_dev, bool en);
 
@@ -82,7 +86,8 @@ static int cx2589x_enable_otg(struct charger_device *chg_dev, bool en);
 #define R_VBUS_CHARGER_1   330
 #define R_VBUS_CHARGER_2   39
 
-#define BC12_RETRY_CNT 5
+#define BC12_RETRY_COUNT     10
+#define UNKNOW_RETRY_COUNT    3
 
 static struct proc_dir_entry *entry;
 static bool dump_reg_enable;
@@ -106,9 +111,7 @@ static const struct charger_properties cx2589x_chg_props = {
  *********************************************************/
 static struct power_supply_desc cx2589x_power_supply_desc;
 static struct charger_device *s_chg_dev_otg;
-static int no_usb_flag = 0;
-static int force_dpdm_count = 0;
-static bool usb_detect_flag = false;
+
 
 /**********************************************************
  *
@@ -568,9 +571,11 @@ static int cx2589x_force_vindpm(struct cx2589x_device *cx, bool en)
 			CX2589x_FORCE_VINDPM_MASK, (u8)en << 7);
 }
 
-__maybe_unused static int cx2589x_force_dpdm(struct cx2589x_device *cx)
+static int cx2589x_force_dpdm(struct cx2589x_device *cx)
 {
 	int ret;
+
+	pr_info("enter\n");
 
 	cx2589x_update_bits(cx, CX2589x_REG_15, CX2589x_DP_VSEL_MASK, 0x1 << 5);  //dp=0v
 	cx2589x_update_bits(cx, CX2589x_REG_15, CX2589x_DM_VSEL_MASK, 0x1 << 2);  //dm=0v
@@ -581,6 +586,31 @@ __maybe_unused static int cx2589x_force_dpdm(struct cx2589x_device *cx)
 	ret = cx2589x_update_bits(cx, CX2589x_REG_02, CX2589x_FORCE_DPDM_MASK, CX2589x_FORCE_DPDM_MASK);
 
 	return ret;
+}
+
+static void retry_charger_detect_work_func(struct work_struct *work)
+{
+	struct cx2589x_device *cx = NULL;
+	int ret;
+
+	cx = container_of(work, struct cx2589x_device, retry_charger_detect_work.work);
+	if (IS_ERR_OR_NULL(cx)) {
+		pr_err("Cann't get cx2589x_device\n");
+		return;
+	}
+
+	Charger_Detect_Init();
+
+	ret = cx2589x_force_dpdm(cx);
+	if (ret < 0) {
+		pr_err("Cann't force dpdm\n");
+		return;
+	}
+
+	cx->force_detect_count++;
+	schedule_delayed_work(&cx->charger_type_detect_work, msecs_to_jiffies(500));
+
+	return;
 }
 
 static int cx2589x_set_input_volt_lim(struct charger_device *chg_dev, unsigned int vindpm)
@@ -675,7 +705,7 @@ static int cx2589x_get_input_mincurr_lim(struct charger_device *chg_dev,u32 *ili
 
 static int cx2589x_get_state(struct cx2589x_device *cx, struct cx2589x_state *state)
 {
-	u8 chrg_stat,therm_stat;
+	u8 chrg_stat, therm_stat;
 	u8 fault;
 	u8 chrg_param_0, chrg_param_1, chrg_param_2;
 	int ret;
@@ -701,7 +731,7 @@ static int cx2589x_get_state(struct cx2589x_device *cx, struct cx2589x_state *st
 	}
 	state->therm_stat = !!(therm_stat & CX2589x_THERM_STAT);
 
-	pr_info("chrg_type=0x%x, chrg_stat=0x%x online=%d\n",
+	pr_info("chrg_type:0x%x, chrg_stat:0x%x, online:%d\n",
 		state->chrg_type >> 5, state->chrg_stat >> 3, state->online);
 
 	ret = cx2589x_read_reg(cx, CX2589x_REG_0C, &fault);
@@ -790,7 +820,7 @@ static int cx2589x_get_charge_stat(struct cx2589x_device *cx)
 	return status;
 }
 
-__maybe_unused static int cx2589x_set_hiz_en(struct charger_device *chg_dev, bool hiz_en)
+static int cx2589x_set_hiz_en(struct charger_device *chg_dev, bool hiz_en)
 {
 	u8 reg_val;
 	struct cx2589x_device *cx = charger_get_data(chg_dev);
@@ -1116,10 +1146,21 @@ static int cx2589x_charger_set_property(struct power_supply *psy,
 	switch (prop) {
 	case POWER_SUPPLY_PROP_ONLINE:
 		if (val->intval == 2) {
-			pr_info("attach is %d, start charger detection\n", val->intval);
-			schedule_delayed_work(&cx->charge_detect_delayed_work, msecs_to_jiffies(1000));
+			pr_info("attach is %d, start charger detection %d\n", val->intval, cx->state.hiz_en);
+			cx->typec_attached = true;
+			if (!cx->fake_sdp_type) {
+				schedule_delayed_work(&cx->charger_type_detect_work, msecs_to_jiffies(300));
+			} else {
+				/*
+				 * due to pd phy will generate 2 interrupts when plug in very slowly.
+				 * need force dpdm for new bc1.2 detection for clearing the fake sdp type.
+				 */
+				pr_info("force dpdm for plug in slowly\n");
+				schedule_delayed_work(&cx->retry_charger_detect_work, msecs_to_jiffies(50));
+			}
 		} else if (val->intval == 0) {
 			pr_info("attach is %d, vbus not online\n", val->intval);
+			cx->typec_attached = false;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 			cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
 #endif
@@ -1131,7 +1172,9 @@ static int cx2589x_charger_set_property(struct power_supply *psy,
 			 * we should set it back to enable when plug out the charger for next time auto detect.
 			 */
 			cx2589x_update_bits(cx, CX2589x_REG_02, CX2589x_AUTO_DPDM_MASK, 1);
-			cancel_delayed_work(&cx->charge_detect_delayed_work);
+			cancel_delayed_work(&cx->charger_type_detect_work);
+			cancel_delayed_work(&cx->unknow_charger_type_detect_work);
+			cancel_delayed_work(&cx->retry_charger_detect_work);
 			power_supply_changed(cx->charger);
 		}
 		break;
@@ -1377,7 +1420,7 @@ out:
 
 static int cx2589x_set_dp(struct charger_device *chg_dev, u32 volt);
 
-static void charger_detect_work_func(struct work_struct *work)
+static void charger_type_detect_work_func(struct work_struct *work)
 {
 	struct cx2589x_device *cx = NULL;
 	struct cx2589x_state state;
@@ -1385,11 +1428,12 @@ static void charger_detect_work_func(struct work_struct *work)
 	u8 fault, status, val;
 	u8 retry_otg = 10;
 
-	cx = container_of(work, struct cx2589x_device, charge_detect_delayed_work.work);
+	cx = container_of(work, struct cx2589x_device, charger_type_detect_work.work);
 	if (IS_ERR_OR_NULL(cx)) {
 		pr_err("Cann't get cx2589x_device\n");
-		return ;
+		return;
 	}
+
 
 	if (!cx->charger_wakelock->active)
 		__pm_stay_awake(cx->charger_wakelock);
@@ -1401,7 +1445,6 @@ static void charger_detect_work_func(struct work_struct *work)
 
 	if (!cx->state.vbus_gd) {
 		pr_err("Vbus not present\n");
-		cx->bc12_retried = 0;
 		//cx2589x_disable_charger(cx);
 		cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
 		cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
@@ -1410,7 +1453,6 @@ static void charger_detect_work_func(struct work_struct *work)
 
 	if (!state.online) {
 		pr_err("Vbus not online\n");
-		cx->bc12_retried = 0;
 		cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
 		cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
 		goto err;
@@ -1418,24 +1460,24 @@ static void charger_detect_work_func(struct work_struct *work)
 
 	switch(cx->state.chrg_type) {
 	case CX2589x_USB_SDP:
-#if 0
-		if (!usb_detect_flag)
-			schedule_delayed_work(&cx->charge_usb_detect_work, 5 * HZ);
-		if (no_usb_flag == 0){
+#if 1
+		if (cx->fake_sdp_type == false) {
 			pr_info("CX2589x charger type: SDP\n");
 			cx->chg_type = POWER_SUPPLY_TYPE_USB;
 			cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_SDP;
+			cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB;
 		} else {
-			pr_info("CX2589x charger type: UNKNOWN/FLOAT\n");
-			cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
-			cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
+			pr_info("CX2589x charger type: FLOAT\n");
+			cx->chg_type = POWER_SUPPLY_TYPE_USB_FLOAT;
+			cx->psy_usb_type = POWER_SUPPLY_TYPE_USB_FLOAT;
+			cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB_DCP;
 		}
 #else
 		pr_info("CX2589x charger type: SDP\n");
 		cx->chg_type = POWER_SUPPLY_TYPE_USB;
 		cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_SDP;
-#endif
 		cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB;
+#endif
 		break;
 
 	case CX2589x_USB_CDP:
@@ -1454,15 +1496,13 @@ static void charger_detect_work_func(struct work_struct *work)
 
 	case CX2589x_NON_STANDARD:
 		pr_info("CX2589x charger type: NON STANDARD\n");
-		cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
-		cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_SDP;
-		cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB;
+		cx->chg_type = POWER_SUPPLY_TYPE_USB_NON_STD;
+		cx->psy_usb_type = POWER_SUPPLY_TYPE_USB_NON_STD;
+		cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB_DCP;
 
-		/* resolve EKLAMU-3431*/
-		if(cx->bc12_retried < BC12_RETRY_CNT) {
-			cx->bc12_retried ++;
-			pr_info("CX2589x retry bc12 count %d\n", cx->bc12_retried);
-			schedule_delayed_work(&cx->charger_bc12_retry_work, msecs_to_jiffies(100));
+		if (cx->force_detect_count < BC12_RETRY_COUNT) {
+			pr_info("CX2589x charger type: NON STANDARD, retry bc1.2 count:%d\n", cx->force_detect_count);
+			schedule_delayed_work(&cx->retry_charger_detect_work, msecs_to_jiffies(100));
 		}
 		break;
 
@@ -1470,20 +1510,29 @@ static void charger_detect_work_func(struct work_struct *work)
 		pr_info("CX2589x charger type: UNKNOWN\n");
 		cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
 		cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
-		cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB;
+		cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_UNKNOWN;
+
+		if (cx->force_detect_count < BC12_RETRY_COUNT) {
+			pr_info("CX2589x charger type: UNKNOWN, retry bc1.2 count:%d\n", cx->force_detect_count);
+			schedule_delayed_work(&cx->retry_charger_detect_work, msecs_to_jiffies(100));
+		}
 		break;
 
 	default:
 		pr_info("CX2589x charger type: default\n");
-		cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
-		cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
-		cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB;
+		cx->chg_type = POWER_SUPPLY_TYPE_USB_NON_STD;
+		cx->psy_usb_type = POWER_SUPPLY_TYPE_USB_NON_STD;
+		cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB_DCP;
+
+		if (cx->force_detect_count < BC12_RETRY_COUNT) {
+			pr_info("CX2589x charger type: default, retry bc1.2 count:%d\n", cx->force_detect_count);
+			schedule_delayed_work(&cx->retry_charger_detect_work, msecs_to_jiffies(100));
+		}
 		break;
-		//return;
 	}
 
 	if (cx->state.chrg_type == CX2589x_USB_SDP || cx->state.chrg_type == CX2589x_USB_CDP) {
-		charger_detect_release(cx);
+		Charger_Detect_Release();
 	/*
 	 * due to the cx25890h will pull up the DP voltage to 0.6V after the DCP detected.
 	 * we should set Auto DPDM enable func to disable to pull down the DP voltage for QC3+ detection.
@@ -1496,7 +1545,7 @@ static void charger_detect_work_func(struct work_struct *work)
 #endif
 	}
 
-	pr_info("Update: chg_type = 0x%x, psy_usb_type = 0x%x\n", cx->chg_type, cx->psy_usb_type);
+	pr_info("Update: chg_type:%d, psy_usb_type:%d\n", cx->chg_type, cx->psy_usb_type);
 
 	//otg retry
 	ret = cx2589x_read_reg(cx, CX2589x_REG_0C, &fault);
@@ -1526,71 +1575,48 @@ err:
 	return;
 }
 
-static void charger_usb_detect_work_func(struct work_struct *work)
+static void unknow_charger_type_detect_work_func(struct work_struct *work)
 {
-	struct delayed_work *charge_usb_detect_work = NULL;
 	struct cx2589x_device *cx = NULL;
-	//struct cx2589x_state state;
+	struct cx2589x_state state;
+	int gadget_state = USB_STATE_NOTATTACHED;
 
-	//int ret;
-
-	charge_usb_detect_work = container_of(work, struct delayed_work, work);
-	if (charge_usb_detect_work == NULL) {
-		pr_err("Cann't get charge_usb_detect_work\n");
-		return ;
-	}
-
-	cx = container_of(charge_usb_detect_work, struct cx2589x_device, charge_usb_detect_work);
-	if (cx == NULL) {
-		pr_err("Cann't get cx2589x_device\n");
-		return ;
-	}
-
-	usb_detect_flag = true;
-	pr_info("enter\n");
-#if 0
-	if (cx->usb2_phy->otg->gadget){
-		//ret = usb_gadget_connect(cx->usb2_phy->otg->gadget);
-		pr_err("gadget->state: %d\n", cx->usb2_phy->otg->gadget->state);
-		if (cx->usb2_phy->otg->gadget->state == 0) {
-			do {
-				pr_err("SDP retry:%d\n", force_dpdm_count);
-				cx2589x_force_dpdm(cx);
-				msleep(1000);
-				cx2589x_get_state(cx, &state);
-				if (state.chrg_type != CX2589x_USB_SDP)
-					break;
-				msleep(2000);
-			} while (force_dpdm_count-- > 0);
-			if (state.chrg_type == CX2589x_USB_SDP)
-				no_usb_flag = 1;
-		} else {
-			no_usb_flag = 0;
-		}
-
-		pr_err("exit\n");
-		schedule_delayed_work(&cx->charge_detect_delayed_work, 0);
-	}
-#endif
-	return;
-}
-
-/* resolve EKLAMU-3431*/
-static void charger_bc12_retry_work_func(struct work_struct *work) {
-
-	struct cx2589x_device *cx = NULL;
-
-	cx = container_of(work, struct cx2589x_device, charger_bc12_retry_work.work);
+	cx = container_of(work, struct cx2589x_device,
+			unknow_charger_type_detect_work.work);
 	if (IS_ERR_OR_NULL(cx)) {
 		pr_err("Cann't get cx2589x_device\n");
-		return ;
+		return;
 	}
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-	charger_detect_init(cx);
-#endif
-	cx2589x_force_dpdm(cx);
-	msleep(1000);
-	schedule_delayed_work(&cx->charge_detect_delayed_work, msecs_to_jiffies(50));
+
+	pr_info("enter\n");
+
+	if (!IS_ERR_OR_NULL(cx->usb2_phy->otg->gadget)) {
+		cx->unknow_type_check = true;
+		do {
+			gadget_state = cx->usb2_phy->otg->gadget->state;
+			pr_info("gadget state:%d\n", gadget_state);
+			if (gadget_state != USB_STATE_NOTATTACHED) {
+				cx->fake_sdp_type = false;
+				break;
+			}
+			pr_info("unknow type retry:%d\n", cx->unknow_detect_count);
+			Charger_Detect_Init();
+			cx2589x_force_dpdm(cx);
+			msleep(500);
+			cx2589x_get_state(cx, &state);
+			if (state.chrg_type != CX2589x_USB_SDP)
+				break;
+			cx->unknow_detect_count++;
+		} while (cx->unknow_detect_count < UNKNOW_RETRY_COUNT);
+
+		if (state.chrg_type == CX2589x_USB_SDP)
+			cx->fake_sdp_type = true;
+
+		schedule_delayed_work(&cx->charger_type_detect_work, msecs_to_jiffies(50));
+	}
+
+	pr_err("exit\n");
+	return;
 }
 
 static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
@@ -1609,6 +1635,15 @@ static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
 		return IRQ_HANDLED;
 	}
 
+	/*
+	 * due to cx2589x will trigger an remove interrupt when set Hiz enable.
+	 * we should ignore this remove for maintaining the USB communication.
+	 */
+	if (state.hiz_en && cx->typec_attached) {
+		pr_info("hiz enable caused interrupt, ignore handler\n");
+		return IRQ_HANDLED;
+	}
+
 	mutex_lock(&cx->lock);
 	prev_vbus_gd = cx->state.vbus_gd;
 	prev_online = cx->state.online;
@@ -1620,38 +1655,30 @@ static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
 		cx2589x_set_input_curr_lim(cx->chg_dev, 100000);
 		cx2589x_set_ichrg_curr(cx->chg_dev, 100000);
 		cx2589x_enable_charger(cx);
+		schedule_delayed_work(&cx->charger_type_detect_work, msecs_to_jiffies(50));
 		return IRQ_HANDLED;
 	}
 
 	if (!prev_vbus_gd && cx->state.vbus_gd) {
-		cx->bc12_retried = 0;
-#if 0
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-		charger_detect_init(cx);
-#else
-		Charger_Detect_Init();
-#endif
-		cx->force_detect_count = 0;
-		allow_set_dp_dm_vol = true;
-#endif
 		pr_info("adapter/usb inserted\n");
+		Charger_Detect_Init();
+		cx->force_detect_count = 0;
+		cx->unknow_detect_count = 0;
+		cx->fake_sdp_type = false;
+		cx->unknow_type_check = false;
+		allow_set_dp_dm_vol = true;
 	} else if (prev_vbus_gd && !cx->state.vbus_gd) {
-		cx->bc12_retried = 0;
 		pr_info("adapter/usb removed\n");
-#if 0
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
-		charger_detect_release(cx);
-#else
 		Charger_Detect_Release();
-#endif
-		//cx2589x_set_dpdm_hiz(cx);
+		cx2589x_set_dpdm_hiz(cx);
 		allow_set_dp_dm_vol = false;
-#endif
-	} else if (!prev_vbus_gd && !cx->state.vbus_gd) {
-		cx->bc12_retried = 0;
+		cx->force_detect_count = 0;
+		cx->unknow_detect_count = 0;
+		cx->fake_sdp_type = false;
+		cx->unknow_type_check = false;
 	}
 #else
-	schedule_delayed_work(&cx->charge_detect_delayed_work, 100);
+	schedule_delayed_work(&cx->charger_type_detect_work, msecs_to_jiffies(100));
 #endif
 	//power_supply_changed(cx->charger);
 	return IRQ_HANDLED;
@@ -2133,22 +2160,20 @@ static int cx2589x_plug_in(struct charger_device *chg_dev)
 	/* Enable charging */
 	ret = cx2589x_enable_charger(cx);
 	if (ret) {
-		pr_err("Failed to enable charging:%d\n", ret);
+		pr_err("Failed to enable charging(%d)\n", ret);
 	}
-#if 0
-	if (cx->usb2_phy->otg->gadget){
-		ret = usb_gadget_connect(cx->usb2_phy->otg->gadget);
-		pr_err("gadget->state: %d\n",cx->usb2_phy->otg->gadget->state);
-	}
-#endif
-	force_dpdm_count = 3;
-	no_usb_flag = 0;
-	usb_detect_flag = false;
 
 	ret = cx2589x_get_state(cx, &state);
 	if (ret) {
 		pr_err("Failed to get state(%d)\n", ret);
 	}
+
+	/*
+	 * due to cx2589x will report SDP type when plug Float/unknow type.
+	 * we should queue a work to check weather it is a Float/unknow type or a real SDP type.
+	 */
+	if (!cx->unknow_type_check && cx->chg_type == POWER_SUPPLY_TYPE_USB)
+		schedule_delayed_work(&cx->unknow_charger_type_detect_work, msecs_to_jiffies(1500));
 
 	mutex_lock(&cx->lock);
 	cx->state = state;
@@ -2164,14 +2189,17 @@ static int cx2589x_plug_out(struct charger_device *chg_dev)
 	struct cx2589x_device *cx = dev_get_drvdata(&chg_dev->dev);
 
 	pr_info("enter\n");
-	ret = cx2589x_set_dpdm_hiz(cx);
+	/*
+	 * disable Hiz when plug out charger
+	 * as cx2589x will not exit Hiz mode automatically when inserting charger next time.
+ 	 */
+	cx2589x_set_dpdm_hiz(cx);
+	cx2589x_set_hiz_en(cx->chg_dev, false);
 	ret = cx2589x_disable_charger(cx);
 	if (ret) {
-		pr_err("Failed to disable charging:%d\n", ret);
+		pr_err("Failed to disable charging(%d)\n", ret);
 	}
 
-	//cancel_delayed_work(&cx->charge_usb_detect_work);
-	no_usb_flag = 0;
 	return ret;
 }
 
@@ -2367,10 +2395,13 @@ static int cx2589x_driver_probe(struct i2c_client *client,
 		return -ENOMEM;
 	}
 
-	cx->bc12_retried = 0;
 	cx->client = client;
 	cx->dev = dev;
 	cx->battery_full = false;
+	cx->typec_attached = false;
+	cx->force_detect_count = 0;
+	cx->fake_sdp_type = false;
+	cx->unknow_type_check = false;
 
 	mutex_init(&cx->lock);
 	mutex_init(&cx->i2c_rw_lock);
@@ -2413,11 +2444,10 @@ static int cx2589x_driver_probe(struct i2c_client *client,
 	/* otg regulator */
 	s_chg_dev_otg = cx->chg_dev;
 
-	INIT_DELAYED_WORK(&cx->charge_detect_delayed_work, charger_detect_work_func);
+	INIT_DELAYED_WORK(&cx->charger_type_detect_work, charger_type_detect_work_func);
 	INIT_DELAYED_WORK(&cx->charge_monitor_work, charger_monitor_work_func);
-	INIT_DELAYED_WORK(&cx->charge_usb_detect_work, charger_usb_detect_work_func);
-	/* resolve EKLAMU-3431*/
-	INIT_DELAYED_WORK(&cx->charger_bc12_retry_work, charger_bc12_retry_work_func);
+	INIT_DELAYED_WORK(&cx->unknow_charger_type_detect_work, unknow_charger_type_detect_work_func);
+	INIT_DELAYED_WORK(&cx->retry_charger_detect_work, retry_charger_detect_work_func);
 
 	if (client->irq) {
 		ret = devm_request_threaded_irq(dev, client->irq, NULL,
@@ -2453,13 +2483,13 @@ static int cx2589x_driver_probe(struct i2c_client *client,
 
 	//ret = cx2589x_vbus_regulator_register(cx);
 
-	//pr_info("run charge_detect_delayed_work\n");
+	//pr_info("run charger_type_detect_work\n");
 
-	//schedule_delayed_work(&cx->charge_detect_delayed_work, 1000);
-	//schedule_delayed_work(&cx->charge_monitor_work, 100);
+	//schedule_delayed_work(&cx->charger_type_detect_work, msecs_to_jiffies(1000));
+	//schedule_delayed_work(&cx->charge_monitor_work, msecs_to_jiffies(100));
 
 	//usb device
-#if 0
+#if 1
 	cx->usb2_phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
 
 	if (IS_ERR_OR_NULL(cx->usb2_phy)) {
@@ -2489,6 +2519,9 @@ static int cx2589x_charger_remove(struct i2c_client *client)
 	struct cx2589x_device *cx = i2c_get_clientdata(client);
 
 	cancel_delayed_work_sync(&cx->charge_monitor_work);
+	cancel_delayed_work_sync(&cx->unknow_charger_type_detect_work);
+	cancel_delayed_work_sync(&cx->charger_type_detect_work);
+	cancel_delayed_work_sync(&cx->retry_charger_detect_work);
 	//regulator_unregister(cx->otg_rdev);
 	power_supply_unregister(cx->charger);
 	cx2589x_destory_device_node(cx->dev);
