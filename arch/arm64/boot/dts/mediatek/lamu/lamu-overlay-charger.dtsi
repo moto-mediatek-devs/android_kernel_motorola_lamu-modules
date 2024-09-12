@@ -41,7 +41,7 @@
 	jeita_temp_above_t4_icurrent = <0>;
 	jeita_temp_t3_to_t4_icurrent = <3600000>;
 	jeita_temp_t2_to_t3_icurrent = <3600000>;
-	jeita_temp_t1_to_t2_icurrent = <3000000>;
+	jeita_temp_t1_to_t2_icurrent = <2550000>;
 	jeita_temp_t0_to_t1_icurrent = <1000000>;
 	jeita_temp_below_t0_icurrent = <0>;
 	temp_t4_thres = <60>;
@@ -55,8 +55,8 @@
 	temp_t0_thres = <(-20)>;
 	temp_t0_thres_plus_x_degree = <(-17)>;
 	temp_neg_10_thres = <(-22)>;
-/* TN Begin modified by xinjun.lu/860715 20240905 CR/EKLAMU-202 */
-	eoc_current = <335000>;
+/* TN Begin modified by xinjun.lu/860715 20240814 CR/EKLAMU-202 */
+	eoc_current = <300000>;
 	/*pe50 config*/
 	pe50,iterm-ma = <300>;
 	pe50,pe50-temp-zones = <0 4208 1000 1000>,

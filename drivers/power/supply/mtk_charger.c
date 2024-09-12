@@ -146,7 +146,7 @@ static bool first_insert = true;
 #define SW_JEITA_TEMP_10		10
 #define SW_JEITA_CV1		4250000
 #define SW_JEITA_CV2		4500000
-#define SW_JEITA_CV1_CURRENT_LIMIT		1000
+#define SW_JEITA_CV1_CURRENT_LIMIT		1550
 #define SW_JEITA_CV1_CURRENT_LIMIT_GAP		50
 static bool sw_jeita_enter_1A = false;
 static bool sw_jeita_enter_cv1 = false;
