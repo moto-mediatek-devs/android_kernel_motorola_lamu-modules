@@ -945,12 +945,12 @@ struct nvt_gesture_cmds{
 #define GESTURE_SINGLE              1
 #define GESTURE_DOUBLE              2
 #define GESTURE_SINGLE_DOUBLE       3
-static struct nvt_gesture_cmds tianma_nvt_gesture_cmds[4] = {
+/*static struct nvt_gesture_cmds tianma_nvt_gesture_cmds[4] = {
 	{0x7B, 0x00},// Sort by the command above
 	{0x7B, 0x01},
 	{0x7B, 0x02},
 	{0x7B, 0x03},
-};
+};*/
 static struct nvt_gesture_cmds djn_nvt_gesture_cmds[4] = {
 	{0x7B, 0x01},
 	{0x7B, 0x02},
@@ -960,19 +960,8 @@ static struct nvt_gesture_cmds djn_nvt_gesture_cmds[4] = {
 
 int nvt_apply_gesture_type(void)
 {
-	int id = 0;
 	int ret = 0;
 	NVT_LOG("Write gesture %d cmd to reg !\n", ts->gesture_tpye);
-	struct nvt_gesture_cmds *iterator;
-
-	id = nt36672s_lcd_id | nt36528a_lcd_id;
-	if(id == 0x0093)
-		iterator = djn_nvt_gesture_cmds;
-	else if(id == 0x0101)
-		iterator = tianma_nvt_gesture_cmds;
-	else
-		return -EINVAL;
-
 	if (ts->gesture_tpye == GESTURE_DISABLE){
 		NVT_LOG("Write gesture GESTURE_DISABLE cmd to reg !\n");
 	}else if (ts->gesture_tpye == GESTURE_SINGLE){
@@ -986,7 +975,8 @@ int nvt_apply_gesture_type(void)
 		return -EINVAL;
 	}
 
-	ret = nvt_cmd_ext_store(iterator[ts->gesture_tpye].cmd, iterator[ts->gesture_tpye].subcmd);
+	ret = nvt_cmd_ext_store(djn_nvt_gesture_cmds[ts->gesture_tpye].cmd,
+							djn_nvt_gesture_cmds[ts->gesture_tpye].subcmd);
 
 	if(ret < 0)
 		NVT_ERR("error ! nvt_cmd_ext_store ret = %d\n", ret);
@@ -1054,7 +1044,7 @@ static ssize_t tp_gesture_mode_write(struct file *filp, const char *buff, size_t
 	}
 	nvt_gesture_mode = (NVT_GESTURE_JUDGE(cmd)) ? 1:0;
 	djn_gesture_mode = (NVT_GESTURE_JUDGE(cmd)) ? 1:0;
-	nvt_apply_gesture_type();
+
 	NVT_LOG("ts_data->gesture_tpye = %d\n", ts->gesture_tpye);
 out:
 	mutex_unlock(&ts->lock);
@@ -3108,6 +3098,8 @@ static int32_t nvt_ts_suspend(struct device *dev)
 
 #if WAKEUP_GESTURE
 	if (ts->gesture_tpye) {
+		nvt_apply_gesture_type();
+
 		//---write command to enter "wakeup gesture mode"---
 		buf[0] = EVENT_MAP_HOST_CMD;
 		buf[1] = 0x13;
