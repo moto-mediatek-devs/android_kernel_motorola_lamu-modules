@@ -1788,15 +1788,6 @@ static int sgm4154x_hw_init(struct sgm4154x_device *sgm)
 	sgm4154x_set_watchdog_timer(sgm, 0);
 	sgm4154x_set_dpm_mask(sgm);
 
-
-	/* TN Begin modified by rongxing.li/860655 20231125 CR/EKFOGO4G-5119 */
-#if IS_ENABLED(CONFIG_FACTORY_BUILD)
-	pr_info("disable charging for factory version\n");
-	ret = sgm4154x_disable_charger(sgm);
-	if (ret)
-		pr_err("disable charging failed\n");
-#endif
-	/* TN End modified by rongxing.li/860655 20231125 CR/EKFOGO4G-5119 */
 	sgm4154x_set_tmr2x(sgm, false);
 	ret = sgm4154x_set_ichrg_curr(s_chg_dev_otg,
 			bat_info.constant_charge_current_max_ua);
