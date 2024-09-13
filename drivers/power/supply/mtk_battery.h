@@ -49,13 +49,6 @@
 
 #define BMLOG_DEFAULT_LEVEL BMLOG_DEBUG_LEVEL
 
-/*TN Begin modified by hao.jia/809321 20240821 CR/EKLAMU-784*/
-#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
-#define RATED_BAT_CAP_6000_MAH 5820 /* mAh */
-#define RATED_BAT_CAP_5200_MAH 5100 /* mAh */
-#endif /* CONFIG_OEM_TINNO_CHARGER */
-/*TN End modified by hao.jia/809321 20240821 CR/EKLAMU-784*/
-
 #define bm_err(gm, fmt, args...)   \
 do {\
 	if (bat_get_debug_level(gm) >= BMLOG_ERROR_LEVEL) {	\

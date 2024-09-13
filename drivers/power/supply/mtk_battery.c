@@ -2816,11 +2816,7 @@ static int bat_health_get(struct mtk_battery *gm,
 	struct mtk_battery_sysfs_field_info *attr,
 	int *val)
 {
-	if (oem_pcba_charge_power() == CHARGE_POWER_18W) {
-		*val = gm->bat_cycle_thr * 10 / RATED_BAT_CAP_5200_MAH;
-	} else {
-		*val = gm->bat_cycle_thr * 10 / RATED_BAT_CAP_6000_MAH;
-	}
+	*val = gm->daemon_data.aging_factor / 100;
 
 	return 0;
 }
