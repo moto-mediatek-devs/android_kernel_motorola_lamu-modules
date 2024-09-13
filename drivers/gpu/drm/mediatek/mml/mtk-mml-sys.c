@@ -27,10 +27,21 @@
 
 #define SYS_SHADOW_CTRL		0x010
 #define SYS_MISC_REG		0x0f0
+#define SYS_CG_CON0		0x100
+#define SYS_CG_CON1		0x110
+#define SYS_CG_CON2		0x120
+#define SYS_CG_CON3		0x130
 #define SYS_SW0_RST_B_REG	0x700
 #define SYS_SW1_RST_B_REG	0x704
 #define SYS_BYPASS_MUX_SHADOW	0xf00
 #define SYS_AID_SEL		0xfa8	/* only for mt6983/mt6895 */
+
+#define SYS_DL_IN_RELAY2_SIZE	0x250
+#define SYS_DL_OUT_RELAY2_SIZE	0x258
+#define SYS_DLO_ASYNC2_STATUS1	0x264
+#define SYS_DLI_ASYNC2_STATUS1	0x274
+#define SYS_DLO_ASYNC5_STATUS1	0x420
+#define SYS_DL_OUT_RELAY5_SIZE	0x428
 
 #define MML_MAX_SYS_COMPONENTS	16
 #define MML_MAX_SYS_MUX_PINS	88
@@ -52,13 +63,16 @@ module_param(mml_ir_loop, int, 0644);
 int mml_racing_sleep = 16000;
 module_param(mml_racing_sleep, int, 0644);
 
-#if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
 int mml_ddp_dump = 1;
 module_param(mml_ddp_dump, int, 0644);
 
+#if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
 int mml_dle_delay;
 module_param(mml_dle_delay, int, 0644);
 #endif
+
+int mml_dlo_dbg = 1;
+module_param(mml_dlo_dbg, int, 0644);
 
 #define sys_msg(fmt, args...) \
 do { \
@@ -346,7 +360,15 @@ static s32 sys_init(struct mml_comp *comp, struct mml_task *task,
 		/* disable ultra in srt mode to avoid occupy bw */
 		cmdq_pkt_write(pkt, NULL,
 			comp->larb_base + SMI_LARB_DISABLE_ULTRA, 0xffffffff, U32_MAX);
-	} else if (cfg->info.mode == MML_MODE_DIRECT_LINK || cfg->info.mode == MML_MODE_RACING) {
+	} else if (cfg->info.mode == MML_MODE_DIRECT_LINK) {
+		/* enable ultra */
+		cmdq_pkt_write(pkt, NULL,
+			comp->larb_base + SMI_LARB_DISABLE_ULTRA, 0x0, U32_MAX);
+
+		/* assign ddp path if underrun addon dump */
+		sys->ddp_path[ccfg->pipe] = cfg->path[ccfg->pipe];
+
+	} else if (cfg->info.mode == MML_MODE_RACING) {
 		/* enable ultra */
 		cmdq_pkt_write(pkt, NULL,
 			comp->larb_base + SMI_LARB_DISABLE_ULTRA, 0x0, U32_MAX);
@@ -1020,8 +1042,11 @@ static s32 sys_repost(struct mml_comp *comp, struct mml_task *task,
 
 	if (mode == MML_MODE_RACING)
 		sys_addr_update(comp, task, ccfg);
-	else if (mode == MML_MODE_DIRECT_LINK)
+	else if (mode == MML_MODE_DIRECT_LINK) {
 		sys_addr_update(comp, task, ccfg);
+		if (comp->sysid == path->mmlsys->sysid && task->dlo_status.inst_offset)
+			cmdq_pkt_backup_update(task->pkts[ccfg->pipe], &task->dlo_status);
+	}
 	return 0;
 }
 
@@ -1058,6 +1083,72 @@ static void sys_debug_dump(struct mml_comp *comp)
 		value = readl(base + sys->dbg_regs[i].offset);
 		mml_err("%s %#010x", sys->dbg_regs[i].name, value);
 	}
+}
+
+static void sys_debug_dump_fast_mml1(struct mml_comp *comp)
+{
+	void __iomem *base = comp->base;
+	u32 shadow_ctrl;
+	u32 value[4];
+
+	/* Enable shadow read working */
+	shadow_ctrl = readl(base + SYS_SHADOW_CTRL);
+	shadow_ctrl |= 0x4;
+	writel(shadow_ctrl, base + SYS_SHADOW_CTRL);
+	shadow_ctrl = readl(base + SYS_SHADOW_CTRL);
+
+	if (mml_ddp_dump & BIT(1)) {
+		mml_err("mmlsys comp %u base %#010x shadow %#x dump:",
+			comp->id, (u32)comp->base_pa, shadow_ctrl);
+
+		value[0] = readl(base + SYS_CG_CON0);
+		value[1] = readl(base + SYS_CG_CON1);
+		value[2] = readl(base + SYS_CG_CON2);
+		value[3] = readl(base + SYS_CG_CON3);
+		mml_err("CG_CON: %#010x %#010x %#010x %#010x",
+			value[0], value[1], value[2], value[3]);
+
+		value[0] = readl(base + SYS_DL_IN_RELAY2_SIZE);
+		value[1] = readl(base + SYS_DLI_ASYNC2_STATUS1);
+		mml_err("DLI2:   %#010x %#010x", value[0], value[1]);
+
+		value[0] = readl(base + SYS_DL_OUT_RELAY5_SIZE);
+		value[1] = readl(base + SYS_DLO_ASYNC5_STATUS1);
+		mml_err("DLO5:   %#010x %#010x", value[0], value[1]);
+	} else {
+		value[0] = readl(base + SYS_DL_OUT_RELAY5_SIZE);
+		value[1] = readl(base + SYS_DLO_ASYNC5_STATUS1);
+		mml_err("mmlsys comp %u DLO5 %#010x %#010x", comp->id, value[0], value[1]);
+	}
+}
+
+static void sys_debug_dump_fast_mml0(struct mml_comp *comp)
+{
+	void __iomem *base = comp->base;
+	u32 shadow_ctrl;
+	u32 value[8];
+
+	if (!(mml_ddp_dump & BIT(1)))
+		return;
+
+	/* Enable shadow read working */
+	shadow_ctrl = readl(base + SYS_SHADOW_CTRL);
+	shadow_ctrl |= 0x4;
+	writel(shadow_ctrl, base + SYS_SHADOW_CTRL);
+	shadow_ctrl = readl(base + SYS_SHADOW_CTRL);
+
+	mml_err("mmlsys comp %u base %#010x shadow %#x dump:",
+		comp->id, (u32)comp->base_pa, shadow_ctrl);
+
+	value[0] = readl(base + SYS_CG_CON0);
+	value[1] = readl(base + SYS_CG_CON1);
+	value[2] = readl(base + SYS_CG_CON2);
+	value[3] = readl(base + SYS_CG_CON3);
+	mml_err("CG_CON: %#010x %#010x %#010x %#010x", value[0], value[1], value[2], value[3]);
+
+	value[0] = readl(base + SYS_DL_OUT_RELAY2_SIZE);
+	value[1] = readl(base + SYS_DLO_ASYNC2_STATUS1);
+	mml_err("DLO2:   %#010x %#010x", value[0], value[1]);
 }
 
 static void sys_reset(struct mml_comp *comp, struct mml_frame_config *cfg, u32 pipe)
@@ -1125,6 +1216,13 @@ static const struct mml_comp_debug_ops sys_debug_ops = {
 
 static const struct mml_comp_debug_ops sys_debug_ops_mt6991 = {
 	.dump = &sys_debug_dump,
+	.dump_fast = &sys_debug_dump_fast_mml1,
+	.reset = &sys_reset_current,
+};
+
+static const struct mml_comp_debug_ops sys_debug_ops_mt6991_mml0 = {
+	.dump = &sys_debug_dump,
+	.dump_fast = &sys_debug_dump_fast_mml0,
 	.reset = &sys_reset_current,
 };
 
@@ -1284,6 +1382,30 @@ static s32 mml_sys_comp_clk_disable(struct mml_comp *comp,
 	return 0;
 }
 
+static void mml_sys_taskdone(struct mml_comp *comp, struct mml_task *task,
+	struct mml_comp_config *ccfg)
+{
+	struct cmdq_pkt *pkt = task->pkts[ccfg->pipe];
+	struct mml_frame_config *cfg = task->config;
+
+	if (cfg->info.mode == MML_MODE_DIRECT_LINK && task->dlo_status.inst_offset &&
+		comp->sysid == cfg->path[ccfg->pipe]->mmlsys->sysid) {
+		u32 status1 = cmdq_pkt_backup_get(pkt, &task->dlo_status);
+
+		if ((status1 & 0x0fff0000) != (task->dlo_size & 0x0fff0000))
+			mml_err("task job %u dlo size %#010x status %#010x not match",
+				task->job.jobid, task->dlo_size, status1);
+		else if (mml_dlo_dbg & BIT(2))
+			mml_log("task job %u dlo size %#010x status %#010x",
+				task->job.jobid, task->dlo_size, status1);
+		else if (mml_dlo_dbg & BIT(1))
+			mml_msg("task job %u dlo size %#010x status %#010x",
+				task->job.jobid, task->dlo_size, status1);
+
+		mml_mmp(dlo, MMPROFILE_FLAG_PULSE, task->dlo_size, status1);
+	}
+}
+
 static const struct mml_comp_hw_ops sys_hw_ops = {
 	.pw_enable = mml_comp_pw_enable,
 	.pw_disable = mml_comp_pw_disable,
@@ -1299,6 +1421,7 @@ static const struct mml_comp_hw_ops sys_hw_ops_mminfra = {
 	.mminfra_pw_disable = mml_mminfra_pw_disable,
 	.clk_enable = &mml_sys_comp_clk_enable,
 	.clk_disable = &mml_sys_comp_clk_disable,
+	.task_done = &mml_sys_taskdone,
 };
 
 #ifdef MML_FPGA
@@ -1920,7 +2043,6 @@ static void sys_unprepare(struct mtk_ddp_comp *ddp_comp)
 		sys_ddp_disable(sys, task, 1);
 }
 
-#if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
 #define call_dbg_op(_comp, op, ...) \
 	((_comp->debug_ops && _comp->debug_ops->op) ? \
 		_comp->debug_ops->op(_comp, ##__VA_ARGS__) : 0)
@@ -1932,16 +2054,21 @@ static void ddp_comp_dump(const struct mml_topology_path *path)
 
 	if (!path)
 		return;
+
+	if (!(mml_ddp_dump & BIT(1))) {
+		/* simple mode, dump mmlsys only */
+		call_dbg_op(path->mmlsys, dump_fast);
+		return;
+	}
+
 	for (i = 0; i < path->node_cnt; i++) {
 		comp = path->nodes[i].comp;
-		call_dbg_op(comp, dump);
+		call_dbg_op(comp, dump_fast);
 	}
 }
-#endif
 
 static void sys_ddp_dump(struct mtk_ddp_comp *ddp_comp)
 {
-#if IS_ENABLED(CONFIG_MTK_MML_DEBUG)
 	struct mml_sys *sys;
 
 	if (!mml_ddp_dump) {
@@ -1953,7 +2080,6 @@ static void sys_ddp_dump(struct mtk_ddp_comp *ddp_comp)
 
 	ddp_comp_dump(sys->ddp_path[0]);
 	ddp_comp_dump(sys->ddp_path[1]);
-#endif
 }
 
 static const struct mtk_ddp_comp_funcs sys_ddp_funcs = {
@@ -2085,6 +2211,8 @@ static s32 dl_config_tile(struct mml_comp *comp, struct mml_task *task,
 	u32 dl_h = tile->in.ye - tile->in.ys + 1;
 	u32 size = (dl_h << 16) + dl_w;
 
+	if (comp->sysid == task->config->path[ccfg->pipe]->mmlsys->sysid)
+		task->dlo_size = size;
 	cmdq_pkt_write(pkt, NULL, base_pa + offset, size, U32_MAX);
 
 	if (dl_frm) {
@@ -2098,8 +2226,13 @@ static s32 dl_config_tile(struct mml_comp *comp, struct mml_task *task,
 static s32 dl_wait(struct mml_comp *comp, struct mml_task *task,
 	struct mml_comp_config *ccfg, u32 idx)
 {
-	if (task->config->info.mode == MML_MODE_DIRECT_LINK)
-		cmdq_pkt_wfe(task->pkts[ccfg->pipe], task->config->info.disp_done_event);
+	if (task->config->info.mode == MML_MODE_DIRECT_LINK) {
+		struct cmdq_pkt *pkt = task->pkts[ccfg->pipe];
+
+		cmdq_pkt_assign_command(pkt, CMDQ_CPR_MML_TRIG, 1);
+		cmdq_pkt_wfe(pkt, task->config->info.disp_done_event);
+		cmdq_pkt_assign_command(pkt, CMDQ_CPR_MML_TRIG, 0);
+	}
 
 	return 0;
 }
@@ -2130,6 +2263,36 @@ static const struct mml_comp_config_ops dl_config_ops = {
 	.tile = dl_config_tile,
 	.wait = dl_wait,
 	.post = dl_post,
+};
+
+#define MT6991_MML_DLO_ASYNC5_STATUS1	0x420
+
+static s32 dlo_post_mt6991f(struct mml_comp *comp, struct mml_task *task,
+		   struct mml_comp_config *ccfg)
+{
+	s32 ret = dl_post(comp, task, ccfg);
+	struct mml_frame_config *cfg = task->config;
+
+	if ((mml_dlo_dbg & BIT(0)) && cfg->info.mode == MML_MODE_DIRECT_LINK &&
+		comp->sysid == cfg->path[ccfg->pipe]->mmlsys->sysid) {
+		struct cmdq_pkt *pkt = task->pkts[ccfg->pipe];
+		int ret;
+
+		ret = cmdq_pkt_backup(pkt, comp->base_pa + MT6991_MML_DLO_ASYNC5_STATUS1,
+			&task->dlo_status);
+		if (ret) {
+			mml_err("%s fail to backup dlo status", __func__);
+			task->dlo_status.inst_offset = 0;
+		}
+	}
+
+	return ret;
+}
+
+static const struct mml_comp_config_ops dlo_config_ops_mt6991f = {
+	.tile = dl_config_tile,
+	.wait = dl_wait,
+	.post = dlo_post_mt6991f,
 };
 
 static s32 dl_mml_config_tile(struct mml_comp *comp, struct mml_task *task,
@@ -2235,6 +2398,18 @@ static int dlo_comp_init(struct device *dev, struct mml_sys *sys,
 		return ret;
 	comp->tile_ops = &dlo_tile_ops;
 	return 0;
+}
+
+static int dlo_comp_init_mt6991f(struct device *dev, struct mml_sys *sys, struct mml_comp *comp)
+{
+	int ret = dl_comp_init(dev, sys, comp);
+
+	if (ret)
+		return ret;
+	comp->tile_ops = &dlo_tile_ops;
+	comp->config_ops = &dlo_config_ops_mt6991f;
+
+	return ret;
 }
 
 static int dl_mml_comp_init(struct device *dev, struct mml_sys *sys, struct mml_comp *comp)
@@ -2745,7 +2920,7 @@ static const struct mml_data mt6991_mmlt_data = {
 	},
 	.aid_sel = sys_config_aid_sel_bits_sys,
 	.hw_ops = &sys_hw_ops_mminfra,
-	.debug_ops = &sys_debug_ops_mt6991,
+	.debug_ops = &sys_debug_ops_mt6991_mml0,
 	.gpr = {CMDQ_GPR_R12, CMDQ_GPR_R14},
 	.px_per_tick = 2,
 	.aidsel_mode = MML_AIDSEL_ENGINEBITS,
@@ -2759,7 +2934,7 @@ static const struct mml_data mt6991_mmlf_data = {
 	.comp_inits = {
 		[MML_CT_SYS] = &sys_comp_init,
 		[MML_CT_DL_IN] = &dl_mml_comp_init,
-		[MML_CT_DL_OUT] = &dlo_comp_init,
+		[MML_CT_DL_OUT] = &dlo_comp_init_mt6991f,
 	},
 	.ddp_comp_funcs = {
 		[MML_CT_SYS] = &sys_ddp_funcs,

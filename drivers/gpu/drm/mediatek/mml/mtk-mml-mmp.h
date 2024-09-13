@@ -84,11 +84,13 @@ struct mml_mmp_events_t {
 	mmp_event mutex_dis;
 
 	/* events for taskdone */
+	mmp_event dlo;
 	mmp_event irq_loop;
 	mmp_event irq_err;
 	mmp_event irq_done;
 	mmp_event irq_stop;
 	mmp_event fence_sig;
+	mmp_event m2m_sig;
 
 	/* events for dvfs */
 	mmp_event throughput;

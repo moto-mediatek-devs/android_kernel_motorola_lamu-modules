@@ -165,6 +165,7 @@
 			dsc1 = &disp_dsc_wrap1;
 			dsc2 = &disp_dsc_wrap2;
 			dsc3 = &disp_dsc_wrap3;
+			r2y0 = &disp_r2y0;
 	};
 
 	aov: aov {
@@ -2079,6 +2080,8 @@ l3_hit,l3_mis,pmu_cyc_cnt";
 					,prefetch_enable,pass_throttle,timer_diff_ms";
 			node-33 = "MCUPM_CPUCOOLER_limiter",
 					"L_limiter,M_limiter,B_limiter";
+			node-34 = "MCUPM_turbo",
+					"enable_turbo";
 		};
 
 		sspm_rts_header: sspm-rts-header {
@@ -9883,6 +9886,13 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			clocks = <&dispsys1_config_clk CLK_MM1_DISP_DSC_WRAP3_DISP>;
 		};
 
+		disp_r2y0: disp-r2y@32540000 {
+			compatible = "mediatek,mt6991-disp1-r2y";
+			reg = <0 0x32540000 0 0x1000>;
+			clocks = <&dispsys1_config_clk CLK_MM1_DISP_R2Y0_DISP>;
+			status = "disabled";
+		};
+
 		disp_dpc: disp-dpc@3e8f0000 {
 			compatible = "mediatek,mt6991-disp-dpc-v2";
 			power-domains = <&hfrpsys MT6991_POWER_DOMAIN_MM_INFRA1>;
@@ -10069,7 +10079,7 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			compatible = "mediatek,disp_c3d2",
 						"mediatek,mt6991-disp-c3d";
 			reg = <0 0x32070000 0 0x1000>;
-			clocks = <&dispsys_config_clk CLK_MM_DISP_C3D0_PQ>;
+			clocks = <&dispsys_config_clk CLK_MM_DISP_C3D2_PQ>;
 			bin-num = <9>;
 		};
 
@@ -10077,7 +10087,7 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			compatible = "mediatek,disp_c3d3",
 						"mediatek,mt6991-disp-c3d";
 			reg = <0 0x32080000 0 0x1000>;
-			clocks = <&dispsys_config_clk CLK_MM_DISP_C3D1_PQ>;
+			clocks = <&dispsys_config_clk CLK_MM_DISP_C3D3_PQ>;
 			bin-num = <17>;
 		};
 
@@ -20670,6 +20680,7 @@ connsys_emi_config_hyp: connsys-emi-config-hyp {
 			interrupts-extended = <&mtk_gauge RG_INT_STATUS_FG_CUR_H>,
 					      <&mtk_gauge RG_INT_STATUS_FG_CUR_L>;
 			interrupt-names = "fg_cur_h", "fg_cur_l";
+			status = "disabled";
 			oc-thd = <6000 7000 8000>;
 		};
 
@@ -20739,6 +20750,7 @@ connsys_emi_config_hyp: connsys-emi-config-hyp {
 			interrupts-extended = <&mtk_gauge2 RG_INT_STATUS_FG_CUR_H>,
 					      <&mtk_gauge2 RG_INT_STATUS_FG_CUR_L>;
 			interrupt-names = "fg_cur_h", "fg_cur_l";
+			status = "disabled";
 			oc-thd = <6000 7000 8000>;
 		};
 

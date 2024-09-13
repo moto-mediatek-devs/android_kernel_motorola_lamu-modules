@@ -285,6 +285,7 @@ struct mml_task_ops {
 	void (*queue)(struct mml_task *task, u32 pipe);
 	void (*submit_done)(struct mml_task *task);
 	void (*frame_done)(struct mml_task *task);
+	void (*signal_irq)(struct mml_task *task);
 	/* optional: adaptor may use frame_done to handle error */
 	void (*frame_err)(struct mml_task *task);
 	s32 (*dup_task)(struct mml_task *task, u32 pipe);
@@ -730,6 +731,9 @@ struct mml_task {
 	struct cmdq_backup perf_dispready;
 	struct cmdq_backup perf_sof;
 
+	struct cmdq_backup dlo_status;
+	u32 dlo_size;
+
 	/* mml context */
 	struct mml_ctx *ctx;
 	void *cb_param;
@@ -750,6 +754,10 @@ struct mml_task {
 
 	/* mml pq task */
 	struct mml_pq_task *pq_task;
+
+	/* mml m2m */
+	struct vb2_v4l2_buffer *src_buf;
+	struct vb2_v4l2_buffer *dst_buf;
 
 	bool done;
 	bool err;
@@ -872,6 +880,7 @@ struct mml_comp_hw_ops {
 
 struct mml_comp_debug_ops {
 	void (*dump)(struct mml_comp *comp);
+	void (*dump_fast)(struct mml_comp *comp);
 	void (*reset)(struct mml_comp *comp, struct mml_frame_config *cfg, u32 pipe);
 };
 

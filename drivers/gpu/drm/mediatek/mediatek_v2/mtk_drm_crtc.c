@@ -5816,11 +5816,12 @@ void mtk_disp_set_module_hrt(struct mtk_drm_crtc *mtk_crtc, unsigned int bw_base
 			continue;
 
 		if ((priv->data->mmsys_id == MMSYS_MT6991) &&
-				(mtk_crtc_state->lye_state.rpo_lye || pre_rpo_lye)) {
+			(mtk_crtc_state->lye_state.rpo_lye || pre_rpo_lye)) {
 			mtk_ddp_comp_io_cmd(priv->ddp_comp[DDP_COMPONENT_OVL_EXDMA2],
 				handle, event, &bw_base);
 		}
-		pre_rpo_lye = mtk_crtc_state->lye_state.rpo_lye;
+		if (event == PMQOS_SET_HRT_BW_DELAY_POST)
+			pre_rpo_lye = mtk_crtc_state->lye_state.rpo_lye;
 
 		for_each_comp_in_crtc_target_path(comp, mtk_crtc, j, i) {
 			mtk_ddp_comp_io_cmd(comp, handle, event,
@@ -7415,7 +7416,17 @@ static void mtk_crtc_update_ddp_state(struct drm_crtc *crtc,
 #else
 	if ((index == 0 || mtk_crtc->path_data->is_discrete_path) && hrt_valid == false) {
 #endif
-		mtk_crtc->usage_ovl_fmt[0] = 4;
+		int layers_i;
+		//no_hwc_layers & no_hwc_overlap for customer modify in dts
+		if(mtk_drm->no_hwc_layers) {
+			for (layers_i = 0; layers_i < mtk_drm->no_hwc_layers; layers_i++)
+				mtk_crtc->usage_ovl_fmt[layers_i] = 4;
+		} else
+			mtk_crtc->usage_ovl_fmt[0] = 4;
+
+		if (mtk_drm->no_hwc_overlap)
+			pan_disp_frame_weight = pan_disp_frame_weight * mtk_drm->no_hwc_overlap;
+
 		if (mtk_drm_helper_get_opt(mtk_drm->helper_opt, MTK_DRM_OPT_HRT))
 			DDPMSG("%s frame:%u correct invalid hrt to:%u, mode:%llu->%llu\n",
 				__func__, prop_lye_idx, pan_disp_frame_weight,
@@ -11019,10 +11030,17 @@ skip_prete:
 				GCE_DO(wfe, EVENT_VDO_EOF);
 
 		} else {
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
+			if (output_comp && mtk_ddp_comp_get_type(output_comp->id) == MTK_DSI)
+				GCE_DO(wfe, EVENT_CMD_EOF);
+			else
+				GCE_DO(wfe, EVENT_VDO_EOF);
+#else
 			if (output_comp && mtk_ddp_comp_get_type(output_comp->id) == MTK_DISP_DVO)
 				GCE_DO(wfe, EVENT_VDO_EOF);
 			else
 				GCE_DO(wfe, EVENT_CMD_EOF);
+#endif
 		}
 
 		/* sw workaround to fix gce hw bug */
@@ -11075,7 +11093,15 @@ skip_prete:
 			}
 		}
 	}
+
+	lop.reg = true;
+	lop.idx = CMDQ_CPR_MML_TRIG;
+	rop.reg = false;
+	rop.value = 1;
+	GCE_IF(lop, R_CMDQ_EQUAL, rop);
 	GCE_DO(set_event, EVENT_MML_DISP_DONE_EVENT);
+	GCE_FI;
+
 	cmdq_pkt_finalize_loop(cmdq_handle);
 	ret = cmdq_pkt_flush_async(cmdq_handle, trig_done_cb, (void *)crtc_id);
 
@@ -13046,6 +13072,10 @@ int mtk_drm_crtc_usage_enable(struct mtk_drm_private *priv,
 	unsigned int i, main_disp_idx = 0xFFFFFFFF;
 	unsigned int occupied_ovl = 0;
 
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
+	return DISP_ENABLE;
+#endif
+
 	if (unlikely(crtc_id >= MAX_CRTC)) {
 		DDPPR_ERR("%s invalid crtc_id %u\n", __func__, crtc_id);
 		return DISP_ENABLE;
@@ -13523,7 +13553,7 @@ static void mtk_drm_crtc_wk_lock(struct drm_crtc *crtc, bool get,
 		__pm_stay_awake(mtk_crtc->wk_lock);
 		atomic_inc(&priv->kernel_pm.wakelock_cnt);
 	} else {
-#if !IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if !IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 		if ((atomic_read(&priv->kernel_pm.status) != KERNEL_SHUTDOWN) &&
 		    (atomic_read(&priv->kernel_pm.wakelock_cnt) == 1) &&
 		    vdisp_func.poll_power_cnt && (vdisp_func.poll_power_cnt(0) < 0)) {
@@ -13539,7 +13569,7 @@ static void mtk_drm_crtc_wk_lock(struct drm_crtc *crtc, bool get,
 		drm_crtc_index(crtc), (get ? "hold" : "release"),
 		func, line, atomic_read(&priv->kernel_pm.wakelock_cnt));
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	if (vdisp_func.wk_lock)
 		vdisp_func.wk_lock(drm_crtc_index(crtc), get, __func__, __LINE__);
 #endif
@@ -13759,7 +13789,7 @@ void mtk_drm_crtc_atomic_resume(struct drm_crtc *crtc,
 		if (atomic_read(&priv->kernel_pm.wakelock_cnt) == 1) {
 			atomic_set(&priv->kernel_pm.wakelock_cnt, 0);
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 			if (vdisp_func.wk_lock)
 				vdisp_func.wk_lock(index, 0, __func__, __LINE__);
 #endif
@@ -18085,7 +18115,7 @@ int mtk_drm_crtc_set_partial_update(struct drm_crtc *crtc,
 	}
 
 	if (!(mtk_crtc->enabled))
-		DDPINFO("Sleep State set partial update enable --crtc not ebable\n");
+		DDPDBG("Sleep State set partial update enable --crtc not ebable\n");
 
 	/* disable partial update if rpo lye is exist */
 	if (state->lye_state.rpo_lye && partial_enable) {
@@ -18115,7 +18145,7 @@ int mtk_drm_crtc_set_partial_update(struct drm_crtc *crtc,
 
 	/* disable partial update if doze mode is enable*/
 	if (state->prop_val[CRTC_PROP_DOZE_ACTIVE] && partial_enable) {
-		DDPINFO("skip because doze mode is enable\n");
+		DDPDBG("skip because doze mode is enable\n");
 		partial_enable = 0;
 	}
 
@@ -18216,12 +18246,12 @@ int mtk_drm_crtc_set_partial_update(struct drm_crtc *crtc,
 
 	/* wait mode switch thread finish */
 	while (atomic_read(&mtk_crtc->singal_for_mode_switch)) {
-		DDPINFO("Wait event from mode_switch\n");
+		DDPDBG("Wait event from mode_switch\n");
 		CRTC_MMP_MARK((int) drm_crtc_index(crtc), mode_switch, 3, 1);
 		ret = wait_event_interruptible(mtk_crtc->mode_switch_end_wq,
 			(atomic_read(&mtk_crtc->singal_for_mode_switch) == 0));
 		if (ret)
-			DDPMSG("Wait event result ret %d\n", ret);
+			DDPDBG("Wait event result ret %d\n", ret);
 	}
 
 	if (debug_trigger_loop & BIT(4))
