@@ -428,9 +428,9 @@ static void txd_panel_init(struct txd *ctx)
 	txd_dcs_write_seq_static(ctx,0x55,0x02);
 	txd_dcs_write_seq_static(ctx,0x35,0x00);
 	txd_dcs_write_seq_static(ctx,0x11);
-	msleep(120);
+	msleep(65);
 	txd_dcs_write_seq_static(ctx,0x29);
-	msleep(20);
+	udelay(5 * 1000);
 }
 
 static int txd_disable(struct drm_panel *panel)
@@ -467,7 +467,7 @@ static int txd_unprepare(struct drm_panel *panel)
 	txd_dcs_write_seq_static(ctx, 0x28);
 	msleep(20);
 	txd_dcs_write_seq_static(ctx, 0x10);
-	msleep(120);
+	msleep(90);
 
 	ctx->error = 0;
 	ctx->prepared = false;
