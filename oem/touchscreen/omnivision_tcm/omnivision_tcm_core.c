@@ -42,9 +42,10 @@
 extern int td4160_lcd_id;
 extern int td4376_lcd_id;
 struct ovt_tcm_hcd *onmivision_tcm_hcd;
+static int tp_skip_fw = false;
 #endif
 
-/* #define RESET_ON_RESUME */
+#define RESET_ON_RESUME
 
 /* #define RESUME_EARLY_UNBLANK */
 
@@ -1159,6 +1160,11 @@ static void ovt_tcm_dispatch_message(struct ovt_tcm_hcd *tcm_hcd)
 
 		if ((tcm_hcd->id_info.mode == MODE_ROMBOOTLOADER) &&
 				tcm_hcd->in_hdl_mode) {
+			if (tp_skip_fw) {
+				LOGE(tcm_hcd->pdev->dev.parent, "delay firmware download!\n");
+				tp_skip_fw = false;
+				msleep(200);
+			}
 
 			retval = wait_for_completion_timeout(tcm_hcd->helper.helper_completion,
 				msecs_to_jiffies(500));
@@ -2318,7 +2324,37 @@ exit:
 	return retval;
 }
 
-static int ovt_tcm_set_gpio(struct ovt_tcm_hcd *tcm_hcd, int gpio,
+int ovt_tcm_request_gpio(struct ovt_tcm_hcd *tcm_hcd, int gpio,
+		bool config)
+{
+	int retval;
+	char label[16];
+
+	if (config) {
+		LOGE(tcm_hcd->pdev->dev.parent, "++request\n");
+		retval = snprintf(label, 16, "tcm_gpio_%d\n", gpio);
+		if (retval < 0) {
+			LOGE(tcm_hcd->pdev->dev.parent,
+					"Failed to set GPIO label\n");
+			return retval;
+		}
+
+		retval = gpio_request(gpio, label);
+		if (retval < 0) {
+			LOGE(tcm_hcd->pdev->dev.parent,
+					"Failed to request GPIO %d\n",
+					gpio);
+			return retval;
+		}
+	} else {
+		LOGE(tcm_hcd->pdev->dev.parent, "--release\n");
+		gpio_free(gpio);
+	}
+
+	return 0;
+}
+
+int ovt_tcm_set_gpio(struct ovt_tcm_hcd *tcm_hcd, int gpio,
 		bool config, int dir, int state)
 {
 	int retval;
@@ -2402,6 +2438,7 @@ static int ovt_tcm_config_gpio(struct ovt_tcm_hcd *tcm_hcd)
 		msleep(bdata->reset_active_ms);
 		gpio_set_value(bdata->reset_gpio, !bdata->reset_on_state);
 		msleep(bdata->reset_delay_ms);
+		ovt_tcm_request_gpio(tcm_hcd, bdata->reset_gpio, false);
 	}
 
 	return 0;
@@ -3302,9 +3339,11 @@ static int ovt_tcm_reset_and_reinit(struct ovt_tcm_hcd *tcm_hcd,
 			retval = -EINVAL;
 			goto exit;
 		}
+		ovt_tcm_request_gpio(tcm_hcd, tcm_hcd->hw_if->bdata->reset_gpio, true);
 		gpio_set_value(bdata->reset_gpio, bdata->reset_on_state);
 		msleep(bdata->reset_active_ms);
 		gpio_set_value(bdata->reset_gpio, !bdata->reset_on_state);
+		ovt_tcm_request_gpio(tcm_hcd, tcm_hcd->hw_if->bdata->reset_gpio, false);
 	} else {
 		retval = ovt_tcm_reset(tcm_hcd);
 		if (retval < 0) {
@@ -3575,6 +3614,7 @@ static void ovt_tcm_helper_work(struct work_struct *work)
 
 static int ovt_tcm_disp_resume(struct device *dev)
 {
+	tp_skip_fw = false;
 #if SPEED_UP_RESUME
 	struct ovt_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
 	mutex_lock(&tcm_hcd->suspend_resume_mutex);
@@ -3718,6 +3758,7 @@ static int ovt_tcm_disp_suspend(struct device *dev)
 	}
 
 	tcm_hcd->in_suspend = true;
+	tp_skip_fw = true;
 	mutex_unlock(&tcm_hcd->suspend_resume_mutex);
 	return 0;
 }
@@ -3775,6 +3816,7 @@ static int ovt_tcm_disp_notifier_cb(struct notifier_block *nb,
 #if defined(CONFIG_PM) || defined(CONFIG_DRMV) || defined(CONFIG_FBV)
 static int ovt_tcm_resume(struct device *dev)
 {
+	tp_skip_fw = false;
 #if SPEED_UP_RESUME
 	struct ovt_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
 	mutex_lock(&tcm_hcd->suspend_resume_mutex);
@@ -3880,6 +3922,7 @@ exit:
 	return retval;
 #endif
 }
+
 #if SPEED_UP_RESUME
 static void speedup_resume(struct work_struct *work)
 {
@@ -3887,7 +3930,6 @@ static void speedup_resume(struct work_struct *work)
 	
 	int retval;
 	struct ovt_tcm_module_handler *mod_handler;
-
 
 	LOGE(tcm_hcd->pdev->dev.parent,"speed up resume enter\n");
 	if (!tcm_hcd->in_suspend  || tcm_hcd->ovt_tcm_driver_removing)
@@ -3941,7 +3983,7 @@ static void speedup_resume(struct work_struct *work)
 	goto mod_resume;
 
 do_reset:
-	retval = tcm_hcd->reset_n_reinit(tcm_hcd, false, true);
+	retval = tcm_hcd->reset_n_reinit(tcm_hcd, true, true);
 	if (retval < 0) {
 		LOGE(tcm_hcd->pdev->dev.parent,
 				"Failed to do reset and reinit\n");
@@ -4021,8 +4063,8 @@ static int ovt_tcm_suspend(struct device *dev)
 		}
 	}
 
-
 	tcm_hcd->in_suspend = true;
+	tp_skip_fw = true;
 	mutex_unlock(&tcm_hcd->suspend_resume_mutex);
 	return 0;
 }
@@ -4286,11 +4328,13 @@ f35_boot_recheck:
 							"Failed to find F$35, try_times = %d\n",
 							retry);
 				if (retry < retry_max) {
+					ovt_tcm_request_gpio(tcm_hcd, tcm_hcd->hw_if->bdata->reset_gpio, true);
 					msleep(100);                   
                     gpio_set_value(bdata->reset_gpio, 0);
                     msleep(5);
                     gpio_set_value(bdata->reset_gpio, 1);        
                     msleep(5);
+					ovt_tcm_request_gpio(tcm_hcd, tcm_hcd->hw_if->bdata->reset_gpio, false);
 					retry++;
 			goto f35_boot_recheck;
 				}
@@ -4978,8 +5022,8 @@ err_sysfs_create_dir:
 	if (bdata->power_gpio >= 0)
 		ovt_tcm_set_gpio(tcm_hcd, bdata->power_gpio, false, 0, 0);
 
-	if (bdata->reset_gpio >= 0)
-		ovt_tcm_set_gpio(tcm_hcd, bdata->reset_gpio, false, 0, 0);
+	//if (bdata->reset_gpio >= 0)
+	//	ovt_tcm_set_gpio(tcm_hcd, bdata->reset_gpio, false, 0, 0);
 
 err_config_gpio:
 	ovt_tcm_enable_regulator(tcm_hcd, false);
@@ -5098,8 +5142,8 @@ static int ovt_tcm_remove(struct platform_device *pdev)
 	if (bdata->power_gpio >= 0)
 		ovt_tcm_set_gpio(tcm_hcd, bdata->power_gpio, false, 0, 0);
 
-	if (bdata->reset_gpio >= 0)
-		ovt_tcm_set_gpio(tcm_hcd, bdata->reset_gpio, false, 0, 0);
+	//if (bdata->reset_gpio >= 0)
+	//	ovt_tcm_set_gpio(tcm_hcd, bdata->reset_gpio, false, 0, 0);
 
 	ovt_tcm_enable_regulator(tcm_hcd, false);
 

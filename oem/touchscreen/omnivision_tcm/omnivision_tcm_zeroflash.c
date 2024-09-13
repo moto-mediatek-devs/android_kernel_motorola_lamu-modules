@@ -1213,10 +1213,12 @@ static void zeroflash_do_f35_firmware_download(void)
 
 exit:
 	if (retval < 0) {
+		ovt_tcm_request_gpio(tcm_hcd, bdata->reset_gpio, true);
         gpio_set_value(bdata->reset_gpio, 0);
         msleep(5);
-        gpio_set_value(bdata->reset_gpio, 1);        
+        gpio_set_value(bdata->reset_gpio, 1);
         msleep(5);
+		ovt_tcm_request_gpio(tcm_hcd, bdata->reset_gpio, false);
 		retry_count++;
     }
 
@@ -1335,10 +1337,12 @@ static void zeroflash_do_romboot_firmware_download(void)
 				"Failed to write command ROMBOOT DOWNLOAD");
 		UNLOCK_BUFFER(zeroflash_hcd->out);
 		if (tcm_hcd->status_report_code != REPORT_IDENTIFY) {
+			ovt_tcm_request_gpio(tcm_hcd, bdata->reset_gpio, true);
 			gpio_set_value(bdata->reset_gpio, 0);
 			msleep(5);
 			gpio_set_value(bdata->reset_gpio, 1);
 			msleep(5);
+			ovt_tcm_request_gpio(tcm_hcd, bdata->reset_gpio, false);
 		}
 		goto exit;
 	}
@@ -1349,10 +1353,12 @@ static void zeroflash_do_romboot_firmware_download(void)
 		LOGE(tcm_hcd->pdev->dev.parent,
 				"Failed to switch to bootloader");
 		if (tcm_hcd->status_report_code != REPORT_IDENTIFY) {
+			ovt_tcm_request_gpio(tcm_hcd, bdata->reset_gpio, true);
 			gpio_set_value(bdata->reset_gpio, 0);
 			msleep(5);
 			gpio_set_value(bdata->reset_gpio, 1);
 			msleep(5);
+			ovt_tcm_request_gpio(tcm_hcd, bdata->reset_gpio, false);
 		}
 		goto exit;
 	}

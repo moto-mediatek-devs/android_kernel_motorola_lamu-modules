@@ -1936,11 +1936,12 @@ static int testing_reset_open(void)
 #ifdef WATCHDOG_SW
 	tcm_hcd->update_watchdog(tcm_hcd, false);
 #endif
-
+	ovt_tcm_request_gpio(tcm_hcd, bdata->reset_gpio, true);
 	gpio_set_value(bdata->reset_gpio, bdata->reset_on_state);
 	msleep(bdata->reset_active_ms);
 	gpio_set_value(bdata->reset_gpio, !bdata->reset_on_state);
 	msleep(bdata->reset_delay_ms);
+	ovt_tcm_request_gpio(tcm_hcd, bdata->reset_gpio, false);
 
 #ifdef WATCHDOG_SW
 	tcm_hcd->update_watchdog(tcm_hcd, true);

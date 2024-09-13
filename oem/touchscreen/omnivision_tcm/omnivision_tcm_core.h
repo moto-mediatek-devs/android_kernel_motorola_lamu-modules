@@ -95,7 +95,7 @@ struct ovt_tcm_board_data {
 
 #define WAKEUP_GESTURE (1)
 
-#define SPEED_UP_RESUME 0
+#define SPEED_UP_RESUME 1
 
 /* The chunk size RD_CHUNK_SIZE/WR_CHUNK_SIZE will not apply in HDL sensors */
 #define RD_CHUNK_SIZE 256 /* read length limit in bytes, 0 = unlimited */
@@ -835,7 +835,9 @@ extern int ovt_tcm_set_func_charger_connected_en_state(unsigned short value);
 extern int ovt_tcm_set_func_face_detect_en_state(unsigned short value);
 extern int ovt_tcm_set_func_ear_phone_connected_en_state(unsigned short value);
 extern int ovt_tcm_set_func_roate_horizontal_level_en_state(unsigned short value);
-
+extern int ovt_tcm_set_gpio(struct ovt_tcm_hcd *tcm_hcd, int gpio,
+		bool config, int dir, int state);
+extern int ovt_tcm_request_gpio(struct ovt_tcm_hcd *tcm_hcd, int gpio, bool config);
 #ifdef CONFIG_OVT_CHARGER_DETECT
 // extern int ovt_start_charger_detect(struct ovt_tcm_hcd *tcm_hcd);
 // extern int ovt_stop_charger_detect(struct ovt_tcm_hcd *tcm_hcd);

@@ -1367,7 +1367,8 @@ int touch_suspend(struct ovt_tcm_hcd *tcm_hcd)
 		}
 
 		touch_hcd->suspend_touch = false;
-
+		LOGE(tcm_hcd->pdev->dev.parent,
+						"set gesture mode\n");
 		retval = tcm_hcd->set_dynamic_config(tcm_hcd,
 				DC_IN_WAKEUP_GESTURE_MODE,
 				1);
