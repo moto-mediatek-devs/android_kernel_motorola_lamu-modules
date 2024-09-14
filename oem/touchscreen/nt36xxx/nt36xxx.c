@@ -2478,7 +2478,7 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 	}
 	ts->client->bits_per_word = 8;
 	ts->client->mode = SPI_MODE_0;
-	ts->client->cs_setup.value = 200;
+	ts->client->cs_setup.value = 500;
 	ts->client->cs_setup.unit = 1;
 
 	ret = spi_setup(ts->client);
