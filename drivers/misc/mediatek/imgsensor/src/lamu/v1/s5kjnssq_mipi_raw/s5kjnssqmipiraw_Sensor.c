@@ -2540,6 +2540,15 @@ UINT32 S5KJNSSQ_Get_Module_Id(void)
 	return moduleid;
 }
 
+static kal_uint32 mainModuleInfo = 0;
+
+void S5KJNSSQ_Get_Lens_Id(void)
+{
+	imgsensor.i2c_write_id = 0xA0;
+	mainModuleInfo = (((read_cmos_sensor_8(0x000B) & 0xff) << 8 & 0xff00) | ((read_cmos_sensor_8(0x000D) & 0xff) & 0x00ff));
+	CAM_DBG(PFX, "mainModuleInfo = 0x%x\n", mainModuleInfo);
+}
+
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
 int main_cam_get_info(char *buf, void *arg0)
 {
@@ -2550,7 +2559,17 @@ int main_cam_get_info(char *buf, void *arg0)
 	if (moduleid == 0x5154){
 		return sprintf(buf, "%s [%d*%d] %dM", "s5kjnssq_rear_qt_|_mipi_raw", imgsensor_info.cap.grabwindow_width*2, imgsensor_info.cap.grabwindow_height*2, pi);
 	}else if (moduleid == 0x5355){
-		return sprintf(buf, "%s [%d*%d] %dM", "s5kjnssq_rear_sn_||_mipi_raw", imgsensor_info.cap.grabwindow_width*2, imgsensor_info.cap.grabwindow_height*2, pi);
+		if (mainModuleInfo == 0x3155) {
+			return sprintf(buf, "%s [%d*%d] %dM", "s5kjnssq_rear_sn_|_mipi_raw", imgsensor_info.cap.grabwindow_width*2, imgsensor_info.cap.grabwindow_height*2, pi);
+		} else if (mainModuleInfo == 0x3151) {
+			return sprintf(buf, "%s [%d*%d] %dM", "s5kjnssq_rear_sn_||_mipi_raw", imgsensor_info.cap.grabwindow_width*2, imgsensor_info.cap.grabwindow_height*2, pi);
+		} else if (mainModuleInfo == 0x3051) {
+			return sprintf(buf, "%s [%d*%d] %dM", "s5kjnssq_rear_sn_|_mipi_raw", imgsensor_info.cap.grabwindow_width*2, imgsensor_info.cap.grabwindow_height*2, pi);
+		} else if (mainModuleInfo == 0x3055) {
+			return sprintf(buf, "%s [%d*%d] %dM", "s5kjnssq_rear_sn_||_mipi_raw", imgsensor_info.cap.grabwindow_width*2, imgsensor_info.cap.grabwindow_height*2, pi);
+		} else {
+			return 0;
+		}
 	}else {
 		return sprintf(buf, "%s [%d*%d] %dM", "s5kjnssq_rear_mipi_raw", imgsensor_info.cap.grabwindow_width*2, imgsensor_info.cap.grabwindow_height*2, pi);
 	}
@@ -2560,7 +2579,7 @@ int main_cam_get_info(char *buf, void *arg0)
 static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 {
 	kal_uint8 i = 0;
-    kal_uint8 retry = 2;
+	kal_uint8 retry = 2;
 	while (imgsensor_info.i2c_addr_table[i] != 0xff) {
 		spin_lock(&imgsensor_drv_lock);
 		imgsensor.i2c_write_id = imgsensor_info.i2c_addr_table[i];
@@ -2570,6 +2589,7 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 			LOG_INF("get_imgsensor_id  sensor_id: 0x%x\n",*sensor_id);
 
 			if (*sensor_id == imgsensor_info.sensor_id) {
+				S5KJNSSQ_Get_Lens_Id();
 				S5KJNSSQ_Get_Module_Id();
 				LOG_INF("s5kjnssq_ofilm i2c 0x%x, sid 0x%x\n", imgsensor.i2c_write_id, *sensor_id);
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
