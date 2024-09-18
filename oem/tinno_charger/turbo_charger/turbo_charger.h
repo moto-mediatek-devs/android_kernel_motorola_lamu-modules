@@ -292,6 +292,7 @@ struct turbo_charger_algo_info {
 	int				total_count;
 	bool			qc_phy_z350;
 	bool			qc_phy_wt6670f;
+	bool			cp_chg_done;
 };
 
 #endif /* __MTK_TURBO_CHARGER_H */

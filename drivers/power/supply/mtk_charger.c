@@ -3794,7 +3794,7 @@ static int pe50_get_ffc_fv(struct mtk_charger *info, int temp_c)
 	return ffc_max_fv;
 }
 
-#define TAPER_COUNT_PE50 3
+#define TAPER_COUNT_PE50 2
 #define TAPER_DROP_MA_PE50 100
 static bool pe50_has_current_tapered(struct mtk_charger *info,
 				    int batt_ma, int taper_ma)
@@ -5187,6 +5187,8 @@ static bool ffc_bat_check_chg_tapered(struct mtk_charger *info,
 		target_ma = taper_ma;
 	else
 		target_ma = allowed_fcc - TAPER_DROP_MA;
+
+	target_ma = taper_ma; // force used taper_ma
 
 	chr_info("%s: curr target_ma:%d, batt_ma:%d\n", __func__, target_ma, batt_ma);
 

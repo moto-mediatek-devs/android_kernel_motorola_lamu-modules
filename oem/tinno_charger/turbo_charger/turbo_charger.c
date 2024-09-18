@@ -28,6 +28,7 @@ extern int z350_set_volt_count(int count);
 extern int z350_reset_charger_type(void);
 extern int wt6670f_set_volt_count(int count);
 extern int wt6670f_reset_charger_type(void);
+extern bool ffc_batt_full;
 #endif
 
 extern int g_thermal_charging_current_limit;  /*TN add by chao.zhang1/860682 20230926 CR/EKFOGO4G-1785*/
@@ -1415,12 +1416,13 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 				turbo_charger_move_state(info, TURBO_STATE_CP_CC_LOOP);
 			}
 		} else {
-			if (info->chrg_step.last_step && (ibatt_curr < info->turbo_charging_curr_min)) {
+			if ((info->chrg_step.last_step && (ibatt_curr < info->turbo_charging_curr_min)) || ffc_batt_full) {
 				if (chrg_cv_taper_tunning_cnt > CV_TAPPER_COUNT) {
 					turbo_charger_find_chrg_step(info, info->pres_temp_zone, vbatt_volt);
 					turbo_charger_move_state(info, TURBO_STATE_CP_QUIT);
 					heartbeat_delay_ms = HEARTBEAT_SHORT_DELAY_MS;
 					chrg_cv_taper_tunning_cnt = 0;
+					info->cp_chg_done = true;
 				} else {
 					chrg_cv_taper_tunning_cnt++;
 				}
@@ -1464,9 +1466,9 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 		is_turbo_charger_ready = false;
 
 		if (info->cp.charge_enabled) {
-			turbo_charger_set_curr_limit_sw(info, info->turbo_charging_curr_min + 200000);
-			turbo_charger_set_chg_curr_limit_sw(info, info->turbo_charging_curr_min);
-			turbo_charger_enable_sw(info, true);
+			//turbo_charger_set_curr_limit_sw(info, info->turbo_charging_curr_min + 200000);
+			//turbo_charger_set_chg_curr_limit_sw(info, info->turbo_charging_curr_min);
+			//turbo_charger_enable_sw(info, true);
 			turbo_charger_enable_cp(info, false);
 			turbo_charger_check_cp_enabled(info);
 		}
@@ -1475,7 +1477,8 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 		info->batt_therm_cooling = false;
 		info->batt_therm_cooling_cnt = 0;
 
-		turbo_charger_move_state(info, TURBO_STATE_RECOVERY_SW);
+		//turbo_charger_move_state(info, TURBO_STATE_RECOVERY_SW);
+		turbo_charger_move_state(info, TURBO_STATE_STOP_CHARGE);
 		heartbeat_delay_ms = HEARTBEAT_SHORT_DELAY_MS;
 		break;
 
@@ -1553,7 +1556,7 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 		}
 
 		if (info->sw.charge_enabled) {
-			//turbo_charger_enable_sw(info, false);
+			turbo_charger_enable_sw(info, false);
 		}
 
 		//usbqc_pm_set_swchg_cap(info, 2500);
@@ -1561,6 +1564,7 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 		if (info->pres_temp_zone != ZONE_COLD
 				&& info->pres_temp_zone != ZONE_HOT
 				&& info->sw.charge_enabled
+				&& !info->cp_chg_done
 				&& info->chrg_step.chrg_step_cc_curr > 0) {
 			turbo_charger_move_state(info, TURBO_STATE_ENTRY);
 			heartbeat_delay_ms = HEARTBEAT_NEXT_STATE_MS;
@@ -1749,6 +1753,7 @@ static void turbo_charger_disconnect(struct turbo_charger_algo_info *info)
 	/*TN Begin modify vbus ovp by rongxing.li/860682 20231208 CR/EKFOGO4G-8986*/
 	info->total_count = 0;
 	/*TN End modify vbus ovp by rongxing.li/860682 20231208 CR/EKFOGO4G-8986*/
+	info->cp_chg_done = false;
 
 	turbo_charger_reset_charger_type(info);
 	turbo_charger_set_curr_limit_sw(info, info->turbo_charging_curr_min + 200000);
