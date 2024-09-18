@@ -584,6 +584,8 @@ done:
 	return 0;
 }
 
+void (*lcd_esd_resume)(bool);
+EXPORT_SYMBOL(lcd_esd_resume);
 int mtk_drm_esd_testing_process(struct mtk_drm_esd_ctx *esd_ctx, bool need_lock)
 {
 		struct mtk_drm_private *private = NULL;
@@ -631,7 +633,11 @@ int mtk_drm_esd_testing_process(struct mtk_drm_esd_ctx *esd_ctx, bool need_lock)
 
 			DDPPR_ERR("[ESD%u]esd check fail, will do esd recovery. try=%d\n",
 				crtc_idx, i);
+			if(lcd_esd_resume)
+				lcd_esd_resume(false);
 			mtk_drm_esd_recover(crtc);
+			if(lcd_esd_resume)
+				lcd_esd_resume(true);
 			// TN modified by kexin.wang/860557 20240705 CR/EKLAMU-838
 			need_setbacklight = 1;
 			recovery_flg = 1;

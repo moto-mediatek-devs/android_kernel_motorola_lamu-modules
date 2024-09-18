@@ -2400,6 +2400,8 @@ static int nvt_get_tp_info(char *buf, void *arg0)
 }
 #endif
 
+extern void (*lcd_esd_resume)(bool);
+void touch_esd_resume(bool status);
 /*******************************************************
 Description:
 	Novatek touchscreen driver probe function.
@@ -2682,6 +2684,7 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 	queue_delayed_work(nvt_esd_check_wq, &nvt_esd_check_work,
 			msecs_to_jiffies(NVT_TOUCH_ESD_CHECK_PERIOD));
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
+	lcd_esd_resume = touch_esd_resume;
 
 	ret = sysfs_create_group(&client->dev.kobj, &nvt_attr_group);
 	if (ret < 0) {
@@ -3203,6 +3206,12 @@ static int32_t nvt_ts_resume(struct device *dev)
 	return 0;
 }
 
+void touch_esd_resume(bool status){
+	if(status)
+		nvt_ts_resume(&ts->client->dev);
+	else
+		nvt_ts_suspend(&ts->client->dev);
+}
 
 #if IS_ENABLED(NVT_DRM_PANEL_NOTIFY)
 static int nvt_drm_panel_notifier_callback(struct notifier_block *self, unsigned long event, void *data)

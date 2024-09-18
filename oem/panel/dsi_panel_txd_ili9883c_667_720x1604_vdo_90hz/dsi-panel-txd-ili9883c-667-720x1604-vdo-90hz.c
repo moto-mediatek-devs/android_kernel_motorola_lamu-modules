@@ -40,10 +40,11 @@
 
 #define TINNO_LCM_OEM_CONFIG
 #if defined(TINNO_LCM_OEM_CONFIG)
-// #include <focaltech_core.h>
 int txd_ili_gesture_mode = -1;
 EXPORT_SYMBOL(txd_ili_gesture_mode);
 #endif
+void (*lcd_ili_resume_by_ddi)(void);
+EXPORT_SYMBOL(lcd_ili_resume_by_ddi);
 
 int hbm;
 bool is_hbm;
@@ -240,6 +241,9 @@ static void txd_panel_init(struct txd *ctx)
 	gpiod_set_value(ctx->reset_gpio, 1);
 	udelay(15 * 1000);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
+
+	if(lcd_ili_resume_by_ddi)
+		lcd_ili_resume_by_ddi();
 
 	txd_dcs_write_seq_static(ctx,0xFF,0x98,0x83,0x06);
 	txd_dcs_write_seq_static(ctx,0x3E,0xE2);

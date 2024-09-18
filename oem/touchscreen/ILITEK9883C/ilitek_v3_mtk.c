@@ -30,6 +30,7 @@
 #define DTS_INT_GPIO	"touch,irq-gpio"
 #define DTS_RESET_GPIO	"touch,reset-gpio"
 #define DTS_OF_NAME	"tchip,ilitek"
+extern void (*lcd_ili_resume_by_ddi)(void);
 
 void ili_tp_reset(void)
 {
@@ -760,6 +761,7 @@ static int ilitek_plat_probe(void)
 #endif
 #endif
 	ILI_INFO("ILITEK Driver loaded successfully!#");
+	lcd_ili_resume_by_ddi = ili_resume_by_ddi;
 	return 0;
 }
 
