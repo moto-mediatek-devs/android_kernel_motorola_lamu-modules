@@ -173,6 +173,8 @@ extern char mp_firmware_name[50];
 #define NVT_TOUCH_ESD_CHECK_PERIOD 1500	/* ms */
 #define NVT_TOUCH_WDT_RECOVERY 1
 
+#define NVT_SPEED_UP_RESUME 1
+
 #define CHECK_PEN_DATA_CHECKSUM 0
 
 #if BOOT_UPDATE_FIRMWARE

@@ -44,6 +44,8 @@ int djn_gesture_mode = -1;
 EXPORT_SYMBOL(djn_gesture_mode);
 #endif
 
+void (*lcd_nvt_resume_nt36672s)(void);
+EXPORT_SYMBOL(lcd_nvt_resume_nt36672s);
 int nt36672s_lcd_id = 0;
 EXPORT_SYMBOL(nt36672s_lcd_id);
 
@@ -242,6 +244,9 @@ static void djn_panel_init(struct djn *ctx)
 	gpiod_set_value(ctx->reset_gpio, 1);
 	udelay(15 * 1000);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
+
+	if(lcd_nvt_resume_nt36672s)
+		lcd_nvt_resume_nt36672s();
 
 	djn_dcs_write_seq_static(ctx, 0XFF, 0X10);
 	djn_dcs_write_seq_static(ctx, 0XFB, 0X01);

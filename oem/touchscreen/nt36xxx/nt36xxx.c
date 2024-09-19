@@ -2402,6 +2402,11 @@ static int nvt_get_tp_info(char *buf, void *arg0)
 
 extern void (*lcd_esd_resume)(bool);
 void touch_esd_resume(bool status);
+#if IS_ENABLED(NVT_SPEED_UP_RESUME)
+extern void (*lcd_nvt_resume_nt36528a)(void);
+extern void (*lcd_nvt_resume_nt36672s)(void);
+void nvt_resume_work(void);
+#endif
 /*******************************************************
 Description:
 	Novatek touchscreen driver probe function.
@@ -2791,7 +2796,10 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 
 	bTouchIsAwake = 1;
 	NVT_LOG("end\n");
-
+#if IS_ENABLED(NVT_SPEED_UP_RESUME)
+	lcd_nvt_resume_nt36528a = nvt_resume_work;
+	lcd_nvt_resume_nt36672s = nvt_resume_work;
+#endif
 	nvt_irq_enable(true);
 
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
@@ -3213,6 +3221,22 @@ void touch_esd_resume(bool status){
 		nvt_ts_suspend(&ts->client->dev);
 }
 
+#if IS_ENABLED(NVT_SPEED_UP_RESUME)
+static void nvt_ts_resume_work_func(struct work_struct *work)  
+{
+	NVT_LOG("++enter\n");
+	touch_esd_resume(true);
+	NVT_LOG("--end\n");
+}
+
+static DECLARE_WORK(lcd_nvt_resume_work, nvt_ts_resume_work_func);
+
+void nvt_resume_work(void)
+{
+	schedule_work(&lcd_nvt_resume_work);
+}
+#endif
+
 #if IS_ENABLED(NVT_DRM_PANEL_NOTIFY)
 static int nvt_drm_panel_notifier_callback(struct notifier_block *self, unsigned long event, void *data)
 {
@@ -3387,7 +3411,9 @@ static int nvt_mtk_drm_notifier_callback(struct notifier_block *nb,
 	} else if (event == MTK_DISP_EVENT_BLANK) {
 		if (*blank == MTK_DISP_BLANK_UNBLANK) {
 			NVT_LOG("event=%lu, *blank=%d\n", event, *blank);
-			nvt_ts_resume(&ts->client->dev);
+			#if !IS_ENABLED(NVT_SPEED_UP_RESUME)
+				nvt_ts_resume(&ts->client->dev);
+			#endif
 		}
 	}
 
