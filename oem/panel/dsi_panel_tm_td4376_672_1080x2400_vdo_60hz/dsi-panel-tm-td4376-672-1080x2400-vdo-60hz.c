@@ -50,8 +50,8 @@ EXPORT_SYMBOL(td4376_lcd_id);
 int hbm;
 bool is_hbm;
 bool is_suspend;
-unsigned int dre_en;
-static unsigned char dre_en_buf[16] = {0};
+bool is_extra;
+static unsigned char extra_buf[16] = {0};
 static unsigned char hbm_buf[16] = {0};
 struct td4376 *ptx;
 
@@ -567,21 +567,19 @@ static int td4376_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 	void *handle, unsigned int level)
 {
 	char bl_tb0[] = {0x51, 0x07, 0xFF};
-	//unsigned int bl_lvl = 0xFF0E;
+	unsigned int bl_lvl = 0x7FF;
 	if (!cb)
 		return -1;
 
-	pr_info("%s: level=%d\n", __func__,level);
+	if(!is_extra & (!is_hbm))
+		bl_lvl = level * 150 / 255; //500nit
+	else
+		bl_lvl = level * 240 / 255; //800nit
 
-/* 	if (is_hbm & (level > 0x6b8)) {
-		pr_info("%s: Enter hbm mode,return 0! level=%x\n", __func__, level);
-		return 0;
-	}
- */
-	//bl_lvl = ((level << 5) & 0xFF00) | (level & 0x0F);
+	pr_info("%s: level=%d, bl_lvl=%d, is_extra=%d, is_hbm=%d\n", __func__, level, bl_lvl, is_extra, is_hbm);
 
-	bl_tb0[1] = (u8)((level >> 8) & 0x0F);
-	bl_tb0[2] = (u8)(level & 0xFF);
+	bl_tb0[1] = (u8)((bl_lvl >> 8) & 0x0F);
+	bl_tb0[2] = (u8)(bl_lvl & 0xFF);
 
 	cb(dsi, handle, bl_tb0, ARRAY_SIZE(bl_tb0));
 
@@ -737,7 +735,7 @@ typedef struct {
 } td4376_proc_node;
 
 #if 1
-static ssize_t td4376_disp_set_dre_read(struct file *filp, char __user *buff, size_t size, loff_t *pos)
+static ssize_t td4376_extra_brightness_read(struct file *filp, char __user *buff, size_t size, loff_t *pos)
 {
 	u32 len = 0;
 
@@ -746,10 +744,10 @@ static ssize_t td4376_disp_set_dre_read(struct file *filp, char __user *buff, si
 	if (*pos != 0)
 		return 0;
 
-	memset(dre_en_buf, 0, 16 * sizeof(unsigned char));
-	len += snprintf(dre_en_buf + len, 16 - len, "%d\n", dre_en);
+	memset(extra_buf, 0, 16 * sizeof(unsigned char));
+	len += snprintf(extra_buf + len, 16 - len, "%d\n", is_extra);
 
-	if (copy_to_user((char *)buff, dre_en_buf, len))
+	if (copy_to_user((char *)buff, extra_buf, len))
 		pr_err("Failed to copy data to user space\n");
 
 	*pos += len;
@@ -757,7 +755,7 @@ static ssize_t td4376_disp_set_dre_read(struct file *filp, char __user *buff, si
 	return len;
 }
 
-static ssize_t td4376_disp_set_dre_write(struct file *filp, const char *buff, size_t size, loff_t *pos)
+static ssize_t td4376_extra_brightness_write(struct file *filp, const char *buff, size_t size, loff_t *pos)
 {
 	char cmd[16] = { 0 };
 	ssize_t ret;
@@ -765,7 +763,7 @@ static ssize_t td4376_disp_set_dre_write(struct file *filp, const char *buff, si
 	pr_info("%s enter!\n", __func__);
 
 	if (is_suspend) {
-		pr_info("In suspend, no write hbm, return now");
+		pr_info("In suspend, no write node, return now");
 		return -1;
 	}
 
@@ -781,10 +779,9 @@ static ssize_t td4376_disp_set_dre_write(struct file *filp, const char *buff, si
 		}
 	}
 
-	//dre_en = simple_strtol(cmd, NULL, 0);
-	//disp_aal_set_dre_en(dre_en);
+	is_extra = simple_strtol(cmd, NULL, 0);
 
-	//pr_info("%s end! dre_en = %d\n", __func__, dre_en);
+	pr_info("%s end! is_extra = %d\n", __func__, is_extra);
 
 out:
 	ret = size;
@@ -899,15 +896,15 @@ static struct proc_ops proc_td4376_hbm_fops = {
 	.proc_lseek = default_llseek,
 };
 
-static struct proc_ops proc_td4376_dre_fops = {
-	.proc_read = td4376_disp_set_dre_read,
-	.proc_write = td4376_disp_set_dre_write,
+static struct proc_ops proc_td4376_extra_fops = {
+	.proc_read = td4376_extra_brightness_read,
+	.proc_write = td4376_extra_brightness_write,
 	.proc_lseek = default_llseek,
 };
 
 td4376_proc_node lcd_info_proc[] = {
 	{"backlight_hbm", NULL, &proc_td4376_hbm_fops, false},
-	{"disp_set_dre", NULL, &proc_td4376_dre_fops, false},
+	{"extra_brightness", NULL, &proc_td4376_extra_fops, false},
 };
 #endif
 
@@ -1039,6 +1036,7 @@ static int td4376_probe(struct mipi_dsi_device *dsi)
 
 	ptx = ctx;
 	hbm = 0;
+	is_extra = 0;
 
 	td4376_lcd_id = 0x010d;
 
