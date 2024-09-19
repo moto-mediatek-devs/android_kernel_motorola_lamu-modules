@@ -1082,7 +1082,7 @@ void do_sw_jeita_state_machine(struct mtk_charger *info)
 		}
 
 		if (sw_jeita_enter_1A) {
-			pdata->temp_charging_current_limit = SW_JEITA_CV1_CURRENT_LIMIT;
+			pdata->temp_charging_current_limit = SW_JEITA_CV1_CURRENT_LIMIT * 1000;
 			if (vbat >= SW_JEITA_CV2 / 1000)
 				sw_jeita_enter_1A = false;
 		}
@@ -3828,6 +3828,8 @@ static bool pe50_has_current_tapered(struct mtk_charger *info,
 		else
 			target_ma = allowed_fcc - TAPER_DROP_MA_PE50;
 	}
+
+	chr_info("%s: curr target_ma:%d, batt_ma:%d\n", __func__, target_ma, batt_ma);
 
 	if (batt_ma > 0) {
 		if (batt_ma <= target_ma)
