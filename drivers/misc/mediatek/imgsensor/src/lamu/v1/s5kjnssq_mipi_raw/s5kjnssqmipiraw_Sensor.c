@@ -2557,20 +2557,18 @@ int main_cam_get_info(char *buf, void *arg0)
 	resolv = imgsensor_info.cap.grabwindow_width * imgsensor_info.cap.grabwindow_height*4;
 	pi = resolv/1000/1000 + (resolv/1000/100%10 > 5 ? 1 : 0);
 	if (moduleid == 0x5154){
-		return sprintf(buf, "%s [%d*%d] %dM", "s5kjnssq_rear_qt_|_mipi_raw", imgsensor_info.cap.grabwindow_width*2, imgsensor_info.cap.grabwindow_height*2, pi);
-	}else if (moduleid == 0x5355){
+		if (mainModuleInfo == 0x3151) {
+			return sprintf(buf, "%s [%d*%d] %dM", "s5kjnssq_rear_qt_||_mipi_raw", imgsensor_info.cap.grabwindow_width*2, imgsensor_info.cap.grabwindow_height*2, pi);
+		} else {
+			return sprintf(buf, "%s [%d*%d] %dM", "s5kjnssq_rear_qt_|_mipi_raw", imgsensor_info.cap.grabwindow_width*2, imgsensor_info.cap.grabwindow_height*2, pi);
+		}
+	} else if (moduleid == 0x5355){
 		if (mainModuleInfo == 0x3155) {
 			return sprintf(buf, "%s [%d*%d] %dM", "s5kjnssq_rear_sn_|_mipi_raw", imgsensor_info.cap.grabwindow_width*2, imgsensor_info.cap.grabwindow_height*2, pi);
-		} else if (mainModuleInfo == 0x3151) {
-			return sprintf(buf, "%s [%d*%d] %dM", "s5kjnssq_rear_sn_||_mipi_raw", imgsensor_info.cap.grabwindow_width*2, imgsensor_info.cap.grabwindow_height*2, pi);
-		} else if (mainModuleInfo == 0x3051) {
-			return sprintf(buf, "%s [%d*%d] %dM", "s5kjnssq_rear_sn_|_mipi_raw", imgsensor_info.cap.grabwindow_width*2, imgsensor_info.cap.grabwindow_height*2, pi);
-		} else if (mainModuleInfo == 0x3055) {
-			return sprintf(buf, "%s [%d*%d] %dM", "s5kjnssq_rear_sn_||_mipi_raw", imgsensor_info.cap.grabwindow_width*2, imgsensor_info.cap.grabwindow_height*2, pi);
 		} else {
-			return 0;
+			return sprintf(buf, "%s [%d*%d] %dM", "s5kjnssq_rear_sn_||_mipi_raw", imgsensor_info.cap.grabwindow_width*2, imgsensor_info.cap.grabwindow_height*2, pi);
 		}
-	}else {
+	} else {
 		return sprintf(buf, "%s [%d*%d] %dM", "s5kjnssq_rear_mipi_raw", imgsensor_info.cap.grabwindow_width*2, imgsensor_info.cap.grabwindow_height*2, pi);
 	}
 }
