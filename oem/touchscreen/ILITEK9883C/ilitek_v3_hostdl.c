@@ -402,7 +402,7 @@ static int ilitek_tddi_fw_iram_upgrade(u8 *pfw, bool mcu)
 			ILI_DBG("Download %s code from hex 0x%x to IRAM 0x%x, len = 0x%x\n",
 					fbi[i].name, fbi[i].start, fbi[i].mem_start, fbi[i].len);
 
-			if (ilitek_tddi_fw_iram_program(fbi[i].mem_start, (fw_ptr + fbi[i].start), fbi[i].len, SPI_UPGRADE_LEN) < 0)
+			if (ilitek_tddi_fw_iram_program(fbi[i].mem_start, (fw_ptr + fbi[i].start), fbi[i].len, (16*K)) < 0)
 				ILI_ERR("IRAM program failed\n");
 
 			crc = CalculateCRC32(fbi[i].start, fbi[i].len - crc_len, fw_ptr);
