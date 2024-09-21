@@ -1004,7 +1004,7 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 		if (!mtk_can_charging) { // mtk charger thread limit charging
 			if (!info->sw.charge_enabled) {
 				TURBO_CHARGER_INFO("mtk charger thread limit charging!!!\n");
-				turbo_charger_move_state(info, TURBO_STATE_SW_ENTRY);
+				turbo_charger_move_state(info, TURBO_STATE_STOP_CHARGE);
 			}
 		}
 
@@ -1122,7 +1122,7 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 		if (!mtk_can_charging) { // mtk charger thread limit charging
 			if (!info->sw.charge_enabled) {
 				TURBO_CHARGER_INFO("mtk charger thread limit charging!!!\n");
-				turbo_charger_move_state(info, TURBO_STATE_SW_ENTRY);
+				turbo_charger_move_state(info, TURBO_STATE_STOP_CHARGE);
 			}
 		}
 
@@ -1312,7 +1312,7 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 		if (!mtk_can_charging) { // mtk charger thread limit charging
 			if (!info->sw.charge_enabled) {
 				TURBO_CHARGER_INFO("mtk charger thread limit charging!!!\n");
-				turbo_charger_move_state(info, TURBO_STATE_SW_ENTRY);
+				turbo_charger_move_state(info, TURBO_STATE_STOP_CHARGE);
 			}
 		}
 
@@ -1456,7 +1456,7 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 		if (!mtk_can_charging) { // mtk charger thread limit charging
 			if (!info->sw.charge_enabled) {
 				TURBO_CHARGER_INFO("mtk charger thread limit charging!!!\n");
-				turbo_charger_move_state(info, TURBO_STATE_SW_ENTRY);
+				turbo_charger_move_state(info, TURBO_STATE_STOP_CHARGE);
 			}
 		}
 		break;
@@ -1565,7 +1565,8 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 				&& info->pres_temp_zone != ZONE_HOT
 				&& info->sw.charge_enabled
 				&& !info->cp_chg_done
-				&& info->chrg_step.chrg_step_cc_curr > 0) {
+				&& info->chrg_step.chrg_step_cc_curr > 0
+				&& mtk_can_charging) {
 			turbo_charger_move_state(info, TURBO_STATE_ENTRY);
 			heartbeat_delay_ms = HEARTBEAT_NEXT_STATE_MS;
 		}
