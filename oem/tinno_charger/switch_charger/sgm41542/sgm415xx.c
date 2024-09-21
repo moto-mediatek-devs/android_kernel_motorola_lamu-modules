@@ -1210,14 +1210,19 @@ static int sgm4154x_charger_set_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_ONLINE:
 		if (val->intval == 2) {
 			pr_info("attach is %d, start charger detection\n", val->intval);
-			schedule_delayed_work(&sgm->charge_detect_delayed_work, msecs_to_jiffies(300));
+			schedule_delayed_work(&sgm->charge_detect_delayed_work, msecs_to_jiffies(500));
 		} else if (val->intval == 0) {
 			pr_info("attach is %d, vbus not online \n", val->intval);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 			sgm->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
 #endif
 			sgm->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
-			sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_UNKNOWN;
+			/*
+			 * if usb cable being plug out between driver probe done and healthd service init done.
+			 * healthd service will ignore all the events of switch charger as the desc type of switch charger is being set to unknown.
+			 * so we can't set the default desc type of switch charger to unknown.
+			 */
+			sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB_TYPE_C;
 			cancel_delayed_work(&sgm->charge_detect_delayed_work);
 			power_supply_changed(sgm->charger);
 		}
@@ -1605,7 +1610,12 @@ static void charger_detect_work_func(struct work_struct *work)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 		sgm->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
 #endif
-		sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_UNKNOWN;
+		/*
+		 * if usb cable being plug out between driver probe done and healthd service init done.
+		 * healthd service will ignore all the events of switch charger as the desc type of switch charger is being set to unknown.
+		 * so we can't set the default desc type of switch charger to unknown.
+		 */
+		sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB_TYPE_C;
 		if (sgm->force_detect_count < 10) {
 			pr_info("SGM4154x charger type: UNKNOWN, retry bc1.2 count:%d\n", sgm->force_detect_count);
 			schedule_delayed_work(&sgm->retry_charger_detect_work, msecs_to_jiffies(100));

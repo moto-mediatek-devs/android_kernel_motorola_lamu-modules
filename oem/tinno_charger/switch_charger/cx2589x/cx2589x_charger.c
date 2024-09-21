@@ -1165,7 +1165,12 @@ static int cx2589x_charger_set_property(struct power_supply *psy,
 			cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
 #endif
 			cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
-			cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_UNKNOWN;
+			/*
+			 * if usb cable being plug out between driver probe done and healthd service init done.
+			 * healthd service will ignore all the events of switch charger as the desc type of switch charger is being set to unknown.
+			 * so we can't set the default desc type of switch charger to unknown.
+			 */
+			cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB_TYPE_C;
 
 			/*
 			 * due to we set Auto DPDM enable func to disable when detecting the DCP.
@@ -1510,7 +1515,12 @@ static void charger_type_detect_work_func(struct work_struct *work)
 		pr_info("CX2589x charger type: UNKNOWN\n");
 		cx->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
 		cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
-		cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_UNKNOWN;
+		/*
+		 * if usb cable being plug out between driver probe done and healthd service init done.
+		 * healthd service will ignore all the events of switch charger as the desc type of switch charger is being set to unknown.
+		 * so we can't set the default desc type of switch charger to unknown.
+		 */
+		cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB_TYPE_C;
 
 		if (cx->force_detect_count < BC12_RETRY_COUNT) {
 			pr_info("CX2589x charger type: UNKNOWN, retry bc1.2 count:%d\n", cx->force_detect_count);
