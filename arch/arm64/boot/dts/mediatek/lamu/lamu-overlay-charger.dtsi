@@ -15,7 +15,7 @@
 };
 
 &charger {
-	battery_cv = <4528000>;
+	battery_cv = <4500000>;
 	max_charger_voltage = <11000000>;
 	hvdcp_input_current_limit = <3000000>;
 	hvdcp_charging_current_limit = <3600000>;
@@ -91,7 +91,7 @@
 	start-soc-max = <90>;
 	stop-soc-max = <90>;
 	vbat-max-gap = <30>;
-	idvchg-term = <375>;
+	idvchg-term = <300>;
 	/* ffc */
 	pe5_therm_cur_thres = <500>;
 	pe5_therm_vol_thres = <80>;
@@ -114,6 +114,10 @@
 	pd_vbus_upper_bound = <9000000>;
 	vsys_watt = <5000000>;
 	ibus_err = <50>;
+
+	/* single charger */
+	sc_input_current = <3800000>;
+	sc_charger_current = <3600000>;
 };
 
 &turbo_charger {
@@ -139,7 +143,7 @@
 				<60 4200 4000 0    0    0    0   >;
 	thermal-min-level = <1000000>; /*uA*/
 	sw-charging-curr-limited = <100000>; /*uA*/
-	charging-curr-min = <750000>; /*uA*/
+	charging-curr-min = <600000>; /*uA*/
 	turbo-volt-comp = <300000>; /*uV*/
 };
 

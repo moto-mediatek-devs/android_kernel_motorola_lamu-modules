@@ -326,7 +326,7 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		}
 
 		if (ffc_batt_full == true)
-			pdata->charging_current_limit = 100000; // mA
+			pdata->charging_current_limit = 0; // mA
 #endif /* CONFIG_OEM_TURBO_CHARGER */
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240823 CR/EKLAMU-202 */
