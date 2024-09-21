@@ -11093,15 +11093,7 @@ skip_prete:
 			}
 		}
 	}
-
-	lop.reg = true;
-	lop.idx = CMDQ_CPR_MML_TRIG;
-	rop.reg = false;
-	rop.value = 1;
-	GCE_IF(lop, R_CMDQ_EQUAL, rop);
 	GCE_DO(set_event, EVENT_MML_DISP_DONE_EVENT);
-	GCE_FI;
-
 	cmdq_pkt_finalize_loop(cmdq_handle);
 	ret = cmdq_pkt_flush_async(cmdq_handle, trig_done_cb, (void *)crtc_id);
 
@@ -12912,7 +12904,7 @@ skip:
 	if (mtk_drm_helper_get_opt(priv->helper_opt, MTK_DRM_OPT_MAX_CHANNEL_HRT)) {
 		unsigned int channel_hrt[BW_CHANNEL_NR] = { 0 };
 
-		mtk_disp_set_max_channel_hrt_bw(mtk_crtc, channel_hrt,
+		mtk_disp_set_all_channel_hrt_bw(mtk_crtc, channel_hrt,
 				ARRAY_SIZE(channel_hrt), __func__);
 	}
 
@@ -13433,7 +13425,6 @@ void mtk_drm_crtc_enable(struct drm_crtc *crtc)
 	mtk_crtc_connect_default_path(mtk_crtc);
 
 	mtk_crtc->qos_ctx->last_hrt_req = 0;
-	priv->last_max_channel_req = 0;
 	mtk_crtc->usage_ovl_fmt[0] = 4;
 	for (i = 0; i < BW_CHANNEL_NR ; i++)
 		mtk_crtc->qos_ctx->last_channel_req[i] = 0;
@@ -13472,7 +13463,7 @@ void mtk_drm_crtc_enable(struct drm_crtc *crtc)
 		if (priv->data->mmsys_id == MMSYS_MT6899 && mtk_drm_dal_enable())
 			mtk_crtc->usage_ovl_fmt[5] = 2;
 		mtk_disp_get_channel_hrt_bw(mtk_crtc, channel_hrt, ARRAY_SIZE(channel_hrt));
-		mtk_disp_set_max_channel_hrt_bw(mtk_crtc, channel_hrt,
+		mtk_disp_set_all_channel_hrt_bw(mtk_crtc, channel_hrt,
 					ARRAY_SIZE(channel_hrt), __func__);
 		for (i = 0 ; i < ARRAY_SIZE(channel_hrt); i++)
 			mtk_crtc->qos_ctx->last_channel_req[i] = channel_hrt[i];
@@ -14355,7 +14346,7 @@ void mtk_crtc_first_enable_ddp_config(struct mtk_drm_crtc *mtk_crtc)
 			cmdq_handle, PMQOS_UPDATE_BW, NULL);
 	}
 	for_each_comp_in_cur_crtc_path(comp, mtk_crtc, i, j) {
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 		mtk_ddp_comp_start(comp, cmdq_handle);
 #endif
 		mtk_ddp_comp_first_cfg(comp, &cfg, cmdq_handle);
@@ -15911,7 +15902,7 @@ static void update_frame_weight(struct drm_crtc *crtc,
 	mutex_unlock(&mtk_drm->lyeblob_list_mutex);
 }
 
-#if IS_ENABLED(CONFIG_MTK_SE_SUPPORT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 static void mtk_drm_check_plane_for_se(struct drm_crtc *crtc)
 {
 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
@@ -16035,7 +16026,7 @@ static void mtk_drm_crtc_atomic_begin(struct drm_crtc *crtc,
 			mtk_crtc_hw_block_ready(crtc);
 		}
 	}
-#if IS_ENABLED(CONFIG_MTK_SE_SUPPORT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	mtk_drm_check_plane_for_se(crtc);
 #endif
 	if (mtk_crtc->ddp_mode == DDP_NO_USE) {
@@ -16616,7 +16607,7 @@ void mtk_drm_crtc_discrete_update(struct drm_crtc *crtc,
 	}
 }
 
-#if IS_ENABLED(CONFIG_MTK_SE_SUPPORT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 static void mtk_drm_plane_for_se(struct drm_crtc *crtc, struct drm_plane *plane,
 	struct mtk_plane_state *plane_state)
 {
@@ -16693,7 +16684,7 @@ void mtk_drm_crtc_plane_update(struct drm_crtc *crtc, struct drm_plane *plane,
 			mtk_crtc->is_dual_pipe,
 			comp->blank_mode);
 
-#if IS_ENABLED(CONFIG_MTK_SE_SUPPORT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	mtk_drm_plane_for_se(crtc, plane, plane_state);
 #endif
 
@@ -20148,7 +20139,7 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
 	}
 	mtk_pq_data_init(mtk_crtc);
 
-#if IS_ENABLED(CONFIG_MTK_SE_SUPPORT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	/*surfaceengine*/
 	mtk_crtc->se_panel = 0;
 	mtk_crtc->sideband_layer = -1;

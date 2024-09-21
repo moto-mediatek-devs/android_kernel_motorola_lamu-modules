@@ -5052,24 +5052,24 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 				};
 			};
 		};
-		cpu-big-core6-0 {
+		cpu-medium-core6-0 {
 			polling-delay = <0>; /* milliseconds */
 			polling-delay-passive = <0>; /* milliseconds */
 			thermal-sensors = <&lvts 9>;
 			trips {
-				cpu_big_core6_0_crit: cpu-big-core6-0-crit {
+				cpu_medium_core6_0_crit: cpu-medium-core6-0-crit {
 					temperature = <119000>;
 					hysteresis = <2000>;
 					type = "passive";
 				};
 			};
 		};
-		cpu-big-core6-1 {
+		cpu-medium-core6-1 {
 			polling-delay = <0>; /* milliseconds */
 			polling-delay-passive = <0>; /* milliseconds */
 			thermal-sensors = <&lvts 10>;
 			trips {
-				cpu_big_core6_1_crit: cpu-big-core6-1-crit {
+				cpu_medium_core6_1_crit: cpu-medium-core6-1-crit {
 					temperature = <119000>;
 					hysteresis = <2000>;
 					type = "passive";
@@ -6063,7 +6063,7 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 				monitor8 {
 					monitor-name = "debug_ctrl_ao_MMUP_AO";
 					base = <0x11651000>;
-					num-ports = <18>;
+					num-ports = <19>;
 					bus-freq-mhz = <728>;
 					isr-dump = <0>;
 				};
@@ -6903,6 +6903,15 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			gce-fast-mtcmos;
 			cmdq-dump-buf-size = <1>;
 			cmdq-print-debug = <1>;
+			cmdq-res-wa-chk = <1>;
+			cmdq-res-debug = <1>;
+			iommu-mask-chk = <1>;
+			iommu-mask-addr = <0x1e800400>;
+			spm-res-chk = <1>;
+			wla-north-ddr-ack-addr = <0x1035d268>;
+			wla-south-ddr-ack-addr = <0x1035e268>;
+			spm-gce-req = <0x1c001864>;
+			cmdq-predump-res-sw-mode = <1>;
 		};
 
 		gce_sec: gce-mbox-sec@1e980000 {
@@ -6945,6 +6954,14 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			gce-req-wa;
 			cmdq-dump-buf-size = <1>;
 			cmdq-print-debug = <1>;
+			cmdq-res-wa-chk = <1>;
+			cmdq-res-debug = <1>;
+			iommu-mask-chk = <1>;
+			iommu-mask-addr = <0x1e800400>;
+			spm-res-chk = <1>;
+			wla-north-ddr-ack-addr = <0x1035d268>;
+			wla-south-ddr-ack-addr = <0x1035e268>;
+			spm-gce-req = <0x1c001864>;
 		};
 
 		gce_m_sec: gce-mbox-m-sec@1e990000 {
@@ -11301,8 +11318,8 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			vdec-power-in-vcp = <1>;
 			vdec-mmdvfs-in-vcp = <1>;
 			vdec-mmdvfs-in-adaptive = <1>;
-			vdec-cpu-hint-mode = <0>; /* cpu grp awr mode */
-			vdec-clamp-util-val = <500>;
+			vdec-cpu-hint-mode = <1>; /* cpu grp awr mode */
+			vdec-clamp-util-val = <720>;
 		};
 
 		venc@17020000 {
@@ -11349,8 +11366,8 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			venc-power-in-vcp = <1>;
 			venc-mmdvfs-in-vcp = <1>;
 			venc-mmdvfs-in-adaptive = <1>;
-			venc-cpu-hint-mode = <0>; /* cpu grp awr mode */
-			venc-clamp-util-val = <500>;
+			venc-cpu-hint-mode = <1>; /* cpu grp awr mode */
+			venc-clamp-util-val = <720>;
 			port-arg-num = <3>;
 			port-def = <0 M4U_L7_P0_VENC_RCPU_U0 0>,
 				<0 M4U_L7_P1_VENC_REC_U0 0>,
@@ -15928,7 +15945,7 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			fmeter-type = <5>;	/* fmeter type */
 			mbox-count = <5>;
 			vcp-excep-mode = <1>;
-			bus-debug-num-ports = <18>;
+			bus-debug-num-ports = <19>;
 			vcp-pwr-status = <0x1c001e94>;
 			/* id, mbox, send_size*/
 			send-table =
@@ -16384,6 +16401,7 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 		oc-limit-freq-lv2 = < 900000 900000 900000>;
 
 		soc-max-level = <1>;
+		soc-core-active-lv1 = < 1 1 1 1 1 1 1 1 >;
 		soc-limit-freq-lv1 = < 2147483647 2147483647 2147483647>;
 	};
 

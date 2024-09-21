@@ -240,6 +240,8 @@
 #define DSI_TIME_CON0(data)	(data->dsi_time_con ? data->dsi_time_con : 0xA0)
 #define FLD_SKEWCAL_PRD REG_FLD_MSB_LSB(31, 16)
 #define DSI_TIME_CON1(data)	(data->dsi_time_con ? data->dsi_time_con + 0x4 : 0xAA)
+#define PREFETCH_EN BIT(31)
+#define FLD_PREFETCH_TIME REG_FLD_MSB_LSB(30, 16)
 #define DSI_RESERVED(data)	(data->dsi_reserved ? data->dsi_reserved : 0xF0)
 #define DSI_VDE_BLOCK_ULTRA BIT(29)
 
@@ -1665,8 +1667,8 @@ unsigned int mtk_dsi_default_rate(struct mtk_dsi *dsi)
 			}
 		}
 
-		if (dsi && dsi->ext &&
-			dsi->ext->params && dsi->ext->params->ext_pix_mode) {
+		if (dsi->ext &&
+			dsi->ext->params && dsi->ext->params->ext_pix_mode != LCM_PACKED_PS_UNKNOWN) {
 			switch (dsi->ext->params->ext_pix_mode) {
 			case LCM_PACKED_PS_30BIT_RGB101010:
 				bit_per_pixel = 30;
@@ -2384,6 +2386,26 @@ static void mtk_dsi_set_vm_cmd(struct mtk_dsi *dsi)
 	mtk_dsi_mask(dsi, dsi->driver_data->reg_vm_cmd_con_ofs, TS_VFP_EN, TS_VFP_EN);
 }
 
+static void mtk_dsi_set_prefetch_time(struct mtk_dsi *dsi)
+{
+	struct mtk_panel_ext *panel_ext = NULL;
+	u32 val = 0, mask = 0, prefetch_time = 0;
+
+	if (IS_ERR_OR_NULL(dsi) || IS_ERR_OR_NULL(dsi->driver_data)) {
+		pr_info("%s:%d NULL Pointer\n", __func__, __LINE__);
+		return;
+	}
+
+	if (dsi->panel && dsi->ext && dsi->ext->params->prefetch_time) {
+		prefetch_time = dsi->ext->params->prefetch_time & 0x7fff;
+		SET_VAL_MASK(val, mask, prefetch_time, FLD_PREFETCH_TIME);
+		mtk_dsi_mask(dsi, DSI_TIME_CON1(dsi->driver_data), mask, val);
+		mtk_dsi_mask(dsi, DSI_TIME_CON1(dsi->driver_data), PREFETCH_EN, PREFETCH_EN);
+		pr_info("%s DSI_TIME_CON1= 0x%x\n", __func__,
+			readl(dsi->regs + DSI_TIME_CON1(dsi->driver_data)));
+	}
+}
+
 int mtk_dsi_get_virtual_heigh(struct mtk_dsi *dsi,
 	struct drm_crtc *crtc)
 {
@@ -2492,8 +2514,8 @@ static unsigned int mtk_get_dsi_buf_bpp(struct mtk_dsi *dsi)
 			default:
 				break;
 			}
-		if (dsi && dsi->ext &&
-			dsi->ext->params && dsi->ext->params->ext_pix_mode) {
+		if (dsi->ext &&
+			dsi->ext->params && dsi->ext->params->ext_pix_mode != LCM_PACKED_PS_UNKNOWN) {
 			switch (dsi->ext->params->ext_pix_mode) {
 			case LCM_PACKED_PS_30BIT_RGB101010:
 				dsi_buf_bpp = 4;
@@ -2593,8 +2615,8 @@ static void mtk_dsi_ps_control_vact(struct mtk_dsi *dsi)
 			SET_VAL_MASK(value, mask, spr_params->rg_xy_swap, RG_XY_SWAP);
 			SET_VAL_MASK(value, mask, spr_params->custom_header_en, CUSTOM_HEADER_EN);
 			SET_VAL_MASK(value, mask, spr_params->custom_header, CUSTOM_HEADER);
-		} else if (dsi && dsi->ext &&
-			dsi->ext->params && dsi->ext->params->ext_pix_mode){
+		} else if (dsi->ext &&
+			dsi->ext->params && dsi->ext->params->ext_pix_mode != LCM_PACKED_PS_UNKNOWN){
 			switch (dsi->ext->params->ext_pix_mode) {
 			case LCM_PACKED_PS_30BIT_RGB101010:
 				value = DSI_DCS_30BIT_FORMAT;
@@ -2981,9 +3003,9 @@ static void mtk_dsi_tx_buf_rw(struct mtk_dsi *dsi)
 	if (dsi->driver_data->support_pre_urgent) {
 		if (!mtk_crtc_is_frame_trigger_mode(&mtk_crtc->base)) {
 			/* line counter mode for vdo mode */
-			u32 line_time_ns;
-			u64 buf_preurgent_high;
-			u32 prefetch_time;
+			u32 line_time_ns = 0;
+			u64 buf_preurgent_high = 0;
+			u32 prefetch_time = 0;
 			struct drm_display_mode *mode = mtk_crtc_get_display_mode_by_comp(__func__,
 							&mtk_crtc->base, comp, false);
 
@@ -3029,6 +3051,8 @@ static void mtk_dsi_tx_buf_rw(struct mtk_dsi *dsi)
 
 			fps = mtk_crtc->panel_ext->params->dyn_fps.vact_timing_fps;
 			fps = fps > 0 ? fps : drm_mode_vrefresh(&mtk_crtc->base.state->adjusted_mode);
+			if (fps == 0)
+				return;
 
 			if (dsc_params->enable)
 				ps_wc = dsc_params->chunk_size * (dsc_params->slice_mode + 1);
@@ -3162,8 +3186,7 @@ static void mtk_dsi_calc_vdo_timing(struct mtk_dsi *dsi)
 		}
 	}
 
-	if (dsi && dsi->ext &&
-			dsi->ext->params && dsi->ext->params->ext_pix_mode) {
+	if (dsi->ext->params && dsi->ext->params->ext_pix_mode != LCM_PACKED_PS_UNKNOWN) {
 		switch (dsi->ext->params->ext_pix_mode) {
 		case LCM_PACKED_PS_30BIT_RGB101010:
 			dsi_tmp_buf_bpp = 4;
@@ -4819,7 +4842,8 @@ static int mtk_preconfig_dsi_enable(struct mtk_dsi *dsi)
 	if (is_bdg_supported())
 		check_stopstate(NULL);
 	mtk_dsi_clk_hs_mode(dsi, 0);
-
+	/*set dsi prefetch time*/
+	mtk_dsi_set_prefetch_time(dsi);
 	return 0;
 }
 
@@ -6294,7 +6318,7 @@ static int mtk_dsi_atomic_check(struct drm_encoder *encoder,
 		}
 	}
 	if (dsi && dsi->ext &&
-			dsi->ext->params && dsi->ext->params->ext_pix_mode) {
+			dsi->ext->params && dsi->ext->params->ext_pix_mode != LCM_PACKED_PS_UNKNOWN) {
 		switch (dsi->ext->params->ext_pix_mode) {
 		case LCM_PACKED_PS_30BIT_RGB101010:
 			mtk_crtc->bpc = 10;
@@ -8660,7 +8684,7 @@ static void mtk_dsi_cmdq_pack_gce(struct mtk_dsi *dsi, struct cmdq_pkt *handle,
 				DSI_CMDQ_CON(dsi->driver_data), CMDQ_SIZE, handle);
 	mtk_ddp_write_mask(comp, CMDQ_SIZE_SEL,
 				DSI_CMDQ_CON(dsi->driver_data), CMDQ_SIZE_SEL, handle);
-	DDPINFO("%s DSI_CMDQ_CON=0x%x\n", __func__, (total_cmdq_size | CMDQ_SIZE_SEL));
+	DDPINFO("%s total_cmdq_size=%d\n", __func__, total_cmdq_size);
 
 	mtk_ddp_write_relaxed(comp, 0x0, DSI_START, handle);
 	mtk_ddp_write_relaxed(comp, 0x1, DSI_START, handle);
@@ -9187,7 +9211,7 @@ int mtk_mipi_dsi_write_gce(struct mtk_dsi *dsi,
 		pr_info("%s: error! dsi->driver_data=NULL! return!\n", __func__);
 		return -1;
 	}
-	dsi_mode = readl(dsi->regs + DSI_MODE_CTRL(dsi->driver_data)) & MODE;
+	dsi_mode = mtk_dsi_is_cmd_mode(&dsi->ddp_comp) ? 0 : 3;
 
 	/* Check cmd_msg param */
 	if (cmd_msg->tx_cmd_num == 0 ||
@@ -9871,7 +9895,7 @@ int mtk_mipi_dsi_read_gce(struct mtk_dsi *dsi,
 		return -1;
 	}
 
-	dsi_mode = readl(dsi->regs + DSI_MODE_CTRL(dsi->driver_data)) & MODE;
+	dsi_mode = mtk_dsi_is_cmd_mode(&dsi->ddp_comp) ? 0: 3;
 
 	/* Check cmd_msg param */
 	if (cmd_msg->tx_cmd_num == 0 ||
@@ -11106,9 +11130,8 @@ void mtk_dsi_set_mmclk_by_datarate_V1(struct mtk_dsi *dsi,
 	struct mtk_ddp_comp *comp = dsi->is_slave ?
 		(&dsi->master_dsi->ddp_comp) : (&dsi->ddp_comp);
 
-	if (dsi && dsi->ext &&
-			dsi->ext->params && dsi->ext->params->ext_pix_mode) {
-		switch (dsi->ext->params->ext_pix_mode) {
+	if (ext && ext->params && ext->params->ext_pix_mode != LCM_PACKED_PS_UNKNOWN) {
+		switch (ext->params->ext_pix_mode) {
 		case LCM_PACKED_PS_30BIT_RGB101010:
 			bpp = 4;
 			break;
@@ -11248,8 +11271,8 @@ void mtk_dsi_set_mmclk_by_datarate_V2(struct mtk_dsi *dsi,
 		return;
 	}
 
-	if (dsi && dsi->ext &&
-			dsi->ext->params && dsi->ext->params->ext_pix_mode) {
+	if (dsi->ext &&
+			dsi->ext->params && dsi->ext->params->ext_pix_mode != LCM_PACKED_PS_UNKNOWN) {
 		switch (dsi->ext->params->ext_pix_mode) {
 		case LCM_PACKED_PS_30BIT_RGB101010:
 			bpp = 4;
@@ -11568,8 +11591,8 @@ unsigned long long mtk_dsi_get_frame_hrt_bw_base_by_datarate(
 					to_info.right_in_width);
 
 	dsi->ext = find_panel_ext(dsi->panel);
-	if (dsi && dsi->ext &&
-			dsi->ext->params && dsi->ext->params->ext_pix_mode) {
+	if (dsi->ext &&
+			dsi->ext->params && dsi->ext->params->ext_pix_mode != LCM_PACKED_PS_UNKNOWN) {
 		switch (dsi->ext->params->ext_pix_mode) {
 		case LCM_PACKED_PS_30BIT_RGB101010:
 			bpp = 4;
@@ -11697,8 +11720,7 @@ unsigned long long mtk_dsi_get_frame_hrt_bw_base_by_mode(
 		DDPINFO("%s:overhead is_support:%d, width L:%d R:%d\n", __func__,
 					to_info.is_support, to_info.left_in_width,
 					to_info.right_in_width);
-	if (dsi && dsi->ext &&
-			dsi->ext->params && dsi->ext->params->ext_pix_mode) {
+	if (dsi->ext->params && dsi->ext->params->ext_pix_mode != LCM_PACKED_PS_UNKNOWN) {
 		switch (dsi->ext->params->ext_pix_mode) {
 		case LCM_PACKED_PS_30BIT_RGB101010:
 			bpp = 4;
@@ -11720,7 +11742,8 @@ unsigned long long mtk_dsi_get_frame_hrt_bw_base_by_mode(
 		}
 	}
 
-	if (dsi->ext->params->dsc_params.enable)
+	if ((dsi->ext != NULL) && (dsi->ext->params != NULL)
+		&& dsi->ext->params->dsc_params.enable)
 		bpp = dsi->ext->params->dsc_params.bit_per_channel * 3;
 
 	if (panel_ext && panel_ext->funcs && panel_ext->funcs->ext_param_get) {
@@ -13920,8 +13943,8 @@ static int mtk_dsi_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 				*bpc = 8;
 				break;
 			}
-			if (dsi && dsi->ext &&
-					dsi->ext->params && dsi->ext->params->ext_pix_mode) {
+			if (dsi->ext &&
+					dsi->ext->params && dsi->ext->params->ext_pix_mode != LCM_PACKED_PS_UNKNOWN) {
 				switch (dsi->ext->params->ext_pix_mode) {
 				case LCM_PACKED_PS_30BIT_RGB101010:
 					*bpc = 10;
@@ -14564,6 +14587,7 @@ static const struct mtk_dsi_driver_data mt6899_dsi_driver_data = {
 	.sram_unit = 32,
 	.urgent_lo_fifo_us = 14,
 	.urgent_hi_fifo_us = 15,
+	.support_bl_at_te = 1,
 	.max_vfp = 0xffe,
 	.mmclk_by_datarate = mtk_dsi_set_mmclk_by_datarate_V2,
 	.bubble_rate = 115,
@@ -15210,8 +15234,8 @@ int fbconfig_mtk_dsi_get_bpp(struct mtk_ddp_comp *comp)
 {
 	struct mtk_dsi *dsi = container_of(comp, struct mtk_dsi, ddp_comp);
 	int bpp = mipi_dsi_pixel_format_to_bpp(dsi->format);
-	if (dsi && dsi->ext &&
-			dsi->ext->params && dsi->ext->params->ext_pix_mode) {
+	if (dsi->ext &&
+			dsi->ext->params && dsi->ext->params->ext_pix_mode != LCM_PACKED_PS_UNKNOWN) {
 		switch (dsi->ext->params->ext_pix_mode) {
 		case LCM_PACKED_PS_30BIT_RGB101010:
 			bpp = 4;
@@ -15276,8 +15300,8 @@ u32 PanelMaster_get_dsi_timing(struct mtk_dsi *dsi, enum MIPI_SETTING_TYPE type)
 			break;
 		}
 	}
-	if (dsi && dsi->ext &&
-			dsi->ext->params && dsi->ext->params->ext_pix_mode) {
+	if (dsi->ext &&
+			dsi->ext->params && dsi->ext->params->ext_pix_mode != LCM_PACKED_PS_UNKNOWN) {
 		switch (dsi->ext->params->ext_pix_mode) {
 		case LCM_PACKED_PS_30BIT_RGB101010:
 			fbconfig_dsiTmpBufBpp = 4;
@@ -15442,7 +15466,8 @@ u32 PanelMaster_get_dsi_timing(struct mtk_dsi *dsi, enum MIPI_SETTING_TYPE type)
 	}
 	case MIPI_SSC_EN:
 	{
-		if (dsi->ext->params->ssc_enable)
+		if ((dsi->ext != NULL) && (dsi->ext->params != NULL)
+			&& dsi->ext->params->ssc_enable)
 			dsi_val = 1;
 		else
 			dsi_val = 0;
@@ -15462,7 +15487,8 @@ u32 DSI_ssc_enable(struct mtk_dsi *dsi, u32 en)
 {
 	u32 enable = en ? 1 : 0;
 
-	dsi->ext->params->ssc_enable = enable;
+	if ((dsi->ext != NULL) && (dsi->ext->params != NULL))
+		dsi->ext->params->ssc_enable = enable;
 
 	return 0;
 }
@@ -15506,9 +15532,8 @@ int PanelMaster_DSI_set_timing(struct mtk_dsi *dsi, struct MIPI_TIMING timing)
 			break;
 		}
 	}
-	if (dsi && dsi->ext &&
-			dsi->ext->params && dsi->ext->params->ext_pix_mode) {
-		switch (dsi->ext->params->ext_pix_mode) {
+	if (ext && ext->params && ext->params->ext_pix_mode != LCM_PACKED_PS_UNKNOWN) {
+		switch (ext->params->ext_pix_mode) {
 		case LCM_PACKED_PS_30BIT_RGB101010:
 			fbconfig_dsiTmpBufBpp = 4;
 			break;
