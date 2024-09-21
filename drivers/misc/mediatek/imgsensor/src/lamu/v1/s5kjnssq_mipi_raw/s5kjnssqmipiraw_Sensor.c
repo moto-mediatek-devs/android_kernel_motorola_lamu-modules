@@ -2563,7 +2563,7 @@ int main_cam_get_info(char *buf, void *arg0)
 			return sprintf(buf, "%s [%d*%d] %dM", "s5kjnssq_rear_qt_|_mipi_raw", imgsensor_info.cap.grabwindow_width*2, imgsensor_info.cap.grabwindow_height*2, pi);
 		}
 	} else if (moduleid == 0x5355){
-		if (mainModuleInfo == 0x3155) {
+		if (mainModuleInfo == 0x3155 || mainModuleInfo == 0x3153) {
 			return sprintf(buf, "%s [%d*%d] %dM", "s5kjnssq_rear_sn_|_mipi_raw", imgsensor_info.cap.grabwindow_width*2, imgsensor_info.cap.grabwindow_height*2, pi);
 		} else {
 			return sprintf(buf, "%s [%d*%d] %dM", "s5kjnssq_rear_sn_||_mipi_raw", imgsensor_info.cap.grabwindow_width*2, imgsensor_info.cap.grabwindow_height*2, pi);
