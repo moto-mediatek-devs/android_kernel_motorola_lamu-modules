@@ -232,6 +232,7 @@ mgk_64_device_modules = [
     "drivers/gpu/drm/panel/k6991v1_64_alpha/panel-nt37707-boe-fhdplus-cmd-ltpo.ko",
     "drivers/gpu/drm/panel/k6991v1_64_alpha/panel-rm692j0-tm-fhdplus-cmd-ltpo.ko",
     "drivers/gpu/drm/panel/panel-nt51021h-wuxga-vdo-boe.ko",
+    "drivers/gpu/drm/panel/panel-n11a-42-02-0a-dsc-vdo.ko",
     "drivers/gpu/mediatek/ged/ged.ko",
     "drivers/gpu/mediatek/gpu_bm/mtk_gpu_qos.ko",
     "drivers/gpu/mediatek/gpueb/mtk_gpueb.ko",
@@ -2891,6 +2892,7 @@ def get_overlay_modules_list():
         mgk_64_device_modules.remove("drivers/misc/mediatek/sspm/v3/sspm_v3.ko")
         mgk_64_device_modules.remove("drivers/misc/mediatek/usb/usb_offload/usb_offload.ko")
         mgk_64_device_modules.remove("drivers/tee/teei/510/isee-ffa.ko")
+        mgk_64_device_modules.append("drivers/tee/teei/515/isee.ko")
         mgk_64_device_modules.remove("sound/soc/mediatek/ultrasound/ultra_common/mtk-scp-ultra.ko")
         mgk_64_device_modules.remove("sound/soc/mediatek/ultrasound/ultra_scp/snd-soc-mtk-scp-ultra.ko")
         mgk_64_device_modules.remove("drivers/misc/mediatek/performance/mtk_perf_ioctl_magt.ko")
@@ -3851,6 +3853,8 @@ def get_overlay_modules_list():
         mgk_64_device_modules.append("drivers/misc/mediatek/lpm_legacy/modules/debug/k6853/mtk-lpm-dbg-mt6853-legacy.ko")
         mgk_64_device_modules.append("drivers/misc/mediatek/lpm_legacy/mtk-lpm-legacy.ko")
         mgk_64_device_modules.append("drivers/misc/mediatek/lpm_legacy/modules/debug/v1/mtk-lpm-dbg-common-v1-legacy.ko")
+        mgk_64_device_modules.append("drivers/misc/mediatek/eem_v2/mtk_picachu.ko")
+        mgk_64_device_modules.append("drivers/misc/mediatek/eem_v2/mediatek_eem.ko")
         mgk_64_device_modules.append("drivers/misc/mediatek/mdpm_v1/mtk_mdpm_v1.ko")
         mgk_64_device_modules.remove("drivers/misc/mediatek/mdpm/mtk_mdpm.ko")
 
@@ -3905,6 +3909,9 @@ def get_overlay_modules_list():
         mgk_64_device_modules.remove("drivers/power/supply/rt9490-charger.ko")
         mgk_64_device_modules.remove("drivers/power/supply/rt9758-charger.ko")
         mgk_64_device_modules.remove("drivers/power/supply/mt6370-charger.ko")
+        mgk_64_device_modules.append("sound/soc/mediatek/aw87519/aw87519_left_audio.ko")
+        mgk_64_device_modules.append("sound/soc/mediatek/aw87519/aw87519_right_audio.ko")
+        mgk_64_device_modules.remove("sound/soc/codecs/snd-soc-rt5509.ko")
 
     if "wifionly.config" in DEFCONFIG_OVERLAYS:
         mgk_64_device_modules.remove("drivers/misc/mediatek/ccci_util/ccci_util_lib.ko")

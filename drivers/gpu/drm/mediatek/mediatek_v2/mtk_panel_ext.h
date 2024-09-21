@@ -20,7 +20,7 @@
 #define ESD_CHECK_NUM 3
 #define MAX_TX_CMD_NUM 20
 #define MAX_RX_CMD_NUM 20
-#define READ_DDIC_SLOT_NUM 4
+#define READ_DDIC_SLOT_NUM 6
 #define MAX_DYN_CMD_NUM 20
 #define MAX_TX_CMD_NUM_PACK 64
 #define MAX_MODE_SWITCH_CMD_NUM 20
@@ -191,6 +191,7 @@ enum MTK_PANEL_SPR_OUTPUT_MODE {
 };
 
 enum LCM_PS_TYPE {
+	LCM_PACKED_PS_UNKNOWN = 0,
 	LCM_PACKED_PS_30BIT_RGB101010 = 8,
 	LCM_PACKED_PS_20BIT_YUV422 = 9,
 	LCM_LOOSELY_PS_20BIT_YUV422 = 10,
@@ -513,6 +514,7 @@ enum DISPLAY_MODE {
 };
 
 struct mtk_panel_params {
+	unsigned int prefetch_time;
 	unsigned int pll_clk;
 	unsigned int data_rate;
 	unsigned int data_rate_khz;

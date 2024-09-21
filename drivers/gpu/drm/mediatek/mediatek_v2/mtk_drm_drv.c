@@ -5,6 +5,7 @@
 
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_atomic_uapi.h>
+#include <drm/drm_blend.h>
 #include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_probe_helper.h>
@@ -2170,7 +2171,7 @@ static int mtk_atomic_commit(struct drm_device *drm,
 			return 0;
 		}
 
-		CRTC_MMP_MARK(drm_crtc_index(crtc), mml_job_status, mtk_crtc->is_mml,
+		CRTC_MMP_MARK((int)drm_crtc_index(crtc), mml_job_status, mtk_crtc->is_mml,
 			atomic_read(&mtk_crtc->wait_mml_last_job_is_flushed));
 
 		if (mtk_crtc->is_mml) {
@@ -8306,7 +8307,7 @@ static int mtk_drm_get_crtc_id(enum MTK_PANEL_ID panel_id, struct mtk_drm_privat
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 static DEFINE_MUTEX(se_lock);
 
 bool mtk_drm_se_crtc_need_enable(struct mtk_drm_crtc *mtk_crtc)
@@ -8445,15 +8446,9 @@ static int mtk_drm_se_enable(struct drm_device *dev, struct mtk_drm_crtc *mtk_cr
 	drm_modeset_acquire_init(&ctx, 0);
 	state->acquire_ctx = &ctx;
 
-	drm_for_each_crtc(crtc, dev)
-		mutex_lock(&crtc->mutex);
-
 	drm_modeset_lock(&dev->mode_config.connection_mutex, state->acquire_ctx);
 	ret = drm_atomic_commit(state);
 	drm_modeset_unlock(&dev->mode_config.connection_mutex);
-
-	drm_for_each_crtc(crtc, dev)
-		mutex_unlock(&crtc->mutex);
 
 	drm_atomic_state_put(state);
 	drm_modeset_drop_locks(&ctx);
@@ -8473,7 +8468,7 @@ int mtk_drm_get_info_ioctl(struct drm_device *dev, void *data,
 	int s_type = MTK_SESSION_TYPE(info->session_id);
 
 	if (s_type == MTK_SESSION_PRIMARY) {
-#if !IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if !IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 		ret = mtk_drm_get_panel_info(dev, info, 0);
 #else
 		int s_dev = MTK_SESSION_DEV(info->session_id);
@@ -8520,7 +8515,7 @@ int mtk_drm_get_info_ioctl(struct drm_device *dev, void *data,
 				return -EINVAL;
 			}
 		} else
-			ret = mtk_drm_get_panel_info(dev, info, 0);
+			ret = mtk_drm_get_panel_info(dev, info, crtc_id);
 		DDPMSG("%s panel w%d h%d\n", __func__, info->physical_width, info->physical_height);
 #endif
 		return ret;
@@ -9571,7 +9566,7 @@ static void mtk_drm_kms_deinit(struct drm_device *drm)
 	}
 }
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 static void mtk_drm_se_cmdq_cb(struct cmdq_cb_data data)
 {
 	struct mtk_cmdq_cb_data *cb_data = data.data;
@@ -9787,6 +9782,7 @@ static int mtk_drm_set_ovl_layer(struct drm_device *dev, void *data,
 
 	state->pending.prop_val[PLANE_PROP_COMPRESS] = layer_info->compress;
 	state->base.alpha = 0xff << 8;
+	state->base.pixel_blend_mode = DRM_MODE_BLEND_PREMULTI;
 
 	DDPINFO("%s line:%d panel_id:%d en:%d, (%d %d %d %d w%d h%d) fmt:%d picth:%d addr:0x%llx, compress:%llu",
 		__func__, __LINE__, se_plane->panel_id, state->pending.enable, state->pending.src_x,
@@ -10206,7 +10202,7 @@ static const struct drm_ioctl_desc mtk_ioctls[] = {
 					DRM_UNLOCKED),
 	DRM_IOCTL_DEF_DRV(MTK_SEC_HND_TO_GEM_HND, mtk_drm_sec_hnd_to_gem_hnd,
 			DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO_YCT)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
 	DRM_IOCTL_DEF_DRV(MTK_SET_OVL_LAYER, mtk_drm_set_ovl_layer,
 			  DRM_UNLOCKED | DRM_AUTH | DRM_RENDER_ALLOW),
 	DRM_IOCTL_DEF_DRV(MTK_MAP_DMA_BUF, mtk_drm_map_dma_buf,

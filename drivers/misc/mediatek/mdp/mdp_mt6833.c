@@ -602,22 +602,22 @@ void cmdq_mdp_init_module_base_VA(void)
 	memset(&gCmdqMdpModuleBaseVA, 0, sizeof(struct CmdqMdpModuleBaseVA));
 
 	gCmdqMdpModuleBaseVA.MDP_RDMA0 =
-		cmdq_dev_alloc_reference_VA_by_name("mdp_rdma0");
+		cmdq_dev_alloc_reference_VA_by_name("mdp-rdma0");
 	gCmdqMdpModuleBaseVA.MDP_RSZ0 =
-		cmdq_dev_alloc_reference_VA_by_name("mdp_rsz0");
+		cmdq_dev_alloc_reference_VA_by_name("mdp-rsz0");
 	gCmdqMdpModuleBaseVA.MDP_RSZ1 =
-		cmdq_dev_alloc_reference_VA_by_name("mdp_rsz1");
+		cmdq_dev_alloc_reference_VA_by_name("mdp-rsz1");
 	gCmdqMdpModuleBaseVA.MDP_WROT0 =
-		cmdq_dev_alloc_reference_VA_by_name("mdp_wrot0");
+		cmdq_dev_alloc_reference_VA_by_name("mdp-wrot0");
 	gCmdqMdpModuleBaseVA.MDP_WROT1 =
-		cmdq_dev_alloc_reference_VA_by_name("mdp_wrot1");
+		cmdq_dev_alloc_reference_VA_by_name("mdp-wrot1");
 	gCmdqMdpModuleBaseVA.MDP_TDSHP0 =
-		cmdq_dev_alloc_reference_VA_by_name("mdp_tdshp0");
+		cmdq_dev_alloc_reference_VA_by_name("mdp-tdshp0");
 	gCmdqMdpModuleBaseVA.MDP_AAL0 =
-		cmdq_dev_alloc_reference_by_name("mdp_aal0",
+		cmdq_dev_alloc_reference_by_name("mdp-aal0",
 		&mdp_module_pa.aal0);
 	gCmdqMdpModuleBaseVA.MDP_HDR0 =
-		cmdq_dev_alloc_reference_by_name("mdp_hdr0",
+		cmdq_dev_alloc_reference_by_name("mdp-hdr0",
 		&mdp_module_pa.hdr0);
 	gCmdqMdpModuleBaseVA.VENC =
 		cmdq_dev_alloc_reference_VA_by_name("venc");
@@ -767,21 +767,21 @@ void cmdq_mdp_init_module_clk(void)
 	cmdq_dev_get_module_clock_by_name("mmsys-config",
 		"MDP_IMG_DL_RELAY1_ASYNC1",
 		&gCmdqMdpModuleClock.clk_IMG0_IMG_DL_RELAY1_ASYNC1);
-	cmdq_dev_get_module_clock_by_name("mdp_rdma0", "MDP_RDMA0",
+	cmdq_dev_get_module_clock_by_name("mdp-rdma0", "MDP_RDMA0",
 		&gCmdqMdpModuleClock.clk_MDP_RDMA0);
-	cmdq_dev_get_module_clock_by_name("mdp_rsz0", "MDP_RSZ0",
+	cmdq_dev_get_module_clock_by_name("mdp-rsz0", "MDP_RSZ0",
 		&gCmdqMdpModuleClock.clk_MDP_RSZ0);
-	cmdq_dev_get_module_clock_by_name("mdp_rsz1", "MDP_RSZ1",
+	cmdq_dev_get_module_clock_by_name("mdp-rsz1", "MDP_RSZ1",
 		&gCmdqMdpModuleClock.clk_MDP_RSZ1);
-	cmdq_dev_get_module_clock_by_name("mdp_wrot0", "MDP_WROT0",
+	cmdq_dev_get_module_clock_by_name("mdp-wrot0", "MDP_WROT0",
 		&gCmdqMdpModuleClock.clk_MDP_WROT0);
-	cmdq_dev_get_module_clock_by_name("mdp_wrot1", "MDP_WROT1",
+	cmdq_dev_get_module_clock_by_name("mdp-wrot1", "MDP_WROT1",
 		&gCmdqMdpModuleClock.clk_MDP_WROT1);
-	cmdq_dev_get_module_clock_by_name("mdp_tdshp0", "MDP_TDSHP0",
+	cmdq_dev_get_module_clock_by_name("mdp-tdshp0", "MDP_TDSHP0",
 		&gCmdqMdpModuleClock.clk_MDP_TDSHP0);
-	cmdq_dev_get_module_clock_by_name("mdp_aal0", "MDP_AAL0",
+	cmdq_dev_get_module_clock_by_name("mdp-aal0", "MDP_AAL0",
 		&gCmdqMdpModuleClock.clk_MDP_AAL0);
-	cmdq_dev_get_module_clock_by_name("mdp_hdr0", "MDP_HDR0",
+	cmdq_dev_get_module_clock_by_name("mdp-hdr0", "MDP_HDR0",
 		&gCmdqMdpModuleClock.clk_MDP_HDR0);
 
 }
@@ -1557,40 +1557,47 @@ struct device *cmdq_mdp_get_larb_device(void)
 	return larb2;
 }
 
-static void mdp_enable_larb(bool enable, struct device *larb)
+static s32 mdp_enable_larb(bool enable, struct device *larb)
 {
+	s32 ret = 0;
 #if IS_ENABLED(CONFIG_DEVICE_MODULES_MTK_SMI)
 	if (!larb) {
 		CMDQ_ERR("%s smi larb not support\n", __func__);
-		return;
+		return TASK_STATE_ERROR;
 	}
 
 	if (enable) {
 		int ret = pm_runtime_resume_and_get(larb);
 
-		cmdq_mdp_enable_clock_APB(enable);
-		cmdq_mdp_enable_clock_MDP_MUTEX0(enable);
-
-		if (ret)
+		if (ret != 0) {
 			CMDQ_ERR("%s enable fail ret:%d\n",
 				__func__, ret);
+			return TASK_STATE_ERROR;
+		}
+		cmdq_mdp_enable_clock_APB(enable);
+		cmdq_mdp_enable_clock_MDP_MUTEX0(enable);
 	} else {
 		cmdq_mdp_enable_clock_MDP_MUTEX0(enable);
 		cmdq_mdp_enable_clock_APB(enable);
-		int ret = pm_runtime_put_sync(larb);
+		ret = pm_runtime_put_sync(larb);
 
-		if (ret)
-			CMDQ_ERR("%s disable fail ret:%d\n", __func__, ret);
-
+		if (ret != 0) {
+			CMDQ_ERR("%s disable fail ret:%d\n",
+				__func__, ret);
+			return TASK_STATE_ERROR;
+		}
 	}
 #endif
+	return ret;
 }
 
 static s32 cmdq_mdp_enable_common_clock(bool enable, u64 engine_flag)
 {
 	if (engine_flag & MDP_ENG_LARB2)
-		mdp_enable_larb(enable, larb2);
-	return 0;
+		return mdp_enable_larb(enable, larb2);
+
+	CMDQ_ERR("%s engine_flag not include MDP_ENG_LARB\n", __func__);
+	return TASK_STATE_ERROR;
 }
 
 static void cmdq_mdp_check_hw_status(struct cmdqRecStruct *handle)
@@ -1992,6 +1999,11 @@ static s32 mdp_get_rdma_idx(u32 eng_base)
 	return rdma_idx;
 }
 
+bool mdp_eng_support_readback(u16 engine)
+{
+	return ((1ll << engine) & CMDQ_ENG_SUPPORT_READBACK_GROUP_BITS);
+}
+
 static bool mdp_svp_support_meta_data(void)
 {
 	return true;
@@ -2017,6 +2029,7 @@ void cmdq_mdp_platform_function_setting(void)
 	pFunc->mdpClockOff = cmdqMdpClockOff;
 	pFunc->mdpIsModuleSuspend = mdp_is_mod_suspend;
 	pFunc->mdpDumpEngineUsage = mdp_dump_engine_usage;
+	pFunc->mdpIsEngineSupportReadback = mdp_eng_support_readback;
 
 	pFunc->mdpIsMtee = mdp_is_mtee;
 	pFunc->mdpIsIspImg = mdp_is_isp_img;

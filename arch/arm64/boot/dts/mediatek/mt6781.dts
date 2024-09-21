@@ -31,7 +31,7 @@
 
 	/* chosen */
 	chosen: chosen {
-		bootargs = "console=tty0 console=ttyS0,921600n1 root=/dev/ram \
+		bootargs = "console=tty0 root=/dev/ram \
 			vmalloc=400M swiotlb=noforce transparent_hugepage=never \
 			initcall_debug=1 \
 			8250.nr_uarts=2 \
@@ -191,7 +191,8 @@
 			operating-points-v2 = <&cluster0_opp>;
 			dynamic-power-coefficient = <85>;
 			capacity-dmips-mhz = <427>;
-
+			cpu-idle-states = <&cpuoff_l &clusteroff_l
+						&mcusysoff &s2idle>;
 		};
 
 		cpu1: cpu@001 {
@@ -747,11 +748,11 @@
 
 				/* ufs reset */
 				0x130 15 0x134 15 0 0
-				(ASSERT_SET | DEASSERT_SET | STATUS_NONE) /* 0: ufshci */
+				(ASSERT_SET | DEASSERT_SET | STATUS_NONE) /* 2: ufshci */
 				0x140  7 0x144  7 0 0
-				(ASSERT_SET | DEASSERT_SET | STATUS_NONE) /* 1: unipro */
+				(ASSERT_SET | DEASSERT_SET | STATUS_NONE) /* 3: unipro */
 				0x150 21 0x154 21 0 0
-				(ASSERT_SET | DEASSERT_SET | STATUS_NONE) /* 2: ufs-crypto */
+				(ASSERT_SET | DEASSERT_SET | STATUS_NONE) /* 4: ufs-crypto */
 				>;
 		};
 	};
@@ -4066,7 +4067,7 @@
 	};
 
 	apdma: dma-controller@10200d80 {
-		compatible = "mediatek,mt6779-uart-dma";
+		compatible = "mediatek,mt6577-uart-dma";
 		reg = <0 0x10200d80 0 0x80>,
 		      <0 0x10200e00 0 0x80>,
 		      <0 0x10200e80 0 0x80>,
@@ -4078,6 +4079,7 @@
 		clocks = <&infracfg_ao INFRACFG_AO_AP_DMA_CG>;
 		clock-names = "apdma";
 		#dma-cells = <1>;
+		dma-bits = <34>;
 		dma-requests = <4>;
 	};
 
@@ -4090,6 +4092,7 @@
 		dmas = <&apdma 0
 				&apdma 1>;
 		dma-names = "tx", "rx";
+		uart-line = <0>;
 	};
 
 	apuart1: serial@11003000 {
@@ -4101,6 +4104,7 @@
 		dmas = <&apdma 2
 				&apdma 3>;
 		dma-names = "tx", "rx";
+		uart-line = <1>;
 	};
 
 	i2c0: i2c0@11007000 {
@@ -4665,8 +4669,8 @@
 
 		vcc-supply = <&mt_pmic_vemc_ldo_reg>;
 
-		resets = <&infracfg_rst 0>, <&infracfg_rst 1>,
-				 <&infracfg_rst 2>;
+		resets = <&infracfg_rst 2>, <&infracfg_rst 3>,
+				 <&infracfg_rst 4>;
 		reset-names = "hci_rst", "unipro_rst", "crypto_rst";
 
 		/* Reference clock control mode */
