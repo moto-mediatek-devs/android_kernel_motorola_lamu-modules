@@ -35,8 +35,21 @@ static struct i2c_client *g_pstI2CclientG;
 extern struct gc08a8_otp_t gc08a8_otp_info;
 extern struct gc05a2_otp_t gc05a2_otp_info;
 extern struct sc820cs_otp_t sc820cs_otp_info;
+extern struct gc08a8spy_otp_t gc08a8spy_otp_info;
 
 struct gc08a8_otp_t {
+	u8  module_flag;
+	u8  module_param[18];
+	u8  moduleChksum;
+	u8  awb_flag;
+	u8  awb_param[12];
+	u8  awbChksum;
+	u8  lsc_flag;
+	u8  lsc_param[1868];
+	u8  lscChksum;
+};
+
+struct gc08a8spy_otp_t {
 	u8  module_flag;
 	u8  module_param[18];
 	u8  moduleChksum;
@@ -417,6 +430,74 @@ unsigned int sc520cs_read_region(struct i2c_client *client, unsigned int addr,
         pr_err("add = 0x%x, read awbChksum = %x\n",addr, *(u32 *)data);
     } else{
         pr_err("sc520cs otp add = 0x%x, size = %d ,read error !!!\n",addr,size);
+    }
+    return size;
+}
+
+unsigned int gc08a8spy_read_region(struct i2c_client *client, unsigned int addr,
+                                unsigned char *data, unsigned int size)
+{
+    unsigned char *dataTmp = data;
+
+    pr_err("gc08a8spy otp region addr = 0x%x, size = %d\n", addr, size);
+    if (addr == 0x1 && size == 1) {//0xff
+        *(u32 *)data = 0x00000002;
+    } else if (addr == 0x0 && size == 1904) {
+       unsigned int totalSize = sizeof(gc08a8spy_otp_info.module_flag) +
+                                 sizeof(gc08a8spy_otp_info.module_param) +
+                                 sizeof(gc08a8spy_otp_info.moduleChksum) +
+                                 sizeof(gc08a8spy_otp_info.awb_flag) +
+                                 sizeof(gc08a8spy_otp_info.awb_param) +
+                                 sizeof(gc08a8spy_otp_info.awbChksum) +
+                                 sizeof(gc08a8spy_otp_info.lsc_flag) +
+                                 sizeof(gc08a8spy_otp_info.lsc_param) +
+                                 sizeof(gc08a8spy_otp_info.lscChksum);
+        pr_err("gc08a8spy otp region addr = 0x%x, size = %d  totalSize=%d \n", addr, size, totalSize);
+        if (size == totalSize) {
+            data[0] = gc08a8spy_otp_info.module_flag;
+
+            dataTmp += sizeof(gc08a8spy_otp_info.module_flag);
+
+            memcpy(dataTmp, gc08a8spy_otp_info.module_param, sizeof(gc08a8spy_otp_info.module_param));
+            dataTmp += sizeof(gc08a8spy_otp_info.module_param);
+
+            data[19] = gc08a8spy_otp_info.moduleChksum;
+            dataTmp += sizeof(gc08a8spy_otp_info.moduleChksum);
+
+            data[20] = gc08a8spy_otp_info.awb_flag;
+            dataTmp += sizeof(gc08a8spy_otp_info.awb_flag);
+
+            memcpy(dataTmp, gc08a8spy_otp_info.awb_param, sizeof(gc08a8spy_otp_info.awb_param));
+            dataTmp += sizeof(gc08a8spy_otp_info.awb_param);
+
+            data[33] = gc08a8spy_otp_info.awbChksum;
+            dataTmp += sizeof(gc08a8spy_otp_info.awbChksum);
+
+            data[34] = gc08a8spy_otp_info.lsc_flag;
+            dataTmp += sizeof(gc08a8spy_otp_info.lsc_flag);
+
+            memcpy(dataTmp, gc08a8spy_otp_info.lsc_param, sizeof(gc08a8spy_otp_info.lsc_param));
+            dataTmp += sizeof(gc08a8spy_otp_info.lsc_param);
+
+            data[totalSize - 1] = gc08a8spy_otp_info.lscChksum;
+        } else {
+            pr_err("gc08a8spy otp size != totalSize");
+            size = totalSize;
+        }
+    } else if (size == 12 && addr == 21) { //read single awb data
+        memcpy(data, (gc08a8spy_otp_info.awb_param), size);
+        pr_err("add = 0x%x, read awb\n",addr);
+    } else if (size >=1868 && size < 2048 && addr == 35) {
+        memcpy(data, gc08a8spy_otp_info.lsc_param, size);
+        pr_err("add = 0x%x, read lsc\n",addr);
+    } else if (addr == 1903 && size == 1) {
+        *(u32 *)data = gc08a8spy_otp_info.lscChksum;
+        pr_err("add = 0x%x, read lscChksum = %x\n",addr, *(u32 *)data);
+    } else if (addr == 33 && size == 1) {
+        *(u32 *)data = gc08a8spy_otp_info.awbChksum;
+        pr_err("add = 0x%x, read awbChksum = %x\n",addr, *(u32 *)data);
+    } else{
+        pr_err("gc08a8spy otp add = 0x%x, size = %d ,read error !!!\n",addr,size);
     }
     return size;
 }
