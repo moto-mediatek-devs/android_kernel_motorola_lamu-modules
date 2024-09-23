@@ -15,7 +15,7 @@
  *
  * Filename:
  * ---------
- *     gc08a8_mipi_Sensor.c
+ *     gc08a8spy_mipi_Sensor.c
  *
  * Project:
  * --------
@@ -50,18 +50,18 @@
 #include "kd_camera_typedef.h"
 #include "kd_imgsensor_define.h"
 #include "kd_imgsensor_errcode.h"
-#include "gc08a8mipiraw_Sensor.h"
+#include "gc08a8spymipiraw_Sensor.h"
 
-#define GC08A8_OTP_DEBUG  0
+#define GC08A8SPY_OTP_DEBUG  0
 
-#define PFX "gc08a8_camera_sensor"
+#define PFX "gc08a8spy_camera_sensor"
 #define LOG_INF(format, args...)		pr_err(PFX "[%s] " format, __func__, ##args)
 
 static DEFINE_SPINLOCK(imgsensor_drv_lock);
 static kal_uint8 module_id;
 
 static struct imgsensor_info_struct imgsensor_info = {
-	.sensor_id = GC08A8_SENSOR_ID,
+	.sensor_id = GC08A8SPY_SENSOR_ID,
 	.checksum_value = 0xe5d32119,
 	.pre = {
 		.pclk = 280000000,
@@ -150,13 +150,13 @@ static struct imgsensor_info_struct imgsensor_info = {
 	.sensor_interface_type = SENSOR_INTERFACE_TYPE_MIPI,
 	.mipi_sensor_type = MIPI_OPHY_NCSI2,
 	.mipi_settle_delay_mode = MIPI_SETTLEDELAY_AUTO,
-#if GC08A8_MIRROR_NORMAL
+#if GC08A8SPY_MIRROR_NORMAL
 	.sensor_output_dataformat = SENSOR_OUTPUT_FORMAT_RAW_R,
-#elif GC08A8_MIRROR_H
+#elif GC08A8SPY_MIRROR_H
 	.sensor_output_dataformat = SENSOR_OUTPUT_FORMAT_RAW_Gr,
-#elif GC08A8_MIRROR_V
+#elif GC08A8SPY_MIRROR_V
 	.sensor_output_dataformat = SENSOR_OUTPUT_FORMAT_RAW_Gb,
-#elif GC08A8_MIRROR_HV
+#elif GC08A8SPY_MIRROR_HV
 	.sensor_output_dataformat = SENSOR_OUTPUT_FORMAT_RAW_B,
 #else
 	.sensor_output_dataformat = SENSOR_OUTPUT_FORMAT_RAW_R,
@@ -187,13 +187,13 @@ static struct imgsensor_struct imgsensor = {
 	.ihdr_mode = 0, /* sensor need support LE, SE with HDR feature */
 	.i2c_write_id = 0x62, /* record current sensor's i2c write id */
 
-#if GC08A8_MIRROR_NORMAL
+#if GC08A8SPY_MIRROR_NORMAL
 		.mirror = IMAGE_NORMAL,
-#elif GC08A8_MIRROR_H
+#elif GC08A8SPY_MIRROR_H
 		.mirror = IMAGE_H_MIRROR,
-#elif GC08A8_MIRROR_V
+#elif GC08A8SPY_MIRROR_V
 		.mirror = IMAGE_V_MIRROR,
-#elif GC08A8_MIRROR_HV
+#elif GC08A8SPY_MIRROR_HV
 		.mirror = IMAGE_HV_MIRROR,
 #else
         .mirror = IMAGE_NORMAL,
@@ -279,10 +279,10 @@ static void table_write_cmos_sensor(kal_uint16 *para, kal_uint32 len)
 }
 
 //begin 20220402 add for otp check
-struct gc08a8_otp_t gc08a8_otp_info;
-EXPORT_SYMBOL(gc08a8_otp_info);
+struct gc08a8spy_otp_t gc08a8spy_otp_info;
+EXPORT_SYMBOL(gc08a8spy_otp_info);
 
-static void gc08a8_otp_init(void)
+static void gc08a8spy_otp_init(void)
 {
 	write_cmos_sensor_8bit(0x031c, 0x60);
 	write_cmos_sensor_8bit(0x0315, 0x80);
@@ -300,13 +300,13 @@ static void gc08a8_otp_init(void)
 	mdelay(10);//add
 }
 
-static void gc08a8_otp_close(void)
+static void gc08a8spy_otp_close(void)
 {
 	write_cmos_sensor_8bit(0x0316, 0x01);
 	write_cmos_sensor_8bit(0x0a67, 0x00);
 }
 
-static kal_uint16 gc08a8_otp_read_group(kal_uint16 addr, kal_uint8 *data, kal_uint16 length)
+static kal_uint16 gc08a8spy_otp_read_group(kal_uint16 addr, kal_uint8 *data, kal_uint16 length)
 {
 	kal_uint16 i = 0;
 
@@ -318,14 +318,14 @@ static kal_uint16 gc08a8_otp_read_group(kal_uint16 addr, kal_uint8 *data, kal_ui
 
 	for (i = 0; i < length; i++) {
 		data[i] = read_cmos_sensor(0x0a6c);
-#if GC08A8_OTP_DEBUG
+#if GC08A8SPY_OTP_DEBUG
 	CAM_DBG(PFX,"addr = 0x%x, data = 0x%x\n", addr + i * 8, data[i]);
 #endif
 	}
 	return 0;
 }
 
-static kal_uint16 gc08a8_otp_read_byte(kal_uint16 addr)
+static kal_uint16 gc08a8spy_otp_read_byte(kal_uint16 addr)
 {
 	kal_uint16 val = 0;
 	write_cmos_sensor_8bit(0x0313, 0x00);
@@ -334,13 +334,13 @@ static kal_uint16 gc08a8_otp_read_byte(kal_uint16 addr)
 	write_cmos_sensor_8bit(0x0313, 0x20);
 	//write_cmos_sensor_8bit(0x0313, 0x12);//??
 	val = read_cmos_sensor(0x0a6c);
-#if GC08A8_OTP_DEBUG
+#if GC08A8SPY_OTP_DEBUG
 	CAM_DBG(PFX,"addr = 0x%x, data = 0x%x\n", addr , val);
 #endif
 	return val;
 }
 
-static int gc08a8_iReadData(unsigned int ui4_offset, unsigned int ui4_length, unsigned char *pinputdata)
+static int gc08a8spy_iReadData(unsigned int ui4_offset, unsigned int ui4_length, unsigned char *pinputdata)
 {
 	int i4RetValue = 0;
 	int i4ResidueDataLength;
@@ -352,7 +352,7 @@ static int gc08a8_iReadData(unsigned int ui4_offset, unsigned int ui4_length, un
 	u4CurrentOffset = ui4_offset;
 	pBuff = pinputdata;
 
-	i4RetValue =gc08a8_otp_read_group((kal_uint16) u4CurrentOffset, pBuff, i4ResidueDataLength);
+	i4RetValue =gc08a8spy_otp_read_group((kal_uint16) u4CurrentOffset, pBuff, i4ResidueDataLength);
 	if (i4RetValue != 0) {
 		CAM_DBG(PFX,"I2C iReadData failed!!\n");
 		return -1;
@@ -378,7 +378,7 @@ static bool check_sum(kal_uint8 *buf, unsigned int size, kal_uint8 chksum)
 	return true;
 }
 
-bool check_gc08a8_otp(void)
+bool check_gc08a8spy_otp(void)
 {
 	kal_uint8 moduleflag =0;
 	kal_uint8 awbflag =0;
@@ -387,11 +387,11 @@ bool check_gc08a8_otp(void)
 	kal_uint8 checksum_awb = 0;
 	kal_uint8 checksum_lsc = 0;
 
-    gc08a8_otp_init();
+    gc08a8spy_otp_init();
 
-	moduleflag = gc08a8_otp_read_byte(MODULE_GROUP_FLAG);
-	awbflag = gc08a8_otp_read_byte(AWB_GROUP_FLAG);
-	lscflag = gc08a8_otp_read_byte(LSC_GROUP_FLAG);
+	moduleflag = gc08a8spy_otp_read_byte(MODULE_GROUP_FLAG);
+	awbflag = gc08a8spy_otp_read_byte(AWB_GROUP_FLAG);
+	lscflag = gc08a8spy_otp_read_byte(LSC_GROUP_FLAG);
 	LOG_INF("moduleflag, = 0x%x", moduleflag);
 	LOG_INF("awbflag, = 0x%x", awbflag);
 	LOG_INF("lscflag, = 0x%x", lscflag);
@@ -399,12 +399,12 @@ bool check_gc08a8_otp(void)
 	//for module info otp read
     if ((moduleflag & 0x03) == 0x01) {
         LOG_INF("group1_module, size %d, block flag 0x01", MODULE_LENGTH);
-        gc08a8_iReadData(MODULE_INFO_FLAG, MODULE_LENGTH,&gc08a8_otp_info.module_param[0]);
-		gc08a8_iReadData(MODULE_INFO_FLAG + (MODULE_LENGTH-1) * 8, 1, &gc08a8_otp_info.moduleChksum);
+        gc08a8spy_iReadData(MODULE_INFO_FLAG, MODULE_LENGTH,&gc08a8spy_otp_info.module_param[0]);
+		gc08a8spy_iReadData(MODULE_INFO_FLAG + (MODULE_LENGTH-1) * 8, 1, &gc08a8spy_otp_info.moduleChksum);
     } else if ((moduleflag & 0x0c) == 0x04) {
         LOG_INF("group2_module, size %d, block flag 0x03", MODULE_LENGTH);
-        gc08a8_iReadData(MODULE_INFO_FLAG + GROUP_LENGTH * 8, MODULE_LENGTH,&gc08a8_otp_info.module_param[0]);
-		gc08a8_iReadData(MODULE_INFO_FLAG + GROUP_LENGTH * 8 + (MODULE_LENGTH-1) * 8, 1, &gc08a8_otp_info.moduleChksum);
+        gc08a8spy_iReadData(MODULE_INFO_FLAG + GROUP_LENGTH * 8, MODULE_LENGTH,&gc08a8spy_otp_info.module_param[0]);
+		gc08a8spy_iReadData(MODULE_INFO_FLAG + GROUP_LENGTH * 8 + (MODULE_LENGTH-1) * 8, 1, &gc08a8spy_otp_info.moduleChksum);
     } else if ((moduleflag & 0x0f) == 0x00) {
         LOG_INF("module info is empty");
     } else {
@@ -412,60 +412,60 @@ bool check_gc08a8_otp(void)
     }
 
 	//for muduleinfo checksum
-	if (check_sum(&gc08a8_otp_info.module_param[0], MODULE_LENGTH-1, gc08a8_otp_info.moduleChksum))
+	if (check_sum(&gc08a8spy_otp_info.module_param[0], MODULE_LENGTH-1, gc08a8spy_otp_info.moduleChksum))
 	{
-		LOG_INF("[yy]gc08a8OTP:module flag chksum pass");
+		LOG_INF("[yy]gc08a8spyOTP:module flag chksum pass");
 		checksum_module = 1;
 
-		LOG_INF("module id = 0x%x", gc08a8_otp_info.module_param[0]);
-        module_id = gc08a8_otp_info.module_param[0];
-		CAM_DBG(PFX,"Year = 0x%x", gc08a8_otp_info.module_param[1]);
-		CAM_DBG(PFX,"Month = 0x%x", gc08a8_otp_info.module_param[2]);
-		CAM_DBG(PFX,"Day = 0x%x", gc08a8_otp_info.module_param[3]);
-		CAM_DBG(PFX,"LENSID = 0x%x", gc08a8_otp_info.module_param[4]);
-		CAM_DBG(PFX,"VCMID = 0x%x", gc08a8_otp_info.module_param[5]);
-		CAM_DBG(PFX,"DriverICID = 0x%x", gc08a8_otp_info.module_param[6]);
+		LOG_INF("module id = 0x%x", gc08a8spy_otp_info.module_param[0]);
+        module_id = gc08a8spy_otp_info.module_param[0];
+		CAM_DBG(PFX,"Year = 0x%x", gc08a8spy_otp_info.module_param[1]);
+		CAM_DBG(PFX,"Month = 0x%x", gc08a8spy_otp_info.module_param[2]);
+		CAM_DBG(PFX,"Day = 0x%x", gc08a8spy_otp_info.module_param[3]);
+		CAM_DBG(PFX,"LENSID = 0x%x", gc08a8spy_otp_info.module_param[4]);
+		CAM_DBG(PFX,"VCMID = 0x%x", gc08a8spy_otp_info.module_param[5]);
+		CAM_DBG(PFX,"DriverICID = 0x%x", gc08a8spy_otp_info.module_param[6]);
 
 	}
 
 	//for awb otp read
     if ((awbflag & 0x03) == 0x01) {
         LOG_INF("group1_awb, size %d, block flag 0x01", AWB_LENGTH);
-        gc08a8_iReadData(AWB_INFO_FLAG, AWB_LENGTH,&gc08a8_otp_info.awb_param[0]);
-		gc08a8_iReadData(AWB_INFO_FLAG + (AWB_LENGTH-1) * 8, 1, &gc08a8_otp_info.awbChksum);
+        gc08a8spy_iReadData(AWB_INFO_FLAG, AWB_LENGTH,&gc08a8spy_otp_info.awb_param[0]);
+		gc08a8spy_iReadData(AWB_INFO_FLAG + (AWB_LENGTH-1) * 8, 1, &gc08a8spy_otp_info.awbChksum);
     } else if ((awbflag & 0x0c) == 0x04) {
         LOG_INF("group2_awb, size %d, block flag 0x03", AWB_LENGTH);
-        gc08a8_iReadData(AWB_INFO_FLAG + GROUP_LENGTH * 8, AWB_LENGTH,&gc08a8_otp_info.awb_param[0]);
-		gc08a8_iReadData(AWB_INFO_FLAG + GROUP_LENGTH * 8 + (AWB_LENGTH-1) * 8, 1, &gc08a8_otp_info.awbChksum);
+        gc08a8spy_iReadData(AWB_INFO_FLAG + GROUP_LENGTH * 8, AWB_LENGTH,&gc08a8spy_otp_info.awb_param[0]);
+		gc08a8spy_iReadData(AWB_INFO_FLAG + GROUP_LENGTH * 8 + (AWB_LENGTH-1) * 8, 1, &gc08a8spy_otp_info.awbChksum);
     } else if ((awbflag & 0x0f) == 0x00) {
         LOG_INF("awb info is empty");
     } else {
         LOG_INF("invalid block awb flag 0x%x", awbflag);
     }
 	//for awb checksum
-	if (check_sum(&gc08a8_otp_info.awb_param[0], AWB_LENGTH-1, gc08a8_otp_info.awbChksum))
+	if (check_sum(&gc08a8spy_otp_info.awb_param[0], AWB_LENGTH-1, gc08a8spy_otp_info.awbChksum))
 	{
 		checksum_awb = 1;
-		LOG_INF("[yy]gc08a8OTP:awb flag chksum pass");
+		LOG_INF("[yy]gc08a8spyOTP:awb flag chksum pass");
 	}
 	else
 	{
 		int i;
 		for (i = 0; i < AWB_LENGTH-1; i++)
-		     CAM_DBG(PFX,"[yy]gc08a8OTP:awb[%d]=0x%x  %d\n", i, gc08a8_otp_info.awb_param[i], gc08a8_otp_info.awb_param[i]);
+		     CAM_DBG(PFX,"[yy]gc08a8spyOTP:awb[%d]=0x%x  %d\n", i, gc08a8spy_otp_info.awb_param[i], gc08a8spy_otp_info.awb_param[i]);
 	}
 
 	//for lsc otp read
     if ((lscflag & 0x03) == 0x01) {
         LOG_INF("group1_lsc, size %d, block flag 0x01", LSC_LENGTH);
-		gc08a8_otp_info.lsc_flag = 0x01;
-        gc08a8_iReadData(LSC_INFO_FLAG, LSC_LENGTH,&gc08a8_otp_info.lsc_param[0]);
-		gc08a8_iReadData(LSC_INFO_FLAG + (LSC_LENGTH-1) * 8, 1, &gc08a8_otp_info.lscChksum);
+		gc08a8spy_otp_info.lsc_flag = 0x01;
+        gc08a8spy_iReadData(LSC_INFO_FLAG, LSC_LENGTH,&gc08a8spy_otp_info.lsc_param[0]);
+		gc08a8spy_iReadData(LSC_INFO_FLAG + (LSC_LENGTH-1) * 8, 1, &gc08a8spy_otp_info.lscChksum);
     } else if ((lscflag & 0x0c) == 0x04) {
         LOG_INF("group2_lsc, size %d, block flag 0x03", LSC_LENGTH);
-        gc08a8_otp_info.lsc_flag = 0x04;
-        gc08a8_iReadData(LSC_INFO_FLAG + GROUP_LENGTH * 8, LSC_LENGTH,&gc08a8_otp_info.lsc_param[0]);
-		gc08a8_iReadData(LSC_INFO_FLAG + GROUP_LENGTH * 8 + (LSC_LENGTH-1) * 8, 1, &gc08a8_otp_info.lscChksum);
+        gc08a8spy_otp_info.lsc_flag = 0x04;
+        gc08a8spy_iReadData(LSC_INFO_FLAG + GROUP_LENGTH * 8, LSC_LENGTH,&gc08a8spy_otp_info.lsc_param[0]);
+		gc08a8spy_iReadData(LSC_INFO_FLAG + GROUP_LENGTH * 8 + (LSC_LENGTH-1) * 8, 1, &gc08a8spy_otp_info.lscChksum);
     } else if ((lscflag & 0x0f) == 0x00) {
         LOG_INF("lsc info is empty");
     } else {
@@ -473,13 +473,13 @@ bool check_gc08a8_otp(void)
     }
 
 	//for lsc checksum
-	if (check_sum(&gc08a8_otp_info.lsc_param[0], LSC_LENGTH-1, gc08a8_otp_info.lscChksum))
+	if (check_sum(&gc08a8spy_otp_info.lsc_param[0], LSC_LENGTH-1, gc08a8spy_otp_info.lscChksum))
 	{
 		checksum_lsc = 1;
-		LOG_INF("[yy]gc08a8OTP:lsc flag chksum pass");
+		LOG_INF("[yy]gc08a8spyOTP:lsc flag chksum pass");
 	}
 
-    gc08a8_otp_close();
+    gc08a8spy_otp_close();
 
 	if (1 == (checksum_module & checksum_awb & checksum_lsc))
 	{
@@ -498,7 +498,7 @@ static kal_uint32 return_sensor_id(void)
 	kal_uint32 sensor_id = 0;
 
 	sensor_id = (read_cmos_sensor(0x03f0) << 8) | read_cmos_sensor(0x03f1);
-	return sensor_id;
+	return sensor_id + 1;
 }
 
 static void set_dummy(void)
@@ -755,7 +755,7 @@ static kal_uint32 streaming_control(kal_bool enable)
 	return ERROR_NONE;
 }
 
-kal_uint16 gc08a8_init_addr_data[] = {
+kal_uint16 gc08a8spy_init_addr_data[] = {
 /*system*/
 	0x031c, 0x60,
 	0x0337, 0x04,
@@ -784,7 +784,7 @@ kal_uint16 gc08a8_init_addr_data[] = {
 	0x0074, 0x0a,
 	0x0059, 0x11,
 	0x0070, 0x05,
-	0x0101, GC08A8_MIRROR,
+	0x0101, GC08A8SPY_MIRROR,
 /*analog*/
 	0x0344, 0x00,
 	0x0345, 0x06,
@@ -1028,7 +1028,7 @@ kal_uint16 gc08a8_init_addr_data[] = {
 	0x047f, 0x04,
 };
 
-static kal_uint16 gc08a8_1632x1224_addr_data[] = {
+static kal_uint16 gc08a8spy_1632x1224_addr_data[] = {
 /*system*/
 	0x031c, 0x60,
 	0x0337, 0x04,
@@ -1209,7 +1209,7 @@ static kal_uint16 gc08a8_1632x1224_addr_data[] = {
 	0x0102, 0x09,
 };
 
-static kal_uint16 gc08a8_3264x2448_addr_data[] = {
+static kal_uint16 gc08a8spy_3264x2448_addr_data[] = {
 /*system*/
 	0x031c, 0x60,
 	0x0337, 0x04,
@@ -1390,7 +1390,7 @@ static kal_uint16 gc08a8_3264x2448_addr_data[] = {
 	0x0102, 0x09,
 };
 
-static kal_uint16 gc08a8_1280x720_addr_data[] = {
+static kal_uint16 gc08a8spy_1280x720_addr_data[] = {
 /*system*/
 	0x031c, 0x60,
 	0x0337, 0x04,
@@ -1575,48 +1575,48 @@ static kal_uint16 gc08a8_1280x720_addr_data[] = {
 static void sensor_init(void)
 {
 	CAM_DBG(PFX,"[%s] init_start\n", __func__);
-	table_write_cmos_sensor(gc08a8_init_addr_data,
-		sizeof(gc08a8_init_addr_data)/sizeof(kal_uint16));
+	table_write_cmos_sensor(gc08a8spy_init_addr_data,
+		sizeof(gc08a8spy_init_addr_data)/sizeof(kal_uint16));
 	CAM_DBG(PFX,"[%s] init_End\n", __func__);
 }	/*	  sensor_init  */
 
 static void preview_setting(void)
 {
 	CAM_DBG(PFX,"%s preview_Start\n", __func__);
-	table_write_cmos_sensor(gc08a8_3264x2448_addr_data,
-		sizeof(gc08a8_3264x2448_addr_data)/sizeof(kal_uint16));
+	table_write_cmos_sensor(gc08a8spy_3264x2448_addr_data,
+		sizeof(gc08a8spy_3264x2448_addr_data)/sizeof(kal_uint16));
 	CAM_DBG(PFX,"%s preview_End\n", __func__);
 }
 
 static void capture_setting(kal_uint16 currefps)
 {
 	CAM_DBG(PFX,"[%s] capture_Start, currefps:%d\n", __func__, currefps);
-	table_write_cmos_sensor(gc08a8_3264x2448_addr_data,
-		sizeof(gc08a8_3264x2448_addr_data)/sizeof(kal_uint16));
+	table_write_cmos_sensor(gc08a8spy_3264x2448_addr_data,
+		sizeof(gc08a8spy_3264x2448_addr_data)/sizeof(kal_uint16));
 	CAM_DBG(PFX,"[%s] capture_End\n", __func__);
 }
 
 static void normal_video_setting(kal_uint16 currefps)
 {
 	CAM_DBG(PFX,"[%s] normal_video_Start, currefps:%d\n", __func__, currefps);
-	table_write_cmos_sensor(gc08a8_3264x2448_addr_data,
-		sizeof(gc08a8_3264x2448_addr_data)/sizeof(kal_uint16));
+	table_write_cmos_sensor(gc08a8spy_3264x2448_addr_data,
+		sizeof(gc08a8spy_3264x2448_addr_data)/sizeof(kal_uint16));
 	CAM_DBG(PFX,"[%s] normal_video_End\n", __func__);
 }
 
 static void hs_video_setting(void)
 {
 	CAM_DBG(PFX,"[%s] hs_video_Start, 1632x1224@30.19fps\n", __func__);
-	table_write_cmos_sensor(gc08a8_1632x1224_addr_data,
-		sizeof(gc08a8_1632x1224_addr_data)/sizeof(kal_uint16));
+	table_write_cmos_sensor(gc08a8spy_1632x1224_addr_data,
+		sizeof(gc08a8spy_1632x1224_addr_data)/sizeof(kal_uint16));
 	CAM_DBG(PFX,"[%s] hs_video_End\n", __func__);
 }
 
 static void slim_video_setting(void)
 {
 	CAM_DBG(PFX,"[%s] slim_video_Start, 1280x720@30.19fps\n", __func__);
-	table_write_cmos_sensor(gc08a8_1280x720_addr_data,
-		sizeof(gc08a8_1280x720_addr_data)/sizeof(kal_uint16));
+	table_write_cmos_sensor(gc08a8spy_1280x720_addr_data,
+		sizeof(gc08a8spy_1280x720_addr_data)/sizeof(kal_uint16));
 	CAM_DBG(PFX,"[%s] slim_video_End\n", __func__);
 }
 
@@ -1651,11 +1651,11 @@ static int front_cam_get_info(char *buf, void *arg0)
     pi = resolv/1000/1000 + (resolv/1000/100%10 > 5 ? 1 : 0);
 
     if (skuNumber > 0 && skuNumber < 10) {
-        return sprintf(buf, "%s [%d*%d] %dM", "gc08a8_front_dd_|_mipi_raw", imgsensor_info.cap.grabwindow_width, imgsensor_info.cap.grabwindow_height, pi);
+        return sprintf(buf, "%s [%d*%d] %dM", "gc08a8spy_front_dd_|_mipi_raw", imgsensor_info.cap.grabwindow_width, imgsensor_info.cap.grabwindow_height, pi);
     } else if (skuNumber > 10) {
-        return sprintf(buf, "%s [%d*%d] %dM", "gc08a8_front_dd_||_mipi_raw", imgsensor_info.cap.grabwindow_width, imgsensor_info.cap.grabwindow_height, pi);
+        return sprintf(buf, "%s [%d*%d] %dM", "gc08a8spy_front_dd_||_mipi_raw", imgsensor_info.cap.grabwindow_width, imgsensor_info.cap.grabwindow_height, pi);
     } else {
-        return sprintf(buf, "%s [%d*%d] %dM", "gc08a8_front_dd_||_mipi_raw", imgsensor_info.cap.grabwindow_width, imgsensor_info.cap.grabwindow_height, pi);
+        return sprintf(buf, "%s [%d*%d] %dM", "gc08a8spy_front_dd_||_mipi_raw", imgsensor_info.cap.grabwindow_width, imgsensor_info.cap.grabwindow_height, pi);
     }
 }
 #endif
@@ -1689,35 +1689,33 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 		spin_unlock(&imgsensor_drv_lock);
 		do {
 			*sensor_id = return_sensor_id();
-			if (*sensor_id == imgsensor_info.sensor_id) {
-				//LOG_INF("[gc08a8_camera_sensor]get_imgsensor_id:i2c write id: 0x%x, sensor id: 0x%x\n",
+			if (*sensor_id == imgsensor_info.sensor_id ) {
+				//LOG_INF("[gc08a8spy_camera_sensor]get_imgsensor_id:i2c write id: 0x%x, sensor id: 0x%x\n",
 					//imgsensor.i2c_write_id, *sensor_id);
-			        if(check_gc08a8_otp())
+			        if(check_gc08a8spy_otp())
 			        {
-	                    LOG_INF("[yy]gc08a8,check OTP pass,module_id = 0x%x\n",module_id);
+		                LOG_INF("[yy]gc08a8spy,check OTP pass, module_id = 0x%x\n",module_id);
 			            *sensor_id |= 0x01000000;
-                        if(module_id == 0x02)
-                        {
+                        if(module_id == 0x47){
                             *sensor_id = 0xFFFFFFFF;
                             return ERROR_SENSOR_CONNECT_FAIL;
                         }
 			        }
-                    LOG_INF("[yy]gc08a8 module_id = 0x%x\n",module_id);
-				LOG_INF("[gc08a8_camera_sensor]get_imgsensor_id:i2c write id: 0x%x, sensor id: 0x%x, module_id:  0x%x\n",
+				LOG_INF("[gc08a8spy_camera_sensor]get_imgsensor_id:i2c write id: 0x%x, sensor id: 0x%x, module_id:0x%x\n",
 					imgsensor.i2c_write_id, *sensor_id,module_id);
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
 				FULL_PRODUCT_DEVICE_CB(ID_FRONT1_CAM, front_cam_get_info, NULL);
 #endif
 				return ERROR_NONE;
 			}
-			LOG_INF("[gc08a8_camera_sensor]get_imgsensor_id:Read sensor id fail, write id: 0x%x, id: 0x%x\n",
+			LOG_INF("[gc08a8spy_camera_sensor]get_imgsensor_id:Read sensor id fail, write id: 0x%x, id: 0x%x\n",
 				imgsensor.i2c_write_id, *sensor_id);
 			retry--;
 		} while (retry > 0);
 		i++;
 		retry = 2;
 	}
-	if (*sensor_id != imgsensor_info.sensor_id) {
+	if(*sensor_id != imgsensor_info.sensor_id) {
 		/* if Sensor ID is not correct,
 		 * Must set *sensor_id to 0xFFFFFFFF
 		 */
@@ -1758,11 +1756,11 @@ static kal_uint32 open(void)
 		do {
 			sensor_id = return_sensor_id();
 			if (sensor_id == imgsensor_info.sensor_id) {
-				printk("[gc08a8_dd_v690_camera_sensor]open:i2c write id: 0x%x, sensor id: 0x%x\n",
+				printk("[gc08a8spy_dd_v690_camera_sensor]open:i2c write id: 0x%x, sensor id: 0x%x\n",
 					imgsensor.i2c_write_id, sensor_id);
 				break;
 			}
-			printk("[gc08a8_dd_v690_camera_sensor]open:Read sensor id fail, write id: 0x%x, id: 0x%x\n",
+			printk("[gc08a8spy_dd_v690_camera_sensor]open:Read sensor id fail, write id: 0x%x, id: 0x%x\n",
 				imgsensor.i2c_write_id, sensor_id);
 			retry--;
 		} while (retry > 0);
@@ -1775,7 +1773,7 @@ static kal_uint32 open(void)
 		return ERROR_SENSOR_CONNECT_FAIL;
 
 	/* initail sequence write in  */
-	//check_gc08a8_otp();
+	//check_gc08a8spy_otp();
 	sensor_init();
 
 	spin_lock(&imgsensor_drv_lock);
@@ -2610,7 +2608,7 @@ static struct SENSOR_FUNCTION_STRUCT sensor_func = {
 	control,
 	close
 };
-UINT32 GC08A8_MIPI_RAW_SensorInit(struct SENSOR_FUNCTION_STRUCT **pfFunc)
+UINT32 GC08A8SPY_MIPI_RAW_SensorInit(struct SENSOR_FUNCTION_STRUCT **pfFunc)
 {
 	/* Check Sensor status here */
 	if (pfFunc != NULL)
