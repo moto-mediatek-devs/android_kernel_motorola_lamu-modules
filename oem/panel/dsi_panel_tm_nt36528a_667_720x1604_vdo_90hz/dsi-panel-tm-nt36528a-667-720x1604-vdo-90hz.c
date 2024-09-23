@@ -484,9 +484,9 @@ static int tianma_enable(struct drm_panel *panel)
 	return 0;
 }
 
-#define HFP (56)
+#define HFP (148)
 #define HSA (4)
-#define HBP (36)
+#define HBP (130)
 #define VFP_60 (1240)
 #define VFP_90 (284)
 #define VSA (4)
@@ -588,7 +588,7 @@ static int tianma_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 }
 
 static struct mtk_panel_params ext_params = {
-	.pll_clk = 436,
+	.pll_clk = 560,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,
 	.lcm_esd_check_table[0] = {
@@ -605,7 +605,7 @@ static struct mtk_panel_params ext_params = {
 };
 
 static struct mtk_panel_params ext_params_90hz = {
-	.pll_clk = 436,
+	.pll_clk = 560,
 	// .vfp_low_power = 300,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,
