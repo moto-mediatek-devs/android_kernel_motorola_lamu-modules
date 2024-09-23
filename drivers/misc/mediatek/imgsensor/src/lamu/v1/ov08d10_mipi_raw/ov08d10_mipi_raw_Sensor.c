@@ -2290,7 +2290,9 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
 			write_cmos_sensor(sensor_reg_data->RegAddr, sensor_reg_data->RegData);
 	break;
 	case SENSOR_FEATURE_GET_REGISTER:
-		write_cmos_sensor(0xfd, 0x00);
+	    if (sensor_reg_data->RegAddr == 0x0000) {
+		    write_cmos_sensor(0xfd, 0x00);
+		}
 	    sensor_reg_data->RegData =
 			read_cmos_sensor(sensor_reg_data->RegAddr);
 	break;
