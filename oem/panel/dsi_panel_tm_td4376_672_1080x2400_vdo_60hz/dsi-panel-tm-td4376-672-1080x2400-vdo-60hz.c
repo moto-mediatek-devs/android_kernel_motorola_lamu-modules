@@ -595,6 +595,9 @@ static struct mtk_panel_params ext_params = {
 		.count = 1,
 		.para_list[0] = 0x9c,
 	},
+
+	.ssc_enable = 0,
+
 /* 	.dyn = {
 		.switch_en = 1,
 		.pll_clk = 465,
