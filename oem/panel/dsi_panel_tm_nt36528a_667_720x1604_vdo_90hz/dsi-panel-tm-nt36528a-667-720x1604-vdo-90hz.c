@@ -245,9 +245,6 @@ static void tianma_panel_init(struct tianma *ctx)
 	udelay(10 * 1000);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 
-	if(lcd_nvt_resume_nt36528a)
-		lcd_nvt_resume_nt36528a();
-
 	tianma_dcs_write_seq_static(ctx, 0xFF, 0x10);
 	tianma_dcs_write_seq_static(ctx, 0xFB, 0x01);
 	tianma_dcs_write_seq_static(ctx, 0x51,0x00,0x00);
@@ -258,6 +255,9 @@ static void tianma_panel_init(struct tianma *ctx)
 	msleep(100);
 	tianma_dcs_write_seq_static(ctx, 0x29);
 	msleep(40);
+
+	if(lcd_nvt_resume_nt36528a)
+		lcd_nvt_resume_nt36528a();
 }
 
 static int tianma_disable(struct drm_panel *panel)

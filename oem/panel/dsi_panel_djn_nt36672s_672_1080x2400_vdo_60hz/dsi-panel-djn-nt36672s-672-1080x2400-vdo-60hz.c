@@ -245,9 +245,6 @@ static void djn_panel_init(struct djn *ctx)
 	udelay(15 * 1000);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 
-	if(lcd_nvt_resume_nt36672s)
-		lcd_nvt_resume_nt36672s();
-
 	djn_dcs_write_seq_static(ctx, 0XFF, 0X10);
 	djn_dcs_write_seq_static(ctx, 0XFB, 0X01);
 	djn_dcs_write_seq_static(ctx, 0XB0, 0X00);
@@ -684,6 +681,9 @@ static void djn_panel_init(struct djn *ctx)
 	msleep(120);
 	djn_dcs_write_seq_static(ctx, 0X29);
 	msleep(50);
+
+	if(lcd_nvt_resume_nt36672s)
+		lcd_nvt_resume_nt36672s();
 }
 
 static int djn_disable(struct drm_panel *panel)
