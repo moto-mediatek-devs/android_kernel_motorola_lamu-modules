@@ -1163,7 +1163,7 @@ static void ovt_tcm_dispatch_message(struct ovt_tcm_hcd *tcm_hcd)
 			if (tp_skip_fw) {
 				LOGE(tcm_hcd->pdev->dev.parent, "delay firmware download!\n");
 				tp_skip_fw = false;
-				msleep(200);
+				//msleep(200);
 			}
 
 			retval = wait_for_completion_timeout(tcm_hcd->helper.helper_completion,
