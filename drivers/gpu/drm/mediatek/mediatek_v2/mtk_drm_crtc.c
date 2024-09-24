@@ -4447,6 +4447,7 @@ static void mtk_crtc_update_ovl_hrt_usage(struct drm_crtc *crtc)
 		for (int i = 0; i < MAX_LAYER_NR ; i++)
 			written += scnprintf(dbg_msg + written, 512 - written, "[%d]",
 				     mtk_crtc->usage_ovl_compr[i]);
+		DDPINFO("%s\n", dbg_msg);
 
 		memset(dbg_msg, 0, sizeof(dbg_msg));
 		written = scnprintf(dbg_msg, 512, "%s usage_ovl_ext_compr = ", __func__);
@@ -10738,6 +10739,13 @@ void mtk_crtc_start_trig_loop(struct drm_crtc *crtc)
 		DDPMSG("%s CRTC%d has no triger loop client\n", __func__, crtc_id);
 		return;
 	}
+
+	DDPMSG("%s crtc%lu cmd mode %d CMD_EOF %d VDO_EOF %d +\n",
+	       __func__,
+	       crtc_id,
+	       mtk_crtc_is_frame_trigger_mode(crtc),
+	       mtk_crtc->gce_obj.event[EVENT_CMD_EOF],
+	       mtk_crtc->gce_obj.event[EVENT_VDO_EOF]);
 #endif
 
 	mtk_crtc->trig_loop_cmdq_handle = cmdq_pkt_create(
@@ -11004,6 +11012,21 @@ skip_prete:
 		}
 	} else {
 		mtk_disp_mutex_submit_sof(mtk_crtc->mutex[0]);
+
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
+		if (output_comp && mtk_ddp_comp_get_type(output_comp->id) == MTK_DSI)
+			GCE_DO(wfe, EVENT_CMD_EOF);
+		else
+			GCE_DO(wfe, EVENT_VDO_EOF);
+
+		DDPMSG("%s crtc%lu output comp %s cmd mode %d CMD_EOF %d VDO_EOF %d +\n",
+		       __func__,
+		       crtc_id,
+		       mtk_dump_comp_str(output_comp),
+		       mtk_crtc_is_frame_trigger_mode(crtc),
+		       mtk_crtc->gce_obj.event[EVENT_CMD_EOF],
+		       mtk_crtc->gce_obj.event[EVENT_VDO_EOF]);
+#else
 		if (crtc_id == 0) {
 			if (mtk_crtc->panel_ext)
 				params = mtk_crtc->panel_ext->params;
@@ -11030,18 +11053,12 @@ skip_prete:
 				GCE_DO(wfe, EVENT_VDO_EOF);
 
 		} else {
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK_AUTO)
-			if (output_comp && mtk_ddp_comp_get_type(output_comp->id) == MTK_DSI)
-				GCE_DO(wfe, EVENT_CMD_EOF);
-			else
-				GCE_DO(wfe, EVENT_VDO_EOF);
-#else
 			if (output_comp && mtk_ddp_comp_get_type(output_comp->id) == MTK_DISP_DVO)
 				GCE_DO(wfe, EVENT_VDO_EOF);
 			else
 				GCE_DO(wfe, EVENT_CMD_EOF);
-#endif
 		}
+#endif
 
 		/* sw workaround to fix gce hw bug */
 		if (mtk_crtc_with_sodi_loop(crtc)) {
@@ -12926,6 +12943,18 @@ skip:
 			mtk_ddp_comp_io_cmd(comp, NULL, PMQOS_SET_HRT_BW, &wdma_bw);
 			mtk_ddp_comp_io_cmd(comp, NULL, PMQOS_UPDATE_BW, &flag);
 			DDPMSG("%s, clear wdma:%u bw:%u\n", __func__, comp->id, wdma_bw);
+		}
+	}
+
+	if (crtc_id == 0 && priv->data->mmsys_id == MMSYS_MT6899) {
+		unsigned int wdma_bw = 0;
+
+		comp = mtk_disp_get_wdma_comp_by_scn(crtc, WDMA_WRITE_BACK);
+		if (comp) {
+			mtk_ddp_comp_io_cmd(comp, NULL, PMQOS_SET_HRT_BW, &wdma_bw);
+			comp->qos_bw = 0;
+			mtk_ddp_comp_io_cmd(comp, NULL, PMQOS_UPDATE_BW, &flag);
+			DDPMSG("%s, clear cwb wdma:%u bw:%u\n", __func__, comp->id, wdma_bw);
 		}
 	}
 
@@ -17116,7 +17145,7 @@ static void mtk_drm_wb_cb(struct cmdq_cb_data data)
 	int session_id;
 	unsigned int fence_idx = cb_data->wb_fence_idx;
 	struct pixel_type_map *pixel_types;
-	unsigned int spr_mode_type, bw_zero;
+	unsigned int spr_mode_type;
 
 	if (mtk_crtc->pq_data) {
 		spr_mode_type = mtk_get_cur_spr_type(crtc);
@@ -17133,9 +17162,6 @@ static void mtk_drm_wb_cb(struct cmdq_cb_data data)
 	//	drm_framebuffer_put(cb_data->wb_fb);
 	session_id = mtk_get_session_id(crtc);
 	mtk_crtc_release_output_buffer_fence_by_idx(crtc, session_id, fence_idx);
-
-	bw_zero = 0;
-	mtk_addon_path_io_cmd(crtc, cb_data->wb_scn, PMQOS_SET_HRT_BW, &bw_zero);
 
 	CRTC_MMP_MARK(0, wbBmpDump, 1, fence_idx);
 	mtk_dprec_mmp_dump_wdma_layer(crtc, cb_data->wb_fb);

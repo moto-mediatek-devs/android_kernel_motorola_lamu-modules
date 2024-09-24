@@ -34,6 +34,7 @@
 #include "modem_secure_base.h"
 #include "modem_reg_base.h"
 #include "ap_md_reg_dump.h"
+#include "ccci_fsm.h"
 
 #if IS_ENABLED(CONFIG_MTK_PBM)
 #include "mtk_pbm.h"
@@ -214,9 +215,9 @@ void md_cd_lock_modem_clock_src(int locked)
 		CCCI_MEM_LOG_TAG(-1, TAG,
 			"a0 = 0x%lX; a1 = 0x%lX\n", res.a0, res.a1);
 
-		if (res.a1 == 0 && res.a0 > 0 && res.a0 < 10)
+		if (res.a1 == 0 && res.a0 > 0 && res.a0 < 40)
 			settle = res.a0; /* ATF */
-		else if (res.a0 == 0 && res.a1 > 0 && res.a1 < 10)
+		else if (res.a0 == 0 && res.a1 > 0 && res.a1 < 40)
 			settle = res.a1; /* TF-A */
 		else {
 			settle = 20;
@@ -973,6 +974,8 @@ static int md_cd_power_off(struct ccci_modem *md, unsigned int timeout)
 		"[POWER OFF] MD MTCMOS OFF end: ret = %d\n", ret);
 	CCCI_NORMAL_LOG(0, TAG,
 		"[POWER OFF] MD MTCMOS OFF end: ret = %d\n", ret);
+	/* mtcmos off done, unblock md block io */
+	ccci_ufs_io_operate(0);
 
 	/* mtcmos off done, then delay 4ms, gen99 spec request */
 	if (md_cd_plat_val_ptr.md_gen == 6299) {
