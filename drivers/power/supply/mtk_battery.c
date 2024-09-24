@@ -168,36 +168,52 @@ int find_battery_sn(const char *target)
 	}
 	return -1;
 }
+
+int find_battery_id(const char *target)
+{
+	for (int i = 0; i < BATTERY_ID_NUMBER; i++) {
+		if (strcmp(BatteryId[i], target) == 0) {
+#if IS_ENABLED(CONFIG_OEM_DEVINFO)
+			FULL_PRODUCT_DEVICE_INFO(ID_BATTERY, BatteryId[i]);
+#endif
+			return i;
+		}
+	}
+	return -1;
+}
 void fgauge_set_profile_id(struct mtk_battery *gm)
 {
-	const char *bat_sn = NULL;
-	int bat_sn_index;
+	const char *bat_info = NULL;
+	int bat_info_index;
 
-	bat_sn = oem_battery_sn();
-	bat_sn_index = find_battery_sn(bat_sn);
-	bm_err(gm, "battery profile name: %s\n", bat_sn);
-	switch(bat_sn_index) {
+	bat_info = oem_battery_sn();
+	bat_info_index = find_battery_sn(bat_info);
+	if (bat_info_index < 0) {
+		bat_info_index = find_battery_id(bat_info);
+	}
+	bm_err(gm, "battery profile name: %s\n", bat_info);
+	switch(bat_info_index) {
 		case 0:
-		case 4:
+		case 6:
 			gm->battery_id = 0;
 			break;
 		case 1:
-		case 5:
+		case 7:
 			gm->battery_id = 1;
 			break;
 		case 2:
-		case 6:
+		case 8:
 			gm->battery_id = 2;
 			break;
 		case 3:
-		case 7:
+		case 9:
 			gm->battery_id = 3;
 			break;
-		case 8:
-		case 9:
+		case 4:
+		case 10:
 			gm->battery_id = 4;
 			break;
-		case 10:
+		case 5:
 		case 11:
 			gm->battery_id = 5;
 			break;
@@ -205,7 +221,7 @@ void fgauge_set_profile_id(struct mtk_battery *gm)
 			gm->battery_id = 0;
 			break;
 	}
-	bm_err(gm, "battery profile id: %d, index: %d\n", gm->battery_id, bat_sn_index);
+	bm_err(gm, "battery profile id: %d, index: %d\n", gm->battery_id, bat_info_index);
 }
 int fgauge_get_profile_id(struct mtk_battery *gm)
 {
