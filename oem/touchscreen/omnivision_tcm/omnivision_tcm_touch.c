@@ -1350,8 +1350,6 @@ int touch_early_suspend(struct ovt_tcm_hcd *tcm_hcd)
 
 int touch_suspend(struct ovt_tcm_hcd *tcm_hcd)
 {
-	int retval;
-	unsigned short gesture_cmd = 0;
 	if (!touch_hcd)
 		return 0;
 
@@ -1367,29 +1365,6 @@ int touch_suspend(struct ovt_tcm_hcd *tcm_hcd)
 		}
 
 		touch_hcd->suspend_touch = false;
-		LOGE(tcm_hcd->pdev->dev.parent,
-						"set gesture mode\n");
-		retval = tcm_hcd->set_dynamic_config(tcm_hcd,
-				DC_IN_WAKEUP_GESTURE_MODE,
-				1);
-		if(tcm_hcd->wakeup_gesture_enabled == 1) {
-			gesture_cmd = 0x8000;//single tap
-		} else if(tcm_hcd->wakeup_gesture_enabled == 2) {
-			gesture_cmd = 0x0001;//double
-		} else if(tcm_hcd->wakeup_gesture_enabled == 3) {
-			gesture_cmd = 0x8001;//all
-		} else
-			LOGE(tcm_hcd->pdev->dev.parent,
-						"invalid gesture mode\n");
-
-		retval = tcm_hcd->set_dynamic_config(tcm_hcd,
-				0xFE,
-				gesture_cmd);
-		if (retval < 0) {
-			LOGE(tcm_hcd->pdev->dev.parent,
-					"Failed to enable wakeup gesture mode %hu\n", gesture_cmd);
-			return retval;
-		}
 	}
 
 	return 0;

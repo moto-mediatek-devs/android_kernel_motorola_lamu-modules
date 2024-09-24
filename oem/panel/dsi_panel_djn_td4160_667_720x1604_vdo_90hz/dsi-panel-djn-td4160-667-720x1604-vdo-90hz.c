@@ -46,6 +46,8 @@ EXPORT_SYMBOL(td4160_gesture_mode);
 
 int td4160_lcd_id = 0;
 EXPORT_SYMBOL(td4160_lcd_id);
+void (*lcd_ovt_apply_gesture_mode_td4160)(void);
+EXPORT_SYMBOL(lcd_ovt_apply_gesture_mode_td4160);
 
 int hbm;
 bool is_hbm;
@@ -302,6 +304,9 @@ static int dijin_unprepare(struct drm_panel *panel)
 
 #ifdef TINNO_LCM_OEM_CONFIG
 	if(td4160_gesture_mode) {
+		if (lcd_ovt_apply_gesture_mode_td4160)
+			lcd_ovt_apply_gesture_mode_td4160();
+
 		pr_info("td4160 Skip Power Control !\n");
 		return 0;
 	}

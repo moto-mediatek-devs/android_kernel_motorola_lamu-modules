@@ -4578,6 +4578,35 @@ out:
 	return size;
 }
 
+void ovt_apply_gesture_mode(void)
+{
+	int retval;
+	unsigned short gesture_cmd = 0;
+
+	LOGE(g_tcm_hcd->pdev->dev.parent,
+					"set gesture mode\n");
+	retval = g_tcm_hcd->set_dynamic_config(g_tcm_hcd,
+			DC_IN_WAKEUP_GESTURE_MODE,
+			1);
+	if(g_tcm_hcd->wakeup_gesture_enabled == 1) {
+		gesture_cmd = 0x8000;//single tap
+	} else if(g_tcm_hcd->wakeup_gesture_enabled == 2) {
+		gesture_cmd = 0x0001;//double
+	} else if(g_tcm_hcd->wakeup_gesture_enabled == 3) {
+		gesture_cmd = 0x8001;//all
+	} else
+		LOGE(g_tcm_hcd->pdev->dev.parent,
+					"invalid gesture mode\n");
+
+	retval = g_tcm_hcd->set_dynamic_config(g_tcm_hcd,
+			0xFE,
+			gesture_cmd);
+	if (retval < 0) {
+		LOGE(g_tcm_hcd->pdev->dev.parent,
+				"Failed to enable wakeup gesture mode %hu\n", gesture_cmd);
+	}
+}
+
 #if LINUX_VERSION_CODE > KERNEL_VERSION(5, 6, 0)
 typedef struct {
 	char *name;
@@ -4690,7 +4719,7 @@ static int ovt_tcm_probe(struct platform_device *pdev)
 	tcm_hcd->rd_chunk_size = RD_CHUNK_SIZE;
 	tcm_hcd->wr_chunk_size = WR_CHUNK_SIZE;
 	tcm_hcd->is_detected = false;
-	tcm_hcd->wakeup_gesture_enabled = WAKEUP_GESTURE;
+	tcm_hcd->wakeup_gesture_enabled = 0;
 
 #ifdef PREDICTIVE_READING
 	tcm_hcd->read_length = MIN_READ_LENGTH;
@@ -4798,6 +4827,8 @@ static int ovt_tcm_probe(struct platform_device *pdev)
 	charger_module_init();
 #endif
 	touch_info_node_init();
+	lcd_ovt_apply_gesture_mode_td4160 = ovt_apply_gesture_mode;
+	lcd_ovt_apply_gesture_mode_td4376 = ovt_apply_gesture_mode;
 
 	sysfs_dir = kobject_create_and_add(PLATFORM_DRIVER_NAME,
 			NULL); //&pdev->dev.kobj);  move to /sys

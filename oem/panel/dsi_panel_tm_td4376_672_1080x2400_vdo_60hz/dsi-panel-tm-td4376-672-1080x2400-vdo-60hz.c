@@ -46,6 +46,8 @@ EXPORT_SYMBOL(td4376_gesture_mode);
 
 int td4376_lcd_id = 0;
 EXPORT_SYMBOL(td4376_lcd_id);
+void (*lcd_ovt_apply_gesture_mode_td4376)(void);
+EXPORT_SYMBOL(lcd_ovt_apply_gesture_mode_td4376);
 
 int hbm;
 bool is_hbm;
@@ -305,6 +307,9 @@ static int td4376_unprepare(struct drm_panel *panel)
 
 #ifdef TINNO_LCM_OEM_CONFIG
 	if(td4376_gesture_mode) {
+		if (lcd_ovt_apply_gesture_mode_td4376)
+			lcd_ovt_apply_gesture_mode_td4376();
+
 		pr_info("td4376 Skip Power Control !\n");
 		return 0;
 	}

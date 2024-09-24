@@ -843,5 +843,7 @@ extern int ovt_tcm_request_gpio(struct ovt_tcm_hcd *tcm_hcd, int gpio, bool conf
 // extern int ovt_stop_charger_detect(struct ovt_tcm_hcd *tcm_hcd);
 int  charger_module_init(void);
 #endif
+extern void (*lcd_ovt_apply_gesture_mode_td4160)(void);
+extern void (*lcd_ovt_apply_gesture_mode_td4376)(void);
 
 #endif
