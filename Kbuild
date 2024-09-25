@@ -108,8 +108,6 @@ obj-y += sound/virtio/
 
 obj-y += drivers/pci/controller/
 
-obj-y += drivers/media/virtio/
-
 obj-y += drivers/video/backlight/
 
 #TN Begin modified by yang.chen1/860621 20240605 CR/EKLAMU-4

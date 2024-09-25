@@ -8796,8 +8796,11 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			mediatek,larb = <&smi_larb33>;
 			mediatek,smi-id = <33>;
 			interconnects = <&mmqos MASTER_LARB_PORT(M4U_L33_P5_DISP1_WDMA0)
-					 &mmqos SLAVE_COMMON(0)>;
-			interconnect-names = "DDP_COMPONENT_WDMA1_hrt_qos";
+					&mmqos SLAVE_COMMON(0)>,
+					<&mmqos MASTER_LARB_PORT(M4U_L33_P5_DISP1_WDMA0)
+					&mmqos SLAVE_COMMON(0)>;
+			interconnect-names = "DDP_COMPONENT_WDMA1_qos",
+					"DDP_COMPONENT_WDMA1_hrt_qos";
 		};
 
 		disp1-smi-larb0@1420f000 {
@@ -13862,7 +13865,7 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 			operating-points-v2 = <&opp_table_disp>;
 			gce-supply = <&gce>;
 			mmqos-supply = <&mmqos>;
-			mml-max-layer = /bits/ 8 <2>;
+			mml-max-layer = /bits/ 8 <1>;
 		};
 
 		mml1_mutex0: mml1-mutex0@1f801000 {
@@ -15419,24 +15422,28 @@ sw_info,frame_id,custom,pipeline_stage,RPID,UID";
 					<18 0x8000 0x0>, /* scp chre to */
 					<19 0x200 0x0>;  /* low power debug */
 
-			scp-resource-dump = "disable";   /* enable dump scp related resource */
+			scp-resource-dump = "enable";   /* enable dump scp related resource */
 			/* regulator */
-			scp-supply-num = <3>;	/* total number of scp related regulator */
-			//vscp0-supply = <&mt6363_vbuck4>;
-			//vscp1-supply = <&mt6363_vsram_apu>;
+			scp-supply-num = <2>;	/* total number of scp related regulator */
+			vscp0-supply = <&mt6363_vbuck4>;
+			vscp1-supply = <&mt6363_vsram_mdfe>;
 			//vscp2-supply = <&mt6363_vs3>;
 
 			/* dump register */
 			/* cell means register info (address,size), not total reg num */
 			scp-resource-reg-dump-cell = <2>;
-			scp-resource-reg-dump = <0x1c001818 0x4>,
-				<0x1c00192c 0x4>;
-				//<0x1c0018e4 0x4>,
+			scp-resource-reg-dump = <0x1c00c92c 0x4>,
+				<0x1c00c930 0x4>,
+				<0x1c013010 0x4>;
 				//<0x1c0012b8 0x4>,
 				//<0x1c013010 0x4>,
 
 			/* awake timeout count plt setting */
 			awake-timeout = <10000>; /* 100 ms */
+			/* scp fmeter dump */
+			scp-clk-fmeter-dump = "enable";
+			scp-u1-id = <34>;
+			scp-u2-id = <35>;
 		};
 
 		srclken_rc: srclken-rc@1c00d000 {
