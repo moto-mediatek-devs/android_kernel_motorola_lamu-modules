@@ -29,6 +29,7 @@
 
 #include <linux/spi/spi.h>
 #include <linux/of_gpio.h>
+#include <linux/pinctrl/consumer.h>
 #include "omnivision_tcm_core.h"
 
 static unsigned char *buf;
@@ -42,6 +43,8 @@ static struct ovt_tcm_bus_io bus_io;
 static struct ovt_tcm_hw_interface hw_if;
 
 static struct platform_device *ovt_tcm_spi_device;
+static struct pinctrl *pinctrl;
+static struct pinctrl_state *pin_spi_mode_default;
 #ifdef CONFIG_DRMV
 static struct drm_panel *active_tcm_panel;
 
@@ -639,6 +642,25 @@ static int ovt_tcm_spi_probe(struct spi_device *spi)
 		return -ENOMEM;
 	}
 	parse_dt(&spi->dev, hw_if.bdata);
+
+	pinctrl = devm_pinctrl_get(spi->controller->dev.parent);
+	if (IS_ERR_OR_NULL(pinctrl)) {
+		LOGE(&spi->dev,"Failed to get pinctrl handler[need confirm]\n");
+		pinctrl = NULL;
+	}
+	/* default spi mode */
+	pin_spi_mode_default = pinctrl_lookup_state(
+				pinctrl, "lamugo_spi_mode");
+	if (IS_ERR_OR_NULL(pin_spi_mode_default)) {
+		LOGE(&spi->dev,"Failed to get pinctrl state:%s\n", "lamugo_spi_mode");
+		pin_spi_mode_default = NULL;
+
+	} else {
+		retval = pinctrl_select_state(pinctrl, pin_spi_mode_default);
+		if (retval < 0)
+			LOGE(&spi->dev,"Failed to select default pinstate, retval:%d \n", retval);
+		retval = 0;
+	}
 #else
 	hw_if.bdata = spi->dev.platform_data;
 #endif

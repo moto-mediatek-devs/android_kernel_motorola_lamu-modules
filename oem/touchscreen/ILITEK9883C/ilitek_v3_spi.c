@@ -594,6 +594,34 @@ int ili_core_spi_setup(int num)
 	return 0;
 }
 
+static int ilitek_spi_pinctrl_init(void)
+{
+	int r = 0;
+
+	ilits->pinctrl = devm_pinctrl_get(ilits->spi->controller->dev.parent);
+	if (IS_ERR_OR_NULL(ilits->pinctrl)) {
+		ILI_ERR("Failed to get ilits->pinctrl handler[need confirm]");
+		ilits->pinctrl = NULL;
+		return -EINVAL;
+	}
+	/* default spi mode */
+	ilits->pin_spi_mode_default = pinctrl_lookup_state(
+				ilits->pinctrl, "lamugo_spi_mode");
+	if (IS_ERR_OR_NULL(ilits->pin_spi_mode_default)) {
+		r = PTR_ERR(ilits->pin_spi_mode_default);
+		ILI_ERR("Failed to get pinctrl state:%s, r:%d",
+				"lamugo_spi_mode", r);
+		ilits->pin_spi_mode_default = NULL;
+
+	} else {
+		r = pinctrl_select_state(ilits->pinctrl, ilits->pin_spi_mode_default);
+		if (r < 0)
+			ILI_ERR("Failed to select default pinstate, r:%d", r);
+	}
+
+	return r;
+}
+
 static int ilitek_spi_probe(struct spi_device *spi)
 {
 	struct touch_bus_info *info =
@@ -735,6 +763,8 @@ static int ilitek_spi_probe(struct spi_device *spi)
 
 	txd_ili_gesture_mode = ilits->gesture;
 #endif
+
+	ilitek_spi_pinctrl_init();
 
 	if (ili_core_spi_setup(SPI_CLK) < 0)
 		return -EINVAL;

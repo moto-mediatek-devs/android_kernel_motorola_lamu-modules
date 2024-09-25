@@ -72,6 +72,7 @@
 #include <linux/security.h>
 #include <linux/mount.h>
 #include <linux/firmware.h>
+#include <linux/pinctrl/consumer.h>
 
 #ifdef CONFIG_OF
 #include <linux/of_address.h>
@@ -1319,6 +1320,8 @@ struct ilitek_ts_data {
 	void (*demo_debug_info[5])(u8 *, size_t);
 	int (*detect_int_stat)(bool status);
 	int (*ice_mode_ctrl)(bool enable, bool mcu, int mode);
+	struct pinctrl *pinctrl;
+	struct pinctrl_state *pin_spi_mode_default;
 	ktime_t last_event_time;
 };
 extern struct ilitek_ts_data *ilits;
