@@ -660,6 +660,8 @@ __maybe_unused static int cx2589x_get_input_minvolt_lim(struct charger_device *c
 	return 0;
 }
 
+#define CX2589x_DCP_CURRENT 2200000
+#define CX2589x_DCP_CURRENT_OFFSET 200000
 static int cx2589x_set_input_curr_lim(struct charger_device *chg_dev, unsigned int iindpm)
 {
 	int ret;
@@ -673,6 +675,10 @@ static int cx2589x_set_input_curr_lim(struct charger_device *chg_dev, unsigned i
 	else if (iindpm > CX2589x_IINDPM_I_MAX_uA)
 		iindpm = CX2589x_IINDPM_I_MAX_uA;
 
+	if (iindpm == CX2589x_DCP_CURRENT) {
+		iindpm += CX2589x_DCP_CURRENT_OFFSET;
+		pr_info("DCP type re-set icl to %d uA\n", iindpm);
+	}
 	reg_val = (iindpm - CX2589x_IINDPM_I_MIN_uA) / CX2589x_IINDPM_STEP_uA;
 
 	ret = cx2589x_update_bits(cx, CX2589x_REG_00, CX2589x_IINDPM_I_MASK, reg_val);
@@ -1782,6 +1788,31 @@ static int cx2589x_init_charge(struct cx2589x_device *cx)
 	return ret;
 }
 
+static int cx2589x_set_bat_comp(struct cx2589x_device *cx, u32 ir_mohm)
+{
+	int ret;
+	u8 reg_val;
+	if (ir_mohm < CX2589x_BAT_COMP_MIN)
+		ir_mohm = CX2589x_BAT_COMP_MIN;
+	else if (ir_mohm > CX2589x_BAT_COMP_MAX)
+		ir_mohm = CX2589x_BAT_COMP_MAX;
+	reg_val = (ir_mohm - CX2589x_BAT_COMP_MIN) / CX2589x_BAT_COMP_STEP;
+	ret = cx2589x_update_bits(cx, CX2589x_REG_08, CX2589x_BAT_COMP_MASK, reg_val);
+	return ret;
+}
+static int cx2589x_set_vclamp(struct cx2589x_device *cx, u32 ir_uv)
+{
+	int ret;
+	u8 reg_val;
+	if (ir_uv < CX2589x_VCLAMP_MIN_uV)
+		ir_uv = CX2589x_VCLAMP_MIN_uV;
+	else if (ir_uv > CX2589x_VCLAMP_MAX_uV)
+		ir_uv = CX2589x_VCLAMP_MAX_uV;
+	reg_val = (ir_uv - CX2589x_VCLAMP_MIN_uV) / CX2589x_VCLAMP_STEP_uV;
+	ret = cx2589x_update_bits(cx, CX2589x_REG_08, CX2589x_VCLAMP_MASK, reg_val);
+	return ret;
+}
+
 static int cx2589x_hw_init(struct cx2589x_device *cx)
 {
 	int ret = 0;
@@ -1842,6 +1873,14 @@ static int cx2589x_hw_init(struct cx2589x_device *cx)
 		goto err_out;
 #endif
 	ret = cx2589x_set_recharge_volt(cx, 100); //100~200mv
+	if (ret)
+		goto err_out;
+
+	ret = cx2589x_set_bat_comp(cx, 40);
+	if (ret)
+		goto err_out;
+
+	ret = cx2589x_set_vclamp(cx, 224000);
 	if (ret)
 		goto err_out;
 

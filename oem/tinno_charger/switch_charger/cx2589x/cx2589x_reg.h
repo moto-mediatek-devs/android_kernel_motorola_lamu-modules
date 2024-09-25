@@ -185,7 +185,18 @@
 #define CX2589x_EN_ICO			BIT(4)
 #define CX2589x_EN_HVDCP		BIT(3)
 
-
+/* bat comp  */
+#define CX2589x_BAT_COMP_MASK		GENMASK(7, 5)
+#define CX2589x_BAT_COMP_MAX		140
+#define CX2589x_BAT_COMP_MIN		0
+#define CX2589x_BAT_COMP_DEF		0
+#define CX2589x_BAT_COMP_STEP		20
+/* vclamp  */
+#define CX2589x_VCLAMP_MASK		GENMASK(4, 2)
+#define CX2589x_VCLAMP_MAX_uV		224000
+#define CX2589x_VCLAMP_MIN_uV		000
+#define CX2589x_VCLAMP_DEF_uV		000
+#define CX2589x_VCLAMP_STEP_uV		32000
 
 struct cx2589x_init_data {
 	u32 ichg;	/* charge current		*/
