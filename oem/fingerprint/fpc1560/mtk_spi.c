@@ -477,7 +477,7 @@ static ssize_t wakeup_enable_set(struct device *dev,
     func_exit();
 	return ret;
 }
-static DEVICE_ATTR(wakeup_enable, S_IWUSR, NULL, wakeup_enable_set);
+static DEVICE_ATTR(fpc_sys_ctl, S_IWUSR, NULL, wakeup_enable_set);
 
 /**
  * sysf node to check the interrupt status of the sensor, the interrupt
@@ -652,7 +652,7 @@ static DEVICE_ATTR(compatible_all, S_IWUSR, NULL, compatible_all_set);
 
 static struct attribute *fpc_attributes[] = {
 	&dev_attr_hw_reset.attr,
-	&dev_attr_wakeup_enable.attr,
+	&dev_attr_fpc_sys_ctl.attr,
 	&dev_attr_clk_enable.attr,
 	&dev_attr_irq.attr,
 #ifdef CONFIG_FPC_COMPAT
