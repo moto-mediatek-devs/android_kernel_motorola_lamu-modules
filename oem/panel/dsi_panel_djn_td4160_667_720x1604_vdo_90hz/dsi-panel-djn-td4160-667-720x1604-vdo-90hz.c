@@ -609,7 +609,7 @@ static int dijin_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 }
 
 static struct mtk_panel_params ext_params = {
-	.pll_clk = 390,
+	.pll_clk = 420,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,
 	.lcm_esd_check_table[0] = {
@@ -626,7 +626,7 @@ static struct mtk_panel_params ext_params = {
 };
 
  static struct mtk_panel_params ext_params_90hz = {
-	.pll_clk = 390,
+	.pll_clk = 420,
 	// .vfp_low_power = 300,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,
