@@ -708,7 +708,9 @@ int mtkts_bts_get_hw_temp(void)
 
 	bts_cur_temp = t_ret;
 
-	if (t_ret > 40000)	/* abnormal high temp */
+	/*TN add begin by libei.guo/860712 20240925/EKLAMU-1871*/
+	if (t_ret > 34000)	/* abnormal high temp */
+	/*TN add end by libei.guo/860712 20240925/EKLAMU-1871*/
 		mtkts_bts_printk("T_AP=%d\n", t_ret);
 
 	mtkts_bts_dprintk("[%s] T_AP, %d\n", __func__, t_ret);
