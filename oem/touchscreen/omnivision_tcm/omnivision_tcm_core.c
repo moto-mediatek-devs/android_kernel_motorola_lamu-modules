@@ -42,7 +42,6 @@
 extern int td4160_lcd_id;
 extern int td4376_lcd_id;
 struct ovt_tcm_hcd *onmivision_tcm_hcd;
-static int tp_skip_fw = false;
 #endif
 
 #define RESET_ON_RESUME
@@ -1160,11 +1159,6 @@ static void ovt_tcm_dispatch_message(struct ovt_tcm_hcd *tcm_hcd)
 
 		if ((tcm_hcd->id_info.mode == MODE_ROMBOOTLOADER) &&
 				tcm_hcd->in_hdl_mode) {
-			if (tp_skip_fw) {
-				LOGE(tcm_hcd->pdev->dev.parent, "delay firmware download!\n");
-				tp_skip_fw = false;
-				//msleep(200);
-			}
 
 			retval = wait_for_completion_timeout(tcm_hcd->helper.helper_completion,
 				msecs_to_jiffies(500));
@@ -3614,7 +3608,6 @@ static void ovt_tcm_helper_work(struct work_struct *work)
 
 static int ovt_tcm_disp_resume(struct device *dev)
 {
-	tp_skip_fw = false;
 #if SPEED_UP_RESUME
 	struct ovt_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
 	mutex_lock(&tcm_hcd->suspend_resume_mutex);
@@ -3758,7 +3751,6 @@ static int ovt_tcm_disp_suspend(struct device *dev)
 	}
 
 	tcm_hcd->in_suspend = true;
-	tp_skip_fw = true;
 	mutex_unlock(&tcm_hcd->suspend_resume_mutex);
 	return 0;
 }
@@ -3816,7 +3808,6 @@ static int ovt_tcm_disp_notifier_cb(struct notifier_block *nb,
 #if defined(CONFIG_PM) || defined(CONFIG_DRMV) || defined(CONFIG_FBV)
 static int ovt_tcm_resume(struct device *dev)
 {
-	tp_skip_fw = false;
 #if SPEED_UP_RESUME
 	struct ovt_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
 	mutex_lock(&tcm_hcd->suspend_resume_mutex);
@@ -4064,7 +4055,6 @@ static int ovt_tcm_suspend(struct device *dev)
 	}
 
 	tcm_hcd->in_suspend = true;
-	tp_skip_fw = true;
 	mutex_unlock(&tcm_hcd->suspend_resume_mutex);
 	return 0;
 }
@@ -4578,6 +4568,11 @@ out:
 	return size;
 }
 
+void ovt_enable_irq(bool enable)
+{
+	g_tcm_hcd->enable_irq(g_tcm_hcd, enable, true);
+}
+
 void ovt_apply_gesture_mode(void)
 {
 	int retval;
@@ -4829,6 +4824,8 @@ static int ovt_tcm_probe(struct platform_device *pdev)
 	touch_info_node_init();
 	lcd_ovt_apply_gesture_mode_td4160 = ovt_apply_gesture_mode;
 	lcd_ovt_apply_gesture_mode_td4376 = ovt_apply_gesture_mode;
+	lcd_ovt_enable_irq_td4160 = ovt_enable_irq;
+	lcd_ovt_enable_irq_td4376 = ovt_enable_irq;
 
 	sysfs_dir = kobject_create_and_add(PLATFORM_DRIVER_NAME,
 			NULL); //&pdev->dev.kobj);  move to /sys

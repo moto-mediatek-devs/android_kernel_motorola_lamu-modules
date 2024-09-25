@@ -845,5 +845,7 @@ int  charger_module_init(void);
 #endif
 extern void (*lcd_ovt_apply_gesture_mode_td4160)(void);
 extern void (*lcd_ovt_apply_gesture_mode_td4376)(void);
+extern void (*lcd_ovt_enable_irq_td4160)(bool);
+extern void (*lcd_ovt_enable_irq_td4376)(bool);
 
 #endif
