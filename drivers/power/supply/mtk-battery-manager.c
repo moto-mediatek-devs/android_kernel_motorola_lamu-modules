@@ -1189,10 +1189,23 @@ static int bs_psy_get_property(struct power_supply *psy,
 
 		if (bm->gm1 != NULL)
 			if(!bm->gm1->bat_plug_out)
+/* TN Begin modified by xinjun.lu/860715 20240921 CR/EKLAMU-5295 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+				qmax += bm->gm1->algo_qmax;
+#else
 				qmax += bm_update_psy_property(bm->gm1, QMAX_DESIGN);
+#endif
+/* TN End modified by xinjun.lu/860715 20240921 CR/EKLAMU-5295 */
+
 		if (bm->gm2 != NULL)
 			if(!bm->gm2->bat_plug_out)
+/* TN Begin modified by xinjun.lu/860715 20240921 CR/EKLAMU-5295 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+				qmax += bm->gm2->algo_qmax;
+#else
 				qmax += bm_update_psy_property(bm->gm2, QMAX_DESIGN);
+#endif
+/* TN End modified by xinjun.lu/860715 20240921 CR/EKLAMU-5295 */
 
 		val->intval = bs_data->bat_capacity * qmax;
 		break;
