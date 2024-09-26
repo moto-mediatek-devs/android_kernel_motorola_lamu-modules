@@ -2787,6 +2787,7 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 	nvt_charger_init();
 #endif
 #endif
+	ts->gesture_tpye = 0;
 	touch_info_node_init();
 	
 #if FW_STATUS_REPORT

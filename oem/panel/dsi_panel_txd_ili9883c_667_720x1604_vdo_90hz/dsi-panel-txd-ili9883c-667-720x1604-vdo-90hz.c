@@ -40,7 +40,7 @@
 
 #define TINNO_LCM_OEM_CONFIG
 #if defined(TINNO_LCM_OEM_CONFIG)
-int txd_ili_gesture_mode = -1;
+int txd_ili_gesture_mode = 0;
 EXPORT_SYMBOL(txd_ili_gesture_mode);
 #endif
 void (*lcd_ili_resume_by_ddi)(void);

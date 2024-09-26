@@ -40,7 +40,7 @@
 
 #define TINNO_LCM_OEM_CONFIG
 #if defined(TINNO_LCM_OEM_CONFIG)
-int td4376_gesture_mode = -1;
+int td4376_gesture_mode = 0;
 EXPORT_SYMBOL(td4376_gesture_mode);
 #endif
 

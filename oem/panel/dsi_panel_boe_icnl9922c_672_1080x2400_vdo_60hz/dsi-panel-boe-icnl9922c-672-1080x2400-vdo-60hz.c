@@ -41,7 +41,7 @@
 #define TINNO_LCM_OEM_CONFIG
 #if defined(TINNO_LCM_OEM_CONFIG)
 // #include <focaltech_core.h>
-int boe_cts_gesture_mode = -1;
+int boe_cts_gesture_mode = 0;
 EXPORT_SYMBOL(boe_cts_gesture_mode);
 #endif
 

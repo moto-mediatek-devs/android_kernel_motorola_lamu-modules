@@ -40,7 +40,7 @@
 
 #define TINNO_LCM_OEM_CONFIG
 #if defined(TINNO_LCM_OEM_CONFIG)
-int nvt_gesture_mode = -1;
+int nvt_gesture_mode = 0;
 EXPORT_SYMBOL(nvt_gesture_mode);
 #endif
 
