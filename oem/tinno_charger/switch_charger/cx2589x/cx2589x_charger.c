@@ -863,9 +863,6 @@ static int cx2589x_disable_charger(struct cx2589x_device *cx)
 {
 	int ret;
 
-	ret = cx2589x_set_input_curr_lim(s_chg_dev_otg, 100000);
-	ret = cx2589x_set_ichrg_curr(s_chg_dev_otg, 128000);
-
 	pr_info("enter\n");
 
 	ret = cx2589x_update_bits(cx, CX2589x_REG_03, CX2589x_CHRG_EN, 0);
@@ -997,6 +994,11 @@ static int cx2589x_get_charging_status(struct charger_device *chg_dev, bool *is_
 	//cx2589x_get_state(cx, &state);
 
 	if (cx->state.chrg_stat == CX2589x_TERM_CHRG)
+		*is_done = true;
+	else
+		*is_done = false;
+
+	if (cx->battery_full)
 		*is_done = true;
 	else
 		*is_done = false;

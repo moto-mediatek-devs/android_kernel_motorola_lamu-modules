@@ -16,12 +16,6 @@
 #include "mtk_charger_algorithm_class.h"
 #include "mtk_pe5.h"
 
-/* TN Begin modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
-extern bool adapter_support_pe50;
-#endif
-/* TN End modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
-
 static int log_level = PE50_INFO_LEVEL;
 module_param(log_level, int, 0644);
 
@@ -1006,16 +1000,6 @@ static int pe50_enable_swchg_charging(struct pe50_algo_info *info, bool en)
 
 	PE50_INFO("en = %d\n", en);
 	if (en) {
-/* TN Begin modified by xinjun.lu/860715 20240828 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
-		ret = pe50_hal_set_cv(info->alg, CHG1, PE50_SET_CV);
-		if (ret < 0) {
-			PE50_ERR("set cv fail(%d)\n", ret);
-			return ret;
-		}
-#endif
-/* TN End modified by xinjun.lu/860715 20240828 CR/EKLAMU-202 */
-
 		ret = pe50_hal_enable_charging(info->alg, CHG1, true);
 		if (ret < 0) {
 			PE50_ERR("en swchg fail(%d)\n", ret);
@@ -1196,17 +1180,20 @@ static int pe50_stop(struct pe50_algo_info *info, struct pe50_stop_info *sinfo)
 		if (sinfo->hardreset_ta)
 			pe50_hal_send_ta_hardreset(info->alg);
 		else if (sinfo->reset_ta)
-			pe50_enable_ta_charging(info, false, PE50_VTA_INIT,
-						PE50_ITA_INIT);
-/* TN Begin modified by xinjun.lu/860715 20240820 CR/EKLAMU-202 */
+/* TN Begin modified by xinjun.lu/860715 20240926 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+			pe50_enable_ta_charging(info, false, 9000,
+						2000);
 		if (info->data->ta_auth_data.pdp < PE50_ENTER_POWER_MIN) {
 			PE50_ERR("Pd adapter support power :[%dW] < [%dW], PE5 do not stat again\n",
 				info->data->ta_auth_data.pdp, PE50_ENTER_POWER_MIN);
 			data->pe50_can_start_again = false;
 		}
+#else
+			pe50_enable_ta_charging(info, false, PE50_VTA_INIT,
+						PE50_ITA_INIT);
 #endif
-/* TN End modified by xinjun.lu/860715 20240820 CR/EKLAMU-202 */
+/* TN End modified by xinjun.lu/860715 20240926 CR/EKLAMU-202 */
 	}
 	pe50_enable_swchg_charging(info, true);
 	pe50_hal_enable_sw_vbusovp(info->alg, true);
@@ -4023,15 +4010,6 @@ static int pe50_is_algo_ready(struct chg_alg_device *alg)
 		goto out;
 	}
 	ret = ALG_READY;
-
-/* TN Begin modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
-	if (info->data->ta_auth_data.pdp >= PE50_ENTER_POWER_MIN)
-		adapter_support_pe50 = true;
-	else
-		adapter_support_pe50 = false;
-#endif
-/* TN End modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
 
 out:
 	mutex_unlock(&data->lock);

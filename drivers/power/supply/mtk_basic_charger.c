@@ -62,6 +62,7 @@
 /* TN Begin modified by hao.jia/809321 20240729 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 #include "../../../oem/tinno_charger/tinno_charger.h"
+#define RECHARGE_CAPACITY 95
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240729 CR/EKLAMU-202 */
 
@@ -86,13 +87,6 @@ EXPORT_SYMBOL(ffc_reduce_count);
 extern int g_thermal_charging_current_limit;
 
 #endif /* CONFIG_OEM_TURBO_CHARGER */
-
-/* TN Begin modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
-bool adapter_support_pe50 = false;
-EXPORT_SYMBOL(adapter_support_pe50);
-#endif
-/* TN End modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
 
 #define SW_BAT_VOLT_COMP_UV	16000
 #define SW_BAT_REDU_CURR_MA	2000
@@ -335,8 +329,10 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 			pdata->charging_current_limit = 1200000;  // uA
 		}
 
-		if (ffc_batt_full == true)
+		if (ffc_batt_full == true) {
+			pdata->input_current_limit = info->data.ac_charger_input_current;
 			pdata->charging_current_limit = 0; // mA
+		}
 #endif /* CONFIG_OEM_TURBO_CHARGER */
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240823 CR/EKLAMU-202 */
@@ -422,19 +418,20 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		}
 	}
 
-/* TN Begin modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
+/* TN Begin modified by xinjun.lu/860715 20240924 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
 	if (!IS_ERR_OR_NULL(info->current_alg) && info->current_alg->alg_id == PE5_ID) {
 		pdata->charging_current_limit = ((info->pe50.target_fcc < 0) ? 0 : info->pe50.target_fcc);
 		info->pe50.target_usb = pdata->input_current_limit;
 	}
-	if (adapter_support_pe50) {
-		if (info->pe50.pres_chrg_step == STEP_FULL_PE50) {
-			pdata->charging_current_limit = 0;
-		}
+#endif
+
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	if (info->pe50.pres_chrg_step == STEP_FULL_PE50) {
+		pdata->charging_current_limit = 0;
 	}
 #endif
-/* TN End modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
+/* TN End modified by xinjun.lu/860715 20240924 CR/EKLAMU-202 */
 
 	sc_select_charging_current(info, pdata);
 
@@ -610,6 +607,28 @@ static int do_algorithm(struct mtk_charger *info)
 	int lst_rnd_alg_idx = info->lst_rnd_alg_idx;
 	int vbat = 0, vbat_cs = 0, ibat_cs = 0;
 	int cs_ir_cmp = 0;
+/* TN Begin modified by xinjun.lu/860715 20240924 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	int real_soc = 0;
+
+	if (IS_ERR_OR_NULL(info->bat_psy)) {
+		info->bat_psy = power_supply_get_by_name("battery");
+		if (IS_ERR_OR_NULL(info->bat_psy)) {
+			chr_err("[%s] failed to get battery supply\n", __func__);
+		}
+	}
+
+	if (IS_ERR_OR_NULL(info->bm)) {
+		if (!IS_ERR_OR_NULL(info->bat_psy)) {
+			info->bm = (struct mtk_battery_manager *)power_supply_get_drvdata(info->bat_psy);
+			power_supply_put(info->bat_psy);
+			if (IS_ERR_OR_NULL(info->bm)) {
+				chr_err("[%s] mtk_battery_manager is not rdy\n", __func__);
+			}
+		}
+	}
+#endif
+/* TN End modified by xinjun.lu/860715 20240924 CR/EKLAMU-202 */
 
 	pdata = &info->chg_data[CHG1_SETTING];
 /*TN Begin modified by hao.jia/809321 20240909 CR/EKLAMU-202 */
@@ -624,17 +643,55 @@ static int do_algorithm(struct mtk_charger *info)
 			ffc_batt_full = false;
 	} else
 #endif /* CONFIG_OEM_TURBO_CHARGER */
-#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
-	if (adapter_support_pe50) {
+/*TN End modified by hao.jia/809321 20240909 CR/EKLAMU-202 */
+/* TN Begin modified by xinjun.lu/860715 20240924 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	{
 		if (info->pe50.pres_chrg_step == STEP_FULL_PE50)
 			chg_done = true;
 		chr_info("%s:chg_done=%d\n", __func__, chg_done);
-	} else
-#endif
-	{
-		charger_dev_is_charging_done(info->chg1_dev, &chg_done);
 	}
-/*TN End modified by hao.jia/809321 20240909 CR/EKLAMU-202 */
+#else
+	charger_dev_is_charging_done(info->chg1_dev, &chg_done);
+#endif
+
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	if (!IS_ERR_OR_NULL(info->bm)) {
+		real_soc = info->bm->gm1->soc;
+
+		/* Recharge condition */
+		if (real_soc <= RECHARGE_CAPACITY && info->is_chg_done) {
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+			if ((turbo_charger_active == true) && (info->sw_jeita.sm == TEMP_T2_TO_T3)) {
+				if (info->pres_chrg_step == STEP_FULL) {
+					info->pres_chrg_step = STEP_NORM;
+					ffc_batt_full = false;
+					chg_done = false;
+				}
+			} else
+#endif /* CONFIG_OEM_TURBO_CHARGER */
+			{
+				if (info->pe50.pres_chrg_step == STEP_FULL_PE50) {
+					info->pe50.pres_chrg_step = STEP_NORM_PE50;
+					chg_done = false;
+				}
+			}
+		}
+
+		/* Plug out charging condition */
+		if (!chg_done && info->is_chg_done) {
+#if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+			if (info->pres_chrg_step != STEP_FULL)
+				chg_done = false;
+#endif
+			if (info->pe50.pres_chrg_step != STEP_FULL_PE50)
+				chg_done = false;
+		}
+
+		chr_info("%s:real_soc=%d chg_done=%d is_chg_done=%d\n", __func__, real_soc, chg_done, info->is_chg_done);
+	}
+#endif
+/* TN End modified by xinjun.lu/860715 20240924 CR/EKLAMU-202 */
 
 	is_basic = select_charging_current_limit(info, &info->setting);
 

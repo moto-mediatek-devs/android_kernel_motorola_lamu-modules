@@ -12,6 +12,11 @@
 #include "mtk_charger_algorithm_class.h"
 #include <linux/power_supply.h>
 #include "mtk_smartcharging.h"
+/* TN Begin modified by xinjun.lu/860715 20240924 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+#include "mtk_battery.h"
+#endif
+/* TN End modified by xinjun.lu/860715 20240924 CR/EKLAMU-202 */
 
 #define CHARGING_INTERVAL 10
 #define CHARGING_FULL_INTERVAL 20
@@ -723,7 +728,7 @@ struct mtk_charger {
 #endif /* CONFIG_OEM_TURBO_CHARGER */
 /* TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 
-/* TN Begin modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
+/* TN Begin modified by hao.jia/809321 20240924 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	bool enable_hiz;
 	bool enable_charger;
@@ -733,8 +738,10 @@ struct mtk_charger {
 	bool battery_protection_mode;
 	bool is_over_bpm_max_soc;
 	bool demo_mode_limit;
+	struct mtk_battery_manager *bm;
+	int ignore_current_check_time;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
-/* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
+/* TN End modified by hao.jia/809321 20240924 CR/EKLAMU-202 */
 	//struct pe50_charger_cfg pe50;
 
 /* TN Begin modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */

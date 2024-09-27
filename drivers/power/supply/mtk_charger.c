@@ -112,7 +112,6 @@ struct tag_bootmode {
 
 /* TN Begin modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
-extern bool adapter_support_pe50;
 static struct mtk_charger *pe50_info;
 #define CHG_SHOW_MAX_SIZE 50
 #define MIN_TEMP_C -20
@@ -151,6 +150,7 @@ static bool first_insert = true;
 static bool sw_jeita_enter_1A = false;
 static bool sw_jeita_enter_cv1 = false;
 #define DEMO_MODE_LIMIT_SOC_DEFAULT	70
+#define IGNORE_CURRENT_CHECK_TIME_MAX 5
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by jirui.li/860702 20240904 CR/EKLAMU-1339 */
 #ifdef MODULE
@@ -4092,6 +4092,7 @@ static void pe50_charger_check_status(struct mtk_charger *info)
 		} else if (pe50_has_current_tapered(info, batt_ma,
 						   pe50->chrg_iterm)) {
 			pe50->pres_chrg_step = STEP_FULL_PE50;
+			charger_dev_enable_termination(info->chg1_dev, true);
 		}
 	} else if (pe50->pres_chrg_step == STEP_FULL_PE50) {
 		if (batt_soc <= 99 || batt_mv < (max_fv_mv - HYST_STEP_MV * 2)) {
@@ -4286,11 +4287,12 @@ static void charger_check_status(struct mtk_charger *info)
 	int temperature;
 	struct battery_thermal_protection_data *thermal;
 	int uisoc = 0;
-/* TN Begin modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+/* TN Begin modified by xinjun.lu/860715 20240924 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	bool devchg1_en = false;
 	int batt_ma = get_battery_current(info);
 #endif
-/* TN End modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
+/* TN End modified by xinjun.lu/860715 20240924 CR/EKLAMU-202 */
 
 	if (get_charger_type(info) == POWER_SUPPLY_TYPE_UNKNOWN)
 		return;
@@ -4402,20 +4404,26 @@ static void charger_check_status(struct mtk_charger *info)
 		goto stop_charging;
 	}
 
-/* TN Begin modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
+/* TN Begin modified by xinjun.lu/860715 20240924 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	charger_dev_is_enabled(info->chg1_dev, &chg_dev_chgen);
-	if (adapter_support_pe50 && chg_dev_chgen) {
-			pe50_get_ffc_fv(info, temperature);
-			if (pe50_has_current_tapered(info, batt_ma, info->pe50.chrg_iterm)) {
+	if (info->dvchg1_dev)
+		charger_dev_is_enabled(info->dvchg1_dev, &devchg1_en);
+
+	if (chg_dev_chgen && !devchg1_en) {
+		if (info->pe50.pres_chrg_step != STEP_FULL_PE50 || info->pres_chrg_step != STEP_FULL) {
+			if (info->ignore_current_check_time > IGNORE_CURRENT_CHECK_TIME_MAX
+				&& pe50_has_current_tapered(info, batt_ma, info->pe50.chrg_iterm))
 				info->pe50.pres_chrg_step = STEP_FULL_PE50;
-				charger_dev_enable_termination(info->chg1_dev, true);
-			}
+
+			if (info->ignore_current_check_time <= IGNORE_CURRENT_CHECK_TIME_MAX)
+				info->ignore_current_check_time++;
+		}
+		chr_info("chrg_iterm=%d batt_ma=%d pres_chrg_step=%d time=%d\n",
+				info->pe50.chrg_iterm, batt_ma, info->pe50.pres_chrg_step, info->ignore_current_check_time);
 	}
-	chr_info("pe50 chrg_iterm = %d batt_ma=%d info->pe50.pres_chrg_step=%d chg_dev_chgen=%d\n",
-		info->pe50.chrg_iterm, batt_ma, info->pe50.pres_chrg_step, chg_dev_chgen);
 #endif
-/* TN End modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
+/* TN End modified by xinjun.lu/860715 20240924 CR/EKLAMU-202 */
 
 	if (info->cmd_discharging)
 		charging = false;
@@ -4942,6 +4950,9 @@ static int mtk_charger_plug_out(struct mtk_charger *info)
 	info->ext_chr_type = POWER_SUPPLY_TYPE_UNKNOWN;
 	sw_jeita_enter_1A = false;
 	sw_jeita_enter_cv1 = false;
+	info->pe50.pres_chrg_step = STEP_NONE_PE50;
+	charger_dev_enable_termination(info->chg1_dev, true);
+	info->ignore_current_check_time = 0;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /*TN End modified by hao.jia/809321 20240904 CR/EKLAMU-202*/
 
@@ -4959,15 +4970,6 @@ static int mtk_charger_plug_out(struct mtk_charger *info)
 	qc3p_charger_ready = 0;
 #endif /* CONFIG_OEM_TURBO_CHARGER */
 /*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202*/
-
-/* TN Begin modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
-	adapter_support_pe50 = false;
-	info->pe50.pres_chrg_step = STEP_NONE_PE50;
-	charger_dev_enable_termination(info->chg1_dev, true);
-#endif
-/* TN End modified by xinjun.lu/860715 20240909 CR/EKLAMU-202 */
-
 	if (info->enable_vbat_mon)
 		charger_dev_enable_6pin_battery_charging(info->chg1_dev, false);
 
@@ -6504,6 +6506,7 @@ static int mtk_charger_probe(struct platform_device *pdev)
 /* TN Begin modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	info->fast_charging_indicator = PDC_ID | PE5_ID;
+	info->ignore_current_check_time = 0;
 #endif
 /* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 	info->enable_meta_current_limit = 1;

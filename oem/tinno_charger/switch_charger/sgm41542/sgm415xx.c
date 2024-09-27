@@ -1044,6 +1044,11 @@ static int sgm4154x_get_charging_status(struct charger_device *chg_dev, bool *is
 	else
 		*is_done = false;
 
+	if (sgm->battery_full)
+		*is_done = true;
+	else
+		*is_done = false;
+
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
 	if ((turbo_charger_active == true) && (ffc_batt_full == true))
 		*is_done = true;
