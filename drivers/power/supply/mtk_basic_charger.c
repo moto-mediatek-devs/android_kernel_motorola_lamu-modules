@@ -165,10 +165,20 @@ static bool is_typec_adapter(struct mtk_charger *info)
 
 	rp = adapter_dev_get_property(info->adapter_dev[PD], TYPEC_RP_LEVEL);
 	cap_type = adapter_dev_get_property(info->adapter_dev[PD], CAP_TYPE);
+/* TN Begin modified by jirui.li/860702 20240927 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	if (cap_type == MTK_CAP_TYPE_UNKNOWN &&
+			rp != 500 &&
+			info->chr_type != POWER_SUPPLY_TYPE_USB &&
+			info->chr_type != POWER_SUPPLY_TYPE_USB_CDP &&
+			info->chr_type != POWER_SUPPLY_TYPE_USB_QC3P)
+#else
 	if (cap_type == MTK_CAP_TYPE_UNKNOWN &&
 			rp != 500 &&
 			info->chr_type != POWER_SUPPLY_TYPE_USB &&
 			info->chr_type != POWER_SUPPLY_TYPE_USB_CDP)
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by jirui.li/860702 20240927 CR/EKLAMU-202 */
 		return true;
 
 	return false;
