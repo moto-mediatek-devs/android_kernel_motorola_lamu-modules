@@ -362,12 +362,19 @@ static kal_uint32 streaming_control(kal_bool enable)
 {
     CAM_DBG(PFX,"streaming_enable(0=Sw Standby,1=streaming): %d\n", enable);
     if (enable){
+        write_cmos_sensor(0xfd, 0x01);
+        write_cmos_sensor(0x01, 0x03);
         write_cmos_sensor(0xfd, 0x00);
+        write_cmos_sensor(0x20, 0x0f);
+        write_cmos_sensor(0xe7, 0x03);
+        write_cmos_sensor(0xe7, 0x00);
         write_cmos_sensor(0xa0, 0x01);
+        write_cmos_sensor(0xfd, 0x01);
     }
     else{
         write_cmos_sensor(0xfd, 0x00);
         write_cmos_sensor(0xa0, 0x00);
+        write_cmos_sensor(0xfd, 0x01);
         mdelay(10);
     }
 
@@ -547,6 +554,7 @@ static void sensor_init(void)
 	write_cmos_sensor(0x05, 0x00);
 	write_cmos_sensor(0x06, 0xd0);
 	write_cmos_sensor(0x07, 0x05);
+	write_cmos_sensor(0x15, 0x43);
 	write_cmos_sensor(0x21, 0x02);
 	write_cmos_sensor(0x24, 0x30);
 	write_cmos_sensor(0x31, 0x00);
@@ -715,6 +723,7 @@ static void preview_setting(void)
 	write_cmos_sensor(0x05, 0x00);
 	write_cmos_sensor(0x06, 0xd0);
 	write_cmos_sensor(0x07, 0x05);
+	write_cmos_sensor(0x15, 0x43);
 	write_cmos_sensor(0x21, 0x02);
 	write_cmos_sensor(0x24, 0x30);
 	write_cmos_sensor(0x31, 0x00);
@@ -883,6 +892,7 @@ static void capture_setting(kal_uint16 currefps)
 	write_cmos_sensor(0x05, 0x00);
 	write_cmos_sensor(0x06, 0xd0);
 	write_cmos_sensor(0x07, 0x05);
+	write_cmos_sensor(0x15, 0x43);
 	write_cmos_sensor(0x21, 0x02);
 	write_cmos_sensor(0x24, 0x30);
 	write_cmos_sensor(0x31, 0x00);
@@ -1044,6 +1054,7 @@ static void normal_video_setting(void)
 	write_cmos_sensor(0x05,0x00);
 	write_cmos_sensor(0x06,0xd0);
 	write_cmos_sensor(0x07,0x05);
+	write_cmos_sensor(0x15,0x43);
 	write_cmos_sensor(0x21,0x02);
 	write_cmos_sensor(0x24,0x30);
 	write_cmos_sensor(0x31,0x00);
