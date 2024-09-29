@@ -5093,7 +5093,8 @@ static int ovt_tcm_remove(struct platform_device *pdev)
 	cancel_work_sync(&tcm_hcd->helper.work);
 	flush_workqueue(tcm_hcd->helper.workqueue);
 	destroy_workqueue(tcm_hcd->helper.workqueue);
-
+	lcd_ovt_apply_gesture_mode_td4160 = NULL;
+	lcd_ovt_apply_gesture_mode_td4376 = NULL;
 
 	mutex_lock(&mod_pool.mutex);
 
