@@ -12,6 +12,7 @@
 	ta_ac_charger_current = <1500000>;
 	pd_charger_current = <1500000>;
 	max_charger_voltage = <9500000>;
+	led_brightness = <102>;
 };
 
 &charger {
