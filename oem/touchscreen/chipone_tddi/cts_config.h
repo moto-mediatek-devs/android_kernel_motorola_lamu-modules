@@ -94,6 +94,7 @@
 #define CFG_CTS_VKEY_KEYCODES               {KEY_BACK, KEY_HOME, KEY_MENU}
 #endif /* CONFIG_CTS_VIRTUALKEY */
 
+#define CTS_PM_WAIT_BUS_RESUME_COMPLETE     1
 /* Gesture wakeup */
 #define CFG_CTS_GESTURE
 #ifdef CFG_CTS_GESTURE

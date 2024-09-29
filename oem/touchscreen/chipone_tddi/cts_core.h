@@ -362,6 +362,10 @@ struct cts_device_rtdata {
 
     struct cts_device_touch_info touch_info;
     struct cts_device_gesture_info gesture_info;
+#if CTS_PM_WAIT_BUS_RESUME_COMPLETE
+	bool dev_pm_suspend;
+	struct completion dev_pm_resume_completion;
+#endif
 
 #ifdef CONFIG_CTS_TP_PROXIMITY
     bool proximity_status;

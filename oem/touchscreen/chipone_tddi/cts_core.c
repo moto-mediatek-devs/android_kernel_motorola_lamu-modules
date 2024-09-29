@@ -1454,6 +1454,20 @@ int cts_irq_handler(struct cts_device *cts_dev)
         return -EINVAL;
     }
 
+#if CTS_PM_WAIT_BUS_RESUME_COMPLETE
+	if (cts_dev->rtdata.dev_pm_suspend) {
+        struct chipone_ts_data *cts_data = container_of(cts_dev, struct chipone_ts_data, cts_dev);
+        cts_dbg("wake up system");
+
+        pm_stay_awake(cts_data->device);
+		ret = wait_for_completion_timeout(&cts_dev->rtdata.dev_pm_resume_completion, msecs_to_jiffies(500));
+		if (!ret) {
+			cts_err("system(bus) can't finished resuming procedure!\n");
+			return -EINVAL;
+		}
+	}
+#endif
+
     touch_info = &cts_dev->rtdata.touch_info;
     ret = cts_get_touchinfo(cts_dev, touch_info);
     if (ret) {
@@ -1701,6 +1715,10 @@ static inline void cts_init_rtdata_with_normal_mode(struct cts_device *cts_dev)
 #ifdef CONFIG_CTS_TP_PROXIMITY
     cts_dev->rtdata.proximity_num = 0;
     cts_dev->rtdata.proximity_status = false;
+#endif
+#if CTS_PM_WAIT_BUS_RESUME_COMPLETE
+	cts_dev->rtdata.dev_pm_suspend = false;
+	init_completion(&cts_dev->rtdata.dev_pm_resume_completion);
 #endif
 }
 

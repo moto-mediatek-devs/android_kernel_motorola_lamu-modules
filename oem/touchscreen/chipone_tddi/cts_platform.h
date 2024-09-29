@@ -44,6 +44,7 @@
 
 #include <linux/spi/spi.h>
 #include <linux/spi/spidev.h>
+#include <linux/pm_wakeup.h>
 
 #include "cts_config.h"
 #include "cts_core.h"

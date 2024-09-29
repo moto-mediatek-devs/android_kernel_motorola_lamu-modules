@@ -381,6 +381,39 @@ static int cts_init_pm_disp_fb_notifier(struct chipone_ts_data *cts_data)
     return mtk_disp_notifier_register("cts_ts", &cts_data->pdata->fb_notifier);
 }
 
+#if CTS_PM_WAIT_BUS_RESUME_COMPLETE
+static int cts_spi_pm_suspend(struct device *dev)
+{
+    struct chipone_ts_data *cts_data;
+    struct cts_device_rtdata *rtdata;
+
+    cts_data = (struct chipone_ts_data *)dev_get_drvdata(dev);
+    rtdata = &cts_data->cts_dev.rtdata;
+	rtdata->dev_pm_suspend = true;
+	reinit_completion(&rtdata->dev_pm_resume_completion);
+
+	return 0;
+}
+
+static int cts_spi_pm_resume(struct device *dev)
+{
+    struct chipone_ts_data *cts_data;
+    struct cts_device_rtdata *rtdata;
+
+    cts_data = (struct chipone_ts_data *)dev_get_drvdata(dev);
+    rtdata = &cts_data->cts_dev.rtdata;
+	rtdata->dev_pm_suspend = false;
+	complete(&rtdata->dev_pm_resume_completion);
+
+	return 0;
+}
+
+static const struct dev_pm_ops cts_spi_dev_pm_ops = {
+	.suspend = cts_spi_pm_suspend,
+	.resume  = cts_spi_pm_resume,
+};
+#endif /* CTS_PM_WAIT_BUS_RESUME_COMPLETE */
+
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
 static int cts_get_tp_info(char *buf, void *arg0)
 {
@@ -1043,7 +1076,9 @@ static struct spi_driver cts_spi_driver = {
 #ifdef CONFIG_CTS_PM_GENERIC
         .pm = &cts_i2c_driver_pm_ops,
 #endif /* CONFIG_CTS_PM_GENERIC */
-
+#if CTS_PM_WAIT_BUS_RESUME_COMPLETE
+        .pm = &cts_spi_dev_pm_ops,
+#endif
         },
     .id_table = cts_device_id_table,
 };
