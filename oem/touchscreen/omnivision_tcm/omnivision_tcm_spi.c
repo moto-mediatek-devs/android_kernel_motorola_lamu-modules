@@ -650,9 +650,9 @@ static int ovt_tcm_spi_probe(struct spi_device *spi)
 	}
 	/* default spi mode */
 	pin_spi_mode_default = pinctrl_lookup_state(
-				pinctrl, "lamugo_spi_mode");
+				pinctrl, "lamu_spi_mode");
 	if (IS_ERR_OR_NULL(pin_spi_mode_default)) {
-		LOGE(&spi->dev,"Failed to get pinctrl state:%s\n", "lamugo_spi_mode");
+		LOGE(&spi->dev,"Failed to get pinctrl state:%s\n", "lamu_spi_mode");
 		pin_spi_mode_default = NULL;
 
 	} else {

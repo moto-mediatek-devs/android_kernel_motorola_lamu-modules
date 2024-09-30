@@ -606,11 +606,11 @@ static int ilitek_spi_pinctrl_init(void)
 	}
 	/* default spi mode */
 	ilits->pin_spi_mode_default = pinctrl_lookup_state(
-				ilits->pinctrl, "lamugo_spi_mode");
+				ilits->pinctrl, "lamu_spi_mode");
 	if (IS_ERR_OR_NULL(ilits->pin_spi_mode_default)) {
 		r = PTR_ERR(ilits->pin_spi_mode_default);
 		ILI_ERR("Failed to get pinctrl state:%s, r:%d",
-				"lamugo_spi_mode", r);
+				"lamu_spi_mode", r);
 		ilits->pin_spi_mode_default = NULL;
 
 	} else {

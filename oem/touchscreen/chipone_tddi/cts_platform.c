@@ -606,6 +606,32 @@ static int cts_plat_parse_dt(struct cts_platform_data *pdata,
 
     return 0;
 }
+
+static int cts_pinctl_select(struct device *dev)
+{
+    struct pinctrl *l_pinctrl;
+	struct pinctrl_state *l_pin_spi_mode_default;
+    int ret = 0;
+
+	l_pinctrl = devm_pinctrl_get(dev->parent);
+	if (IS_ERR_OR_NULL(l_pinctrl)) {
+		cts_warn("Failed to get l_pinctrl handler[need confirm]");
+	}
+	/* default spi mode */
+	l_pin_spi_mode_default = pinctrl_lookup_state(
+				l_pinctrl, "lamu_spi_mode");
+	if (IS_ERR_OR_NULL(l_pin_spi_mode_default)) {
+		cts_warn("Failed to get pinctrl state:%s, ret:%d",
+				"lamu_spi_mode", ret);
+
+	} else {
+		ret = pinctrl_select_state(l_pinctrl, l_pin_spi_mode_default);
+		if (ret < 0)
+			cts_warn("Failed to select default pinstate, ret:%d", ret);
+		ret = 0;
+	}
+    return 0;
+}
 #endif /* CONFIG_CTS_OF */
 
 #ifdef CFG_CTS_FORCE_UP
@@ -670,6 +696,7 @@ int cts_init_platform_data(struct cts_platform_data *pdata,
             cts_err("Parse dt failed %d", ret);
             return ret;
         }
+        cts_pinctl_select(dev);
     }
 #endif /* CONFIG_CTS_OF */
 
