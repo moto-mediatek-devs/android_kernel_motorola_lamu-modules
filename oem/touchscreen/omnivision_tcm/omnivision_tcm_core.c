@@ -94,6 +94,7 @@ struct ovt_tcm_hcd *g_tcm_hcd;
 #if SPEED_UP_RESUME
 static void speedup_resume(struct work_struct *work);
 #endif
+static int g_retry_max = 1;
 
 #define ovt_tcm_set_func_en(c_name, id) \
 int ovt_tcm_set_func_##c_name##_en_state(unsigned short value) \
@@ -4294,7 +4295,6 @@ static int ovt_tcm_check_f35(struct ovt_tcm_hcd *tcm_hcd)
 	int retval;
 	unsigned char fn_number;
 	int retry = 0;
-	const int retry_max = 10;
     const struct ovt_tcm_board_data *bdata = tcm_hcd->hw_if->bdata;
 
 f35_boot_recheck:
@@ -4317,7 +4317,7 @@ f35_boot_recheck:
 					LOGE(tcm_hcd->pdev->dev.parent,
 							"Failed to find F$35, try_times = %d\n",
 							retry);
-				if (retry < retry_max) {
+				if (retry < g_retry_max) {
 					ovt_tcm_request_gpio(tcm_hcd, tcm_hcd->hw_if->bdata->reset_gpio, true);
 					msleep(100);                   
                     gpio_set_value(bdata->reset_gpio, 0);
@@ -4822,10 +4822,6 @@ static int ovt_tcm_probe(struct platform_device *pdev)
 	charger_module_init();
 #endif
 	touch_info_node_init();
-	lcd_ovt_apply_gesture_mode_td4160 = ovt_apply_gesture_mode;
-	lcd_ovt_apply_gesture_mode_td4376 = ovt_apply_gesture_mode;
-	lcd_ovt_enable_irq_td4160 = ovt_enable_irq;
-	lcd_ovt_enable_irq_td4376 = ovt_enable_irq;
 
 	sysfs_dir = kobject_create_and_add(PLATFORM_DRIVER_NAME,
 			NULL); //&pdev->dev.kobj);  move to /sys
@@ -4993,6 +4989,11 @@ prepare_modules:
 	mod_pool.queue_work = true;
 	queue_work(mod_pool.workqueue, &mod_pool.work);
 	mutex_unlock(&tcm_hcd->suspend_resume_mutex);
+	g_retry_max = 10;
+	lcd_ovt_apply_gesture_mode_td4160 = ovt_apply_gesture_mode;
+	lcd_ovt_apply_gesture_mode_td4376 = ovt_apply_gesture_mode;
+	lcd_ovt_enable_irq_td4160 = ovt_enable_irq;
+	lcd_ovt_enable_irq_td4376 = ovt_enable_irq;
 	return 0;
 
 err_enable_irq:
@@ -5095,6 +5096,8 @@ static int ovt_tcm_remove(struct platform_device *pdev)
 	destroy_workqueue(tcm_hcd->helper.workqueue);
 	lcd_ovt_apply_gesture_mode_td4160 = NULL;
 	lcd_ovt_apply_gesture_mode_td4376 = NULL;
+	lcd_ovt_enable_irq_td4160 = NULL;
+	lcd_ovt_enable_irq_td4376 = NULL;
 
 	mutex_lock(&mod_pool.mutex);
 

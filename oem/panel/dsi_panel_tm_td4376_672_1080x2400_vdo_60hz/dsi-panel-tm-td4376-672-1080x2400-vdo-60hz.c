@@ -393,7 +393,8 @@ static int td4376_prepare(struct drm_panel *panel)
 
 	if (ctx->prepared)
 		return 0;
-	lcd_ovt_enable_irq_td4376(false);
+	if(lcd_ovt_enable_irq_td4376)
+		lcd_ovt_enable_irq_td4376(false);
 #ifdef TINNO_LCM_OEM_CONFIG
 	if(td4376_gesture_mode) {
 		udelay(10000);
@@ -409,7 +410,8 @@ static int td4376_prepare(struct drm_panel *panel)
 		td4376_panel_get_data(ctx);
 #endif
 	is_suspend = 0;
-	lcd_ovt_enable_irq_td4376(true);
+	if(lcd_ovt_enable_irq_td4376)
+		lcd_ovt_enable_irq_td4376(true);
 	pr_info("td4376 Skip Power Control !\n");
 	return ret;
 	}
