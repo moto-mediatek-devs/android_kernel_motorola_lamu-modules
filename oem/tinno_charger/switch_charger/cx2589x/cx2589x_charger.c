@@ -151,7 +151,7 @@ static int __cx2589x_read_byte_retry(struct cx2589x_device *cx, u8 reg, u8 *data
 		if (ret >= 0) {
 			if (tmp_val[0] == tmp_val[1]) {
 				*data = tmp_val[0];
-				return ret;
+				return 0;
 			}
 		}
 	}
@@ -716,9 +716,11 @@ static int cx2589x_get_state(struct cx2589x_device *cx, struct cx2589x_state *st
 	u8 chrg_param_0, chrg_param_1, chrg_param_2;
 	int ret;
 
-	ret = cx2589x_read_reg(cx, CX2589x_REG_0B, &chrg_stat);
+	//ret = cx2589x_read_reg(cx, CX2589x_REG_0B, &chrg_stat);
+	ret = cx2589x_read_reg_retry(cx, CX2589x_REG_0B, &chrg_stat);
 	if (ret) {
-		ret = cx2589x_read_reg(cx, CX2589x_REG_0B, &chrg_stat);
+		//ret = cx2589x_read_reg(cx, CX2589x_REG_0B, &chrg_stat);
+		ret = cx2589x_read_reg_retry(cx, CX2589x_REG_0B, &chrg_stat);
 		if (ret) {
 			pr_err("read CX2589x_REG_0B fail\n");
 			return ret;
@@ -1644,6 +1646,7 @@ static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
 	bool prev_vbus_gd;
 	bool prev_online;
 	int ret = 0;
+	int vbus_volt;
 
 	pr_info("enter\n");
 #if 1
@@ -1686,7 +1689,8 @@ static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
 		cx->unknow_type_check = false;
 		allow_set_dp_dm_vol = true;
 	} else if (prev_vbus_gd && !cx->state.vbus_gd) {
-		pr_info("adapter/usb removed\n");
+		cx2589x_get_vbus(cx, &vbus_volt);
+		pr_info("adapter/usb removed state.online=0x%x vbus=%d\n", cx->state.online, vbus_volt);
 		Charger_Detect_Release();
 		cx2589x_set_dpdm_hiz(cx);
 		allow_set_dp_dm_vol = false;
