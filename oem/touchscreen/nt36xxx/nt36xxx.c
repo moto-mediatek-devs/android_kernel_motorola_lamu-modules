@@ -3086,8 +3086,13 @@ static int32_t nvt_ts_suspend(struct device *dev)
 	uint32_t i = 0;
 #endif
 
+	mutex_lock(&ts->lock);
+
+	NVT_LOG("start\n");
+
 	if (!bTouchIsAwake) {
 		NVT_LOG("Touch is already suspend\n");
+		mutex_unlock(&ts->lock);
 		return 0;
 	}
 
@@ -3101,10 +3106,6 @@ static int32_t nvt_ts_suspend(struct device *dev)
 	cancel_delayed_work_sync(&nvt_esd_check_work);
 	nvt_esd_check_enable(false);
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
-
-	mutex_lock(&ts->lock);
-
-	NVT_LOG("start\n");
 
 	bTouchIsAwake = 0;
 
@@ -3176,10 +3177,10 @@ return:
 *******************************************************/
 static int32_t nvt_ts_resume(struct device *dev)
 {
-	if (bTouchIsAwake) {
+	/*if (bTouchIsAwake) {
 		NVT_LOG("Touch is already resume\n");
 		return 0;
-	}
+	}*/
 
 	mutex_lock(&ts->lock);
 

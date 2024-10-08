@@ -245,7 +245,7 @@ static void dijin_panel_init(struct dijin *ctx)
 	gpiod_set_value(ctx->reset_gpio, 0);
 	udelay(2 * 1000);
 	gpiod_set_value(ctx->reset_gpio, 1);
-	udelay(15 * 1000);
+	msleep(20);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 
 	dijin_dcs_write_seq_static(ctx, 0xB0,0x00);
