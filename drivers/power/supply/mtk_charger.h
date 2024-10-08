@@ -201,6 +201,20 @@ struct battery_thermal_protection_data {
 #define JEITA_TEMP_T1_TO_T2_CV	4240000
 #define JEITA_TEMP_T0_TO_T1_CV	4040000
 #define JEITA_TEMP_BELOW_T0_CV	4040000
+/* TN Begin modified by jirui.li/860702 20240929 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+#define TEMP_T4_THRES  60
+#define TEMP_T4_THRES_MINUS_X_DEGREE 57
+#define TEMP_T3_THRES  45
+#define TEMP_T3_THRES_MINUS_X_DEGREE 42
+#define TEMP_T2_THRES  15
+#define TEMP_T2_THRES_PLUS_X_DEGREE 18
+#define TEMP_T1_THRES  0
+#define TEMP_T1_THRES_PLUS_X_DEGREE 3
+#define TEMP_T0_THRES  -20
+#define TEMP_T0_THRES_PLUS_X_DEGREE  -17
+#define TEMP_NEG_10_THRES -22
+#else
 #define TEMP_T4_THRES  50
 #define TEMP_T4_THRES_MINUS_X_DEGREE 47
 #define TEMP_T3_THRES  45
@@ -212,6 +226,8 @@ struct battery_thermal_protection_data {
 #define TEMP_T0_THRES  0
 #define TEMP_T0_THRES_PLUS_X_DEGREE  0
 #define TEMP_NEG_10_THRES 0
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by jirui.li/860702 20240929 CR/EKLAMU-202 */
 
 /*
  * Software JEITA
