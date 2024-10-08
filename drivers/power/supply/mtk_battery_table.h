@@ -220,7 +220,7 @@ int g_temperature[MAX_TABLE] = {
 #if (BAT_NTC_10 == 1)
 /* TN Begin modified by jirui.li/860702 20240927 CR/EKLAMU-4669 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
-struct fg_temp fg_temp_table[23] = {
+struct fg_temp fg_temp_table[25] = {
 		{-40, 195652},
 		{-35, 148171},
 		{-30, 113347},
@@ -243,7 +243,9 @@ struct fg_temp fg_temp_table[23] = {
 		{55, 3535},
 		{60, 3014},
 		{65, 2586},
-		{70, 2228}
+		{70, 2228},
+		{75, 1925},
+		{80, 1669}
 };
 #else
 struct fg_temp fg_temp_table[21] = {

@@ -687,6 +687,16 @@ int adc_battemp(struct mtk_battery *gm, int res)
 	ptable = gm->tmp_table;
 	if (res >= ptable[0].TemperatureR) {
 		tbatt_value = -40;
+/* TN Begin modified by jirui.li/860702 20241007 CR/EKLAMU-4669 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	} else if (res <= ptable[24].TemperatureR) {
+		tbatt_value = 80;
+	} else {
+		res1 = ptable[0].TemperatureR;
+		tmp1 = ptable[0].BatteryTemp;
+
+		for (i = 0; i <= 24; i++) {
+#else
 	} else if (res <= ptable[20].TemperatureR) {
 		tbatt_value = 60;
 	} else {
@@ -694,6 +704,8 @@ int adc_battemp(struct mtk_battery *gm, int res)
 		tmp1 = ptable[0].BatteryTemp;
 
 		for (i = 0; i <= 20; i++) {
+#endif /* CONFIG_OEM_TINNO_CHARGER */
+/* TN End modified by jirui.li/860702 20241007 CR/EKLAMU-4669 */
 			if (res >= ptable[i].TemperatureR) {
 				res2 = ptable[i].TemperatureR;
 				tmp2 = ptable[i].BatteryTemp;
