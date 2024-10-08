@@ -148,7 +148,7 @@ static bool first_insert = true;
 #define SW_JEITA_CV1_CURRENT_LIMIT		1550
 #define SW_JEITA_CV1_CURRENT_LIMIT_GAP		50
 static bool sw_jeita_enter_1A = false;
-static bool sw_jeita_enter_cv1 = false;
+static bool sw_jeita_enter_cv2 = false;
 #define DEMO_MODE_LIMIT_SOC_DEFAULT	70
 #define IGNORE_CURRENT_CHECK_TIME_MAX 5
 #endif /* CONFIG_OEM_TINNO_CHARGER */
@@ -765,6 +765,20 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 	}
 #endif /* CONFIG_OEM_HVDCP_ALGO */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	if (of_property_read_u32(np, "pdc_input_current_limit", &val) >= 0)
+		info->data.pdc_input_current_limit = val;
+	else {
+		chr_err("use default pdc_input_current_limit:%d\n",
+			PDC_CHARGER_INPUT_CURRENT);
+		info->data.pdc_input_current_limit = PDC_CHARGER_INPUT_CURRENT;
+	}
+	if (of_property_read_u32(np, "pdc_charging_current_limit", &val) >= 0)
+		info->data.pdc_charging_current_limit = val;
+	else {
+		chr_err("use default pdc_charging_current_limit:%d\n",
+			PDC_CHARGER_CURRENT);
+		info->data.pdc_charging_current_limit = PDC_CHARGER_CURRENT;
+	}
 	if (of_property_read_u32(np, "eoc_current", &val) >= 0)
 		info->data.eoc_current = val;
 	else if (of_property_read_u32(np, "eoc-current", &val) >= 0)
@@ -1066,26 +1080,21 @@ void do_sw_jeita_state_machine(struct mtk_charger *info)
 		pdata->temp_charging_current_limit = 0;
 
 	if (sw_jeita->sm == TEMP_T1_TO_T2 && info->battery_temp < SW_JEITA_TEMP_10) {
-		if (vbat > SW_JEITA_CV1 / 1000 && vbat < SW_JEITA_CV2 / 1000) {
-			sw_jeita_enter_cv1 = true;
-		}
+		sw_jeita->cv = SW_JEITA_CV1;
 
-		if (sw_jeita_enter_cv1) {
-			sw_jeita->cv = SW_JEITA_CV1;
-			if (ibat <= SW_JEITA_CV1_CURRENT_LIMIT + SW_JEITA_CV1_CURRENT_LIMIT_GAP) {
-				sw_jeita_enter_1A = true;
-				sw_jeita_enter_cv1 = false;
-				sw_jeita->cv = SW_JEITA_CV2;
-			}
-		} else {
-			sw_jeita->cv = SW_JEITA_CV2;
+		if (((ibat <= SW_JEITA_CV1_CURRENT_LIMIT + SW_JEITA_CV1_CURRENT_LIMIT_GAP)
+			&& (vbat >= SW_JEITA_CV1 / 1000 - 50))
+			|| (vbat >= SW_JEITA_CV1 / 1000 + 200)) {
+			sw_jeita_enter_1A = true;
 		}
 
 		if (sw_jeita_enter_1A) {
+			sw_jeita_enter_cv2 = true;
 			pdata->temp_charging_current_limit = SW_JEITA_CV1_CURRENT_LIMIT * 1000;
-			if (vbat >= SW_JEITA_CV2 / 1000)
-				sw_jeita_enter_1A = false;
 		}
+
+		if (sw_jeita_enter_cv2)
+			sw_jeita->cv = SW_JEITA_CV2;
 	}
 
 	chr_err("[SW_JEITA] temp_curr:%d\n", pdata->temp_charging_current_limit);
@@ -1924,7 +1933,7 @@ static ssize_t turbo_power_mode_show(struct device *dev,
 	struct mtk_charger *pinfo = dev->driver_data;
 	int value = 0;
 	int chr_type = get_charger_type(pinfo);
-	if ((chr_type == POWER_SUPPLY_TYPE_USB_QC3 || chr_type == POWER_SUPPLY_TYPE_USB_QC3P) ||
+	if ((chr_type == POWER_SUPPLY_TYPE_USB_QC3 || chr_type == POWER_SUPPLY_TYPE_USB_QC3P || chr_type == POWER_SUPPLY_TYPE_USB_PDC) ||
 	    (pinfo->pe50.apdo_cap.pdp > 15 && chr_type == POWER_SUPPLY_TYPE_USB_DCP)) {
 		turbo_power_mode = 1;
 	} else {
@@ -4949,7 +4958,7 @@ static int mtk_charger_plug_out(struct mtk_charger *info)
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	info->ext_chr_type = POWER_SUPPLY_TYPE_UNKNOWN;
 	sw_jeita_enter_1A = false;
-	sw_jeita_enter_cv1 = false;
+	sw_jeita_enter_cv2 = false;
 	info->pe50.pres_chrg_step = STEP_NONE_PE50;
 	charger_dev_enable_termination(info->chg1_dev, true);
 	info->ignore_current_check_time = 0;
@@ -5350,6 +5359,8 @@ static char *dump_charger_type(int chg_type, int usb_type)
 		return "QC3.0";
 	case POWER_SUPPLY_TYPE_USB_QC3P:
 		return "QC3+";
+	case POWER_SUPPLY_TYPE_USB_PDC:
+		return "PDC";
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240729 CR/EKLAMU-202 */
 	//case POWER_SUPPLY_TYPE_USB_FLOAT:

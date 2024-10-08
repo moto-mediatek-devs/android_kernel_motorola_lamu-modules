@@ -20,6 +20,8 @@
 	max_charger_voltage = <11000000>;
 	hvdcp_input_current_limit = <3000000>;
 	hvdcp_charging_current_limit = <3600000>;
+	pdc_input_current_limit = <3000000>;
+	pdc_charging_current_limit = <3600000>;
 	/* battery temperature protection */
 	enable_min_charge_temp;
 	min_charge_temp = <(-20)>;
@@ -117,7 +119,7 @@
 	ibus_err = <50>;
 
 	/* single charger */
-	sc_input_current = <3800000>;
+	sc_input_current = <3000000>;
 	sc_charger_current = <3600000>;
 };
 

@@ -59,6 +59,8 @@ struct charger_data;
 /* TN Begin modified by xinjun.lu/860715 20240809 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 #define EOC_CURRENT 335000 /* ua */
+#define PDC_CHARGER_CURRENT			3600000
+#define PDC_CHARGER_INPUT_CURRENT		3000000
 #endif
 /* TN End modified by xinjun.lu/860715 20240809 CR/EKLAMU-202 */
 
@@ -334,6 +336,8 @@ struct charger_custom_data {
 	int max_dmivr_charger_current;
 /* TN Begin modified by xinjun.lu/860715 20240809 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	int pdc_charging_current_limit;
+	int pdc_input_current_limit;
 	int eoc_current;
 #endif
 /* TN End modified by xinjun.lu/860715 20240809 CR/EKLAMU-202 */

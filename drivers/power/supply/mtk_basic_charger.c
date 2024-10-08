@@ -316,6 +316,14 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		pdata->charging_current_limit =
 			info->data.hvdcp_charging_current_limit;
 		is_basic = true;
+	} else if (info->chr_type == POWER_SUPPLY_TYPE_USB_PDC) {
+		/* PDC Charger */
+		chr_info("[%s]: for PDC mode, set charge current:%d, input current:%d\n",
+						__func__, info->data.pdc_charging_current_limit, info->data.pdc_input_current_limit);
+		pdata->input_current_limit =
+			info->data.pdc_input_current_limit;
+		pdata->charging_current_limit =
+			info->data.pdc_charging_current_limit;
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
 	} else if (info->chr_type == POWER_SUPPLY_TYPE_USB_QC3P) {
 		/* QC3+ Charger */
@@ -864,12 +872,19 @@ static int do_algorithm(struct mtk_charger *info)
 		}
 /* TN Begin modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
-		if (!IS_ERR_OR_NULL(alg) && alg->alg_id == PE5_ID) {
+		if (!IS_ERR_OR_NULL(alg) && (alg->alg_id == PE5_ID || alg->alg_id == PDC_ID)) {
 			info->current_alg = alg;
 		} else {
 			info->current_alg = NULL;
 		}
 #endif
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+		if (!IS_ERR_OR_NULL(alg) && alg->alg_id == PDC_ID && chg_alg_is_algo_running(alg)) {
+			info->ext_chr_type = POWER_SUPPLY_TYPE_USB_PDC;
+		}
+		chr_err("%s: info->ext_chr_type = %d.\n", __func__, info->ext_chr_type);
+#endif
+
 /* TN End modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
 	} else {
 		if (info->enable_hv_charging != true ||

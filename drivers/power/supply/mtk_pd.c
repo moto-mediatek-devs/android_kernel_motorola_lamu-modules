@@ -785,9 +785,15 @@ static int pd_sc_set_charger(struct chg_alg_device *alg)
 			pd_hal_vbat_mon_en(alg, CHG1, true);
 		}
 	}
-
+/* TN Begin modified by xinjun.lu/860715 202401008 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	pd_dbg("%s old_cv=%d, new_cv=%d, pd_6pin_en=%d 6pin_re_en=%d charging_current1=%d input_current_limit1=%d\n", __func__,
+		pd->old_cv, pd->cv, pd->pd_6pin_en, pd->stop_6pin_re_en, pd->charging_current1, pd->input_current_limit1);
+#else
 	pd_dbg("%s old_cv=%d, new_cv=%d, pd_6pin_en=%d 6pin_re_en=%d\n", __func__,
 		pd->old_cv, pd->cv, pd->pd_6pin_en, pd->stop_6pin_re_en);
+#endif
+/* TN End modified by xinjun.lu/860715 202401008 CR/EKLAMU-202 */
 
 	return 0;
 }

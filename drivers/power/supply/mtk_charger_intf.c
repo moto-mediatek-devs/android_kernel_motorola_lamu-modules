@@ -548,6 +548,13 @@ int get_charger_type(struct mtk_charger *info)
 				return POWER_SUPPLY_TYPE_USB_QC3;
 			}
 		}
+		if (info->ext_chr_type == POWER_SUPPLY_TYPE_USB_PDC) {
+			if (prop2.intval == POWER_SUPPLY_TYPE_UNKNOWN) {
+				return POWER_SUPPLY_TYPE_UNKNOWN;
+			} else {
+				return POWER_SUPPLY_TYPE_USB_PDC;
+			}
+		}
 	}
 #endif /* CONFIG_OEM_TINNO_CHARGER && CONFIG_OEM_DEVINFO */
 /* TN End modified by hao.jia/809321 20240727 CR/EKLAMU-202 */
