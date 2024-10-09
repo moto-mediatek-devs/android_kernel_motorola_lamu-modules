@@ -1250,7 +1250,7 @@ static int sensor_send_timestamp_wake_locked(void)
 	req.set_config_req.action = SENSOR_HUB_SET_TIMESTAMP;
 	req.set_config_req.ap_timestamp = now_time;
 	req.set_config_req.arch_counter = arch_counter;
-	pr_debug("sync ap boottime=%lld\n", now_time);
+	pr_err("sync ap boottime=%lld\n", now_time);
 	len = sizeof(req.set_config_req);
 	err = scp_sensorHub_req_send(&req, &len, 1);
 	if (err < 0)

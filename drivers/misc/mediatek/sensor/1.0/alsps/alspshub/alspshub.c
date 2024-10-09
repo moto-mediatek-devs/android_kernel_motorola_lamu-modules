@@ -11,6 +11,9 @@
 #include <SCP_sensorHub.h>
 #include "SCP_power_monitor.h"
 #include <linux/pm_wakeup.h>
+//TN modified by bingtai.zou/860558 20241007 EKLAMU-7706 begin
+#include <linux/notifier.h>
+//TN modified by bingtai.zou/860558 20241007 EKLAMU-7706 end
 //TN modified by db 20240720 BEGIN
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
 #include "../../../../../../../oem/devinfo/dev_info.h"
@@ -20,7 +23,12 @@
 //TN modified by db 20240723 BEGIN
 #define MAX_CALI_VALUE (10000)
 //TN modified by db 20240723 END
+//TN modified by bingtai.zou/860558 20241007 EKLAMU-7706 begin
+#define PSENSOR_CALI_EVENT 0x63616c69
 
+extern int register_psensor_notifier(struct notifier_block *nb);
+extern int unregister_psensor_notifier(struct notifier_block *nb);
+//TN modified by bingtai.zou/860558 20241007 EKLAMU-7706 end
 #define ALSPSHUB_DEV_NAME     "alsps_hub_pl"
 
 struct alspshub_ipi_data {
@@ -1364,7 +1372,27 @@ static struct platform_driver alspshub_driver = {
 		.name = ALSPSHUB_DEV_NAME,
 	},
 };
+//TN modified by bingtai.zou/860558 20241007 EKLAMU-7706 begin
+int psensor_event_handle(struct notifier_block *nb, unsigned long event, void *v)
+{
+	int event_val =  0;
+	pr_err("psensor_event_handle enter \n");
+	switch(event){
+		case PSENSOR_CALI_EVENT:
+			event_val = sensor_calibration_to_hub(ID_PROXIMITY);
+			pr_err("psensor_event_handle = %d \n", event_val);
+			break;
+		default:
+			break;
+	}
 
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block psensor_notifier = {
+	.notifier_call = psensor_event_handle,
+};
+//TN modified by bingtai.zou/860558 20241007 EKLAMU-7706 end
 static int alspshub_local_init(void)
 {
 
@@ -1389,12 +1417,15 @@ static int __init alspshub_init(void)
 		pr_err("alsps platform device error\n");
 		return -1;
 	}
+	pr_err("alspshub_init register_psensor_notifier\n");
+	register_psensor_notifier(&psensor_notifier);
 	alsps_driver_add(&alspshub_init_info);
 	return 0;
 }
 
 static void __exit alspshub_exit(void)
 {
+	unregister_psensor_notifier(&psensor_notifier);
 	pr_debug("%s\n", __func__);
 }
 

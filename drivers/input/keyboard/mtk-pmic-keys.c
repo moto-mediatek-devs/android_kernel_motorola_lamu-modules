@@ -25,7 +25,22 @@
 #include <linux/mfd/mt6357/registers.h>
 #include <linux/mfd/mt6357/core.h>
 #include <linux/pinctrl/consumer.h>
+//TN modified by bingtai.zou/860558 20241007 EKLAMU-7706 begin
+#include <linux/notifier.h>
+#include <linux/time.h>
+#include <linux/timer.h>
+#include <linux/workqueue.h>
+#include <linux/wait.h>
+#include <linux/kthread.h>
 
+
+static DECLARE_WAIT_QUEUE_HEAD(chre_kthread_wait);
+static uint8_t chre_kthread_wait_condition;
+//static struct timer_list timer;
+struct device *dev_global;
+
+static u32 last_key_time = 0 ;
+//TN modified by bingtai.zou/860558 20241007 EKLAMU-7706 end
 /* 6358 pmic define */
 #define MT6358_TOPSTATUS			(0x28)
 #define MT6358_PSC_TOP_INT_CON0			(0x910)
@@ -208,6 +223,71 @@ enum mtk_pmic_keys_lp_mode {
 	LP_TWOKEY_HOMEKEY2,
 };
 
+//TN modified by bingtai.zou/860558 20241007 EKLAMU-7706 begin
+#define PSENSOR_CALI_EVENT 0x63616c69
+
+static RAW_NOTIFIER_HEAD(psensor_notify_list);
+
+static int call_psensor_notifiers(unsigned long val, void *v)
+{
+	return raw_notifier_call_chain(&psensor_notify_list, val, v);
+}
+
+int register_psensor_notifier(struct notifier_block *nb)
+{
+	int err;
+	err = raw_notifier_chain_register(&psensor_notify_list, nb);
+
+	if(err)
+		goto out;
+
+out:
+	return err;
+}
+EXPORT_SYMBOL(register_psensor_notifier);
+
+int unregister_psensor_notifier(struct notifier_block *nb)
+{
+	int err;
+	err = raw_notifier_chain_unregister(&psensor_notify_list, nb);
+
+	if(err)
+		goto out;
+
+out:
+	return err;
+}
+EXPORT_SYMBOL(unregister_psensor_notifier);
+
+static void check_double_key(struct device * dev)
+{
+	u32 current_time;
+	current_time = jiffies_to_msecs(jiffies);
+	dev_info(dev, "(%s) enter\n",__func__);
+    if (current_time - last_key_time <= 300) {
+	    	//dev_info(dev, "(%s) double current time =%ld  last time =%ld\n",__func__, current_time,last_key_time);
+		call_psensor_notifiers(PSENSOR_CALI_EVENT, NULL);
+    }
+    last_key_time = current_time;
+}
+
+static int powerkey_irq_event(void *data)
+{
+	for (;;) {
+		int ret = 0;
+		dev_info(dev_global, "[TN]powerkey_irq_event enter\n");
+		ret = wait_event_interruptible(chre_kthread_wait,
+			READ_ONCE(chre_kthread_wait_condition));
+		if (ret != 0)
+			continue;
+		check_double_key(dev_global);
+		WRITE_ONCE(chre_kthread_wait_condition, false);
+	}
+	return 0;
+}
+//TN modified by bingtai.zou/860558 20241007 EKLAMU-7706 end
+
+
 static struct platform_device *ktf_pmic_pdev;
 static struct mtk_pmic_keys *ktf_pmic_key;
 static void mtk_pmic_keys_lp_reset_setup(struct mtk_pmic_keys *keys,
@@ -349,12 +429,15 @@ static irqreturn_t mtk_pmic_keys_irq_handler_thread(int irq, void *data)
 
 	input_report_key(info->keys->input_dev, info->keycode, pressed);
 	input_sync(info->keys->input_dev);
-
+//TN modified by bingtai.zou/860558 20241007 EKLAMU-7706 begin
+	WRITE_ONCE(chre_kthread_wait_condition, true);
+	wake_up(&chre_kthread_wait);
+//TN modified by bingtai.zou/860558 20241007 EKLAMU-7706 end
 	if (pressed && info->suspend_lock)
 		__pm_stay_awake(info->suspend_lock);
 	else if (info->suspend_lock)
 		__pm_relax(info->suspend_lock);
-	dev_dbg(info->keys->dev, "(%s) key =%d using PMIC\n",
+	dev_info(info->keys->dev, "(%s) key =%d using PMIC\n",
 		 pressed ? "pressed" : "released", info->keycode);
 
 	return IRQ_HANDLED;
@@ -484,6 +567,9 @@ static int mtk_pmic_keys_probe(struct platform_device *pdev)
 	int error, index = 0;
 	unsigned int keycount;
 	unsigned int release_irq_interval;
+//TN modified by bingtai.zou/860558 20241007 EKLAMU-7706 begin
+	struct task_struct *task = NULL;
+//TN modified by bingtai.zou/860558 20241007 EKLAMU-7706 end
 	struct mt6397_chip *pmic_chip;
 	struct device_node *node = pdev->dev.of_node, *child;
 	struct mtk_pmic_keys *keys;
@@ -509,6 +595,9 @@ static int mtk_pmic_keys_probe(struct platform_device *pdev)
 	}
 
 	keys->dev = &pdev->dev;
+//TN modified by bingtai.zou/860558 20241007 EKLAMU-7706 begin
+	dev_global = keys->dev;
+//TN modified by bingtai.zou/860558 20241007 EKLAMU-7706 end
 	mtk_pmic_regs = of_id->data;
 
 	keys->input_dev = input_dev = devm_input_allocate_device(keys->dev);
@@ -586,7 +675,13 @@ static int mtk_pmic_keys_probe(struct platform_device *pdev)
 			"register input device failed (%d)\n", error);
 		return error;
 	}
-
+//TN modified by bingtai.zou/860558 20241007 EKLAMU-7706 begin
+	task = kthread_run(powerkey_irq_event, NULL, "ps_cali");
+	if (IS_ERR(task)) {
+		pr_err("SCP_sensorHub_direct_push_work create fail!\n");
+		return -1;
+	}
+//TN modified by bingtai.zou/860558 20241007 EKLAMU-7706 end
 	mtk_pmic_keys_lp_reset_setup(keys, mtk_pmic_regs);
 
 	platform_set_drvdata(pdev, keys);
