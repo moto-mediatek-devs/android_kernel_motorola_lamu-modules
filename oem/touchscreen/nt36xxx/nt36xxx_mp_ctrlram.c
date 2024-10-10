@@ -2541,6 +2541,8 @@ void nvt_mp_proc_deinit(void)
 		NVT_proc_selftest_entry = NULL;
 		NVT_LOG("Removed /proc/touch_info/tp_selftest_result\n");
 	}
+	remove_proc_entry("tp_gesture_mode", touch_info_dir);
+	NVT_LOG("Removed /proc/touch_info/tp_gesture_mode\n");
 	if (touch_info_dir != NULL) {
 		remove_proc_entry("touch_info", NULL);
 		touch_info_dir = NULL;

@@ -2209,6 +2209,8 @@ static int testing_remove(struct ovt_tcm_hcd *tcm_hcd)
 		testing_hcd->ovt_selftest_proc_entry = NULL;
 		LOGN(tcm_hcd->pdev->dev.parent,"Removed /proc/touch_info/tp_selftest_result\n");
 	}
+	remove_proc_entry("tp_gesture_mode", touch_info_dir);
+	LOGN(tcm_hcd->pdev->dev.parent,"Removed /proc/touch_info/tp_gesture_mode\n");
 	if (touch_info_dir != NULL) {
 		remove_proc_entry("touch_info", NULL);
 		touch_info_dir = NULL;
