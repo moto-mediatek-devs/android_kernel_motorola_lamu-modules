@@ -369,7 +369,7 @@ static int mtk_cooler_bcct_register_ltf(void)
 	if (oem_pcba_charge_power() == CHARGE_POWER_33W) {
 		MTK_CL_BCCT_SET_LIMIT(4500, cl_bcct_state[0]);
 		MTK_CL_BCCT_SET_LIMIT(3500, cl_bcct_state[1]);
-		MTK_CL_BCCT_SET_LIMIT(500, cl_bcct_state[2]);
+		MTK_CL_BCCT_SET_LIMIT(1000, cl_bcct_state[2]);
 	} else {
 		MTK_CL_BCCT_SET_LIMIT(3200, cl_bcct_state[0]);
 		MTK_CL_BCCT_SET_LIMIT(2500, cl_bcct_state[1]);
