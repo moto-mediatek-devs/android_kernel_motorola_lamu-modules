@@ -4976,6 +4976,9 @@ static int mtk_charger_plug_out(struct mtk_charger *info)
 	charger_dev_enable_termination(info->chg1_dev, true);
 	info->ignore_current_check_time = 0;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
+	info->start_factory_discharging = false;
+#endif
 /*TN End modified by hao.jia/809321 20240904 CR/EKLAMU-202*/
 
 /* TN Begin modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
@@ -6531,6 +6534,9 @@ static int mtk_charger_probe(struct platform_device *pdev)
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	info->fast_charging_indicator = PDC_ID | PE5_ID;
 	info->ignore_current_check_time = 0;
+#endif
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
+	info->start_factory_discharging = false;
 #endif
 /* TN End modified by xinjun.lu/860715 20240725 CR/EKLAMU-202 */
 	info->enable_meta_current_limit = 1;

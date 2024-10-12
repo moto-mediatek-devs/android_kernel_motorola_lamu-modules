@@ -769,8 +769,11 @@ struct mtk_charger {
 	struct pe50_params pe50;
 	struct chg_alg_device *current_alg;
 #endif
-/* TN End modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
 
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
+	bool start_factory_discharging;
+#endif
+/* TN End modified by xinjun.lu/860715 20240821 CR/EKLAMU-202 */
 };
 
 static inline int mtk_chg_alg_notify_call(struct mtk_charger *info,

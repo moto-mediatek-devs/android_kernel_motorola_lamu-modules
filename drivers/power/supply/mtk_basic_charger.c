@@ -92,6 +92,12 @@ extern int g_thermal_charging_current_limit;
 #define SW_BAT_REDU_CURR_MA	2000
 /*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 
+/* TN Begin modified by xinjun.lu/860715 20241011 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
+#define FACTORY_AGAING_SOC_GAP	15
+#endif
+/* TN End modified by xinjun.lu/860715 20241011 CR/EKLAMU-202 */
+
 static int _uA_to_mA(int uA)
 {
 	if (uA == -1)
@@ -214,7 +220,13 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 	bool is_basic = false;
 	u32 ichg1_min = 0, aicr1_min = 0;
 	int ret;
+/* TN Begin modified by xinjun.lu/860715 20241011 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
+	int uisoc = 0;
 
+	uisoc = get_uisoc(info);
+#endif
+/* TN End modified by xinjun.lu/860715 20241011 CR/EKLAMU-202 */
 	select_cv(info);
 
 	pdata = &info->chg_data[CHG1_SETTING];
@@ -438,6 +450,20 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 	if (info->pe50.pres_chrg_step == STEP_FULL_PE50) {
 		pdata->charging_current_limit = 0;
 	}
+#endif
+
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
+	if (uisoc >= info->factory_charging_limit_soc) {
+		info->start_factory_discharging = true;
+	} else if (uisoc <= info->factory_charging_limit_soc - FACTORY_AGAING_SOC_GAP) {
+		info->start_factory_discharging = false;
+	}
+
+	if (info->start_factory_discharging) {
+		pdata->input_current_limit = 0;
+		pdata->charging_current_limit = 0;
+	}
+	chr_err("%s:start_factory_discharging=%d\n", __func__, info->start_factory_discharging);
 #endif
 /* TN End modified by xinjun.lu/860715 20240924 CR/EKLAMU-202 */
 
