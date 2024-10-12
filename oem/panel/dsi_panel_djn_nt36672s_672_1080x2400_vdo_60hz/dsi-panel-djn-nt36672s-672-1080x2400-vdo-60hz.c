@@ -675,6 +675,7 @@ static void djn_panel_init(struct djn *ctx)
 	djn_dcs_write_seq_static(ctx, 0xFB,0x01);
 	djn_dcs_write_seq_static(ctx, 0x51,0x00,0x00);
 	djn_dcs_write_seq_static(ctx, 0x53,0x2C);
+	djn_dcs_write_seq_static(ctx, 0x68,0x03,0x01);
 	djn_dcs_write_seq_static(ctx, 0x55,0x01);
 	djn_dcs_write_seq_static(ctx, 0x35,0x00);
 	djn_dcs_write_seq_static(ctx, 0x3B,0x03,0x20);
