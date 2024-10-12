@@ -1698,6 +1698,7 @@ static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
 		cx->unknow_detect_count = 0;
 		cx->fake_sdp_type = false;
 		cx->unknow_type_check = false;
+		power_supply_changed(cx->charger);
 	}
 #else
 	schedule_delayed_work(&cx->charger_type_detect_work, msecs_to_jiffies(100));

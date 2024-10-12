@@ -1724,6 +1724,7 @@ static irqreturn_t sgm4154x_irq_handler_thread(int irq, void *private)
 		Charger_Detect_Release();
 		sgm4154x_set_dpdm_hiz(sgm);
 		allow_set_dp_dm_vol = false;
+		power_supply_changed(sgm->charger);
 /*TN End modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/
 	}
 #else
