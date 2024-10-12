@@ -142,6 +142,8 @@ static bool first_insert = true;
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 #define BATTERY_PROTECT_MAX_SOC		80
 #define BATTERY_PROTECT_MIN_SOC		20
+#define BATTERY_CHARGING_FULL_SOC	100
+#define BATTERY_CV_GAP			30
 #define SW_JEITA_TEMP_10		10
 #define SW_JEITA_CV1		4250000
 #define SW_JEITA_CV2		4500000
@@ -4296,12 +4298,13 @@ static void charger_check_status(struct mtk_charger *info)
 	int temperature;
 	struct battery_thermal_protection_data *thermal;
 	int uisoc = 0;
-/* TN Begin modified by xinjun.lu/860715 20240924 CR/EKLAMU-202 */
+/* TN Begin modified by xinjun.lu/860715 20241011 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	bool devchg1_en = false;
 	int batt_ma = get_battery_current(info);
+	int vbat = get_battery_voltage(info);
 #endif
-/* TN End modified by xinjun.lu/860715 20240924 CR/EKLAMU-202 */
+/* TN End modified by xinjun.lu/860715 20241011 CR/EKLAMU-202 */
 
 	if (get_charger_type(info) == POWER_SUPPLY_TYPE_UNKNOWN)
 		return;
@@ -4413,27 +4416,6 @@ static void charger_check_status(struct mtk_charger *info)
 		goto stop_charging;
 	}
 
-/* TN Begin modified by xinjun.lu/860715 20240924 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
-	charger_dev_is_enabled(info->chg1_dev, &chg_dev_chgen);
-	if (info->dvchg1_dev)
-		charger_dev_is_enabled(info->dvchg1_dev, &devchg1_en);
-
-	if (chg_dev_chgen && !devchg1_en) {
-		if (info->pe50.pres_chrg_step != STEP_FULL_PE50 || info->pres_chrg_step != STEP_FULL) {
-			if (info->ignore_current_check_time > IGNORE_CURRENT_CHECK_TIME_MAX
-				&& pe50_has_current_tapered(info, batt_ma, info->pe50.chrg_iterm))
-				info->pe50.pres_chrg_step = STEP_FULL_PE50;
-
-			if (info->ignore_current_check_time <= IGNORE_CURRENT_CHECK_TIME_MAX)
-				info->ignore_current_check_time++;
-		}
-		chr_info("chrg_iterm=%d batt_ma=%d pres_chrg_step=%d time=%d\n",
-				info->pe50.chrg_iterm, batt_ma, info->pe50.pres_chrg_step, info->ignore_current_check_time);
-	}
-#endif
-/* TN End modified by xinjun.lu/860715 20240924 CR/EKLAMU-202 */
-
 	if (info->cmd_discharging)
 		charging = false;
 	if (info->safety_timeout)
@@ -4459,7 +4441,7 @@ static void charger_check_status(struct mtk_charger *info)
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 
-/* TN Begin modified by xinjun.lu/860715 20240814 CR/EKLAMU-202 */
+/* TN Begin modified by xinjun.lu/860715 20241011 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_PE50_FFC_SUPPORT)
 	if (info->pe50.pres_chrg_step == STEP_STOP_PE50)
 		charging = false;
@@ -4468,7 +4450,29 @@ static void charger_check_status(struct mtk_charger *info)
 	if (info->pe50.adaptive_charging_disable_ibat)
 		charging = false;
 #endif
-/* TN End modified by xinjun.lu/860715 20240814 CR/EKLAMU-202 */
+
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	charger_dev_is_enabled(info->chg1_dev, &chg_dev_chgen);
+	if (info->dvchg1_dev)
+		charger_dev_is_enabled(info->dvchg1_dev, &devchg1_en);
+
+	if (chg_dev_chgen && !devchg1_en) {
+		if (info->pe50.pres_chrg_step != STEP_FULL_PE50 || info->pres_chrg_step != STEP_FULL) {
+			if (info->ignore_current_check_time > IGNORE_CURRENT_CHECK_TIME_MAX
+				&& uisoc ==  BATTERY_CHARGING_FULL_SOC
+				&& vbat > (info->data.battery_cv / 1000) - BATTERY_CV_GAP
+				&& pe50_has_current_tapered(info, batt_ma, info->pe50.chrg_iterm))
+				info->pe50.pres_chrg_step = STEP_FULL_PE50;
+
+			if (info->ignore_current_check_time <= IGNORE_CURRENT_CHECK_TIME_MAX)
+				info->ignore_current_check_time++;
+		}
+		chr_info("chrg_iterm=%d batt_ma=%d pres_chrg_step=%d time=%d vbat=%d uisoc=%d battery_cv=%d\n",
+				info->pe50.chrg_iterm, batt_ma, info->pe50.pres_chrg_step,
+				info->ignore_current_check_time, vbat, uisoc, info->data.battery_cv);
+	}
+#endif
+/* TN End modified by xinjun.lu/860715 20241011 CR/EKLAMU-202 */
 
 stop_charging:
 	mtk_battery_notify_check(info);
