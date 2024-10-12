@@ -43,7 +43,7 @@ struct h_node {
 
 static DECLARE_HASHTABLE(tbl, 5);
 
-static const char *find_and_get_symobls(unsigned long caller_addr)
+__maybe_unused static const char *find_and_get_symobls(unsigned long caller_addr)
 {
 	struct h_node *cur_node = NULL;
 	struct h_node *new_node = NULL;
@@ -74,10 +74,10 @@ static const char *find_and_get_symobls(unsigned long caller_addr)
 static void handle_cpu_qos_tracer(struct work_struct *qos_queue)
 {
 	struct qos_work_t *my_work = container_of(qos_queue, struct qos_work_t, qos_queue);
-	const char *caller_info = find_and_get_symobls(my_work->data);
+//	const char *caller_info = find_and_get_symobls(my_work->data);
 
-	if (caller_info)
-		pr_info("[pm_qos_debug] %s request PMQOS = %d\n",caller_info, my_work->value);
+//	if (caller_info)
+//		pr_info("[pm_qos_debug] %s request PMQOS = %d\n",caller_info, my_work->value);
 
 	kfree(my_work);
 }
