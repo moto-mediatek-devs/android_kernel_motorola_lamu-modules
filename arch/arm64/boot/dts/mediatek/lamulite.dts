@@ -42,9 +42,9 @@
 		led_mode = <4>;
 		label = "lcd-backlight";
 		led-bits = <8>;
-		trans-bits = <11>;
+		trans-bits = <8>;
 		max-brightness = <255>;
-		max-hw-brightness = <2047>;
+		max-hw-brightness = <255>;
 		default-state = "on";
 	};
 };

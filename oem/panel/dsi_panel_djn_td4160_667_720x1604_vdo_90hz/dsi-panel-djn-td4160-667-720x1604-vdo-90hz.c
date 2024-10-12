@@ -22,6 +22,7 @@
 #include <linux/of_graph.h>
 #include <linux/platform_device.h>
 #include <linux/proc_fs.h>
+#include "../backlight_i2c_map.h"
 
 #define CONFIG_MTK_PANEL_EXT
 #if defined(CONFIG_MTK_PANEL_EXT)
@@ -595,10 +596,15 @@ static int dijin_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 	if (!cb)
 		return -1;
 
-	if(!is_extra & (!is_hbm))
+	/*if(!is_extra & (!is_hbm))
 		bl_lvl = level * 150 / 255; //500nit
 	else
-		bl_lvl = level * 240 / 255; //800nit
+		bl_lvl = level * 240 / 255; //800nit*/
+
+	if (level > 255)
+		level = 255;
+
+	bl_lvl = backlight_i2c_map[level];
 
 	pr_info("%s: level=%d, bl_lvl=%d, is_extra=%d, is_hbm=%d\n", __func__, level, bl_lvl, is_extra, is_hbm);
 
