@@ -187,6 +187,14 @@ int gf_parse_dts(struct gf_device *gf_dev)
 	np = of_find_compatible_node(NULL, NULL, "mediatek,goodix-fp");
 	gf_debug(DEBUG_LOG, "%s, from gpio\n", __func__);
 
+	pr_err("gf get avdd\n");
+	gf_dev->avdd = regulator_get(dev, "vio28");
+    	if (IS_ERR_OR_NULL(gf_dev->avdd)) {
+        	rc = PTR_ERR(gf_dev->avdd);
+        	pr_err("gf get avdd regulator failed,ret=%d", rc);
+        	return rc;
+    	}
+
 	gf_dev->reset_gpio = of_get_named_gpio(np, "goodix_rst", 0);
 	if (gf_dev->reset_gpio < 0) {
 		pr_err("falied to get reset gpio!\n");
@@ -198,6 +206,7 @@ int gf_parse_dts(struct gf_device *gf_dev)
 		goto err_reset;
 	}
 
+#if 0
 	gf_dev->avdd_gpio = of_get_named_gpio(np, "goodix_vdd", 0);
 	if (gf_dev->avdd_gpio < 0) {
 		pr_err("falied to get avdd gpio!\n");
@@ -209,11 +218,14 @@ int gf_parse_dts(struct gf_device *gf_dev)
 		pr_err("failed to request irq gpio, rc = %d\n", rc);
 		goto err_avdd;
 	}
+#endif
 	//gpio_direction_output(gf_dev->avdd_gpio, 1);
 	gpio_direction_output(gf_dev->reset_gpio, 0);
 
+#if 0
 err_avdd:
 	gpio_free(gf_dev->reset_gpio);
+#endif
 
 err_reset:
 	return rc;
@@ -231,10 +243,20 @@ void gf_cleanup(struct gf_device *gf_dev)
 		gpio_free(gf_dev->reset_gpio);
 		pr_info("remove reset_gpio success\n");
 	}
+
+	if (!IS_ERR_OR_NULL(gf_dev->avdd)) {
+        	if (regulator_count_voltages(gf_dev->avdd) > 0)
+            		regulator_set_voltage(gf_dev->avdd, 0, 0);
+        	regulator_put(gf_dev->avdd);
+		pr_info("remove avdd success\n");
+	}
+
+#if 0
 	if (gpio_is_valid(gf_dev->avdd_gpio)) {
 		gpio_free(gf_dev->avdd_gpio);
 		pr_info("remove avdd_gpio success\n");
 	}
+#endif
 }
 int gf_hw_reset(struct gf_device *gf_dev, unsigned int delay_ms)
 {
@@ -364,7 +386,16 @@ static void gf_hw_power_enable(struct gf_device *gf_dev, u8 onoff)
 		/*if(!IS_ERR(gf_dev->pins_vcc_high)) {
 			pinctrl_select_state(gf_dev->pinctrl_gpios, gf_dev->pins_vcc_high);
 		}*/
+
+		pr_err("gf regulator_enable\n");
+		rc = regulator_enable(gf_dev->avdd);
+		if (rc) {
+			pr_err("gf enable avdd regulator failed,ret=%d", rc);
+        	}
+
+#if 0
 		gpio_direction_output(gf_dev->avdd_gpio, 1);
+#endif
 		pr_info("set pwr_gpio on");
 #elif GF_POWER_EXT_LDO
 		rc = wl2868c_set_ldo_enable(LDO4, 3000);
@@ -390,7 +421,16 @@ static void gf_hw_power_enable(struct gf_device *gf_dev, u8 onoff)
 		/*if(!IS_ERR(gf_dev->pins_vcc_low)) {
         	pinctrl_select_state(gf_dev->pinctrl_gpios, gf_dev->pins_vcc_low);
 		}*/
+
+		pr_err("gf regulator_disable\n");
+		rc = regulator_disable(gf_dev->avdd);
+		if (rc) {
+			pr_err("gf disable avdd regulator failed,ret=%d", rc);
+        }
+
+#if 0
 		gpio_direction_output(gf_dev->avdd_gpio, 0);
+#endif
 		pr_info("set pwr_gpio off");
 #elif GF_POWER_EXT_LDO
 		rc = wl2868c_set_ldo_disable(LDO4);

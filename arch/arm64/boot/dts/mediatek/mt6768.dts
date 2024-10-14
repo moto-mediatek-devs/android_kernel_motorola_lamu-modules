@@ -2643,6 +2643,8 @@ transparent_hugepage=never";
 		min-limit = <15>;
 		max-limit = <15000>;
 		vib-supply = <&mt_pmic_vibr_ldo_reg>;
+/*feiyu.zhu modify fp vio2.9v for EKLAMU*/
+		vio28-supply = <&mt_pmic_vio28_ldo_reg>;
 	};
 
 	md_ccif3@1023f000 {
@@ -5800,9 +5802,10 @@ transparent_hugepage=never";
 	regulator-always-on;
 };
 
-&mt_pmic_vio28_ldo_reg {
+/*feiyu.zhu modify fp vio2.9v for EKLAMU*/
+/*&mt_pmic_vio28_ldo_reg {
 	regulator-always-on;
-};
+};*/
 
 &mt_pmic_va12_ldo_reg {
 	regulator-always-on;

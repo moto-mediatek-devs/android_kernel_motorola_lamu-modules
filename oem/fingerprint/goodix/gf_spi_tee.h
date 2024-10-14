@@ -13,6 +13,8 @@
 #endif
 #include <linux/pm_wakeup.h>
 
+#include <linux/regulator/consumer.h>
+
 /**************************debug******************************/
 #define ERR_LOG  (0)
 #define INFO_LOG (1)
@@ -219,6 +221,7 @@ struct gf_device {
 	struct pinctrl_state *pinstate_spi_func;
 #endif
 	struct wakeup_source fp_wakesrc;
+	struct regulator *avdd;
 };
 
 #endif	/* __GF_SPI_TEE_H */

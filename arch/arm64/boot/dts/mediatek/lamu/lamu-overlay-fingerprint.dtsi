@@ -55,6 +55,7 @@
 	debounce = <8 0>;
 	fpc,rst_gpio = <&pio 112 0x0>;
 	fpc,irq_gpio = <&pio 8 0>;
+	avdd-supply = <&mt_pmic_vio28_ldo_reg>;
 	status = "okay";
 };
 
@@ -64,7 +65,7 @@
     goodix_rst = <&pio 112 0x00>;
     gf,gpio_irq = <&pio 8 0x00>;
     //goodix_vdd = <&pio 22 0x0>;
-    //vdd-supply = <&mt_pmic_vio28_ldo_reg>;
+    avdd-supply = <&mt_pmic_vio28_ldo_reg>;
     status = "okay";
 };
 /*[TN.NJDC] fingerprint overlay file.end*/

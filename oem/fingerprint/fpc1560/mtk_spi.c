@@ -112,6 +112,7 @@ struct fpc_data {
 #ifdef CONFIG_FPC_COMPAT
     bool compatible_enabled;
 #endif
+	struct regulator *avdd;
 };
 
 static DEFINE_MUTEX(spidev_set_gpio_mutex);
@@ -271,9 +272,9 @@ static int hw_power_reset(struct fpc_data *fpc)
 	int ret = 0;
 	fpsensor_log(INFO_LOG, "fpc %s entry.\n", __func__);
     
-	if(gpio_is_valid(fpc->power_ctl_gpio)){
+	/*if(gpio_is_valid(fpc->power_ctl_gpio)){
 
-        fpsensor_log(INFO_LOG, "fpc %s POWER GPIO#%d.\n", __func__, fpc->power_ctl_gpio);
+        fpsensor_log(INFO_LOG, "fpc %s POWER GPIO#%d.\n", __func__, fpc->power_ctl_gpio);*/
         
 #ifdef PIN_CONTROL       
         ret = select_pin_ctl(fpc, "fpsensor_fpc_power_low");
@@ -289,17 +290,26 @@ static int hw_power_reset(struct fpc_data *fpc)
         }
         usleep_range(FPC_POWEROFF_SLEEP_US, FPC_POWEROFF_SLEEP_US + 100);
 #else
-		gpio_direction_output(fpc->power_ctl_gpio, 0);
+		ret = regulator_disable(fpc->avdd);
+		if (ret) {
+			pr_err("fpc disable avdd regulator failed,ret=%d", ret);
+        	}
+		//gpio_direction_output(fpc->power_ctl_gpio, 0);
 		usleep_range(FPC_POWEROFF_SLEEP_US, FPC_POWEROFF_SLEEP_US + 100);
-		gpio_direction_output(fpc->power_ctl_gpio, 1);
+
+		ret = regulator_enable(fpc->avdd);
+		if (ret) {
+			pr_err("fpc enable avdd regulator failed,ret=%d", ret);
+        	}
+		//gpio_direction_output(fpc->power_ctl_gpio, 1);
 		usleep_range(FPC_POWEROFF_SLEEP_US, FPC_POWEROFF_SLEEP_US + 100);
 #endif
 		(void)hw_reset(fpc);
-	}
+	/*}
 	else{
         fpsensor_log(ERROR_LOG, "fpc %s fpc POWER GPIO[%d] isn't valid.\n", __func__, fpc->power_ctl_gpio);
 		ret = -1;
-	}
+	}*/
     func_exit();
 	return ret;
 }
@@ -405,6 +415,14 @@ static int fpc_power_supply(struct fpc_data *fpc)
 		return -EINVAL;
 	}
 
+	fpc->avdd = regulator_get(dev, "vio28");
+    	if (IS_ERR_OR_NULL(fpc->avdd)) {
+        	ret = PTR_ERR(fpc->avdd);
+        	pr_err("get vdd regulator failed,ret=%d", ret);
+        	return ret;
+    	}
+
+#if 0
 	fpc->power_ctl_gpio = of_get_named_gpio(node, "fpc,power_ctl_gpio", 0);
 
 	if (fpc->power_ctl_gpio < 0) {
@@ -423,7 +441,8 @@ static int fpc_power_supply(struct fpc_data *fpc)
         }
         fpsensor_log(INFO_LOG,"%s, the return value of request fpc->power_ctl_gpio is %d\n", __func__, ret);
    }
-	
+#endif
+
 #ifdef PIN_CONTROL
     ret = select_pin_ctl(fpc, "fpsensor_fpc_power_high");
     if(ret){
@@ -431,10 +450,15 @@ static int fpc_power_supply(struct fpc_data *fpc)
         return ret;
     }
 #else
-    gpio_direction_output(fpc->power_ctl_gpio, 1);
+    //gpio_direction_output(fpc->power_ctl_gpio, 1);
+    pr_err("fpc:set fpc enable avdd\n");
+    ret = regulator_enable(fpc->avdd);
+    if (ret) {
+       pr_err("fpc enable avdd regulator failed,ret=%d", ret);
+    }
 #endif	
    
-   fpsensor_log(INFO_LOG, "%s, the value after set fpc->power_ctl_gpio 1 is %d\n", __func__, gpio_get_value(fpc->power_ctl_gpio));
+   //fpsensor_log(INFO_LOG, "%s, the value after set fpc->power_ctl_gpio 1 is %d\n", __func__, gpio_get_value(fpc->power_ctl_gpio));
    func_exit();
    return ret;
 }
@@ -631,13 +655,23 @@ static ssize_t compatible_all_set(struct device *dev,
             return rc;
         }
 #else
-        gpio_direction_output(fpc->power_ctl_gpio, 0);
+        //gpio_direction_output(fpc->power_ctl_gpio, 0);
+	rc = regulator_disable(fpc->avdd);
+	if (rc) {
+		pr_err("fpc disable avdd regulator failed,ret=%d", rc);
+	}
 #endif
-   		fpsensor_log(INFO_LOG, "%s, cutoff power fpc->power_ctl_gpio = %d\n", __func__, gpio_get_value(fpc->power_ctl_gpio));
-		if(gpio_is_valid(fpc->power_ctl_gpio)){
-			gpio_free(fpc->power_ctl_gpio);
-			fpsensor_log(INFO_LOG, "%s, Release POWER GPIO#%d.\n", __func__, fpc->power_ctl_gpio);
-		}
+	fpsensor_log(INFO_LOG, "%s, cutoff power \n", __func__);
+	if (!IS_ERR_OR_NULL(fpc->avdd)) {
+		if (regulator_count_voltages(fpc->avdd) > 0)
+			regulator_set_voltage(fpc->avdd, 0, 0);
+		regulator_put(fpc->avdd);
+	}
+   	/*fpsensor_log(INFO_LOG, "%s, cutoff power fpc->power_ctl_gpio = %d\n", __func__, gpio_get_value(fpc->power_ctl_gpio));
+	if(gpio_is_valid(fpc->power_ctl_gpio)){
+		gpio_free(fpc->power_ctl_gpio);
+		fpsensor_log(INFO_LOG, "%s, Release POWER GPIO#%d.\n", __func__, fpc->power_ctl_gpio);
+	}*/
 		if(gpio_is_valid(fpc->rst_gpio)){
 			gpio_free(fpc->rst_gpio);
 			fpsensor_log(INFO_LOG, "%s, Release RST GPIO#%d.\n", __func__, fpc->rst_gpio);
@@ -776,7 +810,11 @@ static int mtk6797_probe(struct spi_device *spidev)
                 return rc;
             }
 #else
-            gpio_direction_output(fpc->power_ctl_gpio, 0);
+            //gpio_direction_output(fpc->power_ctl_gpio, 0);
+            rc = regulator_disable(fpc->avdd);
+     	    if (rc) {
+               pr_err("fpc disable avdd regulator failed,ret=%d", rc);
+            }
 #endif
 			gpio_free(fpc->rst_gpio);
 			fpc1022_fp_exist = false;
