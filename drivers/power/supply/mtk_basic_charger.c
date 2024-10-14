@@ -171,7 +171,8 @@ static bool is_typec_adapter(struct mtk_charger *info)
 			rp != 500 &&
 			info->chr_type != POWER_SUPPLY_TYPE_USB &&
 			info->chr_type != POWER_SUPPLY_TYPE_USB_CDP &&
-			info->chr_type != POWER_SUPPLY_TYPE_USB_QC3P)
+			info->chr_type != POWER_SUPPLY_TYPE_USB_QC3P &&
+			info->chr_type != POWER_SUPPLY_TYPE_USB_QC3)
 #else
 	if (cap_type == MTK_CAP_TYPE_UNKNOWN &&
 			rp != 500 &&
