@@ -716,6 +716,10 @@ static int ilitek_plat_probe(void)
 #endif
 	ILI_INFO("platform probe\n");
 
+#if CHARGER_NOTIFIER_CALLBACK
+	ilits->usb_plug_status = 2;
+#endif
+
 #if REGULATOR_POWER
 	ilitek_plat_regulator_power_init();
 #endif

@@ -720,9 +720,11 @@ int ili_fw_upgrade_handler(void *data)
 #if KERNEL_VERSION(4, 1, 0) <= LINUX_VERSION_CODE
 		/* add_for_charger_start */
 		if (ilits->actual_tp_mode != P5_X_FW_TEST_MODE) {
-			ret = ili_ic_func_ctrl("plug", !ilits->usb_plug_status);/* plug in */
-			if (ret < 0) {
-				ILI_ERR("Write plug in failed\n");
+			if ((ilits->usb_plug_status) != 2){
+				ret = ili_ic_func_ctrl("plug", !ilits->usb_plug_status);/* plug in */
+				if (ret < 0) {
+					ILI_ERR("Write plug in failed\n");
+				}
 			}
 		}
 		/*  add_for_charger_end  */
