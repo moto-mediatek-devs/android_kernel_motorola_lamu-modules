@@ -650,7 +650,7 @@ static int taskRemoveNoise(void *param)
     LOG_INF("remove noise start");
 
     // multiple times
-    while (currentPos > 100) {
+    while (currentPos > 500) {
         currentPos -= 50;
         g_pstAF_CurDrv->pAF_Ioctl(a_pstFile, AFIOC_T_MOVETO, currentPos);
         mdelay(4);
