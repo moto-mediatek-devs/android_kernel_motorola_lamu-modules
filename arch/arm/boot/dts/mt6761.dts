@@ -3228,6 +3228,7 @@ firmware_class.path=/vendor/firmware clk_ignore_unused=1";
 		compatible = "mediatek,mtk-smi-dbg";
 		mediatek-larb-supply = <&smi_larb0 &smi_larb1 &smi_larb2>;
 		mediatek-common-supply = <&smi_common>;
+		skip-bug-On;
 	};
 
 	mdp_rdma0: mdp_rdma0@14004000 {

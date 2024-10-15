@@ -5924,6 +5924,7 @@
 				&smi_larb14 &smi_larb16 &smi_larb17 &smi_larb18
 				&smi_larb19 &smi_larb20>;
 		mediatek-common-supply = <&smi_common>;
+		skip-bug-On;
 	};
 
 	smi_larb4: smi-larb4@1602e000 {
