@@ -493,6 +493,11 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		pdata->thermal_throttle_record = true;
 	} else
 		info->setting.charging_current_limit1 = info->sc.sc_ibat;
+/* TN Begin modified by xinjun.lu/860715 20241016 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	info->setting.charging_current_limit1 = pdata->charging_current_limit;
+#endif
+/* TN End modified by xinjun.lu/860715 20241016 CR/EKLAMU-202 */
 
 	if (pdata->thermal_input_current_limit != -1) {
 		if (pdata->thermal_input_current_limit <=
@@ -505,6 +510,11 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		pdata->thermal_throttle_record = true;
 	} else
 		info->setting.input_current_limit1 = -1;
+/* TN Begin modified by xinjun.lu/860715 20241016 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	info->setting.input_current_limit1 = pdata->input_current_limit;
+#endif
+/* TN End modified by xinjun.lu/860715 20241016 CR/EKLAMU-202 */
 
 	/* only in pdtest mode */
 	if (pdata->usb_input_current_limit != -1) {
@@ -561,6 +571,11 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		}
 	} else
 		info->setting.charging_current_limit2 = info->sc.sc_ibat;
+/* TN Begin modified by xinjun.lu/860715 20241016 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	info->setting.charging_current_limit2 = pdata2->charging_current_limit;
+#endif
+/* TN End modified by xinjun.lu/860715 20241016 CR/EKLAMU-202 */
 
 	if (pdata2->thermal_input_current_limit != -1) {
 		if (pdata2->thermal_input_current_limit <=
@@ -572,6 +587,11 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		}
 	} else
 		info->setting.input_current_limit2 = -1;
+/* TN Begin modified by xinjun.lu/860715 20241016 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+		info->setting.input_current_limit2 = pdata2->input_current_limit;
+#endif
+/* TN End modified by xinjun.lu/860715 20241016 CR/EKLAMU-202 */
 
 	if (is_basic == true && pdata->input_current_limit_by_aicl != -1
 		&& !info->charger_unlimited

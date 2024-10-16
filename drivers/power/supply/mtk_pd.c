@@ -181,12 +181,17 @@ static int _pd_is_algo_ready(struct chg_alg_device *alg)
 		ret_value = pd_hal_is_adapter_ready(alg);
 		if (ret_value == ALG_READY) {
 			uisoc = pd_hal_get_uisoc(alg);
+/* TN Begin modified by xinjun.lu/860715 20241016 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 			if (pd->input_current_limit1 != -1 ||
 				pd->charging_current_limit1 != -1 ||
 				pd->input_current_limit2 != -1 ||
 				pd->charging_current_limit2 != -1)
 				ret_value = ALG_NOT_READY;
-			else if (uisoc >= pd->pd_stop_battery_soc ||
+			else
+#endif
+/* TN End modified by xinjun.lu/860715 20241016 CR/EKLAMU-202 */
+			if (uisoc >= pd->pd_stop_battery_soc ||
 				(uisoc == -1 && pd->ref_vbat > pd->vbat_threshold))
 				ret_value = ALG_WAIVER;
 		} else if (ret_value == ALG_TA_NOT_SUPPORT)
@@ -990,12 +995,17 @@ static int _pd_start_algo(struct chg_alg_device *alg)
 				pd->state = PD_TA_NOT_SUPPORT;
 			else if (ret_value == ALG_READY) {
 				uisoc = pd_hal_get_uisoc(alg);
+/* TN Begin modified by xinjun.lu/860715 20241016 CR/EKLAMU-202 */
+#if !IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 				if (pd->input_current_limit1 != -1 ||
 					pd->charging_current_limit1 != -1 ||
 					pd->input_current_limit2 != -1 ||
 					pd->charging_current_limit2 != -1)
 					ret_value = ALG_NOT_READY;
-				else if (uisoc >= pd->pd_stop_battery_soc ||
+				else
+#endif
+/* TN End modified by xinjun.lu/860715 20241016 CR/EKLAMU-202 */
+				if (uisoc >= pd->pd_stop_battery_soc ||
 					(uisoc == -1 && pd->ref_vbat > pd->vbat_threshold))
 					ret_value = ALG_WAIVER;
 				else {
