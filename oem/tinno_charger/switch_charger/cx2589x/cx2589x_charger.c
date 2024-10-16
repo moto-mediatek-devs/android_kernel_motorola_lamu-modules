@@ -2560,6 +2560,11 @@ static int cx2589x_driver_probe(struct i2c_client *client,
 #if IS_ENABLED(CONFIG_OEM_DEVINFO)
 	FULL_PRODUCT_DEVICE_INFO(ID_SWITCH_CHARGER, "CX25890H");
 #endif
+/* TN Begin modified by xuan.wang/20241016 CR/EKLAMU-7909 */
+	if (cx->state.vbus_gd) {
+		cx2589x_force_dpdm(cx);
+	}
+/* TN End modified by xuan.wang/20241016 CR/EKLAMU-7909 */
 
 	pr_info("successfully\n");
 
