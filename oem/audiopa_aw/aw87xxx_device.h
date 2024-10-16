@@ -37,12 +37,12 @@
 #define AW_GPIO_HIGHT_LEVEL		(1)
 #define AW_GPIO_LOW_LEVEL		(0)
 
-#define AW_I2C_RETRIES			(5)
-#define AW_I2C_RETRY_DELAY		(2)
+#define AW_I2C_RETRIES			(2)
+#define AW_I2C_RETRY_DELAY		(1)
 #define AW_I2C_READ_MSG_NUM		(2)
 
-#define AW_READ_CHIPID_RETRIES		(5)
-#define AW_READ_CHIPID_RETRY_DELAY	(2)
+#define AW_READ_CHIPID_RETRIES		(2)
+#define AW_READ_CHIPID_RETRY_DELAY	(1)
 #define AW_DEV_REG_CHIPID		(0x00)
 
 #define AW_DEV_REG_INVALID_MASK		(0xff)

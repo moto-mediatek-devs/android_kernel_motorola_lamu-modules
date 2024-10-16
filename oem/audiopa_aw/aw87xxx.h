@@ -33,8 +33,8 @@
 #define AW87XXX_PRIVATE_KCONTROL_NUM	(3)
 #define AW87XXX_PUBLIC_KCONTROL_NUM	(3)
 
-#define AW_I2C_RETRIES			(5)
-#define AW_I2C_RETRY_DELAY		(2)
+#define AW_I2C_RETRIES			(2)
+#define AW_I2C_RETRY_DELAY		(1)
 #define AW_I2C_READ_MSG_NUM		(2)
 
 #define AW87XXX_FW_NAME_MAX		(64)
