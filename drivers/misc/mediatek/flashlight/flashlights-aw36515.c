@@ -97,7 +97,7 @@
 #define AW36515_HW_TIMEOUT 600 /* ms */
 
 
-#define AW_I2C_RETRIES			5
+#define AW_I2C_RETRIES			4
 #define AW_I2C_RETRY_DELAY		2
 
 /* define mutex and work queue */
@@ -477,6 +477,11 @@ int aw36515_init(void)
 	/* clear enable register */
 	reg = AW36515_REG_ENABLE;
 	val = AW36515_DISABLE;
+	aw36515_pinctrl_set(AW36515_PINCTRL_PIN_HWEN, AW36515_PINCTRL_PINSTATE_HIGH);
+	mdelay(2);
+	/* soft rst */
+	aw36515_soft_reset();
+	mdelay(2);
 	ret = aw36515_i2c_write(aw36515_i2c_client, reg, val);
 
 	aw36515_reg_enable = val;
@@ -493,6 +498,7 @@ int aw36515_init(void)
 int aw36515_uninit(void)
 {
 	aw36515_disable(AW36515_CHANNEL_CH1);
+	aw36515_pinctrl_set(AW36515_PINCTRL_PIN_HWEN, AW36515_PINCTRL_PINSTATE_LOW);
 	return 0;
 }
 
@@ -740,17 +746,12 @@ aw36515_i2c_probe(struct i2c_client *client)
 		return rval;
 	}
 
-	aw36515_pinctrl_set(AW36515_PINCTRL_PIN_HWEN, AW36515_PINCTRL_PINSTATE_HIGH);
-
 	chip->pdata = pdata;
 	i2c_set_clientdata(client, chip);
 	aw36515_i2c_client = client;
 
 	/* init mutex and spinlock */
 	mutex_init(&chip->lock);
-
-	/* soft rst */
-	aw36515_soft_reset();
 
 	/* init chip hw */
 	aw36515_chip_init(chip);
