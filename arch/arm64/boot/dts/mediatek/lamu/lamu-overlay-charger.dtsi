@@ -636,4 +636,10 @@
 		sgm,sgm41600,mode = <2>; /*0:off 1:bypass 2: Forward Charge-pump mode */
 	};
 };
+&{/} {
+	charge_misc{
+		compatible = "misc,charge";
+		usb-overtemp-en-gpio = <&pio 159 0>;
+	};
+};
 /*[TN.NJDC] charger overlay file.end*/

@@ -21,3 +21,4 @@ obj-$(CONFIG_OEM_QC_LOGIC) += qc_logic/
 obj-$(CONFIG_OEM_TURBO_CHARGER) += turbo_charger/
 obj-$(CONFIG_OEM_FUEL_GAUGE) += fuel_gauge/
 obj-$(CONFIG_OEM_BATTERY_SWITCH) += battery_switch/
+obj-$(CONFIG_OEM_TINNO_CHARGE_MISC) += charge_misc/

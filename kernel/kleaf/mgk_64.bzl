@@ -2245,6 +2245,7 @@ def get_overlay_modules_list():
         mgk_64_device_modules.append("oem/tinno_charger/charger_pump/cps2011s/cps2011s.ko")
         mgk_64_device_modules.append("oem/tinno_charger/charger_pump/sgm41600s/sgm41600s.ko")
         mgk_64_device_modules.append("oem/tinno_charger/turbo_charger/oem_turbo_charger.ko")
+        mgk_64_device_modules.append("oem/tinno_charger/charge_misc/charge_misc/oem_tinno_charge_misc.ko")
         mgk_64_device_modules.append("oem/sensors/aw_sar/awinic_sar.ko")
         mgk_64_device_modules.append("oem/sensors/hx9031/hx9031_sar.ko")
         mgk_64_device_modules.append("oem/nfc/nxppn560/pn553_i2c.ko")

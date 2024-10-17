@@ -198,3 +198,9 @@ config OEM_PDC_ALGO
 	default n
 	help
 	  support oem_pdc_algo
+
+config OEM_TINNO_CHARGE_MISC
+	tristate "oem tinno charge misc"
+	default n
+	help
+	  support oem_tinno_charge_misc
