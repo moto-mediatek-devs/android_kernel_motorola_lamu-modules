@@ -491,7 +491,7 @@ static __s16 mtk_ts_btsusb_volt_to_temp(__u32 dwVolt)
 	BTSUSB_TMP = mtkts_btsusb_thermistor_conver_temp(TRes);
 	return BTSUSB_TMP;
 }
-static int mtktsusb_get_hw_temp(void)
+int mtktsusb_get_hw_temp(void)
 {
 #if IS_ENABLED(CONFIG_DEVICE_MODULES_MEDIATEK_MT6577_AUXADC)
 	int val = 0;
@@ -579,6 +579,8 @@ static int mtktsusb_get_hw_temp(void)
 								ret, output);
 	return output;
 }
+EXPORT_SYMBOL_GPL(mtktsusb_get_hw_temp);
+
 static int mtktsusb_get_temp(struct thermal_zone_device *thermal, int *t)
 {
 	*t = mtktsusb_get_hw_temp() * 1000;
