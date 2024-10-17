@@ -31,6 +31,21 @@
 
 static struct situation_init_info flip_hub_init_info;
 
+//TN Begin modified by jiawei.zou 20241016 for flip onchanged report Begin
+static int last_data = -1;
+static int flip_data_report(int32_t value,int64_t time_stamp)
+{
+	pr_err("zjw enter %s value =%d last_data = %d !!\n",__func__,value,last_data);
+	int err =0;
+	if(value != last_data){
+		err = situation_data_report_t(ID_FLIP, value, time_stamp);
+		last_data = value;
+	}
+	//pr_err("%s last_data = %d \n",__func__,last_data);
+	return err;
+}
+//TN Begin modified by jiawei.zou 20241016 for flip onchanged report End
+
 static int flip_get_data(int *probability, int *status)
 {
 	int err = 0;
@@ -58,6 +73,8 @@ static int flip_open_report_data(int open)
 #else
 
 #endif
+	if(!open)
+		last_data = -1;//disable reset to -1
 	ret = sensor_enable_to_hub(ID_FLIP, open);
 	return ret;
 }
@@ -75,7 +92,7 @@ static int flip_recv_data(struct data_unit_t *event,
 	if (event->flush_action == FLUSH_ACTION)
 		pr_err("flip do not support flush\n");
 	else if (event->flush_action == DATA_ACTION)
-		err = situation_data_report_t(ID_FLIP,event->flip_t.state,
+		err = flip_data_report(event->flip_t.state,
 			(int64_t)event->time_stamp);
 	return err;
 }

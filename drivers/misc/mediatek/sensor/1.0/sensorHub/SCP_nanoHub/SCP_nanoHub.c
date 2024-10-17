@@ -886,7 +886,7 @@ static void SCP_sensorHub_init_sensor_state(void)
 	mSensorState[SENSOR_TYPE_SIGNIFICANT_MOVE].timestamp_filter = false;
 
 	mSensorState[SENSOR_TYPE_FLIP].sensorType = SENSOR_TYPE_FLIP;
-	mSensorState[SENSOR_TYPE_FLIP].rate = SENSOR_RATE_ONESHOT;
+	mSensorState[SENSOR_TYPE_FLIP].rate = SENSOR_RATE_ONCHANGE;
 	mSensorState[SENSOR_TYPE_FLIP].timestamp_filter = false;
 
 	mSensorState[SENSOR_TYPE_TAP_TAP].sensorType = SENSOR_TYPE_TAP_TAP;
