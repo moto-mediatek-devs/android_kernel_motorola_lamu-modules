@@ -2219,6 +2219,7 @@ def get_overlay_modules_list():
 
     if "lamu_overlay.config" in DEFCONFIG_OVERLAYS:
         mgk_64_device_modules.append("oem/devinfo/oem_devinfo.ko")
+        mgk_64_device_modules.append("oem/panel/ocp2131_i2c.ko")
         mgk_64_device_modules.append("oem/panel/dsi_panel_boe_icnl9922c_672_1080x2400_vdo_60hz/dsi_panel_boe_icnl9922c_672_1080x2400_vdo_60hz.ko")
         mgk_64_device_modules.append("oem/panel/dsi_panel_tm_td4376_672_1080x2400_vdo_60hz/dsi_panel_tm_td4376_672_1080x2400_vdo_60hz.ko")
         mgk_64_device_modules.append("oem/panel/dsi_panel_djn_nt36672s_672_1080x2400_vdo_60hz/dsi_panel_djn_nt36672s_672_1080x2400_vdo_60hz.ko")

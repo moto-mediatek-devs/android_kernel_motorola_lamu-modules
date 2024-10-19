@@ -717,6 +717,7 @@ static int djn_unprepare(struct drm_panel *panel)
 	is_suspend = 1;
 
 	djn_dcs_write_seq_static(ctx, 0xAC,0x0A,0x00);
+	djn_dcs_write_seq_static(ctx, 0x51,0x00,0x00);
 	djn_dcs_write_seq_static(ctx, 0x28);
 	msleep(20);
 	djn_dcs_write_seq_static(ctx, 0x10);

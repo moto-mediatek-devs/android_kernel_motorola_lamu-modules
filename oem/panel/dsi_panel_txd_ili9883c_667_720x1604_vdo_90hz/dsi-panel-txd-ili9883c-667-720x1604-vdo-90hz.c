@@ -23,6 +23,7 @@
 #include <linux/platform_device.h>
 #include <linux/proc_fs.h>
 #include "../backlight_i2c_map.h"
+#include "../ocp2131_i2c.h"
 
 #define CONFIG_MTK_PANEL_EXT
 #if defined(CONFIG_MTK_PANEL_EXT)
@@ -46,6 +47,8 @@ EXPORT_SYMBOL(txd_ili_gesture_mode);
 #endif
 void (*lcd_ili_resume_by_ddi)(void);
 EXPORT_SYMBOL(lcd_ili_resume_by_ddi);
+
+#define OCP2131_REG_WRITE(add, data)	ocp2131_i2c_write_byte(add, data)
 
 int hbm;
 bool is_hbm;
@@ -613,6 +616,9 @@ static int txd_prepare(struct drm_panel *panel)
 	gpiod_set_value(ctx->bias_pos, 1);
 	devm_gpiod_put(ctx->dev, ctx->bias_pos);
 
+	OCP2131_REG_WRITE(0x00, 0x14);
+	udelay(2000);
+	OCP2131_REG_WRITE(0x01, 0x14);
 	udelay(5 * 1000);
 
 	ctx->bias_neg = devm_gpiod_get_index(ctx->dev,

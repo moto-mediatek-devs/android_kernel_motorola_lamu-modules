@@ -2,6 +2,8 @@
 subdir-ccflags-y += -Werror -I$(srctree)/drivers/gpu/drm/panel
 subdir-ccflags-y += -Werror -I$(srctree)/drivers/gpu/drm/mediatek/mediatek_v2/
 
+obj-$(CONFIG_OEM_LAMU_PANEL) += ocp2131_i2c.o
+
 ifdef CONFIG_OEM_PANEL
 	obj-y += panel_boe_ili9883c_vdo/
 	obj-y += panel_djin_ft8057s_vdo/

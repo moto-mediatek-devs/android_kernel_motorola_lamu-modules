@@ -23,6 +23,7 @@
 #include <linux/platform_device.h>
 #include <linux/proc_fs.h>
 #include "../backlight_i2c_map.h"
+#include "../ocp2131_i2c.h"
 
 #define CONFIG_MTK_PANEL_EXT
 #if defined(CONFIG_MTK_PANEL_EXT)
@@ -49,6 +50,8 @@ void (*lcd_nvt_resume_nt36528a)(void);
 EXPORT_SYMBOL(lcd_nvt_resume_nt36528a);
 int nt36528a_lcd_id = 0;
 EXPORT_SYMBOL(nt36528a_lcd_id);
+
+#define OCP2131_REG_WRITE(add, data)	ocp2131_i2c_write_byte(add, data)
 
 int hbm;
 bool is_hbm;
@@ -241,7 +244,11 @@ static void tianma_panel_init(struct tianma *ctx)
 	gpiod_set_value(ctx->reset_gpio, 1);
 	udelay(5 * 1000);
 	gpiod_set_value(ctx->reset_gpio, 0);
-	udelay(2 * 1000);
+	udelay(5 * 1000);
+	gpiod_set_value(ctx->reset_gpio, 1);
+	udelay(5 * 1000);
+	gpiod_set_value(ctx->reset_gpio, 0);
+	udelay(5 * 1000);
 	gpiod_set_value(ctx->reset_gpio, 1);
 	udelay(10 * 1000);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
@@ -289,6 +296,7 @@ static int tianma_unprepare(struct drm_panel *panel)
 
 	is_suspend = 1;
 
+	tianma_dcs_write_seq_static(ctx, 0x51,0x00,0x00);
 	tianma_dcs_write_seq_static(ctx, 0x28);
 	msleep(1);
 	tianma_dcs_write_seq_static(ctx, 0x10);
@@ -308,7 +316,7 @@ static int tianma_unprepare(struct drm_panel *panel)
 #if defined(CONFIG_RT5081_PMU_DSV) || defined(CONFIG_MT6370_PMU_DSV)
 	tianma_panel_bias_disable();
 #else
-#if 0
+
 	ctx->reset_gpio =
 		devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(ctx->reset_gpio)) {
@@ -320,7 +328,6 @@ static int tianma_unprepare(struct drm_panel *panel)
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 
 	udelay(10000);
-#endif
 
 	ctx->bias_neg = devm_gpiod_get_index(ctx->dev,
 		"bias", 1, GPIOD_OUT_HIGH);
@@ -406,7 +413,6 @@ static int tianma_prepare(struct drm_panel *panel)
 	devm_gpiod_put(ctx->dev, ctx->vddio_gpio);
 
 	udelay(5000);
-#endif
 
 	ctx->reset_gpio =
 		devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
@@ -419,6 +425,7 @@ static int tianma_prepare(struct drm_panel *panel)
 	gpiod_set_value(ctx->reset_gpio, 0);
 	udelay(5 * 1000);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
+#endif
 
 #if defined(CONFIG_RT5081_PMU_DSV) || defined(CONFIG_MT6370_PMU_DSV)
 	tianma_panel_bias_enable();
@@ -433,6 +440,9 @@ static int tianma_prepare(struct drm_panel *panel)
 	gpiod_set_value(ctx->bias_pos, 1);
 	devm_gpiod_put(ctx->dev, ctx->bias_pos);
 
+	OCP2131_REG_WRITE(0x00, 0x14);
+	udelay(2000);
+	OCP2131_REG_WRITE(0x01, 0x14);
 	udelay(5 * 1000);
 
 	ctx->bias_neg = devm_gpiod_get_index(ctx->dev,
