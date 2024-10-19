@@ -15,9 +15,10 @@
 #endif /* CONFIG_OEM_DEVINFO */
 extern int mtktsusb_get_hw_temp(void);
 #define USB_FAKE_TEMP_INVALID_NUM  0xFFFF
-#define USB_HIGH_TEMP_THRES        70000 //unit: 0.001C
-#define USB_INPUT_RESUME_TEMP      60000 //unit: 0.001C
-#define USB_TEMP_CHECK_INTERVAL_MS 2000 //2s
+#define USB_HIGH_TEMP_THRES        70            //unit: 1C
+#define USB_INPUT_RESUME_TEMP      60            //unit: 1C
+#define USB_TEMP_CHECK_TRIGGER_INTERVAL_MS 1000  //1s
+#define USB_TEMP_CHECK_INTERVAL_MS 10000         //10s
 
 struct usb_hightemp_prot {
 	int usb_overtemp_en_gpio;
@@ -164,7 +165,10 @@ static void usb_temp_check_dwork_handler(struct work_struct *work)
 		pr_err("%s: temp = %d, disable the usb input!!!\n", __func__, temp);
 	}
 
-	schedule_delayed_work(&info->usb_temp_check_dwork, msecs_to_jiffies(USB_TEMP_CHECK_INTERVAL_MS));
+	if (info->uhp.usb_input_off)
+		schedule_delayed_work(&info->usb_temp_check_dwork, msecs_to_jiffies(USB_TEMP_CHECK_TRIGGER_INTERVAL_MS));
+	else
+		schedule_delayed_work(&info->usb_temp_check_dwork, msecs_to_jiffies(USB_TEMP_CHECK_INTERVAL_MS));
 }
 
 static int charge_misc_probe(struct platform_device *pdev)
