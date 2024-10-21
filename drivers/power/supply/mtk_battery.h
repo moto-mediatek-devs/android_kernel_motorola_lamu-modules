@@ -188,6 +188,11 @@ struct battery_data {
 	/* Add for Battery Service */
 	int bat_batt_vol;
 	int bat_batt_temp;
+/* TN Begin modified by xinjun.lu/860715 20241021 CR/EKLAMU-8210 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	struct mutex external_power_changed_lock;
+#endif
+/* TN End modified by xinjun.lu/860715 20241021 CR/EKLAMU-8210 */
 };
 
 struct VersionControl {

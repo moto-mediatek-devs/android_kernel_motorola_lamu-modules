@@ -1368,6 +1368,11 @@ static void mtk_battery_external_power_changed(struct power_supply *psy)
 	struct power_supply *chg_psy = NULL;
 	struct power_supply *dv2_chg_psy = NULL;
 	int ret = 0;
+/* TN Begin modified by xinjun.lu/860715 20241021 CR/EKLAMU-8210 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	int bat_status_temp = 0;
+#endif
+/* TN End modified by xinjun.lu/860715 20241021 CR/EKLAMU-8210 */
 
 	bm = psy->drv_data;
 	bs_data = &bm->bs_data;
@@ -1386,7 +1391,11 @@ static void mtk_battery_external_power_changed(struct power_supply *psy)
 			return;
 		}
 	}
-
+/* TN Begin modified by xinjun.lu/860715 20241021 CR/EKLAMU-8210 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	mutex_lock(&bs_data->external_power_changed_lock);
+#endif
+/* TN End modified by xinjun.lu/860715 20241021 CR/EKLAMU-8210 */
 	if (IS_ERR_OR_NULL(chg_psy)) {
 		chg_psy = devm_power_supply_get_by_phandle(bm->dev,
 						       "charger");
@@ -1420,21 +1429,40 @@ static void mtk_battery_external_power_changed(struct power_supply *psy)
 			bs_data->bat_status = POWER_SUPPLY_STATUS_DISCHARGING;
 		} else {
 			if (status.intval == POWER_SUPPLY_STATUS_NOT_CHARGING) {
+/* TN Begin modified by xinjun.lu/860715 20241021 CR/EKLAMU-8210 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+				bat_status_temp =
+					POWER_SUPPLY_STATUS_NOT_CHARGING;
+#else
 				bs_data->bat_status =
 					POWER_SUPPLY_STATUS_NOT_CHARGING;
+#endif
+/* TN End modified by xinjun.lu/860715 20241021 CR/EKLAMU-8210 */
 
 				dv2_chg_psy = power_supply_get_by_name("mtk-mst-div-chg");
 				if (!IS_ERR_OR_NULL(dv2_chg_psy)) {
 					ret = power_supply_get_property(dv2_chg_psy,
 						POWER_SUPPLY_PROP_ONLINE, &online);
 					if (online.intval) {
+/* TN Begin modified by xinjun.lu/860715 20241021 CR/EKLAMU-8210 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+						bat_status_temp =
+							POWER_SUPPLY_STATUS_CHARGING;
+#else
 						bs_data->bat_status =
 							POWER_SUPPLY_STATUS_CHARGING;
+#endif
+/* TN End modified by xinjun.lu/860715 20241021 CR/EKLAMU-8210 */
 						status.intval =
 							POWER_SUPPLY_STATUS_CHARGING;
 					}
 					power_supply_put(dv2_chg_psy);
 				}
+/* TN Begin modified by xinjun.lu/860715 20241021 CR/EKLAMU-8210 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+				bs_data->bat_status = bat_status_temp;
+#endif
+/* TN End modified by xinjun.lu/860715 20241021 CR/EKLAMU-8210 */
 /* TN Begin modified by xinjun.lu/860715 20240911 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 			} else if (status.intval == POWER_SUPPLY_STATUS_DISCHARGING) {
@@ -1498,6 +1526,11 @@ static void mtk_battery_external_power_changed(struct power_supply *psy)
 		old_vbat0, vbat0.intval);
 
 	bm->chr_type = cur_chr_type;
+/* TN Begin modified by xinjun.lu/860715 20241021 CR/EKLAMU-8210 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	mutex_unlock(&bs_data->external_power_changed_lock);
+#endif
+/* TN End modified by xinjun.lu/860715 20241021 CR/EKLAMU-8210 */
 }
 
 void bm_battery_service_init(struct mtk_battery_manager *bm)
@@ -1532,7 +1565,11 @@ void bm_battery_service_init(struct mtk_battery_manager *bm)
 	bm->gm1->fixed_uisoc = 0xffff;
 	if (bm->gm_no == 2)
 		bm->gm2->fixed_uisoc = 0xffff;
-
+/* TN Begin modified by xinjun.lu/860715 20241021 CR/EKLAMU-8210 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	mutex_init(&bs_data->external_power_changed_lock);
+#endif
+/* TN End modified by xinjun.lu/860715 20241021 CR/EKLAMU-8210 */
 	mtk_battery_external_power_changed(bm->bs_data.psy);
 }
 
