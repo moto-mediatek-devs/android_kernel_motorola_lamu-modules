@@ -740,8 +740,15 @@ static int pd_sc_set_charger(struct chg_alg_device *alg)
 
 	mutex_lock(&pd->data_lock);
 	if (pd->charging_current_limit1 != -1) {
+/* TN Begin modified by xinjun.lu/860715 20240718 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+		if (pd->charging_current_limit1 <=
+			pd->sc_charger_current)
+#else
 		if (pd->charging_current_limit1 <
 			pd->sc_charger_current)
+#endif
+/* TN End modified by xinjun.lu/860715 20240718 CR/EKLAMU-202 */
 			pd->charging_current1 =
 				pd->charging_current_limit1;
 		ret = pd_hal_get_min_charging_current(alg, CHG1, &ichg1_min);
@@ -752,7 +759,13 @@ static int pd_sc_set_charger(struct chg_alg_device *alg)
 		pd->charging_current1 = pd->sc_charger_current;
 
 	if (pd->input_current_limit1 != -1 &&
+/* TN Begin modified by xinjun.lu/860715 20240718 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+		pd->input_current_limit1 <=
+#else
 		pd->input_current_limit1 <
+#endif
+/* TN Begin modified by xinjun.lu/860715 20240718 CR/EKLAMU-202 */
 		pd->sc_input_current) {
 		pd->input_current1 = pd->input_current_limit1;
 		ret = pd_hal_get_min_input_current(alg, CHG1, &aicr1_min);
