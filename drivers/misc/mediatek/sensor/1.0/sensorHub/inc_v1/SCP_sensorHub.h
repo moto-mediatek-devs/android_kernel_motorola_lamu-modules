@@ -128,7 +128,9 @@ struct floor_counter_event_t {
 enum gesture_type_t {
 	GESTURE_NONE,
 	SHAKE,
+#if IS_ENABLED(CONFIG_MTK_TAP_TAP_HUB)
 	TAP,
+#endif
 	TWIST,
 	FLIP,
 	SNAPSHOT,
@@ -195,9 +197,12 @@ struct flip_event_t {
 	int32_t state;		/* 1,2 */
 };
 
+#if IS_ENABLED(CONFIG_MTK_TAP_TAP_HUB)
 struct taptap_event_t {
 	int32_t state;		/* 1,2,3 */
 };
+#endif
+
 /*TN Begin modified by jiawei.zou 20240909 EKLAMU-207 end*/
 struct in_pocket_event_t {
 	int32_t state;		/* 0,1 */
@@ -282,7 +287,9 @@ struct data_unit_t {
 // -20240617 wnn add mtk sensor 1.0 flicker support end
 /*TN Begin modified by jiawei.zou 20240909 EKLAMU-207 begin*/
 		struct flip_event_t flip_t;
+#if IS_ENABLED(CONFIG_MTK_TAP_TAP_HUB)
 		struct taptap_event_t taptap_t;
+#endif
 /*TN Begin modified by jiawei.zou 20240909 EKLAMU-207 end*/
 		int32_t data[8];
 	};

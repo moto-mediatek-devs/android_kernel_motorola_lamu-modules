@@ -6,7 +6,9 @@
 #define pr_fmt(fmt) "<SITUATION> " fmt
 
 #include "situation.h"
+#if IS_ENABLED(CONFIG_MTK_TAP_TAP_HUB)
 #include "../sensorHub/inc_v1/SCP_sensorHub.h"/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449*/
+#endif
 
 static struct situation_context *situation_context_obj;
 
@@ -92,9 +94,11 @@ static int handle_to_index(int handle)
 	case ID_FLIP:
 		index = flip;
 		break;
+#if IS_ENABLED(CONFIG_MTK_TAP_TAP_HUB)
 	case ID_TAP_TAP:
 		index = tap_tap;
 		break;
+#endif
 /*TN Begin modified by jiawei.zou 20220825 EKLAMU-207 end*/
 	default:
 		index = -1;
@@ -183,7 +187,7 @@ int rearals_cali_report(int *value)
 }
 EXPORT_SYMBOL_GPL(rearals_cali_report);
 //TN End modified by jiawei.zou 20240802 for rearals_cali
-
+#if IS_ENABLED(CONFIG_MTK_TAP_TAP_HUB)
 /*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 start*/
 int taptap_cali_report(int *value)
 {
@@ -199,6 +203,7 @@ int taptap_cali_report(int *value)
 }
 EXPORT_SYMBOL_GPL(taptap_cali_report);
 /*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 end*/
+#endif
 
 int situation_notify_t(int handle, int64_t time_stamp)
 {
@@ -480,6 +485,7 @@ static ssize_t situdevnum_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%d\n", 0);	/* TODO: why +5? */
 }
 
+#if IS_ENABLED(CONFIG_MTK_TAP_TAP_HUB)
 /*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 start*/
 static ssize_t taptap_set_cali_store(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
@@ -506,6 +512,7 @@ static ssize_t taptap_set_cali_store(struct device *dev,
 
 }
 /*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 end*/
+#endif
 
 static int situation_real_driver_init(void)
 {
@@ -599,7 +606,9 @@ static int situation_misc_init(struct situation_context *cxt)
 DEVICE_ATTR_RW(situactive);
 DEVICE_ATTR_RW(situbatch);
 DEVICE_ATTR_RW(situflush);
+#if IS_ENABLED(CONFIG_MTK_TAP_TAP_HUB)
 DEVICE_ATTR_WO(taptap_set_cali);/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449*/
+#endif
 DEVICE_ATTR_RO(situdevnum);
 
 static struct attribute *situation_attributes[] = {
@@ -607,7 +616,9 @@ static struct attribute *situation_attributes[] = {
 	&dev_attr_situbatch.attr,
 	&dev_attr_situflush.attr,
 	&dev_attr_situdevnum.attr,
+#if IS_ENABLED(CONFIG_MTK_TAP_TAP_HUB)
 	&dev_attr_taptap_set_cali.attr,/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449*/
+#endif
 	NULL
 };
 

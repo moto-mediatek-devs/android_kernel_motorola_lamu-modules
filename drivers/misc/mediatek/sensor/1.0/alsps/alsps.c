@@ -660,6 +660,7 @@ static ssize_t rearalscali_store(struct device *dev,
 }
 /* -20240617 wnn add mtk sensor 1.0 flicker support end */
 
+#if IS_ENABLED(CONFIG_MTK_TAP_TAP_HUB)
 /*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 start*/
 static ssize_t taptapset_store(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
@@ -685,6 +686,7 @@ static ssize_t taptapset_store(struct device *dev,
 	return count;
 }
 /*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 end*/
+#endif
 
 #if !IS_ENABLED(CONFIG_NANOHUB) || !IS_ENABLED(CONFIG_MTK_ALSPSHUB)
 static int ps_enable_and_batch(void)
@@ -1046,9 +1048,11 @@ DEVICE_ATTR_WO(alscali);
 /* +20240617 wnn add mtk sensor 1.0 flicker support start */
 DEVICE_ATTR_WO(rearalscali);
 /* -20240617 wnn add mtk sensor 1.0 flicker support end */
+#if IS_ENABLED(CONFIG_MTK_TAP_TAP_HUB)
 /*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 start*/
 DEVICE_ATTR_WO(taptapset);
 /*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 end*/
+#endif
 DEVICE_ATTR_RW(psactive);
 DEVICE_ATTR_RW(psbatch);
 DEVICE_ATTR_RW(psflush);
@@ -1064,9 +1068,11 @@ static struct attribute *als_attributes[] = {
 	/* +20240617 wnn add mtk sensor 1.0 flicker support start */
 	&dev_attr_rearalscali.attr,
 	/* -20240617 wnn add mtk sensor 1.0 flicker support end */
+#if IS_ENABLED(CONFIG_MTK_TAP_TAP_HUB)
 	/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 start*/
 	&dev_attr_taptapset.attr,
 	/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 end*/
+#endif
 	NULL
 };
 
@@ -1222,9 +1228,11 @@ int als_register_control_path(struct als_control_path *ctl)
 	cxt->als_ctl.set_cali = ctl->set_cali;
 	/* -20240617 wnn add mtk sensor 1.0 flicker support end */
 	cxt->als_ctl.rearset_cali = ctl->rearset_cali;
+#if IS_ENABLED(CONFIG_MTK_TAP_TAP_HUB)
 	/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 start*/
 	cxt->als_ctl.taptap_set = ctl->taptap_set;
 	/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 end*/
+#endif
 	cxt->als_ctl.rgbw_enable = ctl->rgbw_enable;
 	cxt->als_ctl.rgbw_batch = ctl->rgbw_batch;
 	cxt->als_ctl.rgbw_flush = ctl->rgbw_flush;

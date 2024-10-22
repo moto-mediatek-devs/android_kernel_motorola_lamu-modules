@@ -64,7 +64,9 @@ struct als_control_path {
 	int (*rearset_cali)(uint8_t *data, uint8_t count);
 	/* -20240617 wnn add mtk sensor 1.0 flicker support end */
 	/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 start*/
+#if IS_ENABLED(CONFIG_MTK_TAP_TAP_HUB)
 	int (*taptap_set)(uint8_t *data, uint8_t count);
+#endif
 	/*TN add taptap by jiawei.zou 20240831 EKLAMU-1449 end*/
 	int (*rgbw_enable)(int en);
 	int (*rgbw_batch)(int flag, int64_t samplingPeriodNs,
