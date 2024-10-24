@@ -45,6 +45,7 @@
 		trans-bits = <8>;
 		max-brightness = <255>;
 		max-hw-brightness = <255>;
+		min-hw-brightness = <1>;
 		default-state = "on";
 	};
 };
