@@ -1372,6 +1372,7 @@ transparent_hugepage=never";
 		compatible = "mediatek,sleep";
 		reg = <0 0x10006000 0 0x1000>;
 		interrupts = <GIC_SPI 195 IRQ_TYPE_LEVEL_HIGH 0>;
+		dvfsrc-vcore-supply = <&dvfsrc_vcore>;
 	};
 
 	toprgu:toprgu@10007000 {
