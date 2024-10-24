@@ -63,6 +63,7 @@
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 #include "../../../oem/tinno_charger/tinno_charger.h"
 #define RECHARGE_CAPACITY 95
+#define RECHARGE_OVER_TEMP_GAP 5
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240729 CR/EKLAMU-202 */
 
@@ -671,14 +672,13 @@ static int do_algorithm(struct mtk_charger *info)
 	pdata = &info->chg_data[CHG1_SETTING];
 /*TN Begin modified by hao.jia/809321 20240909 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
-	if ((turbo_charger_active == true) && (info->sw_jeita.sm == TEMP_T2_TO_T3)) {
+	if (turbo_charger_active == true) {
 		if (info->pres_chrg_step == STEP_FULL) {
 			chg_done = true;
 			ffc_batt_full = true;
 			ffc_reduce_count = 0;
 			chr_info("%s:ffc battery chg_done\n", __func__);
-		} else
-			ffc_batt_full = false;
+		}
 	} else
 #endif /* CONFIG_OEM_TURBO_CHARGER */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
@@ -694,11 +694,20 @@ static int do_algorithm(struct mtk_charger *info)
 
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 	uisoc = get_uisoc(info);
+	if (chg_done && !info->is_chg_done) {
+		info->charge_full_soc_for_over_temp = uisoc;
+	}
 
-	/* Recharge condition */
-	if (uisoc <= RECHARGE_CAPACITY && info->is_chg_done) {
+	/* step 1:Recharge condition */
+	if (info->is_chg_done &&
+		((uisoc <= RECHARGE_CAPACITY &&
+			info->battery_temp >= BATTERY_TEMP_LOW &&
+			info->battery_temp <= BATTERY_TEMP_HIGH)
+			|| (uisoc <= info->charge_full_soc_for_over_temp - RECHARGE_OVER_TEMP_GAP &&
+			(info->battery_temp < BATTERY_TEMP_LOW ||
+			info->battery_temp > BATTERY_TEMP_HIGH)))) {
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
-		if ((turbo_charger_active == true) && (info->sw_jeita.sm == TEMP_T2_TO_T3)) {
+		if (turbo_charger_active == true) {
 			if (info->pres_chrg_step == STEP_FULL) {
 				info->pres_chrg_step = STEP_NORM;
 				ffc_batt_full = false;
@@ -714,7 +723,7 @@ static int do_algorithm(struct mtk_charger *info)
 		}
 	}
 
-	/* Plug out charging condition */
+	/* step 2:Plug out recharging condition */
 	if (!chg_done && info->is_chg_done) {
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
 		if (info->pres_chrg_step != STEP_FULL)

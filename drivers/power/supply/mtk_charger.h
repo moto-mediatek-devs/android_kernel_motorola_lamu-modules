@@ -124,6 +124,11 @@ struct charger_data;
 
 #define RESET_BOOT_VOLT_TIME 50
 
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) || IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
+#define BATTERY_TEMP_LOW		0
+#define BATTERY_TEMP_HIGH		45
+#endif
+
 /*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
 struct ffc_bat_zone {
@@ -760,6 +765,7 @@ struct mtk_charger {
 	bool demo_mode_limit;
 	struct mtk_battery_manager *bm;
 	int ignore_current_check_time;
+	int charge_full_soc_for_over_temp;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240924 CR/EKLAMU-202 */
 	//struct pe50_charger_cfg pe50;

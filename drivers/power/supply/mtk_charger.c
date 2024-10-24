@@ -98,6 +98,7 @@ EXPORT_SYMBOL(is_qc3_charger_ready);
 extern bool turbo_charger_active;
 extern int ffc_reduce_count;
 extern bool is_turbo_charger_ready;
+extern bool ffc_batt_full;
 static unsigned int turbo_power_mode = 0;
 static unsigned int turbo_test_mode = 0;
 #endif /* CONFIG_OEM_TURBO_CHARGER */
@@ -141,7 +142,7 @@ static bool first_insert = true;
 #endif
 /* TN End modified by xinjun.lu/860715 20240808 CR/EKLAMU-202 */
 /* TN Begin modified by jirui.li/860702 20240904 CR/EKLAMU-1339 */
-#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) || IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
 #define BATTERY_PROTECT_MAX_SOC		80
 #define BATTERY_PROTECT_MIN_SOC		20
 #define BATTERY_CHARGING_FULL_SOC	100
@@ -4318,6 +4319,7 @@ static void charger_check_status(struct mtk_charger *info)
 	bool devchg1_en = false;
 	int batt_ma = get_battery_current(info);
 	int vbat = get_battery_voltage(info);
+	int target_fv = 0;
 #endif
 /* TN End modified by xinjun.lu/860715 20241011 CR/EKLAMU-202 */
 
@@ -4472,9 +4474,14 @@ static void charger_check_status(struct mtk_charger *info)
 		charger_dev_is_enabled(info->dvchg1_dev, &devchg1_en);
 
 	if (chg_dev_chgen && !devchg1_en) {
-		if (info->pe50.pres_chrg_step != STEP_FULL_PE50 || info->pres_chrg_step != STEP_FULL) {
+		if (info->pe50.pres_chrg_step != STEP_FULL_PE50) {
+			if (temperature < BATTERY_TEMP_LOW || temperature > BATTERY_TEMP_HIGH) {
+				target_fv = pe50_get_ffc_fv(info, temperature);
+				info->data.battery_cv = target_fv * 1000;
+			}
+
 			if (info->ignore_current_check_time > IGNORE_CURRENT_CHECK_TIME_MAX
-				&& uisoc ==  BATTERY_CHARGING_FULL_SOC
+				&& (uisoc == BATTERY_CHARGING_FULL_SOC || temperature < BATTERY_TEMP_LOW || temperature > BATTERY_TEMP_HIGH)
 				&& vbat > (info->data.battery_cv / 1000) - BATTERY_CV_GAP
 				&& pe50_has_current_tapered(info, batt_ma, info->pe50.chrg_iterm))
 				info->pe50.pres_chrg_step = STEP_FULL_PE50;
@@ -4482,7 +4489,7 @@ static void charger_check_status(struct mtk_charger *info)
 			if (info->ignore_current_check_time <= IGNORE_CURRENT_CHECK_TIME_MAX)
 				info->ignore_current_check_time++;
 		}
-		chr_info("chrg_iterm=%d batt_ma=%d pres_chrg_step=%d time=%d vbat=%d uisoc=%d battery_cv=%d\n",
+		chr_err("chrg_iterm=%d batt_ma=%d pres_chrg_step=%d time=%d vbat=%d uisoc=%d battery_cv=%d\n",
 				info->pe50.chrg_iterm, batt_ma, info->pe50.pres_chrg_step,
 				info->ignore_current_check_time, vbat, uisoc, info->data.battery_cv);
 	}
@@ -5012,6 +5019,8 @@ static int mtk_charger_plug_out(struct mtk_charger *info)
 /*TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202*/
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
 	qc3p_charger_ready = 0;
+	ffc_batt_full = false;
+	info->pres_chrg_step = false;
 #endif /* CONFIG_OEM_TURBO_CHARGER */
 /*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202*/
 	if (info->enable_vbat_mon)
@@ -5353,7 +5362,9 @@ static int ffc_bat_check_chg_done(struct mtk_charger *info)
 		if (batt_mv < (target_mv  - FFC_RECHG_VOLT_MV / 2)) {
 			info->chrg_taper_cnt = 0;
 			info->pres_chrg_step = STEP_NORM;
-		} else if (ffc_bat_check_chg_tapered(info, batt_ma, info->chrg_iterm))
+		} else if (ffc_bat_check_chg_tapered(info, batt_ma, info->chrg_iterm) &&
+				(batt_soc == BATTERY_CHARGING_FULL_SOC || batt_temp < BATTERY_TEMP_LOW || batt_temp > BATTERY_TEMP_HIGH)&&
+				batt_mv > info->target_mv - BATTERY_CV_GAP)
 			info->pres_chrg_step = STEP_FULL;
 	} else if (info->pres_chrg_step == STEP_FULL) {
 		if (batt_mv < (target_mv - FFC_RECHG_VOLT_MV)) {
@@ -5517,10 +5528,7 @@ static int charger_routine_thread(void *arg)
 			charger_status_check(info);
 /* TN Begin modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TURBO_CHARGER)
-			if (turbo_charger_active == true
-				&& info->sw_jeita.sm == TEMP_T2_TO_T3
-				&& (info->chg_data[CHG1_SETTING].thermal_charging_current_limit > 500000
-				|| info->chg_data[CHG1_SETTING].thermal_charging_current_limit == -1)) {
+			if (turbo_charger_active == true) {
 				ret = ffc_bat_check_chg_done(info);
 				if (ret < 0)
 					chr_err("ffc_bat_check_chg_done ERR(%d)!!!\n", ret);
