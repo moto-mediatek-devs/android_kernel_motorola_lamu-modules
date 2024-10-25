@@ -586,6 +586,8 @@ done:
 
 void (*lcd_esd_resume)(bool);
 EXPORT_SYMBOL(lcd_esd_resume);
+int in_esd_recovery_flg = 0;
+EXPORT_SYMBOL(in_esd_recovery_flg);
 int mtk_drm_esd_testing_process(struct mtk_drm_esd_ctx *esd_ctx, bool need_lock)
 {
 		struct mtk_drm_private *private = NULL;
@@ -593,7 +595,7 @@ int mtk_drm_esd_testing_process(struct mtk_drm_esd_ctx *esd_ctx, bool need_lock)
 		struct mtk_drm_crtc *mtk_crtc = NULL;
 		int ret = 0;
 		int i = 0;
-		int recovery_flg = 0;
+
 		unsigned int crtc_idx = 0;
 
 		if (!esd_ctx) {
@@ -633,6 +635,7 @@ int mtk_drm_esd_testing_process(struct mtk_drm_esd_ctx *esd_ctx, bool need_lock)
 
 			DDPPR_ERR("[ESD%u]esd check fail, will do esd recovery. try=%d\n",
 				crtc_idx, i);
+			in_esd_recovery_flg = 1;
 			if(lcd_esd_resume)
 				lcd_esd_resume(false);
 			mtk_drm_esd_recover(crtc);
@@ -640,7 +643,6 @@ int mtk_drm_esd_testing_process(struct mtk_drm_esd_ctx *esd_ctx, bool need_lock)
 				lcd_esd_resume(true);
 			// TN modified by kexin.wang/860557 20240705 CR/EKLAMU-838
 			need_setbacklight = 1;
-			recovery_flg = 1;
 			mtk_drm_trace_end();
 		} while (++i < ESD_TRY_CNT);
 
@@ -655,9 +657,9 @@ int mtk_drm_esd_testing_process(struct mtk_drm_esd_ctx *esd_ctx, bool need_lock)
 				DDP_COMMIT_UNLOCK(&private->commit.lock, __func__, __LINE__);
 			}
 			return 0;
-		} else if (recovery_flg && ret == 0) {
+		} else if (in_esd_recovery_flg && ret == 0) {
 			DDPPR_ERR("[ESD%u] esd recovery success\n", crtc_idx);
-			recovery_flg = 0;
+			in_esd_recovery_flg = 0;
 			atomic_set(&mtk_crtc->esd_notice_status, 0);
 		}
 		mtk_drm_trace_end("esd");

@@ -322,7 +322,7 @@ static int boe_unprepare(struct drm_panel *panel)
 
 #ifdef TINNO_LCM_OEM_CONFIG
 	// gesture_mode = fts_lcd_gesture_control();
-	if(boe_cts_gesture_mode) {
+	if(boe_cts_gesture_mode && !in_esd_recovery_flg) {
 		pr_info("%s icnl9922c Skip Power Control !\n", __func__);
 		return 0;
 	}
@@ -397,7 +397,7 @@ static int boe_prepare(struct drm_panel *panel)
 
 #ifdef TINNO_LCM_OEM_CONFIG
 	// gesture_mode = fts_lcd_gesture_control();
-	if(boe_cts_gesture_mode) {
+	if(boe_cts_gesture_mode && !in_esd_recovery_flg) {
 		udelay(10000);
 		boe_panel_init(ctx);
 		ret = ctx->error;

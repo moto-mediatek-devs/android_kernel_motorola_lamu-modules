@@ -727,7 +727,7 @@ static int djn_unprepare(struct drm_panel *panel)
 	ctx->prepared = false;
 
 #ifdef TINNO_LCM_OEM_CONFIG
-	if(djn_gesture_mode) {
+	if(djn_gesture_mode && !in_esd_recovery_flg) {
 		pr_info("nt36672s Skip Power Control !\n");
 		return 0;
 	}
@@ -801,7 +801,7 @@ static int djn_prepare(struct drm_panel *panel)
 		return 0;
 
 #ifdef TINNO_LCM_OEM_CONFIG
-	if(djn_gesture_mode) {
+	if(djn_gesture_mode && !in_esd_recovery_flg) {
 		ctx->reset_gpio =
 		devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
 		if (IS_ERR(ctx->reset_gpio)) {

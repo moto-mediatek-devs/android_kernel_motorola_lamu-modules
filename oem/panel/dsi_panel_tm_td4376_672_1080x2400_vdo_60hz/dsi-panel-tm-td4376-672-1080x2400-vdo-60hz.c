@@ -308,7 +308,7 @@ static int td4376_unprepare(struct drm_panel *panel)
 	// return 0;
 
 #ifdef TINNO_LCM_OEM_CONFIG
-	if(td4376_gesture_mode) {
+	if(td4376_gesture_mode && !in_esd_recovery_flg) {
 		if (lcd_ovt_apply_gesture_mode_td4376)
 			lcd_ovt_apply_gesture_mode_td4376();
 
@@ -397,7 +397,7 @@ static int td4376_prepare(struct drm_panel *panel)
 	if(lcd_ovt_enable_irq_td4376)
 		lcd_ovt_enable_irq_td4376(false);
 #ifdef TINNO_LCM_OEM_CONFIG
-	if(td4376_gesture_mode) {
+	if(td4376_gesture_mode && !in_esd_recovery_flg) {
 		udelay(10000);
 		td4376_panel_init(ctx);
 		ret = ctx->error;

@@ -309,7 +309,7 @@ static int dijin_unprepare(struct drm_panel *panel)
 	ctx->prepared = false;
 
 #ifdef TINNO_LCM_OEM_CONFIG
-	if(td4160_gesture_mode) {
+	if(td4160_gesture_mode && !in_esd_recovery_flg) {
 		if (lcd_ovt_apply_gesture_mode_td4160)
 			lcd_ovt_apply_gesture_mode_td4160();
 
@@ -398,7 +398,7 @@ static int dijin_prepare(struct drm_panel *panel)
 	if(lcd_ovt_enable_irq_td4160)
 		lcd_ovt_enable_irq_td4160(false);
 #ifdef TINNO_LCM_OEM_CONFIG
-	if(td4160_gesture_mode) {
+	if(td4160_gesture_mode && !in_esd_recovery_flg) {
 		udelay(10000);
 		dijin_panel_init(ctx);
 		ret = ctx->error;

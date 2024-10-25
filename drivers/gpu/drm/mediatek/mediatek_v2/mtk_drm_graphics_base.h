@@ -135,5 +135,5 @@ enum hal_color_mode {
 	HAL_COLOR_MODE_ADOBE_RGB = 8,
 	HAL_COLOR_MODE_DISPLAY_P3 = 9,
 };
-
+extern int in_esd_recovery_flg;
 #endif

@@ -308,7 +308,7 @@ static int tianma_unprepare(struct drm_panel *panel)
 
 #ifdef TINNO_LCM_OEM_CONFIG
 	//gesture_mode = fts_lcd_gesture_control();
-	if(nvt_gesture_mode) {
+	if(nvt_gesture_mode && !in_esd_recovery_flg) {
 		pr_info("nt36528a Skip Power Control !\n");
 		return 0;
 	}
@@ -382,7 +382,7 @@ static int tianma_prepare(struct drm_panel *panel)
 
 #ifdef TINNO_LCM_OEM_CONFIG
 	//gesture_mode = fts_lcd_gesture_control();
-	if(nvt_gesture_mode) {
+	if(nvt_gesture_mode && !in_esd_recovery_flg) {
 		udelay(10000);
 		tianma_panel_init(ctx);
 		ret = ctx->error;
