@@ -5127,17 +5127,46 @@ static void charger_send_kpoc_uevent(struct mtk_charger *info)
 	}
 }
 
+/* TN Begin modified by jirui.li/860702 20241025 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+#define IGNORE_PD_HARDRESET_COUNT	5
+#define IGNORE_PD_HARDRESET_INTERVAL_MS	200
+#endif
+/* TN End modified by jirui.li/860702 20241025 CR/EKLAMU-202 */
 static void kpoc_power_off_check(struct mtk_charger *info)
 {
 	unsigned int boot_mode = info->bootmode;
 	int vbus = 0;
 	int counter = 0;
+/* TN Begin modified by jirui.li/860702 20241025 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	int i = 0;
+#endif
+/* TN End modified by jirui.li/860702 20241025 CR/EKLAMU-202 */
 	/* 8 = KERNEL_POWER_OFF_CHARGING_BOOT */
 	/* 9 = LOW_POWER_OFF_CHARGING_BOOT */
 	if (boot_mode == 8 || boot_mode == 9) {
 		vbus = get_vbus(info);
 		if (vbus >= 0 && vbus < 2500 && !mtk_is_charger_on(info) &&
 			!info->ta_hardreset) {
+/* TN Begin modified by jirui.li/860702 20241025 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+			/*
+			 * We re-check vbus in 1 second for "anti-shake" when vbus below 2500mv
+			 * in power-off mode, so it can ignore the abnormal shutdown request which
+			 * caused by PD hardreset.
+			 */
+			while (i < IGNORE_PD_HARDRESET_COUNT) {
+				msleep(IGNORE_PD_HARDRESET_INTERVAL_MS);
+				vbus = get_vbus(info);
+				if (vbus > 2500) {
+					chr_err("in KPOC mode anti-shake, vbus=%d, not shutdown!\n", vbus);
+					goto out;
+				}
+				i++;
+			}
+#endif
+/* TN End modified by jirui.li/860702 20241025 CR/EKLAMU-202 */
 			chr_err("Unplug Charger/USB in KPOC mode, vbus=%d, shutdown\n", vbus);
 			while (1) {
 				if (counter >= 20000) {
@@ -5156,6 +5185,11 @@ static void kpoc_power_off_check(struct mtk_charger *info)
 				counter++;
 			}
 		}
+/* TN Begin modified by jirui.li/860702 20241025 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+out:
+#endif
+/* TN End modified by jirui.li/860702 20241025 CR/EKLAMU-202 */
 		charger_send_kpoc_uevent(info);
 	}
 }
