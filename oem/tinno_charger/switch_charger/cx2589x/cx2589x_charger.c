@@ -1804,7 +1804,7 @@ static int cx2589x_set_bat_comp(struct cx2589x_device *cx, u32 ir_mohm)
 	else if (ir_mohm > CX2589x_BAT_COMP_MAX)
 		ir_mohm = CX2589x_BAT_COMP_MAX;
 	reg_val = (ir_mohm - CX2589x_BAT_COMP_MIN) / CX2589x_BAT_COMP_STEP;
-	ret = cx2589x_update_bits(cx, CX2589x_REG_08, CX2589x_BAT_COMP_MASK, reg_val);
+	ret = cx2589x_update_bits(cx, CX2589x_REG_08, CX2589x_BAT_COMP_MASK, reg_val << 5);
 	return ret;
 }
 static int cx2589x_set_vclamp(struct cx2589x_device *cx, u32 ir_uv)
@@ -1816,7 +1816,7 @@ static int cx2589x_set_vclamp(struct cx2589x_device *cx, u32 ir_uv)
 	else if (ir_uv > CX2589x_VCLAMP_MAX_uV)
 		ir_uv = CX2589x_VCLAMP_MAX_uV;
 	reg_val = (ir_uv - CX2589x_VCLAMP_MIN_uV) / CX2589x_VCLAMP_STEP_uV;
-	ret = cx2589x_update_bits(cx, CX2589x_REG_08, CX2589x_VCLAMP_MASK, reg_val);
+	ret = cx2589x_update_bits(cx, CX2589x_REG_08, CX2589x_VCLAMP_MASK, reg_val << 2);
 	return ret;
 }
 
