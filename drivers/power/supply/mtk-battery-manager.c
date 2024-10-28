@@ -1123,14 +1123,28 @@ static int bs_psy_get_property(struct power_supply *psy,
 		if (bm->gm1 != NULL)
 			if(!bm->gm1->bat_plug_out) {
 				cycle += (bm->gm1->bat_cycle + 1) *
+/* TN Begin modified by jirui.li/860702 20241025 CR/EKLAMU-9381 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+					bm->gm1->algo_qmax;
+				qmax += bm->gm1->algo_qmax;
+#else
 					bm_update_psy_property(bm->gm1, QMAX_DESIGN);
 				qmax += bm_update_psy_property(bm->gm1, QMAX_DESIGN);
+#endif
+/* TN End modified by jirui.li/860702 20241025 CR/EKLAMU-9381 */
 			}
 		if (bm->gm2 != NULL)
 			if(!bm->gm2->bat_plug_out) {
 				cycle += (bm->gm2->bat_cycle + 1) *
+/* TN Begin modified by jirui.li/860702 20241025 CR/EKLAMU-9381 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+					bm->gm2->algo_qmax;
+				qmax += bm->gm2->algo_qmax;
+#else
 					bm_update_psy_property(bm->gm2, QMAX_DESIGN);
 				qmax += bm_update_psy_property(bm->gm2, QMAX_DESIGN);
+#endif
+/* TN End modified by jirui.li/860702 20241025 CR/EKLAMU-9381 */
 			}
 		if (qmax != 0)
 			val->intval = cycle / qmax;
@@ -1177,10 +1191,22 @@ static int bs_psy_get_property(struct power_supply *psy,
 
 		if (bm->gm1 != NULL)
 			if(!bm->gm1->bat_plug_out)
+/* TN Begin modified by jirui.li/860702 20241025 CR/EKLAMU-9381 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+				qmax += bm->gm1->algo_qmax;
+#else
 				qmax += bm_update_psy_property(bm->gm1, QMAX_DESIGN);
+#endif
+/* TN End modified by jirui.li/860702 20241025 CR/EKLAMU-9381 */
 		if (bm->gm2 != NULL)
 			if(!bm->gm2->bat_plug_out)
+/* TN Begin modified by jirui.li/860702 20241025 CR/EKLAMU-9381 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+				qmax += bm->gm2->algo_qmax;
+#else
 				qmax += bm_update_psy_property(bm->gm2, QMAX_DESIGN);
+#endif
+/* TN End modified by jirui.li/860702 20241025 CR/EKLAMU-9381 */
 
 		val->intval = qmax * 100;
 		ret = 0;
@@ -1259,12 +1285,24 @@ static int bs_psy_get_property(struct power_supply *psy,
 		if (bm->gm1 != NULL)
 			if(!bm->gm1->bat_plug_out) {
 				curr_avg += bm_update_psy_property(bm->gm1, CURRENT_AVG);
+/* TN Begin modified by jirui.li/860702 20241025 CR/EKLAMU-9381 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+				qmax += bm->gm1->algo_qmax;
+#else
 				qmax += bm_update_psy_property(bm->gm1, QMAX_DESIGN);
+#endif
+/* TN End modified by jirui.li/860702 20241025 CR/EKLAMU-9381 */
 			}
 		if (bm->gm2 != NULL)
 			if(!bm->gm2->bat_plug_out) {
 				curr_avg += bm_update_psy_property(bm->gm2, CURRENT_AVG);
+/* TN Begin modified by jirui.li/860702 20241025 CR/EKLAMU-9381 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+				qmax += bm->gm2->algo_qmax;
+#else
 				qmax += bm_update_psy_property(bm->gm2, QMAX_DESIGN);
+#endif
+/* TN End modified by jirui.li/860702 20241025 CR/EKLAMU-9381 */
 			}
 
 		remain_mah = remain_ui * qmax / 10;
@@ -1283,10 +1321,22 @@ static int bs_psy_get_property(struct power_supply *psy,
 
 		if (bm->gm1 != NULL)
 			if(!bm->gm1->bat_plug_out)
+/* TN Begin modified by jirui.li/860702 20241025 CR/EKLAMU-9381 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+				qmax += bm->gm1->algo_qmax;
+#else
 				qmax += bm_update_psy_property(bm->gm1, QMAX_DESIGN);
+#endif
+/* TN End modified by jirui.li/860702 20241025 CR/EKLAMU-9381 */
 		if (bm->gm2 != NULL)
 			if(!bm->gm2->bat_plug_out)
+/* TN Begin modified by jirui.li/860702 20241025 CR/EKLAMU-9381 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+				qmax += bm->gm2->algo_qmax;
+#else
 				qmax += bm_update_psy_property(bm->gm2, QMAX_DESIGN);
+#endif
+/* TN End modified by jirui.li/860702 20241025 CR/EKLAMU-9381 */
 
 		q_max_uah = qmax * 100;
 		if (q_max_uah <= 100000) {
