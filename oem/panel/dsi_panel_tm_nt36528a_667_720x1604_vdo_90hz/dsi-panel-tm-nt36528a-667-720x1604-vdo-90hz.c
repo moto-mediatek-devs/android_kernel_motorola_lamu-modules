@@ -591,7 +591,7 @@ static int tianma_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 	if (level > 255)
 		level = 255;
 
-	bl_lvl = backlight_i2c_map[level];
+	bl_lvl = backlight_i2c_map5[level];
 
 	pr_info("%s: level=%d, bl_lvl=%d, is_extra=%d, is_hbm=%d\n", __func__, level, bl_lvl, is_extra, is_hbm);
 

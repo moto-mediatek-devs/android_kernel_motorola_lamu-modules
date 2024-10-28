@@ -784,6 +784,7 @@ static int djn_unprepare(struct drm_panel *panel)
 	}
 	gpiod_set_value(ctx->vddio_gpio, 0);
 	devm_gpiod_put(ctx->dev, ctx->vddio_gpio);
+	udelay(10 * 1000);
 
 	pr_info("%s -\n", __func__);
 
@@ -885,7 +886,7 @@ static int djn_prepare(struct drm_panel *panel)
 	devm_gpiod_put(ctx->dev, ctx->bias_neg);
 #endif
 
-	udelay(3 * 1000);
+	udelay(10 * 1000);
 	djn_panel_init(ctx);
 
 	ret = ctx->error;
@@ -1019,7 +1020,7 @@ static int djn_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 	if (level > 255)
 		level = 255;
 
-	bl_lvl = backlight_i2c_map[level];
+	bl_lvl = backlight_i2c_map3[level];
 
 	pr_info("%s: level=%d, bl_lvl=%d, is_extra=%d, is_hbm=%d\n", __func__, level, bl_lvl, is_extra, is_hbm);
 
