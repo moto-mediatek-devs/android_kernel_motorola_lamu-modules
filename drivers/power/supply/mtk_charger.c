@@ -1838,8 +1838,8 @@ static ssize_t enable_hiz_store(struct device *dev,
 		} else {
 			pinfo->enable_hiz = false;
 		}
-		_wake_up_charger(pinfo);
 		charger_dev_enable_hz(pinfo->chg1_dev, pinfo->enable_hiz);
+		_wake_up_charger(pinfo);
 	} else {
 		chr_err("%s: format error!\n", __func__);
 	}
@@ -1873,8 +1873,8 @@ static ssize_t enable_charger_store(struct device *dev,
 		} else {
 			pinfo->enable_charger = false;
 		}
-		_wake_up_charger(pinfo);
 		charger_dev_enable(pinfo->chg1_dev, pinfo->enable_charger);
+		_wake_up_charger(pinfo);
 	} else {
 		chr_err("%s: format error!\n", __func__);
 	}
