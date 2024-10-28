@@ -436,6 +436,14 @@ static int ts_mtk_drm_notifier_callback(struct notifier_block *nb,
     }
     return 0;
 }
+extern void (*lcd_esd_resume)(bool);
+void lcd_esd_resume_interface(bool enable)
+{
+	if(!enable)
+		ili_sleep_handler(TP_DEEP_SLEEP);
+	else
+		ili_sleep_handler(TP_RESUME);
+}
 static void ilitek_mtk_drm_sleep_init(void)
 {
 	ilits->disp_notifier.notifier_call = ts_mtk_drm_notifier_callback;
@@ -443,6 +451,7 @@ static void ilitek_mtk_drm_sleep_init(void)
 	if (mtk_disp_notifier_register("ILI_TOUCH", &ilits->disp_notifier)) {
 		ILI_ERR("Failed to register disp notifier client!!\n");
 	}
+	lcd_esd_resume = lcd_esd_resume_interface;
 }
 #endif
 #if SPRD_SYSFS_SUSPEND_RESUME

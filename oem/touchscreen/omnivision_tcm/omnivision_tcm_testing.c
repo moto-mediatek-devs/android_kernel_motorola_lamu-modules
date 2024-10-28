@@ -1694,7 +1694,7 @@ static int testing_do_testing(void)
 			error_count++;
 		}
 	}
-	else if(lcd_id == 0x0101){
+	else if(lcd_id == 0x010d){
 		retval = testing_do_test_item(TEST_PT7_DYNAMIC_RANGE, 36, 26, pt7_low_limits_new1, 
 			pt7_hi_limits_new1, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
 		if (retval < 0) {

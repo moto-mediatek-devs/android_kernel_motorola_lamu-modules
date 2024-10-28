@@ -426,6 +426,16 @@ static int cts_get_tp_info(char *buf, void *arg0)
 }
 #endif
 
+extern void (*lcd_esd_resume)(bool);
+void lcd_esd_resume_interface(bool enable)
+{
+	if(!enable)
+        cts_suspend(g_cts_data);
+    else
+    queue_work(g_cts_data->workqueue,
+	    &g_cts_data->ts_resume_work);
+}
+
 #ifdef CONFIG_CTS_I2C_HOST
 static int cts_driver_probe(struct i2c_client *client,
         const struct i2c_device_id *id)
@@ -592,6 +602,7 @@ static int cts_driver_probe(struct spi_device *client)
         cts_err("Init disp FB notifier failed %d", ret);
         //goto err_deinit_sysfs;
     }
+    lcd_esd_resume = lcd_esd_resume_interface;
 
     ret = cts_plat_request_irq(cts_data->pdata);
     if (ret < 0) {

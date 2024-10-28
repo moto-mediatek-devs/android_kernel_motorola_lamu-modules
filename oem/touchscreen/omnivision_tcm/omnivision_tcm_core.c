@@ -3804,7 +3804,14 @@ static int ovt_tcm_disp_notifier_cb(struct notifier_block *nb,
 
 	return 0;
 }
-
+extern void (*lcd_esd_resume)(bool);
+void lcd_esd_resume_interface(bool enable)
+{
+	if(!enable)
+		ovt_tcm_disp_suspend(&g_tcm_hcd->pdev->dev);
+	else
+		ovt_tcm_disp_resume(&g_tcm_hcd->pdev->dev);
+}
 
 #if defined(CONFIG_PM) || defined(CONFIG_DRMV) || defined(CONFIG_FBV)
 static int ovt_tcm_resume(struct device *dev)
@@ -4947,6 +4954,7 @@ static int ovt_tcm_probe(struct platform_device *pdev)
 			create_singlethread_workqueue("ovt_tcm_polling");
 	INIT_DELAYED_WORK(&tcm_hcd->polling_work, ovt_tcm_polling_work);
 
+	lcd_esd_resume = lcd_esd_resume_interface;
 
 	/* skip the following initialization */
 	/* since the fw is not ready for hdl devices */
