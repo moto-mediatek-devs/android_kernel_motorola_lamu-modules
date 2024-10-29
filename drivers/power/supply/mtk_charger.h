@@ -766,6 +766,7 @@ struct mtk_charger {
 	struct mtk_battery_manager *bm;
 	int ignore_current_check_time;
 	int charge_full_soc_for_over_temp;
+	int call_limit_ctrl;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240924 CR/EKLAMU-202 */
 	//struct pe50_charger_cfg pe50;
