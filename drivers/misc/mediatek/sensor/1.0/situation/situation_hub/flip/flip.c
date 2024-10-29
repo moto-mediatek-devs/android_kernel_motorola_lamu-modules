@@ -78,19 +78,30 @@ static int flip_open_report_data(int open)
 	ret = sensor_enable_to_hub(ID_FLIP, open);
 	return ret;
 }
+
 static int flip_batch(int flag,
 	int64_t samplingPeriodNs, int64_t maxBatchReportLatencyNs)
 {
 	return sensor_batch_to_hub(ID_FLIP,
 		flag, samplingPeriodNs, maxBatchReportLatencyNs);
 }
+
+static int flip_flush(void)
+{
+	  pr_err("zjw enter flip_flush");
+	return sensor_flush_to_hub(ID_FLIP);
+}
+
 static int flip_recv_data(struct data_unit_t *event,
 	void *reserved)
 {
 	int err = 0;
 
 	if (event->flush_action == FLUSH_ACTION)
-		pr_err("flip do not support flush\n");
+	{
+          err = situation_flush_report(ID_FLIP);
+	  pr_err("zjw flip_flush recv");
+	}
 	else if (event->flush_action == DATA_ACTION)
 		err = flip_data_report(event->flip_t.state,
 			(int64_t)event->time_stamp);
@@ -105,6 +116,7 @@ static int flip_hub_local_init(void)
 
 	ctl.open_report_data = flip_open_report_data;
 	ctl.batch = flip_batch;
+	ctl.flush = flip_flush;
 	ctl.is_support_wake_lock = true;
 	err = situation_register_control_path(&ctl, ID_FLIP);
 	if (err) {
