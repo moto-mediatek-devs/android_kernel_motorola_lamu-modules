@@ -651,7 +651,7 @@ int mtk_drm_esd_testing_process(struct mtk_drm_esd_ctx *esd_ctx, bool need_lock)
 				"[ESD%u]after esd recovery %d times, still fail, disable esd check\n",
 				crtc_idx, ESD_TRY_CNT);
 			mtk_disp_esd_check_switch(crtc, false);
-
+			in_esd_recovery_flg = 0;
 			if (need_lock) {
 				DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
 				DDP_COMMIT_UNLOCK(&private->commit.lock, __func__, __LINE__);

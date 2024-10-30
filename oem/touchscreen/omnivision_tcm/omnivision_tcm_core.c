@@ -3807,9 +3807,12 @@ static int ovt_tcm_disp_notifier_cb(struct notifier_block *nb,
 extern void (*lcd_esd_resume)(bool);
 void lcd_esd_resume_interface(bool enable)
 {
-	if(!enable)
+	if(!enable){
+		atomic_set(&g_tcm_hcd->command_status, CMD_ERROR);
+		complete(&response_complete);
+		msleep(50);
 		ovt_tcm_disp_suspend(&g_tcm_hcd->pdev->dev);
-	else
+	}else
 		ovt_tcm_disp_resume(&g_tcm_hcd->pdev->dev);
 }
 
