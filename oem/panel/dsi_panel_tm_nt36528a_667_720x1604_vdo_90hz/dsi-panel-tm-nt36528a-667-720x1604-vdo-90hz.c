@@ -457,7 +457,7 @@ static int tianma_prepare(struct drm_panel *panel)
 	devm_gpiod_put(ctx->dev, ctx->bias_neg);
 #endif
 
-	udelay(10000);
+	msleep(15);
 	tianma_panel_init(ctx);
 
 	ret = ctx->error;
