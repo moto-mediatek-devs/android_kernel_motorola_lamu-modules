@@ -1476,7 +1476,7 @@ static int testing_do_test_item(enum test_code test_item, int limit_rows, int li
 	struct ovt_tcm_hcd *tcm_hcd = testing_hcd->tcm_hcd;
 
 	LOGN(tcm_hcd->pdev->dev.parent,
-			"Start testing\n");
+			"Start testing first=0x%x\n", limit_data_high[0]);
 
 	testing_hcd->result = false;
 	app_info = &tcm_hcd->app_info;
@@ -1676,7 +1676,7 @@ static int testing_do_testing(void)
 		error_count++;
 	}
 #else
-	if(lcd_id == 0x000d){
+	if(lcd_id == 0x000d){//TD4160
 		retval = testing_do_test_item(TEST_PT7_DYNAMIC_RANGE, 32, 18, pt7_low_limits_new, 
 			pt7_hi_limits_new, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
 		if (retval < 0) {
@@ -1694,24 +1694,24 @@ static int testing_do_testing(void)
 			error_count++;
 		}
 	}
-	else if(lcd_id == 0x010d){
-		retval = testing_do_test_item(TEST_PT7_DYNAMIC_RANGE, 36, 26, pt7_low_limits_new1, 
-			pt7_hi_limits_new1, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
+	else if(lcd_id == 0x010d){//TD4376
+		retval = testing_do_test_item(TEST_PT7_DYNAMIC_RANGE, 32, 16, pt7_low_limits_new_td4376,
+			pt7_hi_limits_new_td4376, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
 		if (retval < 0) {
 			error_count++;
 		}
 
-		retval = testing_do_test_item(TEST_PT10_DELTA_NOISE, 36, 26, NULL, 
-			pt10_high_limits_new1, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
+		retval = testing_do_test_item(TEST_PT10_DELTA_NOISE, 32, 16, NULL,
+			pt10_high_limits_new, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
 		if (retval < 0) {
 			error_count++;
 		}
-		retval = testing_do_test_item(TEST_PT17_ADC_RANGE, 36, 26, NULL, 
+		retval = testing_do_test_item(TEST_PT17_ADC_RANGE, 32, 16, NULL,
 			pt17_hi_limits_new, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
 		if (retval < 0) {
 			error_count++;
 		}
-		retval = testing_do_test_item(TEST_PT18_HYBRID_ABS_RAW, 36, 26, pt18_low_limits_new, 
+		retval = testing_do_test_item(TEST_PT18_HYBRID_ABS_RAW, 32, 16, pt18_low_limits_new,
 			pt18_hi_limits_new, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
 		if (retval < 0) {
 			error_count++;
