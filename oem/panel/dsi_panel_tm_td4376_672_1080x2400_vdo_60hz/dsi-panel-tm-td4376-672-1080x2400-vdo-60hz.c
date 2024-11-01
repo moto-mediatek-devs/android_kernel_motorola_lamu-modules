@@ -498,9 +498,9 @@ static int td4376_enable(struct drm_panel *panel)
 	return 0;
 }
 
-#define HFP (30)
+#define HFP (48)
 #define HSA (4)
-#define HBP (20)
+#define HBP (28)
 #define VFP_60 (64)
 //#define VFP_90 (300)
 #define VSA (4)
@@ -606,7 +606,7 @@ static int td4376_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 }
 
 static struct mtk_panel_params ext_params = {
-	.pll_clk = 548,
+	.pll_clk = 560,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,
 	.lcm_esd_check_table[0] = {
