@@ -21,7 +21,8 @@
 #include <linux/slab.h>
 
 #include "nt36xxx.h"
-#include "nt36xxx_mp_ctrlram.h"
+#include "nt36xxx_mp_ctrlram_lamu.h"
+#include "nt36xxx_mp_ctrlram_lamulite.h"
 
 #if NVT_TOUCH_MP
 
@@ -119,6 +120,107 @@ extern void nvt_get_mdata(int32_t *buf, uint8_t *m_x_num, uint8_t *m_y_num);
 extern void nvt_read_get_num_mdata(uint32_t xdata_addr, int32_t *buffer, uint32_t num);
 int32_t nvt_mp_parse_dt(struct device_node *root, const char *node_compatible);
 
+static uint8_t *AIN_X;
+static uint8_t *AIN_Y;
+#if TOUCH_KEY_NUM > 0
+static uint8_t *AIN_KEY;
+#endif
+static int32_t *PS_Config_Lmt_Short_Rawdata_P;
+static int32_t *PS_Config_Lmt_Short_Rawdata_N;
+static int32_t *PS_Config_Lmt_Open_Rawdata_P;
+static int32_t *PS_Config_Lmt_Open_Rawdata_N;
+static int32_t *PS_Config_Lmt_FW_Rawdata_P;
+static int32_t *PS_Config_Lmt_FW_Rawdata_N;
+static int32_t *PS_Config_Lmt_FW_CC_P;
+static int32_t *PS_Config_Lmt_FW_CC_N;
+static int32_t *PS_Config_Lmt_FW_Diff_P;
+static int32_t *PS_Config_Lmt_FW_Diff_N;
+static int32_t *PS_Config_Lmt_PenTipX_FW_Raw_P;
+static int32_t *PS_Config_Lmt_PenTipX_FW_Raw_N;
+static int32_t *PS_Config_Lmt_PenTipY_FW_Raw_P;
+static int32_t *PS_Config_Lmt_PenTipY_FW_Raw_N;
+static int32_t *PS_Config_Lmt_PenRingX_FW_Raw_P;
+static int32_t *PS_Config_Lmt_PenRingX_FW_Raw_N;
+static int32_t *PS_Config_Lmt_PenRingY_FW_Raw_P;
+static int32_t *PS_Config_Lmt_PenRingY_FW_Raw_N;
+static int32_t *PS_Config_Lmt_PenTipX_FW_Diff_P;
+static int32_t *PS_Config_Lmt_PenTipX_FW_Diff_N;
+static int32_t *PS_Config_Lmt_PenTipY_FW_Diff_P;
+static int32_t *PS_Config_Lmt_PenTipY_FW_Diff_N;
+static int32_t *PS_Config_Lmt_PenRingX_FW_Diff_P;
+static int32_t *PS_Config_Lmt_PenRingX_FW_Diff_N;
+static int32_t *PS_Config_Lmt_PenRingY_FW_Diff_P;
+static int32_t *PS_Config_Lmt_PenRingY_FW_Diff_N;
+
+void nvt_mp_func_init(int lcd_id)
+{
+	pr_info("%s lcd_id is %d\n", __func__, lcd_id);
+    if (lcd_id == 0x0093) {
+		AIN_X = AIN_X_lamu;
+		AIN_Y = AIN_Y_lamu;
+		#if TOUCH_KEY_NUM > 0
+		AIN_KEY = AIN_KEY_lamu;
+		#endif
+		PS_Config_Lmt_Short_Rawdata_P = PS_Config_Lmt_Short_Rawdata_P_lamu;
+		PS_Config_Lmt_Short_Rawdata_N = PS_Config_Lmt_Short_Rawdata_N_lamu;
+		PS_Config_Lmt_Open_Rawdata_P = PS_Config_Lmt_Open_Rawdata_P_lamu;
+		PS_Config_Lmt_Open_Rawdata_N = PS_Config_Lmt_Open_Rawdata_N_lamu;
+		PS_Config_Lmt_FW_Rawdata_P = PS_Config_Lmt_FW_Rawdata_P_lamu;
+		PS_Config_Lmt_FW_Rawdata_N = PS_Config_Lmt_FW_Rawdata_N_lamu;
+		PS_Config_Lmt_FW_CC_P = PS_Config_Lmt_FW_CC_P_lamu;
+		PS_Config_Lmt_FW_CC_N = PS_Config_Lmt_FW_CC_N_lamu;
+		PS_Config_Lmt_FW_Diff_P = PS_Config_Lmt_FW_Diff_P_lamu;
+		PS_Config_Lmt_FW_Diff_N = PS_Config_Lmt_FW_Diff_N_lamu;
+		PS_Config_Lmt_PenTipX_FW_Raw_P = PS_Config_Lmt_PenTipX_FW_Raw_P_lamu;
+		PS_Config_Lmt_PenTipX_FW_Raw_N = PS_Config_Lmt_PenTipX_FW_Raw_N_lamu;
+		PS_Config_Lmt_PenTipY_FW_Raw_P = PS_Config_Lmt_PenTipY_FW_Raw_P_lamu;
+		PS_Config_Lmt_PenTipY_FW_Raw_N = PS_Config_Lmt_PenTipY_FW_Raw_N_lamu;
+		PS_Config_Lmt_PenRingX_FW_Raw_P = PS_Config_Lmt_PenRingX_FW_Raw_P_lamu;
+		PS_Config_Lmt_PenRingX_FW_Raw_N = PS_Config_Lmt_PenRingX_FW_Raw_N_lamu;
+		PS_Config_Lmt_PenRingY_FW_Raw_P = PS_Config_Lmt_PenRingY_FW_Raw_P_lamu;
+		PS_Config_Lmt_PenRingY_FW_Raw_N = PS_Config_Lmt_PenRingY_FW_Raw_N_lamu;
+		PS_Config_Lmt_PenTipX_FW_Diff_P = PS_Config_Lmt_PenTipX_FW_Diff_P_lamu;
+		PS_Config_Lmt_PenTipX_FW_Diff_N = PS_Config_Lmt_PenTipX_FW_Diff_N_lamu;
+		PS_Config_Lmt_PenTipY_FW_Diff_P = PS_Config_Lmt_PenTipY_FW_Diff_P_lamu;
+		PS_Config_Lmt_PenTipY_FW_Diff_N = PS_Config_Lmt_PenTipY_FW_Diff_N_lamu;
+		PS_Config_Lmt_PenRingX_FW_Diff_P = PS_Config_Lmt_PenRingX_FW_Diff_P_lamu;
+		PS_Config_Lmt_PenRingX_FW_Diff_N = PS_Config_Lmt_PenRingX_FW_Diff_N_lamu;
+		PS_Config_Lmt_PenRingY_FW_Diff_P = PS_Config_Lmt_PenRingY_FW_Diff_P_lamu;
+		PS_Config_Lmt_PenRingY_FW_Diff_N = PS_Config_Lmt_PenRingY_FW_Diff_N_lamu;
+	} else if (lcd_id == 0x0101) {
+		AIN_X = AIN_X_lamulite;
+		AIN_Y = AIN_Y_lamulite;
+		#if TOUCH_KEY_NUM > 0
+		AIN_KEY = AIN_KEY_lamulite;
+		#endif
+		PS_Config_Lmt_Short_Rawdata_P = PS_Config_Lmt_Short_Rawdata_P_lamulite;
+		PS_Config_Lmt_Short_Rawdata_N = PS_Config_Lmt_Short_Rawdata_N_lamulite;
+		PS_Config_Lmt_Open_Rawdata_P = PS_Config_Lmt_Open_Rawdata_P_lamulite;
+		PS_Config_Lmt_Open_Rawdata_N = PS_Config_Lmt_Open_Rawdata_N_lamulite;
+		PS_Config_Lmt_FW_Rawdata_P = PS_Config_Lmt_FW_Rawdata_P_lamulite;
+		PS_Config_Lmt_FW_Rawdata_N = PS_Config_Lmt_FW_Rawdata_N_lamulite;
+		PS_Config_Lmt_FW_CC_P = PS_Config_Lmt_FW_CC_P_lamulite;
+		PS_Config_Lmt_FW_CC_N = PS_Config_Lmt_FW_CC_N_lamulite;
+		PS_Config_Lmt_FW_Diff_P = PS_Config_Lmt_FW_Diff_P_lamulite;
+		PS_Config_Lmt_FW_Diff_N = PS_Config_Lmt_FW_Diff_N_lamulite;
+		PS_Config_Lmt_PenTipX_FW_Raw_P = PS_Config_Lmt_PenTipX_FW_Raw_P_lamulite;
+		PS_Config_Lmt_PenTipX_FW_Raw_N = PS_Config_Lmt_PenTipX_FW_Raw_N_lamulite;
+		PS_Config_Lmt_PenTipY_FW_Raw_P = PS_Config_Lmt_PenTipY_FW_Raw_P_lamulite;
+		PS_Config_Lmt_PenTipY_FW_Raw_N = PS_Config_Lmt_PenTipY_FW_Raw_N_lamulite;
+		PS_Config_Lmt_PenRingX_FW_Raw_P = PS_Config_Lmt_PenRingX_FW_Raw_P_lamulite;
+		PS_Config_Lmt_PenRingX_FW_Raw_N = PS_Config_Lmt_PenRingX_FW_Raw_N_lamulite;
+		PS_Config_Lmt_PenRingY_FW_Raw_P = PS_Config_Lmt_PenRingY_FW_Raw_P_lamulite;
+		PS_Config_Lmt_PenRingY_FW_Raw_N = PS_Config_Lmt_PenRingY_FW_Raw_N_lamulite;
+		PS_Config_Lmt_PenTipX_FW_Diff_P = PS_Config_Lmt_PenTipX_FW_Diff_P_lamulite;
+		PS_Config_Lmt_PenTipX_FW_Diff_N = PS_Config_Lmt_PenTipX_FW_Diff_N_lamulite;
+		PS_Config_Lmt_PenTipY_FW_Diff_P = PS_Config_Lmt_PenTipY_FW_Diff_P_lamulite;
+		PS_Config_Lmt_PenTipY_FW_Diff_N = PS_Config_Lmt_PenTipY_FW_Diff_N_lamulite;
+		PS_Config_Lmt_PenRingX_FW_Diff_P = PS_Config_Lmt_PenRingX_FW_Diff_P_lamulite;
+		PS_Config_Lmt_PenRingX_FW_Diff_N = PS_Config_Lmt_PenRingX_FW_Diff_N_lamulite;
+		PS_Config_Lmt_PenRingY_FW_Diff_P = PS_Config_Lmt_PenRingY_FW_Diff_P_lamulite;
+		PS_Config_Lmt_PenRingY_FW_Diff_N = PS_Config_Lmt_PenRingY_FW_Diff_N_lamulite;
+	}
+}
 /*******************************************************
 Description:
 	Novatek touchscreen allocate buffer for mp selftest.

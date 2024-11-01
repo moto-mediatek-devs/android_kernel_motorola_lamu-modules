@@ -352,5 +352,5 @@ int8_t nvt_charge_mode(bool plugin);
 #if NVT_TOUCH_ESD_PROTECT
 extern void nvt_esd_check_enable(uint8_t enable);
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
-
+void nvt_mp_func_init(int lcd_id);
 #endif /* _LINUX_NVT_TOUCH_H */

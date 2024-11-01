@@ -171,14 +171,9 @@ extern int nt36528a_lcd_id;
 #if NVT_TOUCH_MP
 extern uint32_t IC_Y_CFG_SIZE;
 extern uint32_t Y_Channel;
-extern uint8_t AIN_Y[64];
 #endif
 
 void nvt_set_size_info(int id) {
-
-#if NVT_TOUCH_MP
-	uint8_t given_array[64] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31};
-#endif
 	pr_info("%s lcd_id is %d\n",__func__,id);
     if (id == 0x0093) {
 		touch_max_width=1080;
@@ -194,9 +189,6 @@ void nvt_set_size_info(int id) {
 		IC_Y_CFG_SIZE = 32;
 		Y_Channel = 32;
 
-    for (int i = 0; i < 64; i++) {
-        AIN_Y[i] = given_array[i];
-    }
 #endif
         sprintf(app_firmware_name, "%s_%s", MODULE_VENDOR_2, DEFAULT_APP_FIRMWARE_NAME);
         sprintf(mp_firmware_name, "%s_%s", MODULE_VENDOR_2, DEFAULT_MP_FIRMWARE_NAME);
@@ -2447,6 +2439,7 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 #if NEED_SELECT_VENDOR
 	int lcd_id = nt36672s_lcd_id | nt36528a_lcd_id;
 	nvt_set_size_info(lcd_id);
+	nvt_mp_func_init(lcd_id);
 #endif
 
 	ts = (struct nvt_ts_data *)kzalloc(sizeof(struct nvt_ts_data), GFP_KERNEL);
