@@ -1513,7 +1513,7 @@ static int testing_do_test_item(enum test_code test_item, int limit_rows, int li
 	buf = testing_hcd->resp.buf;
 	testing_hcd->result = true;
 
-	if ((limit_cols != cols) || (limit_rows != rows)) {
+	if ((limit_cols > cols) || (limit_rows > rows)) {
 		LOGE(tcm_hcd->pdev->dev.parent,
 			"incorrect cols and rows size of item:%d\n", test_item);
 		snprintf(output_str + strlen(output_str), str_size - strlen(output_str), 
@@ -1593,7 +1593,7 @@ static int testing_do_test_item(enum test_code test_item, int limit_rows, int li
 	retval = 0;
 
 exit:
-
+	UNLOCK_BUFFER(testing_hcd->resp);
 	if (fp) {
 		ovt_tcm_store_to_file(fp, "\n%s do test item min:%d  max:%d ave:%d\n", __func__, min_data, max_data, ave_data);
 		ovt_tcm_store_to_file(fp, "\n%s do test item %d end, result is %s\n", __func__, test_item, (testing_hcd->result)?"pass":"fail");
