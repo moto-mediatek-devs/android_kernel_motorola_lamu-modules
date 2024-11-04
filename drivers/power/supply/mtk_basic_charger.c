@@ -473,14 +473,6 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 
 /* TN Begin modified by xinjun.lu/860715 20240719 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
-	if(info->call_limit_ctrl != -1) {
-		if (info->call_limit_ctrl <=
-			pdata->input_current_limit) {
-			pdata->input_current_limit = info->call_limit_ctrl;
-			info->setting.input_current_limit1 = pdata->input_current_limit;
-		}
-		chr_info("inputlimit = %d, call_limit_ctrl = %d\n", pdata->input_current_limit, info->call_limit_ctrl);
-	}
 	if (info->disable_thermal_current_limit) {
 		pdata->thermal_charging_current_limit = -1;
 		pdata->thermal_input_current_limit = -1;

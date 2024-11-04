@@ -2003,27 +2003,6 @@ static ssize_t demo_mode_limit_store(struct device *dev,
 	return size;
 }
 static DEVICE_ATTR_RW(demo_mode_limit);
-
-static ssize_t call_limit_ctrl_current_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	struct mtk_charger *pinfo = dev->driver_data;
-	chr_err("[Charger] %s:%d\n", __func__, pinfo->call_limit_ctrl);
-	return sprintf(buf, "%d\n", pinfo->call_limit_ctrl);
-}
-static ssize_t call_limit_ctrl_current_store(struct device *dev, struct device_attribute *attr,
-				   const char *buf, size_t size)
-{
-	struct mtk_charger *pinfo = dev->driver_data;
-	signed int temp;
-	chr_err("[Charger] %s\n", __func__);
-	if (kstrtoint(buf, 10, &temp) == 0) {
-		chr_err("%s: scc call limit = %d\n", __func__, temp);
-		pinfo->call_limit_ctrl = temp;
-	}
-	_wake_up_charger(pinfo);
-	return size;
-}
-static DEVICE_ATTR_RW(call_limit_ctrl_current);
 /* TN Begin modified by jirui.li/860702 20240814 CR/EKLAMU-202 */
 
 #endif /* CONFIG_OEM_TINNO_CHARGER */
@@ -5837,9 +5816,6 @@ static int mtk_charger_setup_files(struct platform_device *pdev)
 	ret = device_create_file(&(pdev->dev), &dev_attr_demo_mode_limit);
 	if (ret)
 		goto _out;
-	ret = device_create_file(&(pdev->dev), &dev_attr_call_limit_ctrl_current);
-	if (ret)
-		goto _out;
 /* TN End modified by jirui.li/860702 20240814 CR/EKLAMU-202 */
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
@@ -6646,7 +6622,6 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	info->battery_protection_mode = false;
 	info->is_over_bpm_max_soc = false;
 	info->demo_mode_limit = false;
-	info->call_limit_ctrl = -1;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 
