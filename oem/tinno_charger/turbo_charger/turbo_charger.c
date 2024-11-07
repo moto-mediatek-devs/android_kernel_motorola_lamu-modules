@@ -953,7 +953,9 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 		is_turbo_charger_ready = false;
 		info->turbo_charger_request_volt = vbus_volt;
 		info->turbo_charger_request_curr = ibus_curr;
-		turbo_charger_enable_term_sw(info, true);
+		//turbo_charger_enable_term_sw(info, true);
+		if (!info->sw.charge_enabled)
+			turbo_charger_enable_sw(info, true);
 		turbo_charger_set_curr_limit_sw(info, info->turbo_charging_curr_min + 200000);
 		turbo_charger_set_chg_curr_limit_sw(info, info->turbo_charging_curr_min);
 		turbo_charger_move_state(info, TURBO_STATE_SW_LOOP);
@@ -1416,7 +1418,7 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 				turbo_charger_move_state(info, TURBO_STATE_CP_CC_LOOP);
 			}
 		} else {
-			if ((info->chrg_step.last_step && (ibatt_curr < info->turbo_charging_curr_min)) || ffc_batt_full) {
+			if (ffc_batt_full) {
 				if (chrg_cv_taper_tunning_cnt > CV_TAPPER_COUNT) {
 					turbo_charger_find_chrg_step(info, info->pres_temp_zone, vbatt_volt);
 					turbo_charger_move_state(info, TURBO_STATE_CP_QUIT);
@@ -1426,6 +1428,24 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 				} else {
 					chrg_cv_taper_tunning_cnt++;
 				}
+			} else if (info->chrg_step.last_step && (ibatt_curr < info->turbo_charging_curr_min) &&
+					(info->batt.temp < BATTERY_TEMP_LOW_TURBO || info->batt.temp >= BATTERY_TEMP_HIGH_TURBO)) {
+				info->cp_chg_done = true;
+				is_turbo_charger_ready = false;
+				if (info->cp.charge_enabled) {
+					turbo_charger_set_curr_limit_sw(info, info->turbo_charging_curr_min + 200000);
+					turbo_charger_set_chg_curr_limit_sw(info, info->turbo_charging_curr_min);
+					turbo_charger_enable_sw(info, true);
+					turbo_charger_enable_cp(info, false);
+					turbo_charger_check_cp_enabled(info);
+				}
+
+				info->sys_therm_cooling = false;
+				info->batt_therm_cooling = false;
+				info->batt_therm_cooling_cnt = 0;
+
+				turbo_charger_move_state(info, TURBO_STATE_RECOVERY_SW);
+				heartbeat_delay_ms = HEARTBEAT_SHORT_DELAY_MS;
 			} else {
 				if (vbatt_volt > info->chrg_step.chrg_step_cv_volt + 10000) {
 					info->turbo_charger_request_volt -= 20000;
@@ -1503,7 +1523,7 @@ static int turbo_charger_sm_work_func(struct turbo_charger_algo_info *info)
 
 		if (chrg_cv_taper_tunning_cnt > CV_TAPPER_COUNT) {
 			heartbeat_delay_ms = HEARTBEAT_SHORT_DELAY_MS;
-			turbo_charger_enable_term_sw(info, true);
+			//turbo_charger_enable_term_sw(info, true);
 			charger_dev_enable_vbus_ovp(info->sw_chg, true);
 			turbo_charger_move_state(info, TURBO_STATE_SW_LOOP);
 		}

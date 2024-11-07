@@ -146,7 +146,7 @@ static bool first_insert = true;
 #define BATTERY_PROTECT_MAX_SOC		80
 #define BATTERY_PROTECT_MIN_SOC		20
 #define BATTERY_CHARGING_FULL_SOC	100
-#define BATTERY_CV_GAP			30
+#define BATTERY_CV_GAP			40
 #define SW_JEITA_TEMP_10		10
 #define SW_JEITA_CV1		4250000
 #define SW_JEITA_CV2		4500000
@@ -4473,7 +4473,7 @@ static void charger_check_status(struct mtk_charger *info)
 	if (info->dvchg1_dev)
 		charger_dev_is_enabled(info->dvchg1_dev, &devchg1_en);
 
-	if (chg_dev_chgen && !devchg1_en) {
+	if (chg_dev_chgen && !devchg1_en && !turbo_charger_active) {
 		if (info->pe50.pres_chrg_step != STEP_FULL_PE50) {
 			if (temperature < BATTERY_TEMP_LOW || temperature > BATTERY_TEMP_HIGH) {
 				target_fv = pe50_get_ffc_fv(info, temperature);
@@ -5376,7 +5376,7 @@ static int ffc_bat_check_chg_done(struct mtk_charger *info)
 	} else
 		batt_temp = prop.intval / 10;
 
-	chr_info("%s: charger_present:%d, vbat:%d mV, ibat:%d mA, batt_soc:%d, batt_temp:%d C\n",
+	chr_err("%s: charger_present:%d, vbat:%d mV, ibat:%d mA, batt_soc:%d, batt_temp:%d C\n",
 				__func__, charger_present, batt_mv, batt_ma, batt_soc, batt_temp);
 
 	usb_mv = get_vbus(info);
@@ -5407,7 +5407,7 @@ static int ffc_bat_check_chg_done(struct mtk_charger *info)
 		}
 	}
 
-	chr_info("%s: pres_chrg_step:%d, target_mv:%d\n", __func__, info->pres_chrg_step, target_mv);
+	chr_err("%s: pres_chrg_step:%d, target_mv:%d\n", __func__, info->pres_chrg_step, target_mv);
 	return 0;
 }
 #endif

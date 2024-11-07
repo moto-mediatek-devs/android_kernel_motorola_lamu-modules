@@ -1883,11 +1883,11 @@ static int cx2589x_hw_init(struct cx2589x_device *cx)
 	if (ret)
 		goto err_out;
 
-	ret = cx2589x_set_bat_comp(cx, 40);
+	ret = cx2589x_set_bat_comp(cx, 0);
 	if (ret)
 		goto err_out;
 
-	ret = cx2589x_set_vclamp(cx, 224000);
+	ret = cx2589x_set_vclamp(cx, 0);
 	if (ret)
 		goto err_out;
 

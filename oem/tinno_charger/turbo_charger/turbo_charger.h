@@ -69,6 +69,8 @@
 #define CP_BUS_UVP_THRESHOLD				8000000
 #define CURRENT_2000_MA					2000000
 /*TN End modify vbus ovp by rongxing.li/860682 20231208 CR/EKFOGO4G-8986*/
+#define BATTERY_TEMP_LOW_TURBO		15
+#define BATTERY_TEMP_HIGH_TURBO		45
 
 extern int turbo_charger_get_log_level(void);
 #define TURBO_CHARGER_DBG(fmt, ...) \

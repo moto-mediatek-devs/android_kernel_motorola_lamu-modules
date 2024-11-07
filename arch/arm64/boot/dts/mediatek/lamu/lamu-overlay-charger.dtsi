@@ -146,7 +146,7 @@
 				<60 4208 2900 0    0    0    0   >;
 	thermal-min-level = <1000000>; /*uA*/
 	sw-charging-curr-limited = <100000>; /*uA*/
-	charging-curr-min = <200000>; /*uA*/
+	charging-curr-min = <1200000>; /*uA*/
 	turbo-volt-comp = <300000>; /*uV*/
 };
 

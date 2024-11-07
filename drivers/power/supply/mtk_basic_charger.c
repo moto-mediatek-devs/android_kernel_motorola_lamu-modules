@@ -203,9 +203,17 @@ static bool support_fast_charging(struct mtk_charger *info)
 
 		chg_alg_set_current_limit(alg, &info->setting);
 		state = chg_alg_is_algo_ready(alg);
+/* TN Begin modified by xinjun.lu/860715 20241105 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+		chr_err("%s %s ret:%s, prtocol_state:%d\n",
+			__func__, dev_name(&alg->dev),
+			chg_alg_state_to_str(state), info->protocol_state);
+#else
 		chr_debug("%s %s ret:%s, prtocol_state:%d\n",
 			__func__, dev_name(&alg->dev),
 			chg_alg_state_to_str(state), info->protocol_state);
+#endif
+/* TN End modified by xinjun.lu/860715 20241105 CR/EKLAMU-202 */
 
 		if (state == ALG_READY || state == ALG_RUNNING) {
 			ret = true;
