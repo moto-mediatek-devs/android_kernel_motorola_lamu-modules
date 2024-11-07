@@ -1686,6 +1686,8 @@ static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
 
 	if (!prev_vbus_gd && cx->state.vbus_gd) {
 		pr_info("adapter/usb inserted\n");
+		if (!cx->charger_wakelock->active)
+			__pm_stay_awake(cx->charger_wakelock);
 		Charger_Detect_Init();
 		cx->force_detect_count = 0;
 		cx->unknow_detect_count = 0;
@@ -1704,6 +1706,8 @@ static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
 		cx->fake_sdp_type = false;
 		cx->unknow_type_check = false;
 		power_supply_changed(cx->charger);
+		if (cx->charger_wakelock->active)
+			__pm_relax(cx->charger_wakelock);
 	}
 #else
 	schedule_delayed_work(&cx->charger_type_detect_work, msecs_to_jiffies(100));
