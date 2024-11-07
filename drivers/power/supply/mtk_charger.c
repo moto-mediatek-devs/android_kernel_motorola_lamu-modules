@@ -4843,6 +4843,10 @@ static int hvdcp_charging(struct mtk_charger *info)
 		}
 
 		while (time_out < 100) {
+			if (first_insert) {
+				chr_err("%s charge already plug out,quit hvdcp work\n", __func__);
+				return -EINVAL;
+			}
 			msleep(10);
 			ret = get_vbus(info);
 			if (ret < 0) {
