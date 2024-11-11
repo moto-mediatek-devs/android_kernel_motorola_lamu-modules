@@ -1695,6 +1695,7 @@ static irqreturn_t cx2589x_irq_handler_thread(int irq, void *private)
 	} else if (prev_vbus_gd && !cx->state.vbus_gd) {
 		cx2589x_get_vbus(cx, &vbus_volt);
 		pr_info("adapter/usb removed state.online=0x%x vbus=%d\n", cx->state.online, vbus_volt);
+		cx2589x_update_bits(cx, CX2589x_REG_02, CX2589x_AUTO_DPDM_MASK, 1);
 		Charger_Detect_Release();
 		cx2589x_set_dpdm_hiz(cx);
 		allow_set_dp_dm_vol = false;
