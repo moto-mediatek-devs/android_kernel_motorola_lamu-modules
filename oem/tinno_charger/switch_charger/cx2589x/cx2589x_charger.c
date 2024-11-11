@@ -1610,6 +1610,10 @@ static void unknow_charger_type_detect_work_func(struct work_struct *work)
 
 	pr_info("enter\n");
 
+	cx2589x_get_state(cx, &state);
+	if (state.chrg_type != CX2589x_USB_SDP)
+		return;
+
 	if (!IS_ERR_OR_NULL(cx->usb2_phy->otg->gadget)) {
 		cx->unknow_type_check = true;
 		do {
@@ -1629,7 +1633,7 @@ static void unknow_charger_type_detect_work_func(struct work_struct *work)
 			cx->unknow_detect_count++;
 		} while (cx->unknow_detect_count < UNKNOW_RETRY_COUNT);
 
-		if (state.chrg_type == CX2589x_USB_SDP)
+		if (state.chrg_type == CX2589x_USB_SDP && gadget_state == USB_STATE_NOTATTACHED)
 			cx->fake_sdp_type = true;
 
 		schedule_delayed_work(&cx->charger_type_detect_work, msecs_to_jiffies(50));
@@ -2565,6 +2569,8 @@ static int cx2589x_driver_probe(struct i2c_client *client,
 		cx2589x_force_dpdm(cx);
 	}
 /* TN End modified by xuan.wang/20241016 CR/EKLAMU-7909 */
+
+	schedule_delayed_work(&cx->unknow_charger_type_detect_work, msecs_to_jiffies(10000));
 
 	pr_info("successfully\n");
 
