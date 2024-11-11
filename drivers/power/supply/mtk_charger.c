@@ -1957,6 +1957,10 @@ static ssize_t turbo_power_mode_show(struct device *dev,
 	} else {
 		turbo_power_mode = 0;
 	}
+
+	if (!IS_ERR_OR_NULL(pinfo->current_alg) && pinfo->current_alg->alg_id == PE5_ID) {
+		turbo_power_mode = 1;
+	}
 	value = turbo_power_mode || turbo_test_mode;
 	chr_info("%s value %d\n", __func__, value);
 	return sprintf(buf, "%d\n", value);
