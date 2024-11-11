@@ -2012,7 +2012,8 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 			input_w = (uint32_t)(point_data[position + 5]);
 			if (input_w == 0)
 				input_w = 1;
-			input_p = (uint32_t)(point_data[1 + 98 + i]);
+			//input_p = (uint32_t)(point_data[1 + 98 + i]);
+			input_p = (uint32_t)(point_data[position + 5]);
 			if (input_p == 0)
 				input_p = 1;
 #else /* #if NVT_SUPER_RESOLUTION_N */
