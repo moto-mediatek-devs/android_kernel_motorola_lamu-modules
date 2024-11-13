@@ -501,6 +501,7 @@ static kal_uint16 set_gain(kal_uint16 gain)
 	}
 	
 	write_cmos_sensor(0x3e0e,0x0b);
+	write_cmos_sensor(0x3812,0x00);
 	write_cmos_sensor(0x3e06, dgain_g_coser & 0xff);
 	write_cmos_sensor(0x3e07, dgain_g_fine  & 0xff);
 	write_cmos_sensor(0x3e66, dgain_r_coser & 0xff);
@@ -509,7 +510,8 @@ static kal_uint16 set_gain(kal_uint16 gain)
 	write_cmos_sensor(0x3e69, dgain_b_fine  & 0xff);
 	write_cmos_sensor(0x3e6a, dgain_g_coser & 0xff);
 	write_cmos_sensor(0x3e6b, dgain_g_fine  & 0xff);
-	CAM_DBG(PFX,"Exit! SC520CS_AGC_Param[gain_index][1] = 0x%x, d_gain = 0x%x, gain = 0x%x, reg_gain = %d\n",
+	write_cmos_sensor(0x3812,0x30);
+	CAM_DBG(PFX,"herman test 1 SC520CS_AGC_Param[gain_index][1] = 0x%x, d_gain = 0x%x, gain = 0x%x, reg_gain = %d\n",
 			 SC520CS_AGC_Param[gain_index][1], d_gain, gain, reg_gain);
 
 	return reg_gain;
