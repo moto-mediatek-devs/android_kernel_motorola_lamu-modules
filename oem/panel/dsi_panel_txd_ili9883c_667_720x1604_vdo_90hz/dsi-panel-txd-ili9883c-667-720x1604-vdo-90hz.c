@@ -52,7 +52,7 @@ EXPORT_SYMBOL(lcd_ili_resume_by_ddi);
 
 int hbm;
 bool is_hbm;
-bool is_extra;
+int is_extra;
 bool is_suspend;
 static unsigned char extra_buf[16] = {0};
 static unsigned char hbm_buf[16] = {0};
@@ -762,12 +762,14 @@ static int txd_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 	if (!cb)
 		return -1;
 
-	/*if(!is_extra & (!is_hbm))
-		bl_lvl = level * 150 / 255; //500nit
-	else
-		bl_lvl = level * 240 / 255; //800nit*/
 	if (level > 255)
 		level = 255;
+
+	if (is_extra == 1 && level > 220) {
+		level = 220;
+	} else if (is_extra == 2 && level > 241) {
+		level = 241;
+	}
 
 	bl_lvl = backlight_i2c_map4[level];
 
