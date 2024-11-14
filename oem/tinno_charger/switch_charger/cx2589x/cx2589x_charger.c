@@ -840,7 +840,7 @@ static int cx2589x_set_hiz_en(struct charger_device *chg_dev, bool hiz_en)
 	return cx2589x_update_bits(cx, CX2589x_REG_00, CX2589x_HIZ_EN, reg_val);
 }
 
-static int cx2589x_reset_chip(struct cx2589x_device *cx)
+__maybe_unused static int cx2589x_reset_chip(struct cx2589x_device *cx)
 {
 	int ret;
 
@@ -1849,7 +1849,7 @@ static int cx2589x_hw_init(struct cx2589x_device *cx)
 			CX2589x_VREG_V_MAX_uV;
 
 	pr_info("init device enter\n");
-	cx2589x_reset_chip(cx);
+	//cx2589x_reset_chip(cx);
 	cx2589x_enable_charger(cx);
 	cx2589x_init_charge(cx);
 	cx2589x_set_watchdog_timer(cx, 0);
