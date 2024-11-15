@@ -634,7 +634,7 @@ __maybe_unused static int sgm41600_enable_charge(struct sgm41600_chip *sgm, bool
 	SGM_INFO("charger en:%d\n",en);
 
 	if (en)
-		ret = sgm41600_field_write(sgm, CHG_MODE, sgm->cfg.mode);
+		ret = sgm41600_field_write(sgm, CHG_MODE, 0x2);
 	else
 		ret = sgm41600_field_write(sgm, CHG_MODE, 0);
 
