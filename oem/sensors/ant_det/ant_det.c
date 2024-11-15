@@ -102,9 +102,9 @@ static int ant_det_populate_dt_pinfo(struct platform_device *pdev)
 
 	ant_pdata->gpio =
 		of_get_named_gpio(pdev->dev.of_node, "tinno,ant-det-gpio", 0);
-	ant_pdata->irq = gpio_to_irq(ant_pdata->gpio);
+//	ant_pdata->irq = gpio_to_irq(ant_pdata->gpio);
 	pr_err(" ant_det gpio: %d\n", ant_pdata->gpio);
-	pr_err(" ant_det irq: %d\n", ant_pdata->irq);
+//	pr_err(" ant_det irq: %d\n", ant_pdata->irq);
 	ret = gpio_get_value(ant_pdata->gpio);
 	pr_err(" ant_det gpio_get_value: %d\n", ret);
 #if 0
@@ -146,7 +146,7 @@ static ssize_t gpio_level_store(const struct class *class,
 }
 
 static CLASS_ATTR_RW(gpio_level);
-
+#if 0
 static void ant_det_work_func(struct work_struct *work)
 {
 	int ret;
@@ -174,7 +174,7 @@ static irqreturn_t ant_det_irq_handler(int irq, void *dev_id)
 	schedule_delayed_work(&ant_pdata->det_work, HZ);
 	return IRQ_HANDLED;
 }
-
+#endif
 static int ant_det_probe(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -207,14 +207,14 @@ static int ant_det_probe(struct platform_device *pdev)
 	//TN Begin modified by bingtai.zou/860558 20230823 EKFOGO4G-1547 end
 	input_set_capability(ant_pdata->input, EV_KEY, 1);
 	input_register_device(ant_pdata->input);
-#endif
+
 	INIT_DELAYED_WORK(&ant_pdata->det_work, ant_det_work_func);
 
 	if (ant_pdata->irq) {
 		ret = request_irq(ant_pdata->irq, ant_det_irq_handler,
 				IRQ_TYPE_EDGE_BOTH, "ant_det", pdev);
 	}
-
+#endif
 #if 0
 #if 0
 	fm_lna_pdata->lna_vdd = regulator_get(&pdev->dev, "lna_vdd");
