@@ -3204,10 +3204,28 @@ static void mtk_battery_daemon_handler(struct mtk_battery *gm, void *nl_data,
 	{
 		int is_charger_exist = 0;
 
+/* TN Begin modified by xinjun.lu/860715 20241119 CR/EKLAMU-9710 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+		union power_supply_propval online = {0};
+		if (!IS_ERR_OR_NULL(gm->bm->bs_data.chg_psy)) {
+			power_supply_get_property(gm->bm->bs_data.chg_psy, POWER_SUPPLY_PROP_ONLINE, &online);
+			if (online.intval)
+				is_charger_exist = true;
+			else
+				is_charger_exist = false;
+		} else {
+			if (gm->bm->bs_data.bat_status == POWER_SUPPLY_STATUS_CHARGING)
+				is_charger_exist = true;
+			else
+				is_charger_exist = false;
+		}
+#else
 		if (gm->bm->bs_data.bat_status == POWER_SUPPLY_STATUS_CHARGING)
 			is_charger_exist = true;
 		else
 			is_charger_exist = false;
+#endif
+/* TN End modified by xinjun.lu/860715 20241119 CR/EKLAMU-9710 */
 
 		ret_msg->data_len += sizeof(is_charger_exist);
 		memcpy(ret_msg->data,

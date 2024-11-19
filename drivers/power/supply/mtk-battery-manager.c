@@ -1530,17 +1530,19 @@ static void mtk_battery_external_power_changed(struct power_supply *psy)
 		if (status.intval == POWER_SUPPLY_STATUS_FULL
 			&& bm->b_EOC != true) {
 			pr_err("POWER_SUPPLY_STATUS_FULL, EOC\n");
-/* TN Begin modified by xinjun.lu/860715 20240911 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
-			bs_data->bat_status = POWER_SUPPLY_STATUS_FULL;
-#endif
-/* TN End modified by xinjun.lu/860715 20240911 CR/EKLAMU-202 */
 			gauge_get_int_property(bm->gm1, GAUGE_PROP_BAT_EOC);
 			bm_send_cmd(bm, MANAGER_NOTIFY_CHR_FULL, 0);
 			pr_err("GAUGE_PROP_BAT_EOC done\n");
 			bm->b_EOC = true;
 		} else
 			bm->b_EOC = false;
+
+/* TN Begin modified by xinjun.lu/860715 20241119 CR/EKLAMU-9710 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+		if (status.intval == POWER_SUPPLY_STATUS_FULL)
+			bs_data->bat_status = POWER_SUPPLY_STATUS_FULL;
+#endif
+/* TN End modified by xinjun.lu/860715 20241119 CR/EKLAMU-9710 */
 
 		battery_update(bm);
 
