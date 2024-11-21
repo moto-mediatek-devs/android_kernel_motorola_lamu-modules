@@ -514,11 +514,11 @@ static int dijin_enable(struct drm_panel *panel)
 	return 0;
 }
 
-#define HFP (120)
+#define HFP (32)
 #define HSA (4)
-#define HBP (104)
-#define VFP_60 (1320)
-#define VFP_90 (324)
+#define HBP (32)
+#define VFP_60 (1080)
+#define VFP_90 (180)
 #define VSA (4)
 #define VBP (32)
 #define VAC (1604)
@@ -624,7 +624,7 @@ static int dijin_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 }
 
 static struct mtk_panel_params ext_params = {
-	.pll_clk = 550,
+	.pll_clk = 420,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,
 	.lcm_esd_check_table[0] = {
