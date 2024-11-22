@@ -641,7 +641,7 @@ static struct mtk_panel_params ext_params = {
 };
 
  static struct mtk_panel_params ext_params_90hz = {
-	.pll_clk = 420,
+	.pll_clk = 550,
 	// .vfp_low_power = 300,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,

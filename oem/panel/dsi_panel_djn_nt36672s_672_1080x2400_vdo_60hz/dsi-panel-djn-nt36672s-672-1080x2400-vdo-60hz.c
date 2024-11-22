@@ -1046,11 +1046,11 @@ static struct mtk_panel_params ext_params = {
 
 	.ssc_enable = 0,
 
- 	.dyn = {
+ 	/*.dyn = {
 		.switch_en = 1,
 		.pll_clk = 553,
 		.hfp = 34,
-	},
+	},*/
 };
 
 /* static struct mtk_panel_params ext_params_90hz = {
