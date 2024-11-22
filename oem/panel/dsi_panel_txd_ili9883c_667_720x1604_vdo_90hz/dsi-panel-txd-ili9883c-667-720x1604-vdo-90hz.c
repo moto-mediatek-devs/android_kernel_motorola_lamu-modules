@@ -793,11 +793,11 @@ static struct mtk_panel_params ext_params = {
 		.para_list[0] = 0x9c,
 	},
 	.ssc_enable = 0,
- 	/*.dyn = {
+ 	.dyn = {
 		.switch_en = 1,
 		.pll_clk = 553,
 		.hbp = 92,
-	},*/
+	},
 };
 
 static struct mtk_panel_params ext_params_90hz = {
@@ -811,11 +811,11 @@ static struct mtk_panel_params ext_params_90hz = {
 		.para_list[0] = 0x9c,
 	},
 	.ssc_enable = 0,
- 	/*.dyn = {
+ 	.dyn = {
 		.switch_en = 1,
 		.pll_clk = 553,
 		.hbp = 92,
-	},*/
+	},
 };
 
 struct drm_display_mode *get_mode_by_id_hfp(struct drm_connector *connector,

@@ -925,9 +925,9 @@ static int djn_enable(struct drm_panel *panel)
 	return 0;
 }
 
-#define HFP (22)
+#define HFP (50)
 #define HSA (4)
-#define HBP (10)
+#define HBP (40)
 #define VFP_60 (56)
 //#define VFP_90 (300)
 #define VSA (8)
@@ -1035,7 +1035,7 @@ static int djn_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 }
 
 static struct mtk_panel_params ext_params = {
-	.pll_clk = 534,
+	.pll_clk = 560,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,
 	.lcm_esd_check_table[0] = {
@@ -1046,11 +1046,11 @@ static struct mtk_panel_params ext_params = {
 
 	.ssc_enable = 0,
 
- 	/*.dyn = {
+ 	.dyn = {
 		.switch_en = 1,
 		.pll_clk = 553,
 		.hfp = 34,
-	},*/
+	},
 };
 
 /* static struct mtk_panel_params ext_params_90hz = {
