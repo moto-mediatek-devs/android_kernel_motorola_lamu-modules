@@ -1184,11 +1184,6 @@ static int pe50_stop(struct pe50_algo_info *info, struct pe50_stop_info *sinfo)
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 			pe50_enable_ta_charging(info, false, 9000,
 						2000);
-		if (info->data->ta_auth_data.pdp < PE50_ENTER_POWER_MIN) {
-			PE50_ERR("Pd adapter support power :[%dW] < [%dW], PE5 do not stat again\n",
-				info->data->ta_auth_data.pdp, PE50_ENTER_POWER_MIN);
-			data->pe50_can_start_again = false;
-		}
 #else
 			pe50_enable_ta_charging(info, false, PE50_VTA_INIT,
 						PE50_ITA_INIT);
@@ -3546,7 +3541,7 @@ static inline int __pe50_plugout_reset(struct pe50_algo_info *info,
 	data->ta_ready = false;
 /* TN Begin modified by xinjun.lu/860715 20240820 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
-	data->pe50_can_start_again = true;
+	data->first_plug_in = true;
 #endif
 /* TN End modified by xinjun.lu/860715 20240820 CR/EKLAMU-202 */
 	memset(auth_data, 0, sizeof(*auth_data));
@@ -3957,16 +3952,6 @@ static int pe50_is_algo_ready(struct chg_alg_device *alg)
 		goto out;
 	}
 
-/* TN Begin modified by xinjun.lu/860715 20240820 CR/EKLAMU-202 */
-#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
-	if (!(data->pe50_can_start_again)) {
-		ret = ALG_TA_NOT_SUPPORT;
-		PE50_INFO("pe50 can not start again\n");
-		goto out;
-	}
-#endif
-/* TN End modified by xinjun.lu/860715 20240820 CR/EKLAMU-202 */
-
 	mutex_lock(&data->notify_lock);
 	if (data->notify & PE50_RESET_NOTIFY) {
 		PE50_INFO("detach/hardreset happened\n");
@@ -4010,6 +3995,20 @@ static int pe50_is_algo_ready(struct chg_alg_device *alg)
 		goto out;
 	}
 	ret = ALG_READY;
+
+/* TN Begin modified by xinjun.lu/860715 20240820 CR/EKLAMU-202 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	if (info->data->ta_auth_data.pdp < PE50_ENTER_POWER_MIN) {
+		ret = ALG_TA_NOT_SUPPORT;
+		PE50_ERR("Pd adapter support power :[%dW] < [%dW], PE5 do not stat again\n",
+			info->data->ta_auth_data.pdp, PE50_ENTER_POWER_MIN);
+		if (data->first_plug_in) {
+			pe50_enable_ta_charging(info, false, 5000, 1000);
+			data->first_plug_in = false;
+		}
+	}
+#endif
+/* TN End modified by xinjun.lu/860715 20240820 CR/EKLAMU-202 */
 
 out:
 	mutex_unlock(&data->lock);
@@ -4502,7 +4501,7 @@ static int pe50_probe(struct platform_device *pdev)
 	chg_alg_dev_set_drvdata(info->alg, info);
 /* TN Begin modified by xinjun.lu/860715 20240820 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
-	data->pe50_can_start_again = true;
+	data->first_plug_in = true;
 #endif
 /* TN End modified by xinjun.lu/860715 20240820 CR/EKLAMU-202 */
 

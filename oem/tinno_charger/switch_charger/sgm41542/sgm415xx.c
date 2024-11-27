@@ -981,7 +981,7 @@ static int sgm4154x_plug_out(struct charger_device *chg_dev)
 	if (ret) {
 		pr_err("Failed to disable charging:%d\n", ret);
 	}
-
+	sgm->pd_type_detected = false;
 	return ret;
 }
 
@@ -1218,6 +1218,7 @@ static int sgm4154x_charger_set_property(struct power_supply *psy,
 			schedule_delayed_work(&sgm->charge_detect_delayed_work, msecs_to_jiffies(500));
 		} else if (val->intval == 0) {
 			pr_info("attach is %d, vbus not online \n", val->intval);
+			sgm->pd_type_detected = false;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 			sgm->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
 #endif
@@ -1230,6 +1231,9 @@ static int sgm4154x_charger_set_property(struct power_supply *psy,
 			sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB_TYPE_C;
 			cancel_delayed_work(&sgm->charge_detect_delayed_work);
 			power_supply_changed(sgm->charger);
+		} else if (val->intval == 5) {
+			pr_info("attach is %d, PD type is ATTACH_TYPE_PD_DCP\n", val->intval);
+			sgm->pd_type_detected = true;
 		}
 		break;
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
@@ -1554,6 +1558,19 @@ static void charger_detect_work_func(struct work_struct *work)
 	mutex_lock(&sgm->lock);
 	sgm->state = state;
 	mutex_unlock(&sgm->lock);
+
+	if (sgm->pd_type_detected) {
+		pr_err("PD type is ATTACH_TYPE_PD_DCP, no need to detect, SGM4154x charger type: DCP\n");
+		sgm->chg_type = POWER_SUPPLY_TYPE_USB_DCP;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
+		sgm->psy_usb_type = POWER_SUPPLY_USB_TYPE_DCP;
+#endif
+		sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB_DCP;
+		power_supply_changed(sgm->charger);
+		pr_info("Relax wakelock\n");
+		__pm_relax(sgm->charger_wakelock);
+		return;
+	}
 
 /*TN Begin modified by maocai.cao/808964 20231120 CR/EKFOGO4G-3815*/
 #if 0
@@ -2467,6 +2484,7 @@ static int sgm4154x_driver_probe(struct i2c_client *client,
 	}
 
 	sgm->battery_full = false;
+	sgm->pd_type_detected = false;
 	/* otg regulator */
 	s_chg_dev_otg = sgm->chg_dev;
 

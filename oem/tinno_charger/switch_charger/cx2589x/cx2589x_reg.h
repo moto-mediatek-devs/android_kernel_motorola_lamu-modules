@@ -275,6 +275,7 @@ struct cx2589x_device {
 	bool fake_sdp_type;
 	bool unknow_type_check;
 	bool typec_attached;
+	bool pd_type_detected;
 };
 
 #endif /* _CX2589x_CHARGER_H__ */

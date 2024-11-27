@@ -197,7 +197,7 @@ struct pe50_algo_data {
 	int pe50_therm_vol_thres;
 #endif
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
-	bool pe50_can_start_again;
+	bool first_plug_in;
 #endif
 /* TN End modified by xinjun.lu/860715 20240820 CR/EKLAMU-202 */
 };

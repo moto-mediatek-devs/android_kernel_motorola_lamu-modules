@@ -1171,6 +1171,7 @@ static int cx2589x_charger_set_property(struct power_supply *psy,
 		} else if (val->intval == 0) {
 			pr_info("attach is %d, vbus not online\n", val->intval);
 			cx->typec_attached = false;
+			cx->pd_type_detected = false;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 			cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
 #endif
@@ -1191,6 +1192,9 @@ static int cx2589x_charger_set_property(struct power_supply *psy,
 			cancel_delayed_work(&cx->unknow_charger_type_detect_work);
 			cancel_delayed_work(&cx->retry_charger_detect_work);
 			power_supply_changed(cx->charger);
+		} else if (val->intval == 5) {
+			pr_info("attach is %d, PD type is ATTACH_TYPE_PD_DCP\n", val->intval);
+			cx->pd_type_detected = true;
 		}
 		break;
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
@@ -1457,6 +1461,19 @@ static void charger_type_detect_work_func(struct work_struct *work)
 	mutex_lock(&cx->lock);
 	cx->state = state;
 	mutex_unlock(&cx->lock);
+
+	if (cx->pd_type_detected) {
+		pr_err("PD type is ATTACH_TYPE_PD_DCP, no need to detect, CX2589x charger type: DCP\n");
+		cx->chg_type = POWER_SUPPLY_TYPE_USB_DCP;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
+		cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_DCP;
+#endif
+		cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB_DCP;
+		power_supply_changed(cx->charger);
+		pr_info("Relax wakelock\n");
+		__pm_relax(cx->charger_wakelock);
+		return;
+	}
 
 	if (!cx->state.vbus_gd) {
 		pr_err("Vbus not present\n");
@@ -2264,7 +2281,7 @@ static int cx2589x_plug_out(struct charger_device *chg_dev)
 	if (ret) {
 		pr_err("Failed to disable charging(%d)\n", ret);
 	}
-
+	cx->pd_type_detected = false;
 	return ret;
 }
 
@@ -2467,6 +2484,7 @@ static int cx2589x_driver_probe(struct i2c_client *client,
 	cx->force_detect_count = 0;
 	cx->fake_sdp_type = false;
 	cx->unknow_type_check = false;
+	cx->pd_type_detected = false;
 
 	mutex_init(&cx->lock);
 	mutex_init(&cx->i2c_rw_lock);

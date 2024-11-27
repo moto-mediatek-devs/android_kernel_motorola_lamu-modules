@@ -283,6 +283,7 @@ struct sgm4154x_device {
 	struct iio_channel *vbus;
 	int force_detect_count;
 	bool battery_full;
+	bool pd_type_detected;
 };
 
 #endif /* _SGM4154x_CHARGER_H__ */
