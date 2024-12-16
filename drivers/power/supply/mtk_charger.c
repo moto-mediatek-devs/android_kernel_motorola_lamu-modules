@@ -136,8 +136,6 @@ static char *stepchg_str[] = {
 #if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
 #define HVDCP_TARGE_VOLT  6600 //mV
 #define HVDCP_MAX_VOLT    (HVDCP_TARGE_VOLT + 200) //mV
-#define HVDCP_VIN_DPM	4800000
-#define HVDCP_VIN_DPM_GAP	400000
 static bool first_insert = true;
 #endif
 /* TN End modified by xinjun.lu/860715 20240808 CR/EKLAMU-202 */
@@ -941,19 +939,6 @@ static void check_dynamic_mivr(struct mtk_charger *info)
 		else
 			charger_dev_set_mivr(info->chg1_dev,
 				info->data.min_charger_voltage);
-/* TN Begin modified by xinjun.lu/860715 20241012 CR/EKLAMU-7959 */
-#if IS_ENABLED(CONFIG_OEM_HVDCP_ALGO)
-		/*
-		 * Should set vindpm for some weak QC3 adapter to prevent the vbus drop.
-		 * temporarily set vindpm to 4.8v during QC3 detection.
-		 */
-		if (first_insert == false)
-			charger_dev_set_mivr(info->chg1_dev, HVDCP_VIN_DPM);
-
-		if (info->ext_chr_type == POWER_SUPPLY_TYPE_USB_QC3)
-			charger_dev_set_mivr(info->chg1_dev, HVDCP_TARGE_VOLT * 1000 - HVDCP_VIN_DPM_GAP);
-#endif
-/* TN End modified by xinjun.lu/860715 20241012 CR/EKLAMU-7959 */
 	}
 }
 
