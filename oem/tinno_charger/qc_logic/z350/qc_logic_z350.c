@@ -20,6 +20,7 @@
 #include <linux/err.h>
 #include <linux/power_supply.h>
 #include <linux/version.h>
+#include <linux/time.h>
 #include "qc_logic_z350.h"
 
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
@@ -1095,6 +1096,9 @@ static int z350_psy_notifier_cb(struct notifier_block *nb,
 				if (chip->qc3p_type == QC3P_POWER_NONE && chip->first_detect_dcp == true) {
 					mutex_lock(&chip->qc3p_lock);
 					pr_info("detect DCP and QC3P not detected, try to QC3P detection\n");
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+					info->is_hvdcp_detecting = true;
+#endif
 					/*Set cur is 500ma before do BC1.2 & QC*/
 					charger_dev_set_charging_current(chip->charger_dev, 500000);
 					charger_dev_set_input_current(chip->charger_dev, 500000);
@@ -1113,6 +1117,9 @@ static int z350_psy_notifier_cb(struct notifier_block *nb,
 					if (chip->qc3p_type == QC3P_POWER_15W) {
 						pr_info("detect QC3 type, set vbus to %d mV\n", QC3_TARGE_VOLT);
 						z350_qc3_pulse(chip, ((QC3_TARGE_VOLT - QC3_BASE_VOLT) / QC3_VOLT_STEP));
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+						info->hvdcp_boost_done_time = ktime_get_boottime();
+#endif
 						//gpio_direction_output(chip->reset_gpio, 1);
 					} else if (chip->qc3p_type == QC3P_POWER_18W
 						|| chip->qc3p_type == QC3P_POWER_27W
@@ -1131,6 +1138,9 @@ static int z350_psy_notifier_cb(struct notifier_block *nb,
 						gpio_direction_output(chip->reset_gpio, 1);
 					}
 					power_supply_changed(chip->z350_usb_psy);
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+					info->is_hvdcp_detecting = false;
+#endif
 				} else {
 					pr_info("QC3P or QC3 already detected done, Ignore detection\n");
 				}

@@ -104,6 +104,10 @@ static unsigned int turbo_test_mode = 0;
 #endif /* CONFIG_OEM_TURBO_CHARGER */
 /*TN End modified by hao.jia/809321 20240628 CR/EKLAMU-202 */
 
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+#define HVDCP_IGNORE_TIME_DIFF_NS 800000000
+#endif
+
 struct tag_bootmode {
 	u32 size;
 	u32 tag;
@@ -4811,20 +4815,20 @@ static int hvdcp_charging(struct mtk_charger *info)
 		return ret;
 	}
 	chr_info("%s enter hvdcp vbus old %d\n", __func__, vbus_volt_old);
-	msleep(100);
+	mdelay(100);
 	for (i = 0; i < 15; i++) {
 		ret = charger_dev_set_dp_voltage(info->chg1_dev, 3300000);
 		if (ret < 0) {
 			chr_err("%s ignore hvdcp detect due to set dp voltage failed(%d), Loop: %d\n", __func__, ret, i);
 			return ret;
 		}
-		usleep_range(100, 100);
+		udelay(100);
 		ret = charger_dev_set_dp_voltage(info->chg1_dev, 600000);
 		if (ret < 0) {
 			chr_err("%s ignore hvdcp detect due to set dp voltage failed(%d), Loop: %d\n", __func__, ret, i);
 			return ret;
 		}
-		msleep(500);
+		mdelay(500);
 		ret = get_vbus(info);
 		if (ret < 0) {
 			chr_err("%s get vbus voltage failed\n", __func__);
@@ -4833,17 +4837,18 @@ static int hvdcp_charging(struct mtk_charger *info)
 
 		while (time_out < 100) {
 			if (first_insert) {
+				info->hvdcp_boost_done_time = ktime_get_boottime();
 				chr_err("%s charge already plug out,quit hvdcp work\n", __func__);
 				return -EINVAL;
 			}
-			msleep(10);
+			mdelay(10);
 			ret = get_vbus(info);
 			if (ret < 0) {
 				chr_err("%s check hvdcp vbus failed, try count: %d\n", __func__, i);
 				return ret;
 			}
 			vbus_volt_new = get_vbus(info);
-			if (vbus_volt_new > vbus_volt_old) {
+			if (vbus_volt_new >= vbus_volt_old - 200) {
 				vbus_volt_old = vbus_volt_new;
 				chr_info("%s hvdcp detected, vbus new voltage: %d\n",  __func__, vbus_volt_new);
 				break;
@@ -4858,16 +4863,17 @@ static int hvdcp_charging(struct mtk_charger *info)
 		if (vbus_volt_new >= HVDCP_TARGE_VOLT) {
 			chr_err("%s vbus new >= %d, vbus voltage: %d\n", __func__, HVDCP_TARGE_VOLT, vbus_volt_new);
 			info->ext_chr_type = POWER_SUPPLY_TYPE_USB_QC3;
+			info->hvdcp_boost_done_time = ktime_get_boottime();
 			break;
 		}
 	}
 
 	if (vbus_volt_new >= HVDCP_MAX_VOLT) {
-		msleep(300);
+		mdelay(300);
 		ret = charger_dev_set_dm_voltage(info->chg1_dev, 600000);
-		usleep_range(100, 100);
+		udelay(100);
 		ret = charger_dev_set_dm_voltage(info->chg1_dev, 3300000);
-		msleep(500);
+		mdelay(500);
 		ret = get_vbus(info);
 		if (ret < 0) {
 			chr_err("%s get vbus voltage failed\n", __func__);
@@ -4890,6 +4896,8 @@ static int hvdcp_charger_detect_notifier_cb(struct notifier_block *nb,
 	struct power_supply *psy = data;
 	int ret = 0;
 	int chr_type = 0;
+	ktime_t time_diff;
+	struct timespec64 dtime;
 
 	chr_err("%s: enter, power supply name is %s\n", __func__, psy->desc->name);
 
@@ -4913,6 +4921,17 @@ static int hvdcp_charger_detect_notifier_cb(struct notifier_block *nb,
 							chr_err("%s: ignore QC3 detection due to pd pps adapter\n", __func__);
 							return NOTIFY_DONE;
 						}
+
+						if (ktime_compare(info->hvdcp_plug_in_time, info->hvdcp_boost_done_time) >= 0) {
+							time_diff = ktime_sub(info->hvdcp_plug_in_time, info->hvdcp_boost_done_time);
+							dtime = ktime_to_timespec64(time_diff);
+							chr_err("%s: dtime %lld.%lld\n", __func__, (long long)dtime.tv_sec, (long long)dtime.tv_nsec);
+							if (dtime.tv_sec == 0 && dtime.tv_nsec < HVDCP_IGNORE_TIME_DIFF_NS) {
+								chr_err("%s: hvdcp dtime too short, ignore detect QC3.\n", __func__);
+								return NOTIFY_DONE;
+							}
+						}
+
 						chr_err("%s: found 18W device, try to detect QC3 charger\n", __func__);
 						charger_dev_set_dp_voltage(info->chg1_dev, 600000);
 						schedule_delayed_work(&info->hvdcp_work, msecs_to_jiffies(1500));
@@ -4939,12 +4958,17 @@ static void charger_hvdcp_detect_work(
 		cancel_delayed_work(&info->hvdcp_work);
 		return;
 	}
+	info->is_hvdcp_detecting = true;
+	/*Set cur is 500ma before do BC1.2 & QC*/
+	charger_dev_set_charging_current(info->chg1_dev, 500000);
+	charger_dev_set_input_current(info->chg1_dev, 500000);
 	ret = hvdcp_charging(info);
 	if (ret < 0) {
 		cancel_delayed_work(&info->hvdcp_work);
 		chr_err("cancel charger_delayed_work hvdcp\n");
 		first_insert = true;
 	}
+	info->is_hvdcp_detecting = false;
 }
 #endif
 /* TN End modified by xinjun.lu/860715 20240710 CR/EKLAMU-202 */
@@ -4994,6 +5018,10 @@ static int mtk_charger_plug_out(struct mtk_charger *info)
 	info->pe50.pres_chrg_step = STEP_NONE_PE50;
 	charger_dev_enable_termination(info->chg1_dev, true);
 	info->ignore_current_check_time = 0;
+	info->aicl_check = true;
+	info->aicl_final_ic = 0;
+	info->restart_hvdcp_work = false;
+	info->is_hvdcp_detecting = false;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
 	info->start_factory_discharging = false;
@@ -5046,6 +5074,7 @@ static int mtk_charger_plug_in(struct mtk_charger *info,
 	info->batpro_done = false;
 	smart_charging(info);
 	chr_err("mtk_is_charger_on plug in, type:%d\n", chr_type);
+	info->hvdcp_plug_in_time = ktime_get_boottime();
 
 	vbat = get_battery_voltage(info);
 
@@ -6615,6 +6644,12 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	info->battery_protection_mode = false;
 	info->is_over_bpm_max_soc = false;
 	info->demo_mode_limit = false;
+	info->aicl_check = true;
+	info->aicl_final_ic = 0;
+	info->is_hvdcp_detecting = false;
+	info->restart_hvdcp_work = false;
+	info->hvdcp_boost_done_time = ktime_get_boottime();
+	info->hvdcp_plug_in_time = ktime_get_boottime();
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 

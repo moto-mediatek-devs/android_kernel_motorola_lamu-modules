@@ -30,6 +30,7 @@
 #include <linux/pinctrl/consumer.h>
 #include <linux/firmware.h>
 #include <linux/version.h>
+#include <linux/time.h>
 
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
 #include <tinno_charger.h>
@@ -1398,11 +1399,17 @@ static int wt6670f_psy_notifier_cb(struct notifier_block *nb,
 
 				if (chip->qc3p_type == QC3P_POWER_NONE && chip->first_detect_dcp == true) {
 					pr_info("detect DCP and QC3P not detected, try to QC3P detection\n");
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+					info->is_hvdcp_detecting = true;
+#endif
 					schedule_delayed_work(&chip->get_charger_type_work, 0);
 					msleep(4000);
 					if (chip->qc3p_type == QC3P_POWER_15W) {
 						pr_info("detect QC3 type, set vbus to %d mV\n", QC3_TARGE_VOLT);
 						wt6670f_set_qc3_volt_count((QC3_TARGE_VOLT - QC3_BASE_VOLT) / QC3_VOLT_STEP);
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+						info->hvdcp_boost_done_time = ktime_get_boottime();
+#endif
 					} else if (chip->qc3p_type == QC3P_POWER_18W
 						|| chip->qc3p_type == QC3P_POWER_27W
 						|| chip->qc3p_type == QC3P_POWER_40W) {
@@ -1420,6 +1427,9 @@ static int wt6670f_psy_notifier_cb(struct notifier_block *nb,
 						gpio_direction_output(chip->rst_gpio, 1);
 					}
 					power_supply_changed(chip->qc_phy_psy);
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+					info->is_hvdcp_detecting = false;
+#endif
 				} else {
 					pr_info("QC3P or QC3 already detected done, Ignore detection\n");
 				}

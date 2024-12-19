@@ -64,6 +64,9 @@
 #include "../../../oem/tinno_charger/tinno_charger.h"
 #define RECHARGE_CAPACITY 95
 #define RECHARGE_OVER_TEMP_GAP 5
+#define HVDCP_AICL_CURRENT_STEP 100000
+#define HVDCP_AICL_TARGET_VOLTAGE 6200
+#define HVDCP_AICL_BASE_CURRENT 1000000
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240729 CR/EKLAMU-202 */
 
@@ -106,6 +109,48 @@ static int _uA_to_mA(int uA)
 	else
 		return uA / 1000;
 }
+
+/* TN Begin modified by xinjun.lu/860715 20241217 CR/EKLAMU-7959 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+static int check_hvdcp_aicl(struct mtk_charger *info)
+{
+	int i = 0;
+	int vbus_now = 0;
+	int temp_input_current_limit = 0;
+	int count = 0;
+	int mivr = 0;
+
+	charger_dev_get_mivr(info->chg1_dev, &mivr);
+	count = (info->data.hvdcp_input_current_limit - HVDCP_AICL_BASE_CURRENT) / HVDCP_AICL_CURRENT_STEP;
+	chr_err("%s count=%d mivr=%d\n", __func__, count, mivr);
+
+	for (i = 0; i < count; i++) {
+		temp_input_current_limit = HVDCP_AICL_BASE_CURRENT + (i * HVDCP_AICL_CURRENT_STEP);
+		charger_dev_set_input_current(info->chg1_dev, temp_input_current_limit + HVDCP_AICL_CURRENT_STEP);
+		mdelay(100);
+		vbus_now = get_vbus(info);
+		if (vbus_now < 0) {
+			chr_err("%s get vbus voltage failed\n", __func__);
+			break;
+		}
+		if (vbus_now && vbus_now <= HVDCP_AICL_TARGET_VOLTAGE) {
+			if (vbus_now >= mivr / 1000) {
+				chr_err("%s vbus(%d) > vindpm(%d), it is not plug out\n", __func__, vbus_now, mivr / 1000);
+				info->restart_hvdcp_work = true;
+			}
+			chr_err("%s find last input current:%d\n", __func__, temp_input_current_limit);
+			break;
+		}
+		if (i == count -1) {
+			temp_input_current_limit = temp_input_current_limit + HVDCP_AICL_CURRENT_STEP;
+			chr_err("%s adapter support hvdcp input current, use hvdcp default\n", __func__);
+		}
+	}
+
+	return temp_input_current_limit;
+}
+#endif
+/* TN END modified by xinjun.lu/860715 20241217 CR/EKLAMU-7959 */
 
 static void select_cv(struct mtk_charger *info)
 {
@@ -292,10 +337,24 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		is_basic = true;
 
 	} else if (info->chr_type == POWER_SUPPLY_TYPE_USB_DCP) {
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+		if (!info->is_hvdcp_detecting) {
+			pdata->input_current_limit =
+				info->data.ac_charger_input_current;
+			pdata->charging_current_limit =
+				info->data.ac_charger_current;
+		} else {
+			pdata->input_current_limit =
+				500000;
+			pdata->charging_current_limit =
+				500000;
+		}
+#else
 		pdata->input_current_limit =
 			info->data.ac_charger_input_current;
 		pdata->charging_current_limit =
 			info->data.ac_charger_current;
+#endif
 		if (info->config == DUAL_CHARGERS_IN_SERIES) {
 			pdata2->input_current_limit =
 				pdata->input_current_limit;
@@ -331,12 +390,33 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		is_basic = true;
 	} else if (info->chr_type == POWER_SUPPLY_TYPE_USB_QC3) {
 		/* QC3.0 Charger */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+		if (info->aicl_check) {
+			charger_dev_set_charging_current(info->chg1_dev, info->data.hvdcp_charging_current_limit);
+			info->aicl_final_ic = check_hvdcp_aicl(info);
+			info->aicl_check = false;
+			chr_err("%s hvdcp used input charging current limit: %d\n", __func__, info->aicl_final_ic);
+		}
+#endif
 		chr_info("[%s]: for QC3 mode, set charge current:%d, input current:%d\n",
 						__func__, info->data.hvdcp_charging_current_limit, info->data.hvdcp_input_current_limit);
 		pdata->input_current_limit =
 			info->data.hvdcp_input_current_limit;
 		pdata->charging_current_limit =
 			info->data.hvdcp_charging_current_limit;
+
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+		if (info->aicl_final_ic && info->aicl_final_ic < pdata->input_current_limit) {
+			chr_err("[%s]: for QC3 mode, check and set aicl input current:%d\n",
+						__func__, info->aicl_final_ic);
+			pdata->input_current_limit = info->aicl_final_ic;
+		}
+		if (info->restart_hvdcp_work) {
+			info->restart_hvdcp_work = false;
+			schedule_delayed_work(&info->hvdcp_work, 0);
+			chr_err("%s start restart_hvdcp_work\n", __func__);
+		}
+#endif
 		is_basic = true;
 	} else if (info->chr_type == POWER_SUPPLY_TYPE_USB_PDC) {
 		/* PDC Charger */

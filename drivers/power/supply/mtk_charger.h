@@ -766,6 +766,12 @@ struct mtk_charger {
 	struct mtk_battery_manager *bm;
 	int ignore_current_check_time;
 	int charge_full_soc_for_over_temp;
+	bool aicl_check;
+	bool restart_hvdcp_work;
+	int aicl_final_ic;
+	bool is_hvdcp_detecting;
+	ktime_t hvdcp_boost_done_time;
+	ktime_t hvdcp_plug_in_time;
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240924 CR/EKLAMU-202 */
 	//struct pe50_charger_cfg pe50;
