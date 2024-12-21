@@ -5022,6 +5022,7 @@ static int mtk_charger_plug_out(struct mtk_charger *info)
 	info->aicl_final_ic = 0;
 	info->restart_hvdcp_work = false;
 	info->is_hvdcp_detecting = false;
+	charger_dev_do_event(info->chg1_dev, EVENT_DISCHARGE, 0);
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER) && IS_ENABLED(CONFIG_FACTORY_BUILD)
 	info->start_factory_discharging = false;
