@@ -6648,8 +6648,6 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	info->aicl_final_ic = 0;
 	info->is_hvdcp_detecting = false;
 	info->restart_hvdcp_work = false;
-	info->hvdcp_boost_done_time = ktime_get_boottime();
-	info->hvdcp_plug_in_time = ktime_get_boottime();
 #endif /* CONFIG_OEM_TINNO_CHARGER */
 /* TN End modified by hao.jia/809321 20240718 CR/EKLAMU-202 */
 
