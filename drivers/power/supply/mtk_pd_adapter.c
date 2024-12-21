@@ -558,8 +558,15 @@ stop_repeat:
 		goto out;
 	if (info->force_cv)
 		data->support_cc = false;
+/* TN Begin modified by xinjun.lu/860715 20241220 CR/EKLAMU-10772 */
+#if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
+	dev_info(info->dev, "%s select cap_idx[%d], power limit[%d,%dW] support_meas_cap:%d support_cc:%d force_cv:%d\n",
+				__func__, apdo_idx, data->pwr_lmt, data->pdp, data->support_meas_cap, data->support_cc, info->force_cv);
+#else
 	dev_info(info->dev, "%s select cap_idx[%d], power limit[%d,%dW]\n",
 			    __func__, apdo_idx, data->pwr_lmt, data->pdp);
+#endif
+/* TN End modified by xinjun.lu/860715 20241220 CR/EKLAMU-10772 */
 out:
 	if (ret != MTK_ADAPTER_OK)
 		dev_notice(info->dev, "%s fail(%d)\n", __func__, ret);

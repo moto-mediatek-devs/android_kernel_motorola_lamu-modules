@@ -1197,7 +1197,7 @@ static int cx2589x_charger_set_property(struct power_supply *psy,
 			cx->pd_type_detected = true;
 			cx->chg_type = POWER_SUPPLY_TYPE_USB_DCP;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
-			cx->psy_usb_type = POWER_SUPPLY_USB_TYPE_DCP;
+			cx->psy_usb_type = POWER_SUPPLY_TYPE_USB_PD_DCP;
 #endif
 			cx2589x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB_DCP;
 			power_supply_changed(cx->charger);

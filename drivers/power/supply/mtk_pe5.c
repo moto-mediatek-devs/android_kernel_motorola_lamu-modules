@@ -3998,10 +3998,10 @@ static int pe50_is_algo_ready(struct chg_alg_device *alg)
 
 /* TN Begin modified by xinjun.lu/860715 20240820 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
-	if (info->data->ta_auth_data.pdp < PE50_ENTER_POWER_MIN) {
+	if (info->data->ta_auth_data.pdp < PE50_ENTER_POWER_MIN || info->data->ta_auth_data.support_cc) {
 		ret = ALG_TA_NOT_SUPPORT;
-		PE50_ERR("Pd adapter support power :[%dW] < [%dW], PE5 do not stat again\n",
-			info->data->ta_auth_data.pdp, PE50_ENTER_POWER_MIN);
+		PE50_ERR("Pd adapter ignore pe5:[%dW] [%dW], support_cc[%d]\n",
+			info->data->ta_auth_data.pdp, PE50_ENTER_POWER_MIN, info->data->ta_auth_data.support_cc);
 		if (data->first_plug_in) {
 			pe50_enable_ta_charging(info, false, 5000, 1000);
 			data->first_plug_in = false;

@@ -535,11 +535,19 @@ int get_charger_type(struct mtk_charger *info)
 
 	chr_info("%s chr_type:%d ext_chr_type:%d\n", __func__, prop2.intval, info->ext_chr_type);
 	if (oem_pcba_charge_power() == CHARGE_POWER_33W) {
-		get_ext_charger_type(info);
-		if (info->ext_chr_type != POWER_SUPPLY_TYPE_UNKNOWN)
-			return info->ext_chr_type;
-		else
-			return prop2.intval;
+		if (info->ext_chr_type == POWER_SUPPLY_TYPE_USB_PDC) {
+			if (prop2.intval == POWER_SUPPLY_TYPE_UNKNOWN) {
+				return POWER_SUPPLY_TYPE_UNKNOWN;
+			} else {
+				return POWER_SUPPLY_TYPE_USB_PDC;
+			}
+		} else {
+			get_ext_charger_type(info);
+			if (info->ext_chr_type != POWER_SUPPLY_TYPE_UNKNOWN)
+				return info->ext_chr_type;
+			else
+				return prop2.intval;
+		}
 	} else {
 		if (info->ext_chr_type == POWER_SUPPLY_TYPE_USB_QC3) {
 			if (prop2.intval == POWER_SUPPLY_TYPE_UNKNOWN) {

@@ -1236,7 +1236,7 @@ static int sgm4154x_charger_set_property(struct power_supply *psy,
 			sgm->pd_type_detected = true;
 			sgm->chg_type = POWER_SUPPLY_TYPE_USB_DCP;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
-			sgm->psy_usb_type = POWER_SUPPLY_USB_TYPE_DCP;
+			sgm->psy_usb_type = POWER_SUPPLY_TYPE_USB_PD_DCP;
 #endif
 			sgm4154x_power_supply_desc.type = POWER_SUPPLY_TYPE_USB_DCP;
 			power_supply_changed(sgm->charger);
