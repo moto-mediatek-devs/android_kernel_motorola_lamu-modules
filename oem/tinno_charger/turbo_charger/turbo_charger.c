@@ -752,9 +752,6 @@ static void turbo_charger_select_pdo(struct turbo_charger_algo_info *info,
 	if (ibus_pump < 0)
 		ibus_pump = 0;
 
-	info->turbo_charger_request_volt_prev = vbus_volt;
-	info->turbo_charger_request_curr_prev = ibus_curr;
-
 	if (target_ua > info->turbo_charger_request_curr_prev) {
 		req_curr_inc_step = (target_ua - info->turbo_charger_request_curr_prev) / 2;
 		if (req_curr_inc_step < 0)
@@ -836,14 +833,14 @@ static void turbo_charger_select_pdo(struct turbo_charger_algo_info *info,
 			info->total_count += count;
 		else if (count < 0)
 			info->total_count -= abs(count);
-
-		udelay(10000 * abs(count));
 		turbo_charger_get_input_voltage_settled(info, &vbus_val);
 		if ((ret != 0) || (info->total_count > MAX_INC_PULSE && vbus_val < CP_BUS_UVP_THRESHOLD)) {
 		/*TN End modify vbus ovp by rongxing.li/860682 20231208 CR/EKFOGO4G-8986*/
 			TURBO_CHARGER_ERR("set vol count to qc logic failed, switch to main charger!\n");
 			turbo_charger_move_state(info, TURBO_STATE_STOP_CHARGE);
 		} else {
+			udelay(10000 * abs(count));
+
 			ret = turbo_charger_get_input_voltage_settled(info, &vbus_val);
 			if (!ret) {
 				vbus_volt_new = vbus_val;
