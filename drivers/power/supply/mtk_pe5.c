@@ -58,7 +58,7 @@ int pe50_get_log_level(void)
 #define PE50_WHILE_LOOP_ITERATION_MAX	50
 /* TN Begin modified by xinjun.lu/860715 20240828 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
-#define PE50_ENTER_POWER_MIN		30
+#define PE50_ENTER_POWER_MIN		25
 #define PE50_SET_CV		4528
 #endif
 /* TN End modified by xinjun.lu/860715 20240828 CR/EKLAMU-202 */
@@ -3998,7 +3998,9 @@ static int pe50_is_algo_ready(struct chg_alg_device *alg)
 
 /* TN Begin modified by xinjun.lu/860715 20240820 CR/EKLAMU-202 */
 #if IS_ENABLED(CONFIG_OEM_TINNO_CHARGER)
-	if (info->data->ta_auth_data.pdp < PE50_ENTER_POWER_MIN || info->data->ta_auth_data.support_cc) {
+	if ((info->data->ta_auth_data.pdp < PE50_ENTER_POWER_MIN
+		&& info->data->ta_auth_data.pdp > 0)
+		|| info->data->ta_auth_data.support_cc) {
 		ret = ALG_TA_NOT_SUPPORT;
 		PE50_ERR("Pd adapter ignore pe5:[%dW] [%dW], support_cc[%d]\n",
 			info->data->ta_auth_data.pdp, PE50_ENTER_POWER_MIN, info->data->ta_auth_data.support_cc);
