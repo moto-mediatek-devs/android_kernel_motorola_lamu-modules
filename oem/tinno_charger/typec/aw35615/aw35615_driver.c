@@ -525,7 +525,7 @@ static void aw35615_shutdown(struct i2c_client *client)
 	if (ret < 0)
 		pr_err("send hardreset failed, ret = %d\n", ret);
 
-	SetStateUnattached(&chip->port);
+	//SetStateUnattached(&chip->port);
 
 	/* keep the cc open status 20ms */
 	mdelay(5);
