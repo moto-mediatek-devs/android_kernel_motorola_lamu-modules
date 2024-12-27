@@ -282,6 +282,7 @@ static int turbo_charger_update_cp_status(struct turbo_charger_algo_info *info)
 			TURBO_CHARGER_ERR("enable adc first\n");
 			charger_dev_enable_adc(info->cp_chg, true);
 			info->cp.adc_enabled = true;
+			mdelay(40);
 		}
 	}
 
