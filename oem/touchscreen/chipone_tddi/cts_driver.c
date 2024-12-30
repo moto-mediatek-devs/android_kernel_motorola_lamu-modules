@@ -660,6 +660,7 @@ err_deinit_oem:
     cts_plat_free_irq(cts_data->pdata);
 
 err_register_fb:
+    mtk_disp_notifier_unregister(&cts_data->pdata->fb_notifier);
 #ifdef CONFIG_CTS_PM_FB_NOTIFIER
     cts_deinit_pm_fb_notifier(cts_data);
 err_deinit_sysfs:
@@ -741,6 +742,7 @@ static void cts_driver_remove(struct spi_device *client)
 
         cts_plat_free_irq(cts_data->pdata);
 
+	mtk_disp_notifier_unregister(&cts_data->pdata->fb_notifier);
 #ifdef CONFIG_CTS_PM_FB_NOTIFIER
         cts_deinit_pm_fb_notifier(cts_data);
 #endif
