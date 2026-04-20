@@ -33,8 +33,12 @@
 #define DEFAULT_AVG_WINDOW		(50)
 #define IDD_TBL_DBG
 
+#ifndef MAX
 #define MAX(a, b)			((a) >= (b) ? (a) : (b))
+#endif
+#ifndef MIN
 #define MIN(a, b)			((a) >= (b) ? (b) : (a))
+#endif
 
 #define SWPM_OPS (swpm_m.plat_ops)
 /****************************************************************************
