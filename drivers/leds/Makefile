@@ -13,6 +13,7 @@ obj-$(CONFIG_LEDS_MTK_DISP)		+= leds-mtk-disp.o
 obj-$(CONFIG_LEDS_REGULATOR_VIBRATOR)	+= regulator-vibrator.o
 # Flash and Torch LED Drivers
 obj-$(CONFIG_LEDS_CLASS_FLASH)		+= flash/
+obj-$(CONFIG_LEDS_TRIGGERS)		+= trigger/
 
 ifeq ($(CONFIG_GCOV_KERNEL),y)
 GCOV_PROFILE := y

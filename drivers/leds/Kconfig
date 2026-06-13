@@ -81,5 +81,6 @@ config LEDS_REGULATOR_VIBRATOR
 
 comment "Flash and Torch LED drivers"
 source "$(KCONFIG_EXT_PREFIX)drivers/leds/flash/Kconfig"
+source "$(KCONFIG_EXT_PREFIX)drivers/leds/trigger/Kconfig"
 
 endif # NEW_LEDS
