@@ -3,8 +3,6 @@
  * Copyright (c) 2019 MediaTek Inc.
  */
 
-#include "ged_base.h"
-#include "ged_global.h"
 #include <asm/page.h>
 #include <linux/version.h>
 #include <linux/vmalloc.h>
@@ -13,6 +11,9 @@
 #include <linux/interrupt.h>
 
 #include <linux/uaccess.h>
+
+#include "ged_base.h"
+#include "ged_global.h"
 
 unsigned long ged_copy_to_user(void __user *pvTo, const void *pvFrom,
 	unsigned long ulBytes)
