@@ -25,6 +25,7 @@ KLEAF_OUT=("--output_user_root=${OUT_DIR} --output_base=${OUT_DIR}/bazel/output_
 KLEAF_ARGS=("${DEBUG_ARGS} ${SANDBOX_ARGS} \
 	--experimental_writable_outputs \
 	--noenable_bzlmod \
+	--config=stamp \
 	--//build/bazel_mgk_rules:kernel_version=${KERNEL_VERSION_NUM}")
 
 set -x
