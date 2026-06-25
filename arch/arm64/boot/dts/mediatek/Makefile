@@ -14,3 +14,4 @@ DTC_INCLUDE += $(dir $(src))
 DTC_FLAGS += -@
 
 dtb-$(CONFIG_ARCH_MEDIATEK) += mt6768.dtb
+dtb-$(CONFIG_ARCH_MEDIATEK) += lamu.dtbo lamulite.dtbo

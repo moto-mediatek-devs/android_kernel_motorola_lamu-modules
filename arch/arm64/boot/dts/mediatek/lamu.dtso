@@ -9,10 +9,6 @@
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/pinctrl/mt6768-pinfunc.h>
 
-// TN Begin modified by yang.chen1/860621 20240606 CR/EKLAMU-3
-#include <generated/autoconf.h>
-// TN End modified by yang.chen1/860621 20240606 CR/EKLAMU-3
-
 &reserved_memory {
 	reserve-memory-scp_share {
 		compatible = "mediatek,reserve-memory-scp_share";
@@ -428,7 +424,7 @@
 
 /* DISPSYS GPIO standardization end*/
 
-#include <lamu/cust.dtsi>
+#include "lamu/cust.dtsi"
 #include "mediatek/cust_mt6768_camera.dtsi"
 #include "mediatek/cust_mt6768_msdc.dtsi"
 #include "mediatek/cust_mt6768_touch_1080x2160.dtsi"

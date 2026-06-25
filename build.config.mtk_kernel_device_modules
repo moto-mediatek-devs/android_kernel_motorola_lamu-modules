@@ -17,6 +17,8 @@ dtbs
 # These paths need to be relative to KERNEL_DIR.
 FILES="
 ${DEVICE_MODULES_REL_DIR}/arch/arm64/boot/dts/mediatek/mt6768.dtb
+${DEVICE_MODULES_REL_DIR}/arch/arm64/boot/dts/mediatek/lamu.dtbo
+${DEVICE_MODULES_REL_DIR}/arch/arm64/boot/dts/mediatek/lamulite.dtbo
 "
 
 EXT_MODULES+="
