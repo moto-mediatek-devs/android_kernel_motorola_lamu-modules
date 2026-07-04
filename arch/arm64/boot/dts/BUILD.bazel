@@ -43,3 +43,5 @@ filegroup(
     ],
     visibility = ["//visibility:public"],
 )
+
+exports_files(["dtbo.cfg"])
