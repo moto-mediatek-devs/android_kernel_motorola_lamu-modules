@@ -1626,11 +1626,11 @@ retry:
 
 	tcm_hcd->payload_length = le2_to_uint(header->length);
 
-	LOGN(tcm_hcd->pdev->dev.parent,
+	LOGD(tcm_hcd->pdev->dev.parent,
 			"Status report code = 0x%02x\n",
 			tcm_hcd->status_report_code);
 
-	LOGN(tcm_hcd->pdev->dev.parent,
+	LOGD(tcm_hcd->pdev->dev.parent,
 			"Payload length = %d\n",
 			tcm_hcd->payload_length);
 

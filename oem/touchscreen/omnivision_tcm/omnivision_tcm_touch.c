@@ -514,7 +514,7 @@ static int touch_parse_report(void)
 			}
 			touch_data->gesture_id = data;
 			offset += bits;
-			LOGE(tcm_hcd->pdev->dev.parent,
+			LOGD(tcm_hcd->pdev->dev.parent,
 				"gesture_id = %x\n", touch_data->gesture_id);
 			break;
 		case TOUCH_FRAME_RATE:
@@ -1009,12 +1009,12 @@ static int ovt_check_face_state(int current_face_state)
 	if ((current_face_state == FACE_FAR_FROM_1_2_3_CLOSE_WHEN_SCREEN_ON) ||
 		(current_face_state == FACE_FAR_FROM_1_2_3_CLOSE_WHEN_SCREEN_OFF)) {
 		//report far event
-		printk("tcm check face far\n");
+		pr_debug("tcm check face far\n");
 	} else if ((current_face_state == FACE_CLOSE_1_SMALL_SIGNAL) ||
 				(current_face_state == FACE_CLOSE_FROM_1_2_3_CLOSE_WHEN_SCREEN_OFF)) {
 
 		//report close event
-		printk("tcm check face close\n");
+		pr_debug("tcm check face close\n");
 	}
 	return 0;
 }
