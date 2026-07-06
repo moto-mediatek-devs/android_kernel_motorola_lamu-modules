@@ -393,8 +393,6 @@ static unsigned int mtk_idle_output_log(
 	} else {
 		if (wakesta->assert_pc != 0 || wakesta->r12 == 0)
 			print_log = true;
-		else if (wakesta->timer_out <= IDLE_TIMER_OUT_CRITERIA)
-			print_log = true;
 		else if (check_print_log_duration())
 			print_log = true;
 	}
