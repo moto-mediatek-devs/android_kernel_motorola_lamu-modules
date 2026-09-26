@@ -126,6 +126,8 @@
 /* Lamu */
 #define S5KJNSSQ_SENSOR_ID                      0x38EE
 #define SENSOR_DRVNAME_S5KJNSSQ_MIPI_RAW        "s5kjnssq_mipi_raw"
+#define GC50F6_SENSOR_ID                        0x50f6
+#define SENSOR_DRVNAME_GC50F6_MIPI_RAW          "gc50f6_mipi_raw"
 #define GC08A8_SENSOR_ID                        0x08a8
 #define SENSOR_DRVNAME_GC08A8_MIPI_RAW          "gc08a8_mipi_raw"
 #define GC08A8SPY_SENSOR_ID                     0x08a9

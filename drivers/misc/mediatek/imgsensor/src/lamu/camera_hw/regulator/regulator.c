@@ -44,6 +44,7 @@ struct REGULATOR_CTRL regulator_control[REGULATOR_TYPE_MAX_NUM] = {
 	{"vcama"},
 	{"vcamd"},
 	{"vcamio"},
+	{"vcamaf"},
 };
 static struct REGULATOR reg_instance;
 struct regmap *g_regmap;
@@ -231,7 +232,7 @@ static enum IMGSENSOR_RETURN regulator_set(
 	int reg_type_offset;
 	int regval;
 	atomic_t	*enable_cnt;
-	if (pin > IMGSENSOR_HW_PIN_DOVDD   ||
+	if (pin > IMGSENSOR_HW_PIN_AFVDD   ||
 	    pin < IMGSENSOR_HW_PIN_AVDD    ||
 	    pin_state < IMGSENSOR_HW_PIN_STATE_LEVEL_0 ||
 	    pin_state >= IMGSENSOR_HW_PIN_STATE_LEVEL_HIGH)

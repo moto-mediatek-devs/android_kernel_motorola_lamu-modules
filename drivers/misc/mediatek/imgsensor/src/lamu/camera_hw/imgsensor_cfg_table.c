@@ -29,6 +29,7 @@ struct IMGSENSOR_HW_CFG imgsensor_custom_config[] = {
 			{IMGSENSOR_HW_ID_REGULATOR, IMGSENSOR_HW_PIN_AVDD},
 			{IMGSENSOR_HW_ID_REGULATOR, IMGSENSOR_HW_PIN_DVDD},
 			{IMGSENSOR_HW_ID_REGULATOR, IMGSENSOR_HW_PIN_DOVDD},
+			{IMGSENSOR_HW_ID_REGULATOR, IMGSENSOR_HW_PIN_AFVDD},
 			/* {IMGSENSOR_HW_ID_GPIO, IMGSENSOR_HW_PIN_PDN}, */
 			{IMGSENSOR_HW_ID_GPIO, IMGSENSOR_HW_PIN_RST},
 			{IMGSENSOR_HW_ID_NONE, IMGSENSOR_HW_PIN_NONE}
@@ -156,6 +157,20 @@ struct IMGSENSOR_HW_POWER_SEQ sensor_power_sequence[] = {
 			{RST, Vol_High, 1},
 			{SensorMCLK, Vol_High, 15},
         },
+	},
+#endif
+#if defined(GC50F6_MIPI_RAW)
+	{
+		SENSOR_DRVNAME_GC50F6_MIPI_RAW,
+		{
+			{SensorMCLK, Vol_High, 1},
+			{RST, Vol_Low, 1},
+			{DOVDD, Vol_1800, 1},
+			{DVDD, Vol_1100, 5},
+			{AVDD, Vol_2800, 5},
+			{AFVDD, Vol_2800, 5},
+			{RST, Vol_High, 3},
+		},
 	},
 #endif
 #if defined(GC08A8_MIPI_RAW)
