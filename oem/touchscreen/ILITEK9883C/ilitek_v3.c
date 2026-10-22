@@ -649,43 +649,43 @@ int ili_sleep_handler(int mode)
 		ILI_INFO("TP deep suspend end\n");
 		break;
 	case TP_RESUME:
-#if !RESUME_BY_DDI
-		ILI_INFO("TP resume start\n");
-		ilits->tp_suspend = false;
-		ilits->report = ENABLE;
-		if (ilits->gesture)
-			disable_irq_wake(ilits->irq_num);
+		if (!RESUME_BY_DDI || ilits->tp_suspend) {
+			ILI_INFO("TP resume start\n");
+			ilits->tp_suspend = false;
+			ilits->report = ENABLE;
+			if (ilits->gesture)
+				disable_irq_wake(ilits->irq_num);
 
-		/* Set tp as demo mode and reload code if it's iram. */
-		ilits->actual_tp_mode = P5_X_FW_AP_MODE;
-		if (ilits->fw_upgrade_mode == UPGRADE_IRAM) {
-			if (ili_fw_upgrade_handler(NULL) < 0)
-				ILI_ERR("FW upgrade failed during resume\n");
-		} else {
-			if (ilits->cascade_info_block.nNum != 0) {
-				if (ili_cascade_reset_ctrl(ilits->reset, true) < 0)
-					ILI_ERR("TP Cascade Reset failed during resume\n");
+			/* Set tp as demo mode and reload code if it's iram. */
+			ilits->actual_tp_mode = P5_X_FW_AP_MODE;
+			if (ilits->fw_upgrade_mode == UPGRADE_IRAM) {
+				if (ili_fw_upgrade_handler(NULL) < 0)
+					ILI_ERR("FW upgrade failed during resume\n");
 			} else {
-				if (ili_reset_ctrl(ilits->reset) < 0)
-					ILI_ERR("TP Reset failed during resume\n");
+				if (ilits->cascade_info_block.nNum != 0) {
+					if (ili_cascade_reset_ctrl(ilits->reset, true) < 0)
+						ILI_ERR("TP Cascade Reset failed during resume\n");
+				} else {
+					if (ili_reset_ctrl(ilits->reset) < 0)
+						ILI_ERR("TP Reset failed during resume\n");
+				}
+				ili_ic_func_ctrl_reset();
 			}
-			ili_ic_func_ctrl_reset();
-		}
-		ilits->power_status = true;
+			ilits->power_status = true;
 
-		if (ilits->prox_face_mode == PROXIMITY_SUSPEND_RESUME) {
-		ilits->proxmity_face = false;
+			if (ilits->prox_face_mode == PROXIMITY_SUSPEND_RESUME) {
+			ilits->proxmity_face = false;
 
-		if (ilits->prox_face_gesture == true) {
-			ilits->prox_face_gesture = false;
-			if (ili_ic_func_ctrl("proximity", 0x01) < 0) {
-				ILI_ERR("Write proximity cmd failed\n");
+			if (ilits->prox_face_gesture == true) {
+				ilits->prox_face_gesture = false;
+				if (ili_ic_func_ctrl("proximity", 0x01) < 0) {
+					ILI_ERR("Write proximity cmd failed\n");
+				}
+			}	
 			}
-		}	
-		}
 
-		ILI_INFO("TP resume end\n");
-#endif
+			ILI_INFO("TP resume end\n");
+		}
 		ili_wq_ctrl(WQ_ESD, ENABLE);
 		ili_wq_ctrl(WQ_BAT, ENABLE);
 		ili_irq_enable();
