@@ -94,4 +94,5 @@ define_mgk(
     symbol_list = mgk_kmi_symbol_list,
     dtb_files = ["mt6768.dtb", "lamu.dtbo", "lamulite.dtbo"],
     dtbo_config = "//kernel_device_modules-6.6/arch/arm64/boot/dts:dtbo.cfg",
+    build_dtbo_image = True,
 )
